@@ -1752,7 +1752,7 @@ void DofMap::dof_indices (const Elem* const elem,
   di.clear();
 
   // Ghost subdivision elements have no real dofs
-  if (elem->type() == TRI3SD)
+  if (elem->type() == TRI3SUBDIVISION)
     {
       const Tri3Subdivision* sd_elem = static_cast<const Tri3Subdivision*>(elem);
       if (sd_elem->is_ghost())
@@ -1775,7 +1775,7 @@ void DofMap::dof_indices (const Elem* const elem,
 
   // Determine the nodes contributing to element elem
   std::vector<Node*> elem_nodes;
-  if (elem->type() == TRI3SD)
+  if (elem->type() == TRI3SUBDIVISION)
     {
       // Subdivision surface FE require the 1-ring around elem
       const Tri3Subdivision* sd_elem = static_cast<const Tri3Subdivision*>(elem);
@@ -1839,7 +1839,7 @@ void DofMap::dof_indices (const Elem* const elem,
   di.clear();
 
   // Ghost subdivision elements have no real dofs
-  if (elem->type() == TRI3SD)
+  if (elem->type() == TRI3SUBDIVISION)
     {
       const Tri3Subdivision* sd_elem = static_cast<const Tri3Subdivision*>(elem);
       if (sd_elem->is_ghost())
@@ -1860,7 +1860,7 @@ void DofMap::dof_indices (const Elem* const elem,
 
   // Determine the nodes contributing to element elem
   std::vector<Node*> elem_nodes;
-  if (elem->type() == TRI3SD)
+  if (elem->type() == TRI3SUBDIVISION)
     {
       // Subdivision surface FE require the 1-ring around elem
       const Tri3Subdivision* sd_elem = static_cast<const Tri3Subdivision*>(elem);
@@ -2136,7 +2136,7 @@ void DofMap::old_dof_indices (const Elem* const elem,
 
   // Determine the nodes contributing to element elem
   std::vector<Node*> elem_nodes;
-  if (elem->type() == TRI3SD)
+  if (elem->type() == TRI3SUBDIVISION)
     {
       // Subdivision surface FE require the 1-ring around elem
       const Tri3Subdivision* sd_elem = static_cast<const Tri3Subdivision*>(elem);
