@@ -228,16 +228,9 @@ public:
   /**
    * Sets the number of nodes connected with this node.
    */
-  void set_valence(unsigned int val) { _valence = val; }
+  void set_valence(unsigned int val);
 
 private:
-
-  /**
-   * The number of nodes connected with this node.
-   * Currently, this value is invalid (zero) except for
-   * subdivision meshes.
-   */
-  unsigned int _valence;
 
   /**
    * This class need access to the node key information,
@@ -245,6 +238,18 @@ private:
    */
   friend class MeshRefinement;
   friend class Elem;
+
+  /**
+   * Type used to store node valence.
+   */
+  typedef unsigned char valence_idx_t;
+
+  /**
+   * The number of nodes connected with this node.
+   * Currently, this value is invalid (zero) except for
+   * subdivision meshes.
+   */
+  valence_idx_t _valence;
 };
 
 
@@ -361,6 +366,24 @@ inline
 bool Node::active () const
 {
   return (this->id() != Node::invalid_id);
+}
+
+
+
+inline
+void Node::set_valence (unsigned int val)
+{
+#ifndef NDEBUG
+  if (val != static_cast<valence_idx_t>(val))
+    {
+      libMesh::err << "ERROR: Node::valence_idx_t too small to hold val="
+                   << val
+                   << std::endl;
+      libmesh_error();
+    }
+#endif
+
+      _valence = val;
 }
 
 
