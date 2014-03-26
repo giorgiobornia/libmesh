@@ -223,7 +223,15 @@ public:
    * Currently, this value is invalid (zero) except for
    * subdivision meshes.
    */
-  unsigned int valence() const { return _valence; }
+  unsigned int valence() const
+  {
+#ifdef LIBMESH_ENABLE_NODE_VALENCE
+    return _valence;
+#else
+    libmesh_not_implemented();
+    return libMesh::invalid_uint;
+#endif
+  }
 
   /**
    * Sets the number of nodes connected with this node.
@@ -239,6 +247,7 @@ private:
   friend class MeshRefinement;
   friend class Elem;
 
+#ifdef LIBMESH_ENABLE_NODE_VALENCE
   /**
    * Type used to store node valence.
    */
@@ -250,6 +259,7 @@ private:
    * subdivision meshes.
    */
   valence_idx_t _valence;
+#endif
 };
 
 
@@ -273,8 +283,11 @@ Node::Node (const Real x,
             const Real y,
             const Real z,
             const dof_id_type dofid) :
-  Point(x,y,z),
+  Point(x,y,z)
+#ifdef LIBMESH_ENABLE_NODE_VALENCE
+  ,
   _valence(0)
+#endif
 {
   this->set_id() = dofid;
 }
@@ -285,8 +298,11 @@ inline
 Node::Node (const Node& n) :
   Point(n),
   DofObject(n),
-  ReferenceCountedObject<Node>(),
-  _valence(n.valence())
+  ReferenceCountedObject<Node>()
+#ifdef LIBMESH_ENABLE_NODE_VALENCE
+  ,
+  _valence(n._valence)
+#endif
 {
 }
 
@@ -370,6 +386,8 @@ bool Node::active () const
 
 
 
+#ifdef LIBMESH_ENABLE_NODE_VALENCE
+
 inline
 void Node::set_valence (unsigned int val)
 {
@@ -381,10 +399,22 @@ void Node::set_valence (unsigned int val)
                    << std::endl;
       libmesh_error();
     }
-#endif
+#endif // #ifndef NDEBUG
 
-      _valence = val;
+  _valence = val;
 }
+
+#else
+
+inline
+void Node::set_valence (unsigned int)
+{
+  libmesh_not_implemented();
+}
+
+#endif // #ifdef LIBMESH_ENABLE_NODE_VALENCE
+
+
 
 
 } // namespace libMesh
