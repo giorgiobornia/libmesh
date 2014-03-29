@@ -53,6 +53,8 @@
 #include "libmesh/vtk_io.h"
 #include "libmesh/abaqus_io.h"
 #include "libmesh/checkpoint_io.h"
+#include "libmesh/gambit_io.h"
+
 
 #include LIBMESH_INCLUDE_UNORDERED_MAP
 
@@ -726,6 +728,9 @@ void UnstructuredMesh::read (const std::string& name,
           else if (new_name.rfind(".inp") < new_name.size())
             AbaqusIO(*this).read(new_name);
 
+          else if (new_name.rfind(".gam") < new_name.size())
+            GambitIO(*this).read(new_name);
+
           else
             {
               libMesh::err << " ERROR: Unrecognized file extension: " << name
@@ -748,6 +753,7 @@ void UnstructuredMesh::read (const std::string& name,
                            << "     *.xz   -- any above format xzipped\n"
                            << "     *.cpa  -- libMesh Checkpoint ASCII format\n"
                            << "     *.cpr  -- libMesh Checkpoint binary format\n"
+                           << "     *.gam  -- Gambit neutral format (originally .neu) \n"
 
                            << std::endl;
               libmesh_error();
