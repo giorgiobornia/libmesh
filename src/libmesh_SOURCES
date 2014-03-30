@@ -212,6 +212,7 @@ libmesh_SOURCES =  \
         src/mesh/parallel_mesh_iterators.C \
         src/mesh/patch.C \
         src/mesh/postscript_io.C \
+        src/mesh/salome_io.C \
         src/mesh/serial_mesh.C \
         src/mesh/serial_mesh_iterators.C \
         src/mesh/tecplot_io.C \
