@@ -156,6 +156,7 @@ include_HEADERS =  \
         mesh/ensight_io.h \
         mesh/exodusII_io.h \
         mesh/fro_io.h \
+        mesh/gambit_io.h \
         mesh/gmsh_io.h \
         mesh/gmv_io.h \
         mesh/gnuplot_io.h \
