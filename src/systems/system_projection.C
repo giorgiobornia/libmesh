@@ -252,7 +252,8 @@ public:
 
 // ------------------------------------------------------------
 // System implementation
-void System::project_vector (NumericVector<Number>& vector) const
+void System::project_vector (NumericVector<Number>& vector,
+                             int is_adjoint) const
 {
   // Create a copy of the vector, which currently
   // contains the old data.
@@ -260,7 +261,7 @@ void System::project_vector (NumericVector<Number>& vector) const
     old_vector (vector.clone());
 
   // Project the old vector to the new vector
-  this->project_vector (*old_vector, vector);
+  this->project_vector (*old_vector, vector, is_adjoint);
 }
 
 
@@ -270,7 +271,8 @@ void System::project_vector (NumericVector<Number>& vector) const
  * interpolations on each element.
  */
 void System::project_vector (const NumericVector<Number>& old_v,
-                             NumericVector<Number>& new_v) const
+                             NumericVector<Number>& new_v,
+                             int is_adjoint) const
 {
   START_LOG ("project_vector()", "System");
 
@@ -350,11 +352,7 @@ void System::project_vector (const NumericVector<Number>& old_v,
       old_vector_ptr = local_old_vector;
     }
   else // unknown old_v.type()
-    {
-      libMesh::err << "ERROR: Unknown old_v.type() == " << old_v.type()
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: Unknown old_v.type() == " << old_v.type());
 
   // Note that the above will have zeroed the new_vector.
   // Just to be sure, assert that new_vector_ptr and old_vector_ptr
@@ -385,7 +383,7 @@ void System::project_vector (const NumericVector<Number>& old_v,
             dof_map.SCALAR_dof_indices (new_SCALAR_indices, var, false);
             dof_map.SCALAR_dof_indices (old_SCALAR_indices, var, true);
             const unsigned int new_n_dofs =
-              libmesh_cast_int<unsigned int>(new_SCALAR_indices.size());
+              cast_int<unsigned int>(new_SCALAR_indices.size());
 
             for (unsigned int i=0; i<new_n_dofs; i++)
               {
@@ -429,7 +427,11 @@ void System::project_vector (const NumericVector<Number>& old_v,
       new_v.close();
     }
 
-  this->get_dof_map().enforce_constraints_exactly(*this, &new_v);
+  if (is_adjoint == -1)
+    this->get_dof_map().enforce_constraints_exactly(*this, &new_v);
+  else if (is_adjoint >= 0)
+    this->get_dof_map().enforce_adjoint_constraints_exactly(new_v,
+                                                            is_adjoint);
 
 #else
 
@@ -502,11 +504,12 @@ void System::project_vector (Number fptr(const Point& p,
                                            const std::string& sys_name,
                                            const std::string& unknown_name),
                              const Parameters& parameters,
-                             NumericVector<Number>& new_vector) const
+                             NumericVector<Number>& new_vector,
+                             int is_adjoint) const
 {
   WrappedFunction<Number> f(*this, fptr, &parameters);
   WrappedFunction<Gradient> g(*this, gptr, &parameters);
-  this->project_vector(new_vector, &f, &g);
+  this->project_vector(new_vector, &f, &g, is_adjoint);
 }
 
 /**
@@ -515,7 +518,8 @@ void System::project_vector (Number fptr(const Point& p,
  */
 void System::project_vector (NumericVector<Number>& new_vector,
                              FunctionBase<Number> *f,
-                             FunctionBase<Gradient> *g) const
+                             FunctionBase<Gradient> *g,
+                             int is_adjoint) const
 {
   START_LOG ("project_vector()", "System");
 
@@ -550,7 +554,7 @@ void System::project_vector (NumericVector<Number>& new_vector,
             std::vector<dof_id_type> SCALAR_indices;
             dof_map.SCALAR_dof_indices (SCALAR_indices, var);
             const unsigned int n_SCALAR_dofs =
-              libmesh_cast_int<unsigned int>(SCALAR_indices.size());
+              cast_int<unsigned int>(SCALAR_indices.size());
 
             for (unsigned int i=0; i<n_SCALAR_dofs; i++)
               {
@@ -565,7 +569,11 @@ void System::project_vector (NumericVector<Number>& new_vector,
   new_vector.close();
 
 #ifdef LIBMESH_ENABLE_CONSTRAINTS
-  this->get_dof_map().enforce_constraints_exactly(*this, &new_vector);
+  if (is_adjoint == -1)
+    this->get_dof_map().enforce_constraints_exactly(*this, &new_vector);
+  else if (is_adjoint >= 0)
+    this->get_dof_map().enforce_adjoint_constraints_exactly(new_vector,
+                                                            is_adjoint);
 #endif
 
   STOP_LOG("project_vector()", "System");
@@ -578,7 +586,8 @@ void System::project_vector (NumericVector<Number>& new_vector,
  */
 void System::project_vector (NumericVector<Number>& new_vector,
                              FEMFunctionBase<Number> *f,
-                             FEMFunctionBase<Gradient> *g) const
+                             FEMFunctionBase<Gradient> *g,
+                             int is_adjoint) const
 {
   START_LOG ("project_fem_vector()", "System");
 
@@ -609,7 +618,7 @@ void System::project_vector (NumericVector<Number>& new_vector,
             std::vector<dof_id_type> SCALAR_indices;
             dof_map.SCALAR_dof_indices (SCALAR_indices, var);
             const unsigned int n_SCALAR_dofs =
-              libmesh_cast_int<unsigned int>(SCALAR_indices.size());
+              cast_int<unsigned int>(SCALAR_indices.size());
 
             for (unsigned int i=0; i<n_SCALAR_dofs; i++)
               {
@@ -625,7 +634,11 @@ void System::project_vector (NumericVector<Number>& new_vector,
   new_vector.close();
 
 #ifdef LIBMESH_ENABLE_CONSTRAINTS
-  this->get_dof_map().enforce_constraints_exactly(*this, &new_vector);
+  if (is_adjoint == -1)
+    this->get_dof_map().enforce_constraints_exactly(*this, &new_vector);
+  else if (is_adjoint >= 0)
+    this->get_dof_map().enforce_adjoint_constraints_exactly(new_vector,
+                                                            is_adjoint);
 #endif
 
   STOP_LOG("project_fem_vector()", "System");
@@ -692,11 +705,13 @@ void System::boundary_project_vector
                const std::string& sys_name,
                const std::string& unknown_name),
  const Parameters& parameters,
- NumericVector<Number>& new_vector) const
+ NumericVector<Number>& new_vector,
+ int is_adjoint) const
 {
   WrappedFunction<Number> f(*this, fptr, &parameters);
   WrappedFunction<Gradient> g(*this, gptr, &parameters);
-  this->boundary_project_vector(b, variables, new_vector, &f, &g);
+  this->boundary_project_vector(b, variables, new_vector, &f, &g,
+                                is_adjoint);
 }
 
 /**
@@ -708,7 +723,8 @@ void System::boundary_project_vector
  const std::vector<unsigned int> &variables,
  NumericVector<Number>& new_vector,
  FunctionBase<Number> *f,
- FunctionBase<Gradient> *g) const
+ FunctionBase<Gradient> *g,
+ int is_adjoint) const
 {
   START_LOG ("boundary_project_vector()", "System");
 
@@ -726,7 +742,11 @@ void System::boundary_project_vector
   new_vector.close();
 
 #ifdef LIBMESH_ENABLE_CONSTRAINTS
-  this->get_dof_map().enforce_constraints_exactly(*this, &new_vector);
+  if (is_adjoint == -1)
+    this->get_dof_map().enforce_constraints_exactly(*this, &new_vector);
+  else if (is_adjoint >= 0)
+    this->get_dof_map().enforce_adjoint_constraints_exactly(new_vector,
+                                                            is_adjoint);
 #endif
 
   STOP_LOG("boundary_project_vector()", "System");
@@ -737,7 +757,7 @@ void System::boundary_project_vector
 #ifndef LIBMESH_ENABLE_AMR
 void ProjectVector::operator()(const ConstElemRange &) const
 {
-  libmesh_error();
+  libmesh_not_implemented();
 }
 #else
 void ProjectVector::operator()(const ConstElemRange &range) const
@@ -849,7 +869,7 @@ void ProjectVector::operator()(const ConstElemRange &range) const
 
           // The number of DOFs on the new element
           const unsigned int new_n_dofs =
-            libmesh_cast_int<unsigned int>(new_dof_indices.size());
+            cast_int<unsigned int>(new_dof_indices.size());
 
           // Fixed vs. free DoFs on edge/face projections
           std::vector<char> dof_is_fixed(new_n_dofs, false); // bools
@@ -908,7 +928,7 @@ void ProjectVector::operator()(const ConstElemRange &range) const
             }
 
           unsigned int old_n_dofs =
-            libmesh_cast_int<unsigned int>(old_dof_indices.size());
+            cast_int<unsigned int>(old_dof_indices.size());
 
           if (fe_type.family != LAGRANGE) {
 
@@ -1163,7 +1183,7 @@ void BuildProjectionList::unique()
 #ifndef LIBMESH_ENABLE_AMR
 void BuildProjectionList::operator()(const ConstElemRange &)
 {
-  libmesh_error();
+  libmesh_not_implemented();
 }
 #else
 void BuildProjectionList::operator()(const ConstElemRange &range)
@@ -1348,7 +1368,7 @@ void ProjectSolution::operator()(const ConstElemRange &range) const
 
           // The number of DOFs on the element
           const unsigned int n_dofs =
-            libmesh_cast_int<unsigned int>(dof_indices.size());
+            cast_int<unsigned int>(dof_indices.size());
 
           // Fixed vs. free DoFs on edge/face projections
           std::vector<char> dof_is_fixed(n_dofs, false); // bools
@@ -1523,7 +1543,7 @@ void ProjectSolution::operator()(const ConstElemRange &range) const
                     }
                 }
               else
-                libmesh_error();
+                libmesh_error_msg("Unknown continuity " << cont);
             }
 
           // In 3D, project any edge values next
@@ -1934,7 +1954,7 @@ void ProjectFEMSolution::operator()(const ConstElemRange &range) const
 
           // The number of DOFs on the element
           const unsigned int n_dofs =
-            libmesh_cast_int<unsigned int>(dof_indices.size());
+            cast_int<unsigned int>(dof_indices.size());
 
           // Fixed vs. free DoFs on edge/face projections
           std::vector<char> dof_is_fixed(n_dofs, false); // bools
@@ -2122,7 +2142,7 @@ void ProjectFEMSolution::operator()(const ConstElemRange &range) const
                     }
                 }
               else
-                libmesh_error();
+                libmesh_error_msg("Unknown continuity " << cont);
             }
 
           // In 3D, project any edge values next
@@ -2136,7 +2156,7 @@ void ProjectFEMSolution::operator()(const ConstElemRange &range) const
               if (cont == C_ONE)
                 dphi = &(edge_fe->get_dphi());
 
-              for (unsigned int e=0; e != elem->n_edges(); ++e)
+              for (unsigned char e=0; e != elem->n_edges(); ++e)
                 {
                   context.edge = e;
                   context.edge_fe_reinit();
@@ -2244,7 +2264,7 @@ void ProjectFEMSolution::operator()(const ConstElemRange &range) const
               if (cont == C_ONE)
                 dphi = &(side_fe->get_dphi());
 
-              for (unsigned int s=0; s != elem->n_sides(); ++s)
+              for (unsigned char s=0; s != elem->n_sides(); ++s)
                 {
                   FEInterface::dofs_on_side(elem, dim, fe_type, s,
                                             side_dofs);
@@ -2481,7 +2501,8 @@ void BoundaryProjectSolution::operator()(const ConstElemRange &range) const
   const DofMap& dof_map = system.get_dof_map();
 
   // Boundary info for the current mesh
-  const BoundaryInfo& boundary_info = *system.get_mesh().boundary_info;
+  const BoundaryInfo& boundary_info =
+    system.get_mesh().get_boundary_info();
 
   // The element matrix and RHS for projections.
   // Note that Ke is always real-valued, whereas
@@ -2595,7 +2616,7 @@ void BoundaryProjectSolution::operator()(const ConstElemRange &range) const
 
           // The number of DOFs on the element
           const unsigned int n_dofs =
-            libmesh_cast_int<unsigned int>(dof_indices.size());
+            cast_int<unsigned int>(dof_indices.size());
 
           // Fixed vs. free DoFs on edge/face projections
           std::vector<char> dof_is_fixed(n_dofs, false); // bools
@@ -2769,7 +2790,7 @@ void BoundaryProjectSolution::operator()(const ConstElemRange &range) const
                     }
                 }
               else
-                libmesh_error();
+                libmesh_error_msg("Unknown continuity " << cont);
             }
 
           // In 3D, project any edge values next

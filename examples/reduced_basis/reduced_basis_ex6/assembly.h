@@ -40,6 +40,8 @@ using libMesh::RBEIMEvaluation;
 using libMesh::RBEIMTheta;
 using libMesh::Real;
 using libMesh::RealGradient;
+using libMesh::Elem;
+using libMesh::FEBase;
 
 struct ElemAssemblyWithConstruction : ElemAssembly
 {
@@ -93,7 +95,7 @@ struct AssemblyA0 : ElemAssemblyWithConstruction
   virtual void boundary_assembly(FEMContext &c)
   {
     const std::vector<boundary_id_type> bc_ids =
-      rb_con->get_mesh().boundary_info->boundary_ids (&c.get_elem(),c.side);
+      rb_con->get_mesh().get_boundary_info().boundary_ids (&c.get_elem(),c.side);
     for (std::vector<boundary_id_type>::const_iterator b =
            bc_ids.begin(); b != bc_ids.end(); ++b)
       if( *b == 1 || *b == 2 || *b == 3 || *b == 4 )
@@ -134,7 +136,7 @@ struct AssemblyA1 : ElemAssemblyWithConstruction
   virtual void boundary_assembly(FEMContext &c)
   {
     const std::vector<boundary_id_type> bc_ids =
-      rb_con->get_mesh().boundary_info->boundary_ids (&c.get_elem(),c.side);
+      rb_con->get_mesh().get_boundary_info().boundary_ids (&c.get_elem(),c.side);
     for (std::vector<boundary_id_type>::const_iterator b =
            bc_ids.begin(); b != bc_ids.end(); ++b)
       if( *b == 1 || *b == 3 ) // y == -0.2, y == 0.2
@@ -181,7 +183,7 @@ struct AssemblyA2 : ElemAssemblyWithConstruction
   virtual void boundary_assembly(FEMContext &c)
   {
     const std::vector<boundary_id_type> bc_ids =
-      rb_con->get_mesh().boundary_info->boundary_ids (&c.get_elem(),c.side);
+      rb_con->get_mesh().get_boundary_info().boundary_ids (&c.get_elem(),c.side);
     for (std::vector<boundary_id_type>::const_iterator b =
            bc_ids.begin(); b != bc_ids.end(); ++b)
       if( *b == 2 || *b == 4) // x == 0.2, x == -0.2
@@ -261,8 +263,6 @@ struct AssemblyEIM : RBEIMAssembly
     const std::vector<Real> &JxW = elem_fe->get_JxW();
 
     const std::vector<std::vector<RealGradient> >& dphi = elem_fe->get_dphi();
-
-    const std::vector<Point>& qpoints = elem_fe->get_xyz();
 
     // The number of local degrees of freedom in each variable
     const unsigned int n_u_dofs = c.get_dof_indices(u_var).size();

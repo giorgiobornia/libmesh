@@ -23,7 +23,8 @@
 #include <iomanip>
 
 // C includes
-#include <unistd.h>  // for unlink()
+#include <sys/types.h> // for pid_t
+#include <unistd.h>    // for getpid(), unlink()
 
 // Local includes
 #include "libmesh/boundary_info.h"
@@ -83,9 +84,9 @@ namespace libMesh
 
 // ------------------------------------------------------------
 // UnstructuredMesh class member functions
-UnstructuredMesh::UnstructuredMesh (const Parallel::Communicator &comm,
-                                    unsigned int d) :
-  MeshBase (comm,d)
+UnstructuredMesh::UnstructuredMesh (const Parallel::Communicator &comm_in,
+                                    unsigned char d) :
+  MeshBase (comm_in,d)
 {
   libmesh_assert (libMesh::initialized());
 }
@@ -93,7 +94,7 @@ UnstructuredMesh::UnstructuredMesh (const Parallel::Communicator &comm,
 
 
 #ifndef LIBMESH_DISABLE_COMMWORLD
-UnstructuredMesh::UnstructuredMesh (unsigned int d) :
+UnstructuredMesh::UnstructuredMesh (unsigned char d) :
   MeshBase (d)
 {
   libmesh_assert (libMesh::initialized());
@@ -296,7 +297,7 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
       {
         Elem* element = *el;
 
-        for (unsigned int ms=0; ms<element->n_neighbors(); ms++)
+        for (unsigned char ms=0; ms<element->n_neighbors(); ms++)
           {
           next_side:
             // If we haven't yet found a neighbor on this side, try.
@@ -493,7 +494,7 @@ void UnstructuredMesh::find_neighbors (const bool reset_remote_elements,
                                      << " neighbor at level " << neigh->level()
                                      << std::endl;
                         GMVIO(*this).write ("bad_mesh.gmv");
-                        libmesh_error();
+                        libmesh_error_msg("Problematic mesh written to bad_mesh.gmv.");
                       }
 #endif // DEBUG
                 }
@@ -530,7 +531,7 @@ void UnstructuredMesh::read (const std::string& name,
 
       // Find the length of a string which represents the highest processor ID
       full_name << (this->n_processors());
-      unsigned field_width = full_name.str().size();
+      int field_width = cast_int<int>(full_name.str().size());
 
       // reset the string stream
       full_name.str("");
@@ -543,12 +544,7 @@ void UnstructuredMesh::read (const std::string& name,
       std::ifstream in (full_name.str().c_str());
 
       if (!in.good())
-        {
-          libMesh::err << "ERROR: cannot locate specified file:\n\t"
-                       << full_name.str()
-                       << std::endl;
-          libmesh_error();
-        }
+        libmesh_error_msg("ERROR: cannot locate specified file:\n\t" << full_name.str());
     }
   else if(name.rfind(".cp")) {} // Do error checking in the reader
   else
@@ -556,12 +552,7 @@ void UnstructuredMesh::read (const std::string& name,
       std::ifstream in (name.c_str());
 
       if (!in.good())
-        {
-          libMesh::err << "ERROR: cannot locate specified file:\n\t"
-                       << name
-                       << std::endl;
-          libmesh_error();
-        }
+        libmesh_error_msg("ERROR: cannot locate specified file:\n\t" << name);
     }
 
   // Set the skip_renumber_nodes_and_elements flag on all processors.
@@ -659,9 +650,7 @@ void UnstructuredMesh::read (const std::string& name,
                 libmesh_file_error(system_string);
               STOP_LOG("system(bunzip2)", "Mesh");
 #else
-              libMesh::err << "ERROR: need bzip2/bunzip2 to open .bz2 file "
-                           << name << std::endl;
-              libmesh_error();
+              libmesh_error_msg("ERROR: need bzip2/bunzip2 to open .bz2 file " << name);
 #endif
             }
           else if (name.size() - name.rfind(".xz") == 3)
@@ -676,9 +665,7 @@ void UnstructuredMesh::read (const std::string& name,
                 libmesh_file_error(system_string);
               STOP_LOG("system(xz -d)", "XdrIO");
 #else
-              libMesh::err << "ERROR: need xz to open .xz file "
-                           << name << std::endl;
-              libmesh_error();
+              libmesh_error_msg("ERROR: need xz to open .xz file " << name);
 #endif
             }
 
@@ -697,16 +684,7 @@ void UnstructuredMesh::read (const std::string& name,
             LegacyXdrIO(*this,true).read_mgf (new_name);
 
           else if (new_name.rfind(".unv") < new_name.size())
-            {
-              if (mesh_data == NULL)
-                {
-                  libMesh::err << "Error! You must pass a "
-                               << "valid MeshData pointer to "
-                               << "read UNV files!" << std::endl;
-                  libmesh_error();
-                }
-              UNVIO(*this, *mesh_data).read (new_name);
-            }
+            UNVIO(*this, mesh_data).read (new_name);
 
           else if ((new_name.rfind(".node")  < new_name.size()) ||
                    (new_name.rfind(".ele")   < new_name.size()))
@@ -733,30 +711,28 @@ void UnstructuredMesh::read (const std::string& name,
 
           else
             {
-              libMesh::err << " ERROR: Unrecognized file extension: " << name
-                           << "\n   I understand the following:\n\n"
-                           << "     *.e    -- Sandia's ExodusII format\n"
-                           << "     *.exd  -- Sandia's ExodusII format\n"
-                           << "     *.gmv  -- LANL's General Mesh Viewer format\n"
-                           << "     *.mat  -- Matlab triangular ASCII file\n"
-                           << "     *.n    -- Sandia's Nemesis format\n"
-                           << "     *.nem  -- Sandia's Nemesis format\n"
-                           << "     *.off  -- OOGL OFF surface format\n"
-                           << "     *.ucd  -- AVS's ASCII UCD format\n"
-                           << "     *.unv  -- I-deas Universal format\n"
-                           << "     *.vtu  -- Paraview VTK format\n"
-                           << "     *.inp  -- Abaqus .inp format\n"
-                           << "     *.xda  -- libMesh ASCII format\n"
-                           << "     *.xdr  -- libMesh binary format\n"
-                           << "     *.gz   -- any above format gzipped\n"
-                           << "     *.bz2  -- any above format bzip2'ed\n"
-                           << "     *.xz   -- any above format xzipped\n"
-                           << "     *.cpa  -- libMesh Checkpoint ASCII format\n"
-                           << "     *.cpr  -- libMesh Checkpoint binary format\n"
-                           << "     *.gam  -- Gambit neutral format (originally .neu) \n"
-
-                           << std::endl;
-              libmesh_error();
+              libmesh_error_msg(" ERROR: Unrecognized file extension: " \
+                                << name                                 \
+                                << "\n   I understand the following:\n\n" \
+                                << "     *.e    -- Sandia's ExodusII format\n" \
+                                << "     *.exd  -- Sandia's ExodusII format\n" \
+                                << "     *.gmv  -- LANL's General Mesh Viewer format\n" \
+                                << "     *.mat  -- Matlab triangular ASCII file\n" \
+                                << "     *.n    -- Sandia's Nemesis format\n" \
+                                << "     *.nem  -- Sandia's Nemesis format\n" \
+                                << "     *.off  -- OOGL OFF surface format\n" \
+                                << "     *.ucd  -- AVS's ASCII UCD format\n" \
+                                << "     *.unv  -- I-deas Universal format\n" \
+                                << "     *.vtu  -- Paraview VTK format\n" \
+                                << "     *.inp  -- Abaqus .inp format\n" \
+                                << "     *.xda  -- libMesh ASCII format\n" \
+                                << "     *.xdr  -- libMesh binary format\n" \
+                                << "     *.gz   -- any above format gzipped\n" \
+                                << "     *.bz2  -- any above format bzip2'ed\n" \
+                                << "     *.xz   -- any above format xzipped\n" \
+                                << "     *.cpa  -- libMesh Checkpoint ASCII format\n" \
+                                << "     *.cpr  -- libMesh Checkpoint binary format\n");
+                                << "     *.gam  -- Gambit neutral format (originally .neu) \n"
             }
 
           // If we temporarily decompressed a file, remove the
@@ -814,7 +790,7 @@ void UnstructuredMesh::write (const std::string& name,
 
       // Nasty hack for reading/writing zipped files
       std::string new_name = name;
-      processor_id_type pid_0 = 0;
+      pid_t pid_0 = 0;
       if (this->processor_id() == 0)
         pid_0 = getpid();
       this->comm().broadcast(pid_0);
@@ -863,16 +839,7 @@ void UnstructuredMesh::write (const std::string& name,
           LegacyXdrIO(*this,true).write_mgf(new_name);
 
         else if (new_name.rfind(".unv") < new_name.size())
-          {
-            if (mesh_data == NULL)
-              {
-                libMesh::err << "Error! You must pass a "
-                             << "valid MeshData pointer to "
-                             << "write UNV files!" << std::endl;
-                libmesh_error();
-              }
-            UNVIO(*this, *mesh_data).write (new_name);
-          }
+          UNVIO(*this, mesh_data).write (new_name);
 
         else if (new_name.rfind(".mesh") < new_name.size())
           MEDITIO(*this).write (new_name);
@@ -1109,18 +1076,18 @@ void UnstructuredMesh::create_submesh (UnstructuredMesh& new_mesh,
       new_elem->processor_id() = old_elem->processor_id();
 
       // Maybe add boundary conditions for this element
-      for (unsigned int s=0; s<old_elem->n_sides(); s++)
+      for (unsigned short s=0; s<old_elem->n_sides(); s++)
         // We're supporting boundary ids on internal sides now
         //if (old_elem->neighbor(s) == NULL)
         {
-          const std::vector<boundary_id_type>& bc_ids = this->boundary_info->boundary_ids(old_elem, s);
+          const std::vector<boundary_id_type>& bc_ids =
+            this->get_boundary_info().boundary_ids(old_elem, s);
           for (std::vector<boundary_id_type>::const_iterator id_it=bc_ids.begin(); id_it!=bc_ids.end(); ++id_it)
             {
               const boundary_id_type bc_id = *id_it;
-              if (bc_id != this->boundary_info->invalid_id)
-                new_mesh.boundary_info->add_side (new_elem,
-                                                  s,
-                                                  bc_id);
+              if (bc_id != this->get_boundary_info().invalid_id)
+                new_mesh.get_boundary_info().add_side (new_elem, s,
+                                                       bc_id);
             }
         }
     } // end loop over elements

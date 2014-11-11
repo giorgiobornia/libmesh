@@ -76,8 +76,7 @@ int XdrMESH::header(XdrMHEAD *hd)
 
     default:
       // Unknown access type
-      libmesh_error();
-
+      libmesh_error_msg("Unknown m_type" << m_type);
     }
 
   // Let's write the augmented header information
@@ -127,7 +126,7 @@ int XdrMESH::header(XdrMHEAD *hd)
 
         default:
           // Unknown access type
-          libmesh_error();
+          libmesh_error_msg("Unknown m_type" << m_type);
         }
 
 
@@ -150,7 +149,7 @@ int XdrMESH::header(XdrMHEAD *hd)
           {
             xdr_vector(mp_xdr_handle,
                        (char *) &et[0],
-                       et.size(),
+                       cast_int<unsigned int>(et.size()),
                        sizeof(unsigned int),
                        (xdrproc_t) xdr_u_int);
             break;
@@ -187,7 +186,7 @@ int XdrMESH::header(XdrMHEAD *hd)
 
         default:
           // Unknown access type
-          libmesh_error();
+          libmesh_error_msg("Unknown m_type" << m_type);
         }
 
 
@@ -215,7 +214,7 @@ int XdrMESH::header(XdrMHEAD *hd)
           {
             xdr_vector(mp_xdr_handle,
                        (char *) &neeb[0],
-                       neeb.size(),
+                       cast_int<unsigned int>(neeb.size()),
                        sizeof(unsigned int),
                        (xdrproc_t) xdr_u_int);
           }
@@ -265,11 +264,7 @@ int XdrMESH::header(XdrMHEAD *hd)
 
                 // If you reach an alphabetic character, this is an error
                 if (!isdigit(token[0]))
-                  {
-                    libMesh::err << "Error: Unrecognized character detected."
-                                 << std::endl;
-                    libmesh_error();
-                  }
+                  libmesh_error_msg("Error: Unrecognized character detected.");
 
                 // Otherwise, add the value to the neeb vector
                 neeb.push_back( std::atoi(token) );
@@ -283,21 +278,18 @@ int XdrMESH::header(XdrMHEAD *hd)
 
         default:
           // Unknown access type
-          libmesh_error();
+          libmesh_error_msg("Unknown m_type" << m_type);
         }
 
       if ((m_type == DECODE) || (m_type == R_ASCII))
         hd->set_num_elem_each_block(neeb);
     }
 
-
   else if (orig_flag == 1) // MGF originator
     {
     }
   else  // Unknown Originator!
-    {
-      libmesh_error();
-    }
+    libmesh_error_msg("Unknown orig_flag " << orig_flag);
 
 
 
@@ -312,13 +304,19 @@ int XdrMESH::header(XdrMHEAD *hd)
     case (XdrMGF::DECODE):
       {
         char* temp = hd->cpyString(hd->getId());
-        xdr_string(mp_xdr_handle,&temp, ((m_type == XdrMGF::ENCODE) ? std::strlen(temp) : hd->m_strSize));
+        xdr_string(mp_xdr_handle, &temp,
+                   ((m_type == XdrMGF::ENCODE) ?
+                    cast_int<unsigned int>(std::strlen(temp)) :
+                    hd->m_strSize));
         hd->setId(temp);
         delete [] temp;
 
         temp = hd->cpyString(hd->getTitle());
 
-        xdr_string(mp_xdr_handle,&temp, ((m_type == XdrMGF::ENCODE) ? std::strlen(temp) : hd->m_strSize));
+        xdr_string(mp_xdr_handle, &temp,
+                   ((m_type == XdrMGF::ENCODE) ?
+                    cast_int<unsigned int>(std::strlen(temp)) :
+                    hd->m_strSize));
         hd->setTitle(temp);
         delete [] temp;
         break;
@@ -350,7 +348,7 @@ int XdrMESH::header(XdrMHEAD *hd)
 
     default:
       // Unknown access type
-      libmesh_error();
+      libmesh_error_msg("Unknown m_type" << m_type);
     }
 
   return 1;

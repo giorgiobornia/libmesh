@@ -80,11 +80,14 @@ int main (int argc, char** argv)
   // Initialize libMesh and any dependent libaries
   LibMeshInit init (argc, argv);
 
+  // This example NaNs with the Eigen sparse linear solvers
+  libmesh_example_requires(libMesh::default_solver_package() != EIGEN_SOLVERS, "--enable-petsc or --enable-laspack");
+
   // Initialize the cantilever mesh
   const unsigned int dim = 2;
 
   // Skip this 2D example if libMesh was compiled as 1D-only.
-  libmesh_example_assert(dim <= LIBMESH_DIM, "2D support");
+  libmesh_example_requires(dim <= LIBMESH_DIM, "2D support");
 
   // Create a 2D mesh distributed across the default MPI communicator.
   Mesh mesh(init.comm(), dim);
@@ -330,7 +333,7 @@ void assemble_elasticity(EquationSystems& es,
           if (elem->neighbor(side) == NULL)
             {
               const std::vector<boundary_id_type> bc_ids =
-                mesh.boundary_info->boundary_ids (elem,side);
+                mesh.get_boundary_info().boundary_ids (elem,side);
 
               const std::vector<std::vector<Real> >&  phi_face = fe_face->get_phi();
               const std::vector<Real>& JxW_face = fe_face->get_JxW();

@@ -125,23 +125,17 @@ void MeshData::read_xdr (const std::string& name,
     io.data (vtype);
 #ifdef LIBMESH_USE_COMPLEX_NUMBERS
     if (vtype != "COMPLEX")
-      {
-        libMesh::err << "ERROR: File does not contain complex-valued data!"
-                     << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR: File does not contain complex-valued data!");
+
 #elif LIBMESH_USE_REAL_NUMBERS
     if (vtype != "REAL")
-      {
-        libMesh::err << "ERROR: File does not contain real-valued data!"
-                     << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR: File does not contain real-valued data!");
+
 #else
     /*
      * What number type is this?
      */
-    libmesh_error();
+    libmesh_error_msg("Must be using either real or complex numbers!");
 #endif
   }
 
@@ -165,7 +159,7 @@ void MeshData::read_xdr (const std::string& name,
   io.data (n_elem);
 
 #ifdef DEBUG
-  unsigned int previous_values_size = 0;
+  std::size_t previous_values_size = 0;
 #endif
 
   for (unsigned int n_cnt=0; n_cnt < n_node; n_cnt++)
@@ -203,10 +197,7 @@ void MeshData::read_xdr (const std::string& name,
         else
           {
             if (previous_values_size != values.size())
-              {
-                libMesh::err << "ERROR: Size mismatch for n_cnt = " << n_cnt << std::endl;
-                libmesh_error();
-              }
+              libmesh_error_msg("ERROR: Size mismatch for n_cnt = " << n_cnt);
           }
 #endif
 
@@ -258,10 +249,7 @@ void MeshData::read_xdr (const std::string& name,
         else
           {
             if (previous_values_size != values.size())
-              {
-                libMesh::err << "ERROR: Size mismatch for n_cnt = " << n_cnt << std::endl;
-                libmesh_error();
-              }
+              libmesh_error_msg("ERROR: Size mismatch for n_cnt = " << n_cnt);
           }
 #endif
 
@@ -385,7 +373,8 @@ void MeshData::write_xdr (const std::string& name,
    * Write the number of nodes for which data is there
    */
   {
-    unsigned int n_node = this->_node_data.size();
+    unsigned int n_node =
+      cast_int<unsigned int>(this->_node_data.size());
     io.data (n_node, "# No. of nodes for which data is stored");
   }
 
@@ -396,7 +385,8 @@ void MeshData::write_xdr (const std::string& name,
    * Write the number of elements for which data is there
    */
   {
-    unsigned int n_elem = this->_elem_data.size();
+    unsigned int n_elem =
+      cast_int<unsigned int>(this->_elem_data.size());
     io.data (n_elem, "# No. of elements for which data is stored");
   }
 

@@ -44,7 +44,7 @@ ErrorVectorReal ErrorVector::minimum() const
 {
   START_LOG ("minimum()", "ErrorVector");
 
-  const dof_id_type n = this->size();
+  const dof_id_type n = cast_int<dof_id_type>(this->size());
   ErrorVectorReal min = std::numeric_limits<ErrorVectorReal>::max();
 
   for (dof_id_type i=0; i<n; i++)
@@ -68,7 +68,7 @@ Real ErrorVector::mean() const
 {
   START_LOG ("mean()", "ErrorVector");
 
-  const dof_id_type n = this->size();
+  const dof_id_type n = cast_int<dof_id_type>(this->size());
 
   Real the_mean  = 0;
   dof_id_type nnz = 0;
@@ -91,7 +91,7 @@ Real ErrorVector::mean() const
 
 Real ErrorVector::median()
 {
-  const dof_id_type n   = this->size();
+  const dof_id_type n = cast_int<dof_id_type>(this->size());
 
   if (n == 0)
     return 0.;
@@ -125,7 +125,7 @@ Real ErrorVector::median() const
 
 Real ErrorVector::variance(const Real mean_in) const
 {
-  const dof_id_type n   = this->size();
+  const dof_id_type n = cast_int<dof_id_type>(this->size());
 
   START_LOG ("variance()", "ErrorVector");
 
@@ -153,7 +153,7 @@ std::vector<dof_id_type> ErrorVector::cut_below(Real cut) const
 {
   START_LOG ("cut_below()", "ErrorVector");
 
-  const dof_id_type n = this->size();
+  const dof_id_type n = cast_int<dof_id_type>(this->size());
 
   std::vector<dof_id_type> cut_indices;
   cut_indices.reserve(n/2);  // Arbitrary
@@ -179,7 +179,7 @@ std::vector<dof_id_type> ErrorVector::cut_above(Real cut) const
 {
   START_LOG ("cut_above()", "ErrorVector");
 
-  const dof_id_type n   = this->size();
+  const dof_id_type n = cast_int<dof_id_type>(this->size());
 
   std::vector<dof_id_type> cut_indices;
   cut_indices.reserve(n/2);  // Arbitrary
@@ -219,6 +219,10 @@ void ErrorVector::plot_error(const std::string& filename,
 {
   AutoPtr<MeshBase> meshptr = oldmesh.clone();
   MeshBase &mesh = *meshptr;
+
+  // The all_first_order routine requires that renumbering be allowed
+  mesh.allow_renumbering(true);
+
   mesh.all_first_order();
   EquationSystems temp_es (mesh);
   ExplicitSystem& error_system

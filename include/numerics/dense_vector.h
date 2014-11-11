@@ -79,7 +79,7 @@ public:
    * @returns the size of the vector.
    */
   virtual unsigned int size() const {
-    return libmesh_cast_int<unsigned int>(_val.size());
+    return cast_int<unsigned int>(_val.size());
   }
 
   /**
@@ -391,7 +391,7 @@ DenseVector<T>::add (const T2 factor,
   libmesh_assert_equal_to (this->size(), vec.size());
 
   for (unsigned int i=0; i<this->size(); i++)
-    (*this)(i) += factor*vec(i);
+    (*this)(i) += static_cast<T>(factor)*vec(i);
 }
 
 template<typename T>

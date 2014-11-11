@@ -29,6 +29,7 @@
 #include "libmesh/fe_macro.h"
 #include "libmesh/fe_map.h"
 #include "libmesh/fe_xyz_map.h"
+#include "libmesh/mesh_subdivision_support.h"
 
 namespace libMesh
 {
@@ -54,8 +55,7 @@ AutoPtr<FEMap> FEMap::build( FEType fe_type )
       }
     }
 
-  //Shouldn't ever get here
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return AutoPtr<FEMap>();
 }
 
@@ -304,7 +304,7 @@ void FEMap::init_reference_to_physical_map( const std::vector<Point>& qp,
       }
 
     default:
-      libmesh_error();
+      libmesh_error_msg("Invalid Dim = " << Dim);
     }
 
   // Stop logging the reference->physical map initialization
@@ -317,9 +317,11 @@ void FEMap::init_reference_to_physical_map( const std::vector<Point>& qp,
 void FEMap::compute_single_point_map(const unsigned int dim,
                                      const std::vector<Real>& qw,
                                      const Elem* elem,
-                                     unsigned int p)
+                                     unsigned int p,
+                                     const std::vector<Node*>& elem_nodes)
 {
   libmesh_assert(elem);
+  libmesh_assert_equal_to(phi_map.size(), elem_nodes.size());
 
   switch (dim)
     {
@@ -327,7 +329,8 @@ void FEMap::compute_single_point_map(const unsigned int dim,
       // 0D
     case 0:
       {
-        xyz[p] = elem->point(0);
+        libmesh_assert(elem_nodes[0]);
+        xyz[p] = *elem_nodes[0];
         jac[p] = 1.0;
         JxW[p] = qw[p];
         break;
@@ -349,7 +352,8 @@ void FEMap::compute_single_point_map(const unsigned int dim,
           {
             // Reference to the point, helps eliminate
             // exessive temporaries in the inner loop
-            const Point& elem_point = elem->point(i);
+            libmesh_assert(elem_nodes[i]);
+            const Point& elem_point = *elem_nodes[i];
 
             xyz[p].add_scaled          (elem_point, phi_map[i][p]    );
             dxyzdxi_map[p].add_scaled  (elem_point, dphidxi_map[i][p]);
@@ -378,14 +382,7 @@ void FEMap::compute_single_point_map(const unsigned int dim,
         jac[p] = dxyzdxi_map[p].size();
 
         if (jac[p] <= 0.)
-          {
-            libMesh::err << "ERROR: negative Jacobian: "
-                         << jac[p]
-                         << " in element "
-                         << elem->id()
-                         << std::endl;
-            libmesh_error();
-          }
+          libmesh_error_msg("ERROR: negative Jacobian: " << jac[p] << " in element " << elem->id());
 
         // The inverse Jacobian entries also come from the
         // generalized inverse of T (see also the 2D element
@@ -430,7 +427,8 @@ void FEMap::compute_single_point_map(const unsigned int dim,
           {
             // Reference to the point, helps eliminate
             // exessive temporaries in the inner loop
-            const Point& elem_point = elem->point(i);
+            libmesh_assert(elem_nodes[i]);
+            const Point& elem_point = *elem_nodes[i];
 
             xyz[p].add_scaled          (elem_point, phi_map[i][p]     );
 
@@ -462,14 +460,7 @@ void FEMap::compute_single_point_map(const unsigned int dim,
         jac[p] = (dx_dxi*dy_deta - dx_deta*dy_dxi);
 
         if (jac[p] <= 0.)
-          {
-            libMesh::err << "ERROR: negative Jacobian: "
-                         << jac[p]
-                         << " in element "
-                         << elem->id()
-                         << std::endl;
-            libmesh_error();
-          }
+          libmesh_error_msg("ERROR: negative Jacobian: " << jac[p] << " in element " << elem->id());
 
         JxW[p] = jac[p]*qw[p];
 
@@ -527,13 +518,7 @@ void FEMap::compute_single_point_map(const unsigned int dim,
         const Real det = (g11*g22 - g12*g21);
 
         if (det <= 0.)
-          {
-            libMesh::err << "ERROR: negative Jacobian! "
-                         << " in element "
-                         << elem->id()
-                         << std::endl;
-            libmesh_error();
-          }
+          libmesh_error_msg("ERROR: negative Jacobian! " << " in element " << elem->id());
 
         const Real inv_det = 1./det;
         jac[p] = std::sqrt(det);
@@ -591,7 +576,8 @@ void FEMap::compute_single_point_map(const unsigned int dim,
           {
             // Reference to the point, helps eliminate
             // exessive temporaries in the inner loop
-            const Point& elem_point = elem->point(i);
+            libmesh_assert(elem_nodes[i]);
+            const Point& elem_point = *elem_nodes[i];
 
             xyz[p].add_scaled           (elem_point, phi_map[i][p]      );
             dxyzdxi_map[p].add_scaled   (elem_point, dphidxi_map[i][p]  );
@@ -634,14 +620,7 @@ void FEMap::compute_single_point_map(const unsigned int dim,
                   dz_dxi*(dx_deta*dy_dzeta - dy_deta*dx_dzeta));
 
         if (jac[p] <= 0.)
-          {
-            libMesh::err << "ERROR: negative Jacobian: "
-                         << jac[p]
-                         << " in element "
-                         << elem->id()
-                         << std::endl;
-            libmesh_error();
-          }
+          libmesh_error_msg("ERROR: negative Jacobian: " << jac[p] << " in element " << elem->id());
 
         JxW[p] = jac[p]*qw[p];
 
@@ -666,7 +645,7 @@ void FEMap::compute_single_point_map(const unsigned int dim,
       }
 
     default:
-      libmesh_error();
+      libmesh_error_msg("Invalid dim = " << dim);
     }
 }
 
@@ -722,20 +701,25 @@ void FEMap::compute_affine_map( const unsigned int dim,
 
   libmesh_assert(elem);
 
-  const unsigned int n_qp = libmesh_cast_int<unsigned int>(qw.size());
+  const unsigned int n_qp = cast_int<unsigned int>(qw.size());
 
   // Resize the vectors to hold data at the quadrature points
   this->resize_quadrature_map_vectors(dim, n_qp);
 
+  // Determine the nodes contributing to element elem
+  std::vector<Node*> elem_nodes(elem->n_nodes(), NULL);
+  for (unsigned int i=0; i<elem->n_nodes(); i++)
+    elem_nodes[i] = elem->get_node(i);
+
   // Compute map at quadrature point 0
-  this->compute_single_point_map(dim, qw, elem, 0);
+  this->compute_single_point_map(dim, qw, elem, 0, elem_nodes);
 
   // Compute xyz at all other quadrature points
   for (unsigned int p=1; p<n_qp; p++)
     {
       xyz[p].zero();
       for (unsigned int i=0; i<phi_map.size(); i++) // sum over the nodes
-        xyz[p].add_scaled        (elem->point(i), phi_map[i][p]    );
+        xyz[p].add_scaled        (*elem_nodes[i], phi_map[i][p]    );
     }
 
   // Copy other map data from quadrature point 0
@@ -781,10 +765,71 @@ void FEMap::compute_affine_map( const unsigned int dim,
 
 
 
+void FEMap::compute_null_map( const unsigned int dim,
+                              const std::vector<Real>& qw)
+{
+  // Start logging the map computation.
+  START_LOG("compute_null_map()", "FEMap");
+
+  const unsigned int n_qp = cast_int<unsigned int>(qw.size());
+
+  // Resize the vectors to hold data at the quadrature points
+  this->resize_quadrature_map_vectors(dim, n_qp);
+
+  // Compute "fake" xyz
+  for (unsigned int p=1; p<n_qp; p++)
+    {
+      xyz[p].zero();
+
+      dxyzdxi_map[p] = 0;
+      dxidx_map[p] = 0;
+      dxidy_map[p] = 0;
+      dxidz_map[p] = 0;
+#ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
+      d2xyzdxi2_map[p] = 0;
+#endif
+      if (dim > 1)
+        {
+          dxyzdeta_map[p] = 0;
+          detadx_map[p] = 0;
+          detady_map[p] = 0;
+          detadz_map[p] = 0;
+#ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
+          d2xyzdxideta_map[p] = 0.;
+          d2xyzdeta2_map[p] = 0.;
+#endif
+          if (dim > 2)
+            {
+              dxyzdzeta_map[p] = 0;
+              dzetadx_map[p] = 0;
+              dzetady_map[p] = 0;
+              dzetadz_map[p] = 0;
+#ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
+              d2xyzdxidzeta_map[p] = 0;
+              d2xyzdetadzeta_map[p] = 0;
+              d2xyzdzeta2_map[p] = 0;
+#endif
+            }
+        }
+      jac[p] = 1;
+      JxW[p] = qw[p];
+    }
+
+  STOP_LOG("compute_null_map()", "FEMap");
+}
+
+
+
 void FEMap::compute_map(const unsigned int dim,
                         const std::vector<Real>& qw,
                         const Elem* elem)
 {
+  if (!elem)
+    {
+      compute_null_map(dim, qw);
+      return;
+    }
+
   if (elem->has_affine_map())
     {
       compute_affine_map(dim, qw, elem);
@@ -796,14 +841,31 @@ void FEMap::compute_map(const unsigned int dim,
 
   libmesh_assert(elem);
 
-  const unsigned int n_qp = libmesh_cast_int<unsigned int>(qw.size());
+  const unsigned int n_qp = cast_int<unsigned int>(qw.size());
 
   // Resize the vectors to hold data at the quadrature points
   this->resize_quadrature_map_vectors(dim, n_qp);
 
+  // Determine the nodes contributing to element elem
+  std::vector<Node*> elem_nodes;
+  if (elem->type() == TRI3SUBDIVISION)
+    {
+      // Subdivision surface FE require the 1-ring around elem
+      libmesh_assert_equal_to (dim, 2);
+      const Tri3Subdivision* sd_elem = static_cast<const Tri3Subdivision*>(elem);
+      MeshTools::Subdivision::find_one_ring(sd_elem, elem_nodes);
+    }
+  else
+    {
+      // All other FE use only the nodes of elem itself
+      elem_nodes.resize(elem->n_nodes(), NULL);
+      for (unsigned int i=0; i<elem->n_nodes(); i++)
+        elem_nodes[i] = elem->get_node(i);
+    }
+
   // Compute map at all quadrature points
   for (unsigned int p=0; p!=n_qp; p++)
-    this->compute_single_point_map(dim, qw, elem, p);
+    this->compute_single_point_map(dim, qw, elem, p, elem_nodes);
 
   // Stop logging the map computation.
   STOP_LOG("compute_map()", "FEMap");
@@ -1078,7 +1140,7 @@ Point FE<Dim,T>::inverse_map (const Elem* elem,
 
           //  Some other dimension?
         default:
-          libmesh_error();
+          libmesh_error_msg("Invalid Dim = " << Dim);
         } // end switch(Dim), dp now computed
 
 
@@ -1144,12 +1206,13 @@ Point FE<Dim,T>::inverse_map (const Elem* elem,
                   libMesh::err << "ERROR: Newton scheme FAILED to converge in "
                                << cnt
                                << " iterations!"
-                               << " in element " << elem->id()
+                               << " in element "
+                               << elem->id()
                                << std::endl;
 
                   elem->print_info(libMesh::err);
 
-                  libmesh_error();
+                  libmesh_error_msg("Exiting...");
                 }
             }
           //  Return a far off point when secure is false - this
@@ -1367,5 +1430,9 @@ INSTANTIATE_ALL_MAPS(0);
 INSTANTIATE_ALL_MAPS(1);
 INSTANTIATE_ALL_MAPS(2);
 INSTANTIATE_ALL_MAPS(3);
+
+// subdivision elements are implemented only for 2D meshes & reimplement
+// the inverse_maps method separately
+INSTANTIATE_SUBDIVISION_MAPS;
 
 } // namespace libMesh

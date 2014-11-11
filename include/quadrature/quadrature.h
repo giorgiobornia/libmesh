@@ -38,6 +38,8 @@ namespace libMesh
 {
 
 
+// forward declarations
+class Elem;
 
 /**
  * This is the \p QBase class.  It provides the basic functionality
@@ -115,7 +117,7 @@ public:
    */
   unsigned int n_points() const
   { libmesh_assert (!_points.empty());
-    return libmesh_cast_int<unsigned int>(_points.size()); }
+    return cast_int<unsigned int>(_points.size()); }
 
   /**
    * @returns the dimension of the quadrature rule.
@@ -160,8 +162,20 @@ public:
    * Initializes the data structures to contain a quadrature rule
    * for an object of type \p type.
    */
-  void init (const ElemType type=INVALID_ELEM,
-             unsigned int p_level=0);
+  virtual void init (const ElemType type=INVALID_ELEM,
+                     unsigned int p_level=0);
+
+  /**
+   * Initializes the data structures for a specific, potentially cut
+   * element.  The array \p vertex_distance_func contains vertex
+   * values of a signed distance function that cuts the element.  This
+   * interface is indended to be extended by derived classes that can
+   * cut the element into subelements, for example, and constuct a
+   * composite quadrature rule for the cut element.
+   */
+  virtual void init (const Elem &elem,
+                     const std::vector<Real> &vertex_distance_func,
+                     unsigned int p_level=0);
 
   /**
    * @returns the order of the quadrature rule.
@@ -249,9 +263,7 @@ protected:
   {}
 #else
   {
-    libMesh::err << "ERROR: Seems as if this quadrature rule" << std::endl
-                 << " is not implemented for 2D." << std::endl;
-    libmesh_error();
+    libmesh_error_msg("ERROR: Seems as if this quadrature rule \nis not implemented for 2D.");
   }
 #endif
 
@@ -269,9 +281,7 @@ protected:
   {}
 #else
   {
-    libMesh::err << "ERROR: Seems as if this quadrature rule" << std::endl
-                 << " is not implemented for 3D." << std::endl;
-    libmesh_error();
+    libmesh_error_msg("ERROR: Seems as if this quadrature rule \nis not implemented for 3D.");
   }
 #endif
 
@@ -364,15 +374,19 @@ void QBase::print_info(std::ostream& os) const
   libmesh_assert(!_points.empty());
   libmesh_assert(!_weights.empty());
 
+  Real summed_weights=0;
   os << "N_Q_Points=" << this->n_points() << std::endl << std::endl;
   for (unsigned int qpoint=0; qpoint<this->n_points(); qpoint++)
     {
       os << " Point " << qpoint << ":\n"
          << "  "
          << _points[qpoint]
-         << " Weight:\n "
+         << "\n Weight:\n "
          << "  w=" << _weights[qpoint] << "\n" << std::endl;
+
+      summed_weights += _weights[qpoint];
     }
+  os << "Summed Weights: " << summed_weights << std::endl;
 }
 
 } // namespace libMesh

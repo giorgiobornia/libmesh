@@ -112,7 +112,8 @@ int main(int argc, char** argv)
 
   // In case the mesh file doesn't let us auto-infer dimension, we let
   // the user specify it on the command line
-  const unsigned int requested_dim = cl.follow(3, "--dim");
+  const unsigned char requested_dim =
+    cast_int<unsigned char>(cl.follow(3, "--dim"));
 
   // Load the old mesh from --inmesh filename
   Mesh old_mesh(init.comm(), requested_dim);
@@ -147,10 +148,7 @@ int main(int argc, char** argv)
   else if (solnname.rfind(".xda") < solnname.size())
     read_mode = READ;
   else
-    {
-      libMesh::err << "Unrecognized file extension on " << solnname << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("Unrecognized file extension on " << solnname);
 
   old_es.read(solnname, read_mode,
               EquationSystems::READ_HEADER |

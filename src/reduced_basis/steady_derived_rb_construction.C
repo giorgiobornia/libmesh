@@ -35,16 +35,17 @@ namespace libMesh
 {
 
 template <>
-AutoPtr<RBEvaluation> DerivedRBConstruction<RBConstruction>::build_rb_evaluation(const Parallel::Communicator &comm)
+AutoPtr<RBEvaluation> DerivedRBConstruction<RBConstruction>::build_rb_evaluation(const Parallel::Communicator &comm_in)
 {
-  return AutoPtr<RBEvaluation>( new DerivedRBEvaluation<RBEvaluation>(comm) );
+  return AutoPtr<RBEvaluation>
+    ( new DerivedRBEvaluation<RBEvaluation>(comm_in) );
 }
 
 template <>
 DenseVector<Number> DerivedRBConstruction<RBConstruction>::get_derived_basis_function(unsigned int i)
 {
   DerivedRBEvaluation<RBEvaluation>& der_rb_eval =
-    libmesh_cast_ref<DerivedRBEvaluation<RBEvaluation>&>(get_rb_evaluation());
+    cast_ref<DerivedRBEvaluation<RBEvaluation>&>(get_rb_evaluation());
 
   return der_rb_eval.derived_basis_functions[i];
 }
@@ -92,7 +93,7 @@ void DerivedRBConstruction<RBConstruction>::enrich_RB_space()
 
   // Need to cast the RBEvaluation object
   DerivedRBEvaluation<RBEvaluation>& der_rb_eval =
-    libmesh_cast_ref<DerivedRBEvaluation<RBEvaluation>&>(get_rb_evaluation());
+    cast_ref<DerivedRBEvaluation<RBEvaluation>&>(get_rb_evaluation());
 
   // compute Gram-Schmidt orthogonalization
   DenseVector<Number> proj_sum(uber_size);
@@ -120,7 +121,7 @@ void DerivedRBConstruction<RBConstruction>::update_RB_system_matrices()
   START_LOG("update_RB_system_matrices()", "DerivedRBConstruction");
 
   DerivedRBEvaluation<RBEvaluation>& der_rb_eval =
-    libmesh_cast_ref<DerivedRBEvaluation<RBEvaluation>&>(get_rb_evaluation());
+    cast_ref<DerivedRBEvaluation<RBEvaluation>&>(get_rb_evaluation());
 
   EquationSystems& es = this->get_equation_systems();
   RBConstruction& uber_system = es.get_system<RBConstruction>(uber_system_name);
@@ -179,7 +180,7 @@ void DerivedRBConstruction<RBConstruction>::generate_residual_terms_wrt_truth()
 {
   START_LOG("generate_residual_terms_wrt_truth()", "DerivedRBConstruction");
 
-  SteadyDerivedRBEvaluation& drb_eval = libmesh_cast_ref< SteadyDerivedRBEvaluation& >(get_rb_evaluation());
+  SteadyDerivedRBEvaluation& drb_eval = cast_ref< SteadyDerivedRBEvaluation& >(get_rb_evaluation());
 
   if(drb_eval.residual_type_flag != SteadyDerivedRBEvaluation::RESIDUAL_WRT_TRUTH)
     {
@@ -203,7 +204,7 @@ void DerivedRBConstruction<RBConstruction>::compute_Fq_representor_innerprods(bo
   EquationSystems& es = this->get_equation_systems();
   RBConstruction& uber_system = es.get_system<RBConstruction>(uber_system_name);
 
-  SteadyDerivedRBEvaluation& drb_eval = libmesh_cast_ref< SteadyDerivedRBEvaluation& >(get_rb_evaluation());
+  SteadyDerivedRBEvaluation& drb_eval = cast_ref< SteadyDerivedRBEvaluation& >(get_rb_evaluation());
 
   const unsigned int Q_f = get_rb_theta_expansion().get_n_F_terms();
 
@@ -273,7 +274,7 @@ void DerivedRBConstruction<RBConstruction>::update_residual_terms(bool compute_i
   START_LOG("update_residual_terms()", "DerivedRBConstruction");
 
   DerivedRBEvaluation<RBEvaluation>& der_rb_eval =
-    libmesh_cast_ref<DerivedRBEvaluation<RBEvaluation>&>(get_rb_evaluation());
+    cast_ref<DerivedRBEvaluation<RBEvaluation>&>(get_rb_evaluation());
 
   EquationSystems& es = this->get_equation_systems();
   RBConstruction& uber_system = es.get_system<RBConstruction>(uber_system_name);
@@ -417,15 +418,12 @@ void DerivedRBConstruction<RBConstruction>::load_rb_solution()
   solution->zero();
 
   if(get_rb_evaluation().RB_solution.size() > get_rb_evaluation().get_n_basis_functions())
-    {
-      libMesh::err << "ERROR: rb_eval contains " << get_rb_evaluation().get_n_basis_functions() << " basis functions."
-                   << " RB_solution vector constains " << get_rb_evaluation().RB_solution.size() << " entries."
-                   << " RB_solution in RBConstruction::load_rb_solution is too long!" << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: rb_eval contains " << get_rb_evaluation().get_n_basis_functions() << " basis functions." \
+                      << " RB_solution vector constains " << get_rb_evaluation().RB_solution.size() << " entries." \
+                      << " RB_solution in RBConstruction::load_rb_solution is too long!");
 
   DerivedRBEvaluation<RBEvaluation>& der_rb_eval =
-    libmesh_cast_ref<DerivedRBEvaluation<RBEvaluation>&>(get_rb_evaluation());
+    cast_ref<DerivedRBEvaluation<RBEvaluation>&>(get_rb_evaluation());
 
   EquationSystems& es = this->get_equation_systems();
   RBConstruction& uber_system = es.get_system<RBConstruction>(uber_system_name);

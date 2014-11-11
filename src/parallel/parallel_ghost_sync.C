@@ -1,5 +1,7 @@
 #include "libmesh/parallel_ghost_sync.h"
 
+namespace libMesh
+{
 
 SyncNodalPositions::SyncNodalPositions(MeshBase& m)
   : mesh(m)
@@ -18,10 +20,7 @@ void SyncNodalPositions::gather_data (const std::vector<dof_id_type>& ids, std::
       Node *node = mesh.node_ptr(ids[i]);
 
       if (node == NULL)
-        {
-          libMesh::err << "Error! Mesh returned a NULL node pointer in SyncNodalPosition::gather_data()." << std::endl;
-          libmesh_error();
-        }
+        libmesh_error_msg("Error! Mesh returned a NULL node pointer in SyncNodalPosition::gather_data().");
 
       // Store this node's position in the data array.
       // This should call Point::op=
@@ -40,12 +39,11 @@ void SyncNodalPositions::act_on_data (const std::vector<dof_id_type>& ids, std::
       Node* node = mesh.node_ptr(ids[i]);
 
       if (node == NULL)
-        {
-          libMesh::err << "Error! Mesh returned a NULL node pointer in SyncNodalPosition::act_on_data()." << std::endl;
-          libmesh_error();
-        }
+        libmesh_error_msg("Error! Mesh returned a NULL node pointer in SyncNodalPosition::act_on_data().");
 
       // Update this node's position.  Should call Point::op=
       *node = data[i];
     } // end for
 } // act_on_data()
+
+} // namespace

@@ -30,7 +30,6 @@
 #include "libmesh/system.h"
 #include "libmesh/equation_systems.h"
 #include "libmesh/zero_function.h"
-#include "libmesh/boundary_info.h"
 #include "libmesh/dirichlet_boundaries.h"
 #include "libmesh/dof_map.h"
 
@@ -43,12 +42,7 @@ void HeatSystem::init_data ()
   {
     std::ifstream i("heat.in");
     if (!i)
-      {
-        std::cerr << '[' << this->processor_id()
-                  << "] Can't find heat.in; exiting early."
-                  << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg('[' << this->processor_id() << "] Can't find heat.in; exiting early.");
   }
   GetPot infile("heat.in");
   _k = infile("k", 1.0);
@@ -78,7 +72,7 @@ void HeatSystem::init_data ()
 
 void HeatSystem::init_context(DiffContext &context)
 {
-  FEMContext &c = libmesh_cast_ref<FEMContext&>(context);
+  FEMContext &c = cast_ref<FEMContext&>(context);
 
   FEBase* elem_fe = NULL;
   c.get_element_fe( 0, elem_fe );
@@ -106,7 +100,7 @@ void HeatSystem::init_context(DiffContext &context)
   FEMSystem::init_context(context);
 }
 
-#define optassert(X) {if (!(X)) libmesh_error();}
+#define optassert(X) {if (!(X)) libmesh_error_msg("Assertion " #X " failed.");}
 //#define optassert(X) libmesh_assert(X);
 
 bool HeatSystem::element_time_derivative (bool request_jacobian,
@@ -114,7 +108,7 @@ bool HeatSystem::element_time_derivative (bool request_jacobian,
 {
   bool compute_jacobian = request_jacobian && _analytic_jacobians;
 
-  FEMContext &c = libmesh_cast_ref<FEMContext&>(context);
+  FEMContext &c = cast_ref<FEMContext&>(context);
 
   // First we get some references to cell-specific data that
   // will be used to assemble the linear system.

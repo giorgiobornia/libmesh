@@ -80,7 +80,7 @@ int main (int argc, char** argv)
   const unsigned int dim = 2;
 
   // Skip this 2D example if libMesh was compiled as 1D-only.
-  libmesh_example_assert(dim <= LIBMESH_DIM, "2D support");
+  libmesh_example_requires(dim <= LIBMESH_DIM, "2D support");
 
   // Create a 2D mesh distributed across the default MPI communicator.
   Mesh mesh(init.comm(), dim);
@@ -318,7 +318,7 @@ void assemble_elasticity(EquationSystems& es,
 
               fe_face->reinit(elem, side);
 
-              if( mesh.boundary_info->has_boundary_id (elem, side, 1) ) // Apply a traction on the right side
+              if( mesh.get_boundary_info().has_boundary_id (elem, side, 1) ) // Apply a traction on the right side
                 {
                   for (unsigned int qp=0; qp<qface.n_points(); qp++)
                     {

@@ -67,6 +67,7 @@ void QGauss::init_2D(const ElemType type_in,
       //---------------------------------------------
       // Triangle quadrature rules
     case TRI3:
+    case TRI3SUBDIVISION:
     case TRI6:
       {
         switch(_order + 2*p)
@@ -1046,7 +1047,7 @@ void QGauss::init_2D(const ElemType type_in,
             // It was copied 23rd June 2008 from:
             // http://people.scs.fsu.edu/~burkardt/f_src/dunavant/dunavant.f90
           case EIGHTTEENTH:
-          case NINTEENTH:
+          case NINETEENTH:
             {
               _points.resize (73);
               _weights.resize(73);
@@ -1288,16 +1289,8 @@ void QGauss::init_2D(const ElemType type_in,
       //---------------------------------------------
       // Unsupported type
     default:
-      {
-        libMesh::err << "Element type not supported!:" << type_in << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("Element type not supported!:" << type_in);
     }
-
-  libmesh_error();
-
-  return;
-
 #endif
 }
 

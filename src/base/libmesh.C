@@ -121,14 +121,29 @@ void libmesh_handleFPE(int /*signo*/, siginfo_t *info, void * /*context*/)
     }
   libMesh::err << ")!" << std::endl;
 
-  libMesh::err << std::endl;
-  libMesh::err << "To track this down, compile debug version, start debugger, set breakpoint for 'libmesh_handleFPE' and run" << std::endl;
-  libMesh::err << "In gdb do:" << std::endl;
-  libMesh::err << "  break libmesh_handleFPE" << std::endl;
-  libMesh::err << "  run ..." << std::endl;
-  libMesh::err << "  bt" << std::endl;
+  libmesh_error_msg("\nTo track this down, compile in debug mode, then in gdb do:\n" \
+                    << "  break libmesh_handleFPE\n"                    \
+                    << "  run ...\n"                                    \
+                    << "  bt");
+}
 
-  libmesh_error();
+
+void libmesh_handleSEGV(int /*signo*/, siginfo_t *info, void * /*context*/)
+{
+  libMesh::err << std::endl;
+  libMesh::err << "Segmentation fault exception signaled (";
+  switch (info->si_code)
+    {
+    case SEGV_MAPERR: libMesh::err << "Address not mapped"; break;
+    case SEGV_ACCERR: libMesh::err << "Invalid permissions"; break;
+    default:         libMesh::err << "unrecognized"; break;
+    }
+  libMesh::err << ")!" << std::endl;
+
+  libmesh_error_msg("\nTo track this down, compile in debug mode, then in gdb do:\n" \
+                    << "  break libmesh_handleSEGV\n"                    \
+                    << "  run ...\n"                                    \
+                    << "  bt");
 }
 }
 
@@ -137,7 +152,7 @@ void libmesh_handleFPE(int /*signo*/, siginfo_t *info, void * /*context*/)
 #ifdef LIBMESH_HAVE_MPI
 void libMesh_MPI_Handler (MPI_Comm *, int *, ...)
 {
-  libmesh_error();
+  libmesh_not_implemented();
 }
 #endif
 
@@ -233,10 +248,10 @@ SolverPackage libMesh::libMeshPrivateData::_solver_package =
   PETSC_SOLVERS;
 #elif defined(LIBMESH_HAVE_TRILINOS) // Use Trilinos if PETSc isn't there
 TRILINOS_SOLVERS;
-#elif defined(LIBMESH_HAVE_LASPACK)  // Use LASPACK if neither are there
-LASPACK_SOLVERS;
-#elif defined(LIBMESH_HAVE_EIGEN)    // Use Eigen as a last resort
+#elif defined(LIBMESH_HAVE_EIGEN)    // Use Eigen if neither are there
 EIGEN_SOLVERS;
+#elif defined(LIBMESH_HAVE_LASPACK)  // Use LASPACK as a last resort
+LASPACK_SOLVERS;
 #else                        // No valid linear solver package at compile time
 INVALID_SOLVER_PACKAGE;
 #endif
@@ -369,7 +384,46 @@ LibMeshInit::LibMeshInit (int argc, const char* const* argv,
 
       if (!flag)
         {
+#if MPI_VERSION > 1
+          int mpi_thread_provided;
+          const int mpi_thread_requested = libMesh::n_threads() > 1 ?
+            MPI_THREAD_FUNNELED :
+            MPI_THREAD_SINGLE;
+
+          MPI_Init_thread (&argc, const_cast<char***>(&argv),
+                           mpi_thread_requested, &mpi_thread_provided);
+
+          if ((libMesh::n_threads() > 1) &&
+              (mpi_thread_provided < MPI_THREAD_FUNNELED))
+            {
+              libmesh_warning("Warning: MPI failed to guarantee MPI_THREAD_FUNNELED\n"
+                              << "for a threaded run.\n"
+                              << "Be sure your library is funneled-thread-safe..."
+                              << std::endl);
+
+              // Ideally, if an MPI stack tells us it's unsafe for us
+              // to use threads, we shouldn't use threads.
+              // In practice, we've encountered one MPI stack (an
+              // mvapich2 configuration) that returned
+              // MPI_THREAD_SINGLE as a proper warning, two stacks
+              // that handle MPI_THREAD_FUNNELED properly, and two
+              // current stacks plus a couple old stacks that return
+              // MPI_THREAD_SINGLE but support libMesh threaded runs
+              // anyway.
+
+              // libMesh::libMeshPrivateData::_n_threads = 1;
+              // task_scheduler.reset (new Threads::task_scheduler_init(libMesh::n_threads()));
+            }
+#else
+          if (libMesh::libMeshPrivateData::_n_threads > 1)
+            {
+              libmesh_warning("Warning: using MPI1 for threaded code.\n" <<
+                              "Be sure your library is funneled-thread-safe..." <<
+                              std::endl);
+            }
+
           MPI_Init (&argc, const_cast<char***>(&argv));
+#endif
           libmesh_initialized_mpi = true;
         }
 
@@ -389,9 +443,9 @@ LibMeshInit::LibMeshInit (int argc, const char* const* argv,
       //MPI_Comm_set_name (libMesh::COMM_WORLD, "libMesh::COMM_WORLD");
 
       libMeshPrivateData::_processor_id =
-        libmesh_cast_int<processor_id_type>(this->comm().rank());
+        cast_int<processor_id_type>(this->comm().rank());
       libMeshPrivateData::_n_processors =
-        libmesh_cast_int<processor_id_type>(this->comm().size());
+        cast_int<processor_id_type>(this->comm().size());
 
       // Set up an MPI error handler if requested.  This helps us get
       // into a debugger with a proper stack when an MPI error occurs.
@@ -412,7 +466,7 @@ LibMeshInit::LibMeshInit (int argc, const char* const* argv,
   // Could we have gotten bad values from the above calls?
   libmesh_assert_greater (libMeshPrivateData::_n_processors, 0);
 
-  // The libmesh_cast_int already tested _processor_id>=0
+  // The cast_int already tested _processor_id>=0
   // libmesh_assert_greater_equal (libMeshPrivateData::_processor_id, 0);
 
   // Let's be sure we properly initialize on every processor at once:
@@ -533,6 +587,9 @@ LibMeshInit::LibMeshInit (int argc, const char* const* argv,
 
   if (libMesh::on_command_line("--enable-fpe"))
     libMesh::enableFPE(true);
+
+  if (libMesh::on_command_line("--enable-segv"))
+    libMesh::enableSEGV(true);
 
   // The library is now ready for use
   libMeshPrivateData::_is_initialized = true;
@@ -708,7 +765,34 @@ void enableFPE(bool on)
       _MM_SET_EXCEPTION_MASK(flags);
 #  endif
 #endif
-      signal(SIGFPE, 0);
+      signal(SIGFPE, SIG_DFL);
+    }
+}
+
+
+// Enable handling of SIGSEGV by libMesh
+// (potentially instead of PETSc)
+void enableSEGV(bool on)
+{
+  static struct sigaction old_action;
+  static bool was_on = false;
+
+  if (on)
+    {
+      struct sigaction new_action;
+      was_on = true;
+
+      // Set up the structure to specify the new action.
+      new_action.sa_sigaction = libmesh_handleSEGV;
+      sigemptyset (&new_action.sa_mask);
+      new_action.sa_flags = SA_SIGINFO;
+
+      sigaction (SIGSEGV, &new_action, &old_action);
+    }
+  else if (was_on)
+    {
+      was_on = false;
+      sigaction (SIGSEGV, &old_action, NULL);
     }
 }
 

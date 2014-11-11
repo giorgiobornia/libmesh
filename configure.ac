@@ -4,7 +4,7 @@
 
 
 
-AC_INIT([libmesh], [1.0.0-pre], [libmesh-users@lists.sourceforge.net], [libmesh], [http://libmesh.sourceforge.net])
+AC_INIT([libmesh], [1.0.0-pre], [libmesh-users@lists.sourceforge.net], [libmesh], [http://libmesh.github.io])
 AC_PREREQ([2.61]) # require autoconf 2.61 - I havent tried anything older
 
 # by default CFLAGS and CXXFLAGS are set to '-g -O2' on systems that support them.
@@ -40,13 +40,15 @@ AC_CONFIG_FILES([Makefile
                  contrib/utils/Makefile
                  contrib/utils/Make.common
                  tests/Makefile
-                 doc/Doxyfile
                  contrib/utils/libmesh.pc:contrib/utils/libmesh-opt.pc.in
                  contrib/utils/libmesh-opt.pc
                  contrib/utils/libmesh-dbg.pc
                  contrib/utils/libmesh-devel.pc
                  contrib/utils/libmesh-prof.pc
                  contrib/utils/libmesh-oprof.pc
+                 doc/Doxyfile
+                 doc/Makefile
+                 doc/html/Makefile
                  ])
 
 AC_CONFIG_FILES(contrib/bin/libmesh-config,          [chmod +x contrib/bin/libmesh-config])
@@ -93,13 +95,45 @@ AM_CONDITIONAL(LIBMESH_VPATH_BUILD, test x$libmesh_vpath_build = xyes)
 # --------------------------------------------------------------
 AC_LANG([C++])
 
+# -------------------------------------------------------------
+# Perl - look for perl.  Perl is used to generate dependencies.  We
+# also use it to (optionally) parse compiler version strings, so $PERL
+# needs to be set before LIBMESH_SET_COMPILERS is called.
+# -------------------------------------------------------------
+AC_PATH_PROG(PERL, perl)
+AC_SUBST(PERL)
+
 # --------------------------------------------------------------
 # Set our preferred compilers
 # --------------------------------------------------------------
 LIBMESH_SET_COMPILERS
 
 # --------------------------------------------------------------
-# See aclocal.m4 for the definition of this as well.  It uses the
+# Allow the user to explicitly turn off C++11 support by saying
+# --disable-cxx11.  Otherwise, C++11 support is enabled by default
+# although libmesh does not (currently) use any C++11 features.
+# --------------------------------------------------------------
+AC_ARG_ENABLE(cxx11,
+              AC_HELP_STRING([--disable-cxx11],
+                             [build without C++11 support]),
+                             [case "${enableval}" in
+                   yes) enablecxx11=yes ;;
+                   no)  enablecxx11=no ;;
+                   *)   AC_MSG_ERROR(bad value ${enableval} for --disable-cxx11) ;;
+                   esac],
+                   [enablecxx11=yes])
+
+if (test "x$enablecxx11" = "xyes"); then
+  # --------------------------------------------------------------
+  # Standard autoconf macro for determining the proper -std=c++11
+  # flag for the current compiler.  Adds the result to CXXFLAGS if
+  # one is found.  See ax_cxx_compile_stdcxx_11.m4 for details.
+  # --------------------------------------------------------------
+  AX_CXX_COMPILE_STDCXX_11([],[optional])
+fi
+
+# --------------------------------------------------------------
+# See compiler.m4 for the definition of this function.  It uses the
 # output of DETERMINE_CXX_BRAND to set special flags for idiosyncratic
 # compilers.  For example, newer versions of GCC have additional C++ debugging
 # flags like _GLIBCXX_DEBUG_PEDANTIC which were not present in older versions.
@@ -118,6 +152,21 @@ libmesh_CXXFLAGS="$GCOV_FLAGS $libmesh_CXXFLAGS"
 # Set compiler flags for devel, opt, etc. methods
 #-----------------------------------------------------
 LIBMESH_SET_METHODS
+
+# --------------------------------------------------------------
+# Test for specific C++11 features.  Note, we still run these
+# tests even when C++11 has been explicitly disabled even though
+# we know they will fail, since they contain AM_CONDITIONALs.
+# --------------------------------------------------------------
+LIBMESH_TEST_CXX11_MOVE
+LIBMESH_TEST_CXX11_SHARED_PTR
+LIBMESH_TEST_CXX11_UNIQUE_PTR
+LIBMESH_TEST_CXX11_REGEX
+LIBMESH_TEST_CXX11_OVERRIDE
+LIBMESH_TEST_CXX11_INITIALIZER_LIST
+LIBMESH_TEST_CXX11_VARIADIC_TEMPLATES
+LIBMESH_TEST_CXX11_THREAD
+LIBMESH_TEST_CXX11_TYPE_TRAITS
 
 #-----------------------------------------------------
 # Initialize libtool.  By default, we will build
@@ -151,7 +200,12 @@ AC_DEFINE_UNQUOTED(IO_COMPATIBILITY_VERSION, ["0.7.4"],            [libMesh I/O 
 AC_PROG_LN_S
 # -------------------------------------------------------------
 
-
+# ---------------------------------------------------------------
+# this seems to get done automatically for C++, but not C?
+# Required for QHull rules as implemented
+# --------------------------------------------------------------
+AM_PROG_CC_C_O
+# --------------------------------------------------------------
 
 # --------------------------------------------------------------
 # parent directories -- portably and without race conditions
@@ -165,15 +219,6 @@ AC_PROG_MKDIR_P
 AC_PROG_SED
 AC_SUBST(SED)
 # --------------------------------------------------------------
-
-
-# -------------------------------------------------------------
-# Perl - look for perl.  Perl is used to generate dependencies
-# -------------------------------------------------------------
-AC_PATH_PROG(PERL, perl)
-AC_SUBST(PERL)
-# -------------------------------------------------------------
-
 
 
 # -------------------------------------------------------------
@@ -303,8 +348,10 @@ if (test "x$enableexamples" = "xyes"); then
                 examples/miscellaneous/miscellaneous_ex8/Makefile
                 examples/miscellaneous/miscellaneous_ex9/Makefile
                 examples/miscellaneous/miscellaneous_ex10/Makefile
+                examples/miscellaneous/miscellaneous_ex11/Makefile
                 examples/subdomains/subdomains_ex1/Makefile
                 examples/subdomains/subdomains_ex2/Makefile
+                examples/subdomains/subdomains_ex3/Makefile
                 examples/systems_of_equations/systems_of_equations_ex1/Makefile
                 examples/systems_of_equations/systems_of_equations_ex2/Makefile
                 examples/systems_of_equations/systems_of_equations_ex3/Makefile

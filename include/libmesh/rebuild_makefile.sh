@@ -45,17 +45,20 @@ cat <<EOF >> Makefile.am
 if LIBMESH_ENABLE_FPARSER
 
 fparser.hh: \$(top_srcdir)/contrib/fparser/fparser.hh
-	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) \$< \$@
+	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) -f \$< \$@
 
-  BUILT_SOURCES  += fparser.hh
-  DISTCLEANFILES += fparser.hh
+fparser_ad.hh: \$(top_srcdir)/contrib/fparser/fparser_ad.hh
+	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) -f \$< \$@
+
+  BUILT_SOURCES  += fparser.hh fparser_ad.hh
+  DISTCLEANFILES += fparser.hh fparser_ad.hh
 
 endif
 
 if LIBMESH_ENABLE_NANOFLANN
 
 nanoflann.hpp: \$(top_srcdir)/contrib/nanoflann/include/nanoflann.hpp
-	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) \$< \$@
+	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) -f \$< \$@
 
   BUILT_SOURCES  += nanoflann.hpp
   DISTCLEANFILES += nanoflann.hpp
@@ -65,13 +68,13 @@ endif
 if LIBMESH_ENABLE_EXODUS_V509
 
 exodusII.h: \$(top_srcdir)/contrib/exodusii/v5.09/include/exodusII.h
-	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) \$< \$@
+	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) -f \$< \$@
 
   BUILT_SOURCES  += exodusII.h
   DISTCLEANFILES += exodusII.h
 
 exodusII_ext.h: \$(top_srcdir)/contrib/exodusii/v5.09/include/exodusII_ext.h
-	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) \$< \$@
+	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) -f \$< \$@
 
   BUILT_SOURCES  += exodusII_ext.h
   DISTCLEANFILES += exodusII_ext.h
@@ -81,7 +84,7 @@ endif
 if LIBMESH_ENABLE_EXODUS_V522
 
 exodusII.h: \$(top_srcdir)/contrib/exodusii/v5.22/exodus/cbind/include/exodusII.h
-	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) \$< \$@
+	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) -f \$< \$@
 
   BUILT_SOURCES  += exodusII.h
   DISTCLEANFILES += exodusII.h
@@ -91,7 +94,7 @@ endif
 if LIBMESH_ENABLE_NETCDF_V3
 
 netcdf.h: \$(top_srcdir)/contrib/netcdf/v3/netcdf.h
-	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) \$< \$@
+	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) -f \$< \$@
 
   BUILT_SOURCES  += netcdf.h
   DISTCLEANFILES += netcdf.h
@@ -101,7 +104,7 @@ endif
 if LIBMESH_ENABLE_NETCDF_V4
 
 netcdf.h: \$(top_srcdir)/contrib/netcdf/v4/include/netcdf.h
-	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) \$< \$@
+	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) -f \$< \$@
 
   BUILT_SOURCES  += netcdf.h
   DISTCLEANFILES += netcdf.h
@@ -117,7 +120,7 @@ cat <<EOF >> Makefile.am
 #
 # libmesh_config.h rule
 libmesh_config.h: \$(top_builddir)/include/libmesh_config.h
-	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) \$< \$@
+	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) -f \$< \$@
 
   BUILT_SOURCES  += libmesh_config.h
   DISTCLEANFILES += libmesh_config.h
@@ -137,7 +140,7 @@ for header_with_path in $headers $specializations ; do
     #echo "source = $source"
     cat <<EOF >> Makefile.am
 $header: $source
-	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) \$< \$@
+	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) -f \$< \$@
 
 EOF
 done

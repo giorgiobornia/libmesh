@@ -46,9 +46,6 @@ class Node;
  *
  * \author  Benjamin S. Kirk
  */
-
-// ------------------------------------------------------------
-//Side class definition
 template <class SideType, class ParentType>
 class Side : public SideType
 {
@@ -122,7 +119,7 @@ public:
 
   virtual bool is_child_on_side(const unsigned int,
                                 const unsigned int) const
-  { libmesh_error(); return false; }
+  { libmesh_not_implemented(); return false; }
 
 
 private:

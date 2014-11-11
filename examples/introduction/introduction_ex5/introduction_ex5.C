@@ -115,24 +115,20 @@ int main (int argc, char** argv)
     {
       if (init.comm().rank() == 0)
         {
-          std::cerr << "Usage: " << argv[0] << " -q n"
-                    << std::endl;
-          std::cerr << "  where n stands for:" << std::endl;
-
+          libMesh::err << "Usage: " << argv[0] << " -q n\n"
+                       << "  where n is one of:" << std::endl;
 
           // Note that only some of all quadrature rules are
           // valid choices.  For example, the Jacobi quadrature
           // is actually a "helper" for higher-order rules,
           // included in QGauss.
           for (unsigned int n=0; n<QuadratureRules::num_valid_elem_rules; n++)
-            std::cerr << "  " << QuadratureRules::valid_elem_rules[n] << "    "
-                      << QuadratureRules::name(QuadratureRules::valid_elem_rules[n])
-                      << std::endl;
-
-          std::cerr << std::endl;
+            libMesh::err << "  " << QuadratureRules::valid_elem_rules[n] << "    "
+                         << QuadratureRules::name(QuadratureRules::valid_elem_rules[n])
+                         << std::endl;
         }
 
-      libmesh_error();
+      libmesh_error_msg("Error, must choose a valid quadrature rule.");
     }
 
 
@@ -152,7 +148,7 @@ int main (int argc, char** argv)
   quad_type = static_cast<QuadratureType>(std::atoi(argv[2]));
 
   // Skip this 3D example if libMesh was compiled as 1D-only.
-  libmesh_example_assert(3 <= LIBMESH_DIM, "3D support");
+  libmesh_example_requires(3 <= LIBMESH_DIM, "3D support");
 
   // The following is identical to example 4, and therefore
   // not commented.  Differences are mentioned when present.

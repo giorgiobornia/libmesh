@@ -147,7 +147,7 @@ void SolidSystem::update() {
 }
 
 void SolidSystem::init_context(DiffContext &context) {
-  FEMContext &c = libmesh_cast_ref<FEMContext&>(context);
+  FEMContext &c = cast_ref<FEMContext&>(context);
 
   // Pre-request all the data needed
   FEBase* elem_fe = NULL;
@@ -172,7 +172,7 @@ void SolidSystem::init_context(DiffContext &context) {
  */
 bool SolidSystem::element_time_derivative(bool request_jacobian,
                                           DiffContext &context) {
-  FEMContext &c = libmesh_cast_ref<FEMContext&>(context);
+  FEMContext &c = cast_ref<FEMContext&>(context);
 
   // First we get some references to cell-specific data that
   // will be used to assemble the linear system.
@@ -270,7 +270,7 @@ bool SolidSystem::element_time_derivative(bool request_jacobian,
 
 bool SolidSystem::side_time_derivative(bool request_jacobian,
                                        DiffContext &context) {
-  FEMContext &c = libmesh_cast_ref<FEMContext&>(context);
+  FEMContext &c = cast_ref<FEMContext&>(context);
 
   // Apply displacement boundary conditions with penalty method
 
@@ -285,12 +285,8 @@ bool SolidSystem::side_time_derivative(bool request_jacobian,
 
   // Get number of BCs to enforce
   unsigned int num_bc = args.vector_variable_size("bc/displacement");
-  if (num_bc % 4 != 0) {
-    libMesh::err
-      << "ERROR, Odd number of values in displacement boundary condition.\n"
-      << std::endl;
-    libmesh_error();
-  }
+  if (num_bc % 4 != 0)
+    libmesh_error_msg("ERROR, Odd number of values in displacement boundary condition.");
   num_bc /= 4;
 
   // Loop over all BCs
@@ -299,8 +295,8 @@ bool SolidSystem::side_time_derivative(bool request_jacobian,
     short int positive_boundary_id = args("bc/displacement", 1, nbc * 4);
 
     // The current side may not be on the boundary to be restricted
-    if (!this->get_mesh().boundary_info->has_boundary_id
-        (&c.get_elem(),c.get_side(),positive_boundary_id))
+    if (!this->get_mesh().get_boundary_info().has_boundary_id
+          (&c.get_elem(),c.get_side(),positive_boundary_id))
       continue;
 
     // Read values from configuration file

@@ -47,8 +47,8 @@ public:
    * Constructor. Initializes dimenstion and processor id.
    */
   explicit
-  BoundaryMesh (const Parallel::Communicator &comm,
-                unsigned int dim=1);
+  BoundaryMesh (const Parallel::Communicator &comm_in,
+                unsigned char dim=1);
 
 #ifndef LIBMESH_DISABLE_COMMWORLD
   /**
@@ -57,7 +57,7 @@ public:
    * changed by mesh generation/loading) later.
    */
   explicit
-  BoundaryMesh (unsigned int dim=1);
+  BoundaryMesh (unsigned char dim=1);
 #endif
 
 

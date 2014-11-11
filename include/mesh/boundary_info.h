@@ -345,12 +345,12 @@ public:
   /**
    * Builds the list of unique node boundary ids.
    */
-  void build_node_boundary_ids(std::vector<boundary_id_type> &b_ids);
+  void build_node_boundary_ids(std::vector<boundary_id_type> &b_ids) const;
 
   /**
    * Builds the list of unique side boundary ids.
    */
-  void build_side_boundary_ids(std::vector<boundary_id_type> &b_ids);
+  void build_side_boundary_ids(std::vector<boundary_id_type> &b_ids) const;
 
   /**
    * @returns the number of element-side-based boundary conditions.
@@ -391,6 +391,19 @@ public:
    */
   void build_side_list (std::vector<dof_id_type>&        element_id_list,
                         std::vector<unsigned short int>& side_list,
+                        std::vector<boundary_id_type>&   bc_id_list) const;
+  /**
+   * Creates a list of active element numbers, sides, and  and ids for those sides.
+   */
+  void build_active_side_list (std::vector<dof_id_type>&        element_id_list,
+                               std::vector<unsigned short int>& side_list,
+                               std::vector<boundary_id_type>&   bc_id_list) const;
+
+  /**
+   * Creates a list of element numbers, edges, and boundary ids for those edges.
+   */
+  void build_edge_list (std::vector<dof_id_type>&        element_id_list,
+                        std::vector<unsigned short int>& edge_list,
                         std::vector<boundary_id_type>&   bc_id_list) const;
 
   /**
@@ -433,14 +446,24 @@ public:
   void print_summary (std::ostream& out=libMesh::out) const;
 
   /**
-   * Returns a writable reference for getting/setting an optional
-   * name for a sideset name.
+   * Returns a reference for getting an optional name for a sideset.
+   */
+  const std::string& get_sideset_name(boundary_id_type id) const;
+
+  /**
+   * Returns a writable reference for setting an optional
+   * name for a sideset.
    */
   std::string& sideset_name(boundary_id_type id);
 
   /**
-   * Returns a writable reference for getting/setting an optional
-   * name for a nodeset name.
+   * Returns a reference for getting an optional name for a nodeset.
+   */
+  const std::string& get_nodeset_name(boundary_id_type id) const;
+
+  /**
+   * Returns a writable reference for setting an optional
+   * name for a nodeset.
    */
   std::string& nodeset_name(boundary_id_type id);
 

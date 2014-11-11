@@ -42,8 +42,9 @@ class MeshBase;
  * GMSH software see
  * <a href="http://http://www.geuz.org/gmsh/">the Gmsh home page</a>
  *
- * @author John W. Peterson, 2004
- * @author Martin Lüthi, 2005 (support for reading meshes and writing results)
+ * @author John W. Peterson, 2004, 2014
+ * @author Martin Luthi (mluthi@tnoo.net), 2005: massive overhaul and extension,
+ *                                         plus support for reading meshes and writing results
  */
 
 // ------------------------------------------------------------
@@ -68,13 +69,11 @@ public:
   GmshIO (const MeshBase& mesh);
 
   /**
-   * Reads in a mesh in the Gmsh *.msh format
-   * from the ASCII file given by name.
+   * Reads in a mesh in the Gmsh *.msh format from the ASCII file
+   * given by name.
    *
-   * Note that for this method to work (in 2d and 3d) you have to
-   * explicitly set the mesh dimension prior to calling GmshIO::read()
-   * and that Mesh::prepare_for_use() must be called after reading the
-   * mesh and before using it.
+   * The user is responsible for calling Mesh::prepare_for_use()
+   * after reading the mesh and before using it.
    */
   virtual void read (const std::string& name);
 
@@ -132,35 +131,7 @@ private:
    * Flag to write binary data.
    */
   bool _binary;
-
-
-
 };
-
-
-
-// ------------------------------------------------------------
-// GmshIO inline members
-inline
-GmshIO::GmshIO (const MeshBase& mesh) :
-  MeshOutput<MeshBase> (mesh),
-  _binary        (false)
-{
-}
-
-
-inline
-GmshIO::GmshIO (MeshBase& mesh) :
-  MeshInput<MeshBase>  (mesh),
-  MeshOutput<MeshBase> (mesh),
-  _binary (false)
-{}
-
-inline
-bool & GmshIO::binary ()
-{
-  return _binary;
-}
 
 
 } // namespace libMesh

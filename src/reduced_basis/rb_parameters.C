@@ -49,11 +49,7 @@ Real RBParameters::get_value(const std::string& param_name) const
 
   // throw and error if the parameter doesn't exist
   if( it == _parameters.end() )
-    {
-      libMesh::err << "Error: parameter " << param_name << " does not exist in RBParameters object."
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("Error: parameter " << param_name << " does not exist in RBParameters object.");
 
   return it->second;
 }
@@ -65,7 +61,7 @@ void RBParameters::set_value(const std::string& param_name, Real value)
 
 unsigned int RBParameters::n_parameters() const
 {
-  return libmesh_cast_int<unsigned int>
+  return cast_int<unsigned int>
     (_parameters.size());
 }
 

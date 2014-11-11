@@ -16,7 +16,7 @@ noinst_HEADERS =  \
 # to a user.  Consider these the public interface of libMesh.
 # will get installed into '$(prefix)/include/libmesh'
 include_HEADERS =  \
-        libmesh/libmesh_config.h \
+        libmesh_config.h \
         base/auto_ptr.h \
         base/dirichlet_boundaries.h \
         base/dof_map.h \
@@ -123,6 +123,7 @@ include_HEADERS =  \
         geom/edge_edge4.h \
         geom/edge_inf_edge2.h \
         geom/elem.h \
+        geom/elem_cutter.h \
         geom/elem_quality.h \
         geom/elem_range.h \
         geom/elem_type.h \
@@ -136,6 +137,7 @@ include_HEADERS =  \
         geom/face_quad9.h \
         geom/face_tri.h \
         geom/face_tri3.h \
+        geom/face_tri3_subdivision.h \
         geom/face_tri6.h \
         geom/node.h \
         geom/node_elem.h \
@@ -179,6 +181,7 @@ include_HEADERS =  \
         mesh/mesh_smoother.h \
         mesh/mesh_smoother_laplace.h \
         mesh/mesh_smoother_vsmoother.h \
+        mesh/mesh_subdivision_support.h \
         mesh/mesh_tetgen_interface.h \
         mesh/mesh_tetgen_wrapper.h \
         mesh/mesh_tools.h \
@@ -222,6 +225,7 @@ include_HEADERS =  \
         numerics/fem_function_base.h \
         numerics/function_base.h \
         numerics/numeric_vector.h \
+        numerics/parsed_fem_function.h \
         numerics/parsed_function.h \
         numerics/petsc_macro.h \
         numerics/petsc_matrix.h \
@@ -273,8 +277,10 @@ include_HEADERS =  \
         physics/fem_physics.h \
         quadrature/quadrature.h \
         quadrature/quadrature_clough.h \
+        quadrature/quadrature_composite.h \
         quadrature/quadrature_conical.h \
         quadrature/quadrature_gauss.h \
+        quadrature/quadrature_gauss_lobatto.h \
         quadrature/quadrature_gm.h \
         quadrature/quadrature_grid.h \
         quadrature/quadrature_jacobi.h \

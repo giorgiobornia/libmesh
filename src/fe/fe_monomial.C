@@ -21,6 +21,7 @@
 #include "libmesh/fe.h"
 #include "libmesh/elem.h"
 #include "libmesh/fe_interface.h"
+#include "libmesh/string_to_enum.h"
 
 namespace libMesh
 {
@@ -107,7 +108,7 @@ unsigned int monomial_n_dofs(const ElemType t, const Order o)
       // constant shape functions
       // no matter what shape there is only one DOF.
     case CONSTANT:
-      return 1;
+      return (t != INVALID_ELEM) ? 1 : 0;
 
 
       // Discontinuous linear shape functions
@@ -144,15 +145,11 @@ unsigned int monomial_n_dofs(const ElemType t, const Order o)
           case PYRAMID14:
             return 4;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for " << o << "th order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
@@ -191,15 +188,11 @@ unsigned int monomial_n_dofs(const ElemType t, const Order o)
           case PYRAMID14:
             return 10;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for " << o << "th order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
@@ -238,15 +231,11 @@ unsigned int monomial_n_dofs(const ElemType t, const Order o)
           case PYRAMID14:
             return 20;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for " << o << "th order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
@@ -284,15 +273,11 @@ unsigned int monomial_n_dofs(const ElemType t, const Order o)
           case PYRAMID14:
             return 35;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for " << o << "th order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
@@ -329,21 +314,16 @@ unsigned int monomial_n_dofs(const ElemType t, const Order o)
           case PYRAMID14:
             return (order+1)*(order+2)*(order+3)/6;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for " << o << "th order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
     }
 
-  libmesh_error();
-
+  libmesh_error_msg("We'll never get here!");
   return 0;
 } // monomial_n_dofs()
 

@@ -71,14 +71,11 @@ void RBConstructionBase<Base>::clear ()
   std::map< std::string, NumericVector<Number>* >::iterator it           = training_parameters.begin();
   std::map< std::string, NumericVector<Number>* >::const_iterator it_end = training_parameters.end();
 
-  for( ; it != it_end; ++it)
+  for ( ; it != it_end; ++it)
     {
       NumericVector<Number>* training_vector = it->second;
-      if(training_vector)
-        {
-          delete training_vector;
-          training_vector = NULL;
-        }
+      delete training_vector;
+      training_vector = NULL;
     }
   training_parameters.clear();
 }
@@ -200,13 +197,18 @@ void RBConstructionBase<Base>::initialize_training_parameters(const RBParameters
                << (deterministic ? "deterministic " : "random " )
                << "training set..." << std::endl;
 
-  std::map<std::string,bool>::iterator it           = log_param_scale.begin();
-  std::map<std::string,bool>::const_iterator it_end = log_param_scale.end();
-  for(; it != it_end; ++it)
-    {
-      libMesh::out << "Parameter " << it->first
-                   << ": log scaling = " << it->second << std::endl;
-    }
+  {
+    std::map<std::string,bool>::iterator it           = log_param_scale.begin();
+    std::map<std::string,bool>::const_iterator it_end = log_param_scale.end();
+    for (; it != it_end; ++it)
+      {
+        libMesh::out << "Parameter "
+                     << it->first
+                     << ": log scaling = "
+                     << it->second
+                     << std::endl;
+      }
+  }
   libMesh::out << std::endl;
 
   if(deterministic)
@@ -269,35 +271,25 @@ void RBConstructionBase<Base>::load_training_set(std::map< std::string, std::vec
   // First, make sure that an initial training set has already been
   // generated
   if(!training_parameters_initialized)
-    {
-      libMesh::out << "Error: load_training_set cannot be used to initialize parameters"
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("Error: load_training_set cannot be used to initialize parameters");
 
   // Make sure that the training set has the correct number of parameters
   if(new_training_set.size() != get_n_params())
-    {
-      libMesh::out << "Error: Incorrect number of parameters in load_training_set."
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("Error: Incorrect number of parameters in load_training_set.");
 
   // Clear the training set
   std::map< std::string, NumericVector<Number>* >::iterator it           = training_parameters.begin();
   std::map< std::string, NumericVector<Number>* >::const_iterator it_end = training_parameters.end();
-  for( ; it != it_end; ++it)
+  for ( ; it != it_end; ++it)
     {
       NumericVector<Number>* training_vector = it->second;
-      if(training_vector)
-        {
-          delete training_vector;
-          training_vector = NULL;
-        }
+      delete training_vector;
+      training_vector = NULL;
     }
 
   // Get the number of local and global training parameters
-  numeric_index_type n_local_training_samples  = new_training_set.begin()->second.size();
+  numeric_index_type n_local_training_samples  =
+    cast_int<numeric_index_type>(new_training_set.begin()->second.size());
   numeric_index_type n_global_training_samples = n_local_training_samples;
   this->comm().sum(n_global_training_samples);
 
@@ -342,14 +334,11 @@ void RBConstructionBase<Base>::generate_training_parameters_random(const Paralle
     std::map< std::string, NumericVector<Number>* >::iterator it           = training_parameters_in.begin();
     std::map< std::string, NumericVector<Number>* >::const_iterator it_end = training_parameters_in.end();
 
-    for( ; it != it_end; ++it)
+    for ( ; it != it_end; ++it)
       {
         NumericVector<Number>* training_vector = it->second;
-        if(training_vector)
-          {
-            delete training_vector;
-            training_vector = NULL;
-          }
+        delete training_vector;
+        training_vector = NULL;
       }
     training_parameters_in.clear();
   }
@@ -481,14 +470,11 @@ void RBConstructionBase<Base>::generate_training_parameters_deterministic(const 
     std::map< std::string, NumericVector<Number>* >::iterator it           = training_parameters_in.begin();
     std::map< std::string, NumericVector<Number>* >::const_iterator it_end = training_parameters_in.end();
 
-    for( ; it != it_end; ++it)
+    for ( ; it != it_end; ++it)
       {
         NumericVector<Number>* training_vector = it->second;
-        if(training_vector)
-          {
-            delete training_vector;
-            training_vector = NULL;
-          }
+        delete training_vector;
+        training_vector = NULL;
       }
   }
 
@@ -568,12 +554,11 @@ void RBConstructionBase<Base>::generate_training_parameters_deterministic(const 
       // First make sure n_training_samples_in is a square number
       unsigned int n_training_parameters_per_var = static_cast<unsigned int>( std::sqrt(static_cast<Real>(n_training_samples_in)) );
       if( (n_training_parameters_per_var*n_training_parameters_per_var) != n_training_samples_in)
-        {
-          libMesh::out << "Error: Number of training parameters = " << n_training_samples_in << "." << std::endl
-                       << "Deterministic training set generation with two parameters requires " << std::endl
-                       << "the number of training parameters to be a perfect square." << std::endl;
-          libmesh_error();
-        }
+        libmesh_error_msg("Error: Number of training parameters = " \
+                          << n_training_samples_in \
+                          << ".\n" \
+                          << "Deterministic training set generation with two parameters requires\n " \
+                          << "the number of training parameters to be a perfect square.");
 
       // make a matrix to store all the parameters, put them in vector form afterwards
       std::vector< std::vector<Real> > training_parameters_matrix(num_params);
@@ -679,7 +664,7 @@ RBConstructionBase<Base>::set_alternative_solver
 #ifdef LIBMESH_HAVE_PETSC
   // ... but we can set it the "hard" way
   PetscLinearSolver<Number>* petsc_linear_solver =
-    libmesh_cast_ptr<PetscLinearSolver<Number>*>(ls.get());
+    cast_ptr<PetscLinearSolver<Number>*>(ls.get());
 
   // Note: #define PCType char*, and PCGetType just sets a pointer.  We'll use
   // the string below to make a real copy, and set the PC back to its original
@@ -775,7 +760,7 @@ void RBConstructionBase<Base>::reset_alternative_solver(
       // this->linear_solver->set_preconditioner_type(orig_pc);
       // Set PC back to its previous type
       PetscLinearSolver<Number>* petsc_linear_solver =
-        libmesh_cast_ptr<PetscLinearSolver<Number>*>(ls.get());
+        cast_ptr<PetscLinearSolver<Number>*>(ls.get());
 
       PC pc;
       KSP ksp;

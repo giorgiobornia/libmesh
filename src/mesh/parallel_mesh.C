@@ -31,9 +31,9 @@ namespace libMesh
 
 // ------------------------------------------------------------
 // ParallelMesh class member functions
-ParallelMesh::ParallelMesh (const Parallel::Communicator &comm,
-                            unsigned int d) :
-  UnstructuredMesh (comm,d), _is_serial(true),
+ParallelMesh::ParallelMesh (const Parallel::Communicator &comm_in,
+                            unsigned char d) :
+  UnstructuredMesh (comm_in,d), _is_serial(true),
   _n_nodes(0), _n_elem(0), _max_node_id(0), _max_elem_id(0),
   _next_free_local_node_id(this->processor_id()),
   _next_free_local_elem_id(this->processor_id()),
@@ -52,7 +52,7 @@ ParallelMesh::ParallelMesh (const Parallel::Communicator &comm,
 #ifndef LIBMESH_DISABLE_COMMWORLD
 // ------------------------------------------------------------
 // ParallelMesh class member functions
-ParallelMesh::ParallelMesh (unsigned int d) :
+ParallelMesh::ParallelMesh (unsigned char d) :
   UnstructuredMesh (d), _is_serial(true),
   _n_nodes(0), _n_elem(0), _max_node_id(0), _max_elem_id(0),
   _next_free_local_node_id(this->processor_id()),
@@ -100,7 +100,7 @@ ParallelMesh::ParallelMesh (const ParallelMesh &other_mesh) :
     other_mesh._next_free_unpartitioned_node_id;
   _next_free_unpartitioned_elem_id =
     other_mesh._next_free_unpartitioned_elem_id;
-  *this->boundary_info = *other_mesh.boundary_info;
+  this->get_boundary_info() = other_mesh.get_boundary_info();
 
   // Need to copy extra_ghost_elems
   for(std::set<Elem *>::iterator it = other_mesh._extra_ghost_elems.begin();
@@ -120,7 +120,7 @@ ParallelMesh::ParallelMesh (const UnstructuredMesh &other_mesh) :
   _next_free_unpartitioned_elem_id(this->n_processors())
 {
   this->copy_nodes_and_elements(other_mesh);
-  *this->boundary_info = *other_mesh.boundary_info;
+  this->get_boundary_info() = other_mesh.get_boundary_info();
 
   this->update_parallel_id_counts();
 }
@@ -431,16 +431,14 @@ Elem* ParallelMesh::add_elem (Elem *e)
   // And shouldn't be added in the same batch as ghost elems
   // But we might be just adding on processor 0 to
   // broadcast later
-#if 0
-#ifdef DEBUG
-  if (elem_procid == DofObject::invalid_processor_id)
-    {
-      dof_id_type elem_id = e->id();
-      this->comm().max(elem_id);
-      libmesh_assert_equal_to (elem_id, e->id());
-    }
-#endif
-#endif
+  // #ifdef DEBUG
+  //   if (elem_procid == DofObject::invalid_processor_id)
+  //     {
+  //       dof_id_type elem_id = e->id();
+  //       this->comm().max(elem_id);
+  //       libmesh_assert_equal_to (elem_id, e->id());
+  //     }
+  // #endif
 
   return e;
 }
@@ -464,7 +462,7 @@ void ParallelMesh::delete_elem(Elem* e)
   libmesh_assert (e);
 
   // Delete the element from the BoundaryInfo object
-  this->boundary_info->remove(e);
+  this->get_boundary_info().remove(e);
 
   // But not yet from the container; we might invalidate
   // an iterator that way!
@@ -596,16 +594,14 @@ Node* ParallelMesh::add_node (Node *n)
   // And shouldn't be added in the same batch as ghost nodes
   // But we might be just adding on processor 0 to
   // broadcast later
-#if 0
-#ifdef DEBUG
-  if (node_procid == DofObject::invalid_processor_id)
-    {
-      dof_id_type node_id = n->id();
-      this->comm().max(node_id);
-      libmesh_assert_equal_to (node_id, n->id());
-    }
-#endif
-#endif
+  // #ifdef DEBUG
+  //   if (node_procid == DofObject::invalid_processor_id)
+  //     {
+  //       dof_id_type node_id = n->id();
+  //       this->comm().max(node_id);
+  //       libmesh_assert_equal_to (node_id, n->id());
+  //     }
+  // #endif
 
   return n;
 }
@@ -625,7 +621,7 @@ void ParallelMesh::delete_node(Node* n)
   libmesh_assert(_nodes[n->id()]);
 
   // Delete the node from the BoundaryInfo object
-  this->boundary_info->remove(n);
+  this->get_boundary_info().remove(n);
 
   // But not yet from the container; we might invalidate
   // an iterator that way!
@@ -943,11 +939,11 @@ dof_id_type ParallelMesh::renumber_dof_objects
       for (processor_id_type p=1; p != this->n_processors(); ++p)
         {
           // Trade my requests with processor procup and procdown
-          processor_id_type procup = (this->processor_id() + p) %
-            this->n_processors();
-          processor_id_type procdown = (this->n_processors() +
-                                        this->processor_id() - p) %
-            this->n_processors();
+          processor_id_type procup = cast_int<processor_id_type>
+            ((this->processor_id() + p) % this->n_processors());
+          processor_id_type procdown = cast_int<processor_id_type>
+            ((this->n_processors() + this->processor_id() - p) %
+             this->n_processors());
           std::vector<dof_id_type> request_to_fill;
           this->comm().send_receive(procup, requested_ids[procup],
                                     procdown, request_to_fill);
@@ -1112,7 +1108,7 @@ void ParallelMesh::renumber_nodes_and_elements ()
           {
             // remove any boundary information associated with
             // this node
-            this->boundary_info->remove (nd);
+            this->get_boundary_info().remove (nd);
 
             // delete the node
             delete nd;

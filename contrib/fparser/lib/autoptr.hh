@@ -14,13 +14,15 @@ public:
 
     FPOPT_autoptr& operator= (Ref*        b) { Set(b); return *this; }
     FPOPT_autoptr& operator= (const FPOPT_autoptr& b) { Set(b.p); return *this; }
-#ifdef __GXX_EXPERIMENTAL_CXX0X__
+#ifdef FP_SUPPORT_CXX11_MOVE
     FPOPT_autoptr(FPOPT_autoptr&& b)      : p(b.p) { b.p = 0; }
     FPOPT_autoptr& operator= (FPOPT_autoptr&& b) { if(p != b.p) { Forget(); p=b.p; b.p=0; }
                                                    return *this; }
 #endif
 
     ~FPOPT_autoptr() { Forget(); }
+
+    bool isNull() const { return p == 0; }
 
     void UnsafeSetP(Ref* newp) { p = newp; }
     void swap(FPOPT_autoptr<Ref>& b) { Ref* tmp=p; p=b.p; b.p=tmp; }

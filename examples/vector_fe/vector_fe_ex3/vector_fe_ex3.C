@@ -52,7 +52,7 @@ int main (int argc, char** argv)
   const unsigned int grid_size = infile( "grid_size", 2 );
 
   // Skip higher-dimensional examples on a lower-dimensional libMesh build
-  libmesh_example_assert(3 <= LIBMESH_DIM, "2D/3D support");
+  libmesh_example_requires(3 <= LIBMESH_DIM, "2D/3D support");
 
   // Create a mesh, with dimension to be overridden later, on the
   // default MPI communicator.
@@ -65,13 +65,10 @@ int main (int argc, char** argv)
   std::string elem_str = command_line_value( std::string("element_type"),
                                              std::string("TRI6") );
 
-  if( elem_str != "TRI6" && elem_str != "QUAD8" && elem_str != "QUAD9" )
-    {
-      libMesh::err << "This example must be run with TRI6, QUAD8, or QUAD9."
-                   << std::endl
-                   << "You entered: " << elem_str << std::endl;
-      libmesh_error();
-    }
+  if (elem_str != "TRI6" && elem_str != "QUAD8" && elem_str != "QUAD9")
+    libmesh_error_msg("You selected: "                                  \
+                      << elem_str                                       \
+                      << " but this example must be run with TRI6, QUAD8, or QUAD9.");
 
   MeshTools::Generation::build_square (mesh,
                                        grid_size,

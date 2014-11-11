@@ -221,7 +221,7 @@ void ParmetisPartitioner::initialize (const MeshBase& mesh,
   // Set up the vtxdist array.  This will be the same on each processor.
   // ***** Consult the Parmetis documentation. *****
   libmesh_assert_equal_to (_vtxdist.size(),
-                           libmesh_cast_int<std::size_t>(mesh.n_processors()+1));
+                           cast_int<std::size_t>(mesh.n_processors()+1));
   libmesh_assert_equal_to (_vtxdist[0], 0);
 
   for (processor_id_type pid=0; pid<mesh.n_processors(); pid++)
@@ -309,11 +309,7 @@ void ParmetisPartitioner::initialize (const MeshBase& mesh,
     // processors of the number of active elements per processor, which means
     // there must be some unpartitioned objects out there.
     if (global_index_map.size() != _global_index_by_pid_map.size())
-      {
-        libMesh::err << "ERROR:  ParmetisPartitioner cannot handle unpartitioned objects!"
-                     << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR:  ParmetisPartitioner cannot handle unpartitioned objects!");
   }
 
   // Finally, we need to initialize the vertex (partition) weights and the initial subdomain
@@ -332,8 +328,7 @@ void ParmetisPartitioner::initialize (const MeshBase& mesh,
         if (pid < static_cast<unsigned int>(_nparts))
           {
             tgt_subdomain_size = n_active_elem/std::min
-              (libmesh_cast_int<int>(mesh.n_processors()),
-               _nparts);
+              (cast_int<int>(mesh.n_processors()), _nparts);
 
             if (pid < n_active_elem%_nparts)
               tgt_subdomain_size++;

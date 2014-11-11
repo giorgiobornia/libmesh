@@ -90,6 +90,7 @@ echo '  periodic boundary conditions..... :' $enableperiodic
 echo '  reference counting............... :' $enablerefct
 echo '  shape function 2nd derivatives... :' $enablesecond
 echo '  stack trace files................ :' $enabletracefiles
+echo '  track node valence............... :' $enablenodevalence
 echo '  variational smoother............. :' $enablevsmoother
 echo '  xdr binary I/O................... :' $enablexdr
 if (test "x$enablelegacyincludepaths" = "xyes"); then
@@ -126,6 +127,9 @@ if (test "x$enableoptional" = "xyes"); then
   if (test "x$enablefparser" = "xyes" -a "x$enablefparserdevel" = "xyes"); then
   echo '     'build from version............ : devel
   fi
+  if (test "x$enablefparser" = "xyes" -a "x$enablefparserdebugging" = "xyes"); then
+  echo '     'fparser debugging............. : enabled
+  fi
   echo '  'glpk............................. : $enableglpk
   echo '  'gmv.............................. : $enablegmv
   echo '  'gzstream......................... : $enablegz
@@ -149,7 +153,12 @@ if (test "x$enableoptional" = "xyes"); then
   if (test "x$enablepetsc" = "xyes"); then
   echo '     'version....................... : $petscversion
   fi
+  echo '  'slepc............................ : $enableslepc
+  if (test "x$enableslepc" = "xyes"); then
+  echo '     'version....................... : $slepcversion
+  fi
   echo '  'pthreads......................... : $enablepthreads
+  echo '  'qhull............................ : $enableqhull
   echo '  'sfcurves......................... : $enablesfc
   echo '  'slepc............................ : $enableslepc
   echo '  'tbb.............................. : $enabletbb

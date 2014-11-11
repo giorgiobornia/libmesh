@@ -75,25 +75,31 @@ public:
    * FEMSystem, for example) needed for an interior integration at a new point
    * within a timestep
    */
-  virtual void elem_reinit(Real) {}
+  virtual void elem_reinit(Real /* theta */) {}
 
   /**
    * Gives derived classes the opportunity to reinitialize data needed
    * for a side integration at a new point within a timestep
    */
-  virtual void elem_side_reinit(Real) {}
+  virtual void elem_side_reinit(Real /* theta */) {}
 
   /**
    * Gives derived classes the opportunity to reinitialize data needed
    * for an edge integration at a new point within a timestep
    */
-  virtual void elem_edge_reinit(Real) {}
+  virtual void elem_edge_reinit(Real /* theta */) {}
+
+  /**
+   * Gives derived classes the opportunity to reinitialize data needed
+   * for nonlocal calculations at a new point within a timestep
+   */
+  virtual void nonlocal_reinit(Real /* theta */) {}
 
   /**
    * Number of variables in solution.
    */
   unsigned int n_vars() const
-  { return libmesh_cast_int<unsigned int>(dof_indices_var.size()); }
+  { return cast_int<unsigned int>(dof_indices_var.size()); }
 
   /**
    * Accessor for associated system.

@@ -721,8 +721,8 @@ void Nemesis_IO_Helper::create(std::string filename)
     }
   else
     {
-      comp_ws = libmesh_cast_int<int>(std::min(sizeof(Real), sizeof(double)));
-      io_ws = libmesh_cast_int<int>(std::min(sizeof(Real), sizeof(double)));
+      comp_ws = cast_int<int>(std::min(sizeof(Real), sizeof(double)));
+      io_ws = cast_int<int>(std::min(sizeof(Real), sizeof(double)));
     }
 
   this->ex_id = exII::ex_create(filename.c_str(), EX_CLOBBER, &comp_ws, &io_ws);
@@ -745,7 +745,7 @@ void Nemesis_IO_Helper::create(std::string filename)
 void Nemesis_IO_Helper::initialize(std::string title_in, const MeshBase & mesh, bool /*use_discontinuous*/)
 {
   // Make sure that the reference passed in is really a ParallelMesh
-  // const ParallelMesh& pmesh = libmesh_cast_ref<const ParallelMesh&>(mesh);
+  // const ParallelMesh& pmesh = cast_ref<const ParallelMesh&>(mesh);
   const MeshBase& pmesh = mesh;
 
   // According to Nemesis documentation, first call when writing should be to
@@ -924,9 +924,9 @@ void Nemesis_IO_Helper::write_exodus_initialization_info(const MeshBase& pmesh,
   // Exodus will also use *global* number of side and node sets,
   // though it will not write out entries for all of them...
   this->num_side_sets =
-    libmesh_cast_int<int>(this->global_sideset_ids.size());
+    cast_int<int>(this->global_sideset_ids.size());
   this->num_node_sets =
-    libmesh_cast_int<int>(this->global_nodeset_ids.size());
+    cast_int<int>(this->global_nodeset_ids.size());
 
   // We need to write the global number of blocks, even though this processor might not have
   // elements in some of them!
@@ -1147,7 +1147,8 @@ void Nemesis_IO_Helper::compute_communication_map_parameters()
          ++it)
       {
         this->node_cmap_ids[cnt] = (*it).first; // The ID of the proc we communicate with
-        this->node_cmap_node_cnts[cnt] = (*it).second.size(); // The number of nodes we communicate
+        this->node_cmap_node_cnts[cnt] =
+          cast_int<int>((*it).second.size());   // The number of nodes we communicate
         cnt++; // increment vector index!
       }
   }
@@ -1180,7 +1181,8 @@ void Nemesis_IO_Helper::compute_communication_map_parameters()
          ++it)
       {
         this->elem_cmap_ids[cnt] = (*it).first; // The ID of the proc we communicate with
-        this->elem_cmap_elem_cnts[cnt] = (*it).second.size(); // The number of elems we communicate to/from that proc
+        this->elem_cmap_elem_cnts[cnt] =
+          cast_int<int>((*it).second.size()); // The number of elems we communicate to/from that proc
         cnt++; // increment vector index!
       }
   }
@@ -1316,7 +1318,8 @@ Nemesis_IO_Helper::compute_internal_and_border_elems_and_internal_nodes(const Me
     }
 
   // The size of the neighboring_processor_ids set should be the number of element communication maps
-  this->num_elem_cmaps = neighboring_processor_ids.size();
+  this->num_elem_cmaps =
+    cast_int<int>(neighboring_processor_ids.size());
 
   if (verbose)
     libMesh::out << "[" << this->processor_id() << "] "
@@ -1339,9 +1342,12 @@ Nemesis_IO_Helper::compute_internal_and_border_elems_and_internal_nodes(const Me
 
   // Store the number of internal and border elements, and the number of internal nodes,
   // to be written to the Nemesis file.
-  this->num_internal_elems = this->internal_elem_ids.size();
-  this->num_border_elems = this->border_elem_ids.size();
-  this->num_internal_nodes = this->internal_node_ids.size();
+  this->num_internal_elems =
+    cast_int<int>(this->internal_elem_ids.size());
+  this->num_border_elems   =
+    cast_int<int>(this->border_elem_ids.size());
+  this->num_internal_nodes =
+    cast_int<int>(this->internal_node_ids.size());
 
   if (verbose)
     {
@@ -1358,14 +1364,15 @@ void Nemesis_IO_Helper::compute_num_global_sidesets(const MeshBase& pmesh)
 {
   // 1.) Get reference to the set of side boundary IDs
   std::set<boundary_id_type> global_side_boundary_ids
-    (pmesh.boundary_info->get_side_boundary_ids().begin(),
-     pmesh.boundary_info->get_side_boundary_ids().end());
+    (pmesh.get_boundary_info().get_side_boundary_ids().begin(),
+     pmesh.get_boundary_info().get_side_boundary_ids().end());
 
   // 2.) Gather boundary side IDs from other processors
   this->comm().set_union(global_side_boundary_ids);
 
   // 3.) Now global_side_boundary_ids actually contains a global list of all side boundary IDs
-  this->num_side_sets_global = global_side_boundary_ids.size();
+  this->num_side_sets_global =
+    cast_int<int>(global_side_boundary_ids.size());
 
   // 4.) Pack these sidesets into a vector so they can be written by Nemesis
   this->global_sideset_ids.clear(); // Make sure there is no leftover information
@@ -1386,7 +1393,7 @@ void Nemesis_IO_Helper::compute_num_global_sidesets(const MeshBase& pmesh)
   std::vector<dof_id_type> bndry_elem_list;
   std::vector<unsigned short int> bndry_side_list;
   std::vector<boundary_id_type> bndry_id_list;
-  pmesh.boundary_info->build_side_list(bndry_elem_list, bndry_side_list, bndry_id_list);
+  pmesh.get_boundary_info().build_side_list(bndry_elem_list, bndry_side_list, bndry_id_list);
 
   // Similarly to the nodes, we can't count any sides for elements which aren't local
   std::vector<dof_id_type>::iterator it_elem=bndry_elem_list.begin();
@@ -1431,9 +1438,10 @@ void Nemesis_IO_Helper::compute_num_global_sidesets(const MeshBase& pmesh)
   // Get the count for each global sideset ID
   for (unsigned i=0; i<global_sideset_ids.size(); ++i)
     {
-      this->num_global_side_counts[i] = std::count(bndry_id_list.begin(),
-                                                   bndry_id_list.end(),
-                                                   this->global_sideset_ids[i]);
+      this->num_global_side_counts[i] = cast_int<int>
+        (std::count(bndry_id_list.begin(),
+                    bndry_id_list.end(),
+                    cast_int<boundary_id_type>(this->global_sideset_ids[i])));
     }
 
   if (verbose)
@@ -1467,8 +1475,8 @@ void Nemesis_IO_Helper::compute_num_global_nodesets(const MeshBase& pmesh)
 
   // 1.) Get reference to the set of node boundary IDs *for this processor*
   std::set<boundary_id_type> global_node_boundary_ids
-    (pmesh.boundary_info->get_node_boundary_ids().begin(),
-     pmesh.boundary_info->get_node_boundary_ids().end());
+    (pmesh.get_boundary_info().get_node_boundary_ids().begin(),
+     pmesh.get_boundary_info().get_node_boundary_ids().end());
 
   // Save a copy of the local_node_boundary_ids...
   local_node_boundary_ids = global_node_boundary_ids;
@@ -1477,7 +1485,8 @@ void Nemesis_IO_Helper::compute_num_global_nodesets(const MeshBase& pmesh)
   this->comm().set_union(global_node_boundary_ids);
 
   // 3.) Now global_node_boundary_ids actually contains a global list of all node boundary IDs
-  this->num_node_sets_global = global_node_boundary_ids.size();
+  this->num_node_sets_global =
+    cast_int<int>(global_node_boundary_ids.size());
 
   // 4.) Create a vector<int> from the global_node_boundary_ids set
   this->global_nodeset_ids.clear();
@@ -1504,7 +1513,8 @@ void Nemesis_IO_Helper::compute_num_global_nodesets(const MeshBase& pmesh)
   // There is probably a better way to do this...
   std::vector<dof_id_type> boundary_node_list;
   std::vector<boundary_id_type> boundary_node_boundary_id_list;
-  pmesh.boundary_info->build_node_list(boundary_node_list, boundary_node_boundary_id_list);
+  pmesh.get_boundary_info().build_node_list
+    (boundary_node_list, boundary_node_boundary_id_list);
 
   if (verbose)
     {
@@ -1561,9 +1571,10 @@ void Nemesis_IO_Helper::compute_num_global_nodesets(const MeshBase& pmesh)
   // Now we can do the local count for each ID...
   for (unsigned i=0; i<global_nodeset_ids.size(); ++i)
     {
-      this->num_global_node_counts[i] = std::count(boundary_node_boundary_id_list.begin(),
-                                                   boundary_node_boundary_id_list.end(),
-                                                   this->global_nodeset_ids[i]);
+      this->num_global_node_counts[i] = cast_int<int>
+        (std::count(boundary_node_boundary_id_list.begin(),
+                    boundary_node_boundary_id_list.end(),
+                    cast_int<boundary_id_type>(this->global_nodeset_ids[i])));
     }
 
   // And finally we can sum them up
@@ -1628,7 +1639,8 @@ void Nemesis_IO_Helper::compute_num_global_elem_blocks(const MeshBase& pmesh)
   }
 
   // 5.) Now global_subdomain_ids actually contains a global list of all subdomain IDs
-  this->num_elem_blks_global = global_subdomain_ids.size();
+  this->num_elem_blks_global =
+    cast_int<int>(global_subdomain_ids.size());
 
   // Print the number of elements found locally in each subdomain
   if (verbose)
@@ -1749,7 +1761,7 @@ void Nemesis_IO_Helper::build_element_and_node_maps(const MeshBase& pmesh)
       for (unsigned int n=0; n<elem->n_nodes(); ++n)
         this->nodes_attached_to_local_elems.insert( elem->node(n) );
 
-      unsigned int cur_subdomain = elem->subdomain_id();
+      subdomain_id_type cur_subdomain = elem->subdomain_id();
 
       /*
       // We can't have a zero subdomain ID in Exodus (for some reason?)
@@ -1758,11 +1770,13 @@ void Nemesis_IO_Helper::build_element_and_node_maps(const MeshBase& pmesh)
       cur_subdomain = std::numeric_limits<subdomain_id_type>::max();
       */
 
-      this->subdomain_map[cur_subdomain].push_back(elem->id());
+      this->subdomain_map[cur_subdomain].push_back
+        (cast_int<unsigned>(elem->id()));
     }
 
   // Set num_nodes which is used by exodusII_io_helper
-  this->num_nodes = this->nodes_attached_to_local_elems.size();
+  this->num_nodes =
+    cast_int<int>(this->nodes_attached_to_local_elems.size());
 
   // Now come up with a 1-based numbering for these nodes
   this->exodus_node_num_to_libmesh.clear(); // Make sure it's empty
@@ -1786,7 +1800,8 @@ void Nemesis_IO_Helper::build_element_and_node_maps(const MeshBase& pmesh)
       // Likewise, given libmesh_node_id,
       // libmesh_node_num_to_exodus[ libmesh_node_id ] returns the *Exodus* ID for that node.
       // Unlike the exodus_node_num_to_libmesh vector above, this one is a std::map
-      this->libmesh_node_num_to_exodus[*it] = this->exodus_node_num_to_libmesh.size(); // should never be zero...
+      this->libmesh_node_num_to_exodus[*it] =
+        cast_int<int>(this->exodus_node_num_to_libmesh.size()); // should never be zero...
     }
 
   // Now we're going to loop over the subdomain map and build a few things right
@@ -1809,10 +1824,7 @@ void Nemesis_IO_Helper::build_element_and_node_maps(const MeshBase& pmesh)
 
       // The code below assumes this subdomain block is not empty, make sure that's the case!
       if (elem_ids_this_subdomain.size() == 0)
-        {
-          libMesh::err << "Error, no element IDs found in subdomain " << (*it).first << std::endl;
-          libmesh_error();
-        }
+        libmesh_error_msg("Error, no element IDs found in subdomain " << (*it).first);
 
       ExodusII_IO_Helper::ElementMaps em;
 
@@ -1836,7 +1848,8 @@ void Nemesis_IO_Helper::build_element_and_node_maps(const MeshBase& pmesh)
 
           // Set the number map for elements
           this->exodus_elem_num_to_libmesh.push_back(elem_id);
-          this->libmesh_elem_num_to_exodus[elem_id] = this->exodus_elem_num_to_libmesh.size();
+          this->libmesh_elem_num_to_exodus[elem_id] =
+            cast_int<int>(this->exodus_elem_num_to_libmesh.size());
 
           const Elem * elem = pmesh.elem(elem_id);
 
@@ -1899,7 +1912,8 @@ void Nemesis_IO_Helper::compute_border_node_ids(const MeshBase& pmesh)
     // The number of node communication maps is the number of other processors
     // with which we share nodes. (I think.) This is just the size of the map we just
     // created, minus 1.
-    this->num_node_cmaps = proc_nodes_touched.size() - 1;
+    this->num_node_cmaps =
+      cast_int<int>(proc_nodes_touched.size() - 1);
 
     // If we've got no elements on this processor and haven't touched
     // any nodes, however, then that's 0 other processors with which
@@ -1995,7 +2009,7 @@ void Nemesis_IO_Helper::compute_border_node_ids(const MeshBase& pmesh)
   } // end scope for border node ID creation
 
   // Store the number of border node IDs to be written to Nemesis file
-  this->num_border_nodes = this->border_node_ids.size();
+  this->num_border_nodes = cast_int<int>(this->border_node_ids.size());
 }
 
 
@@ -2018,7 +2032,8 @@ void Nemesis_IO_Helper::write_nodesets(const MeshBase & mesh)
   // build it here again, hopefully it's small relative to the size of the entire mesh.
   std::vector<dof_id_type> boundary_node_list;
   std::vector<boundary_id_type> boundary_node_boundary_id_list;
-  mesh.boundary_info->build_node_list(boundary_node_list, boundary_node_boundary_id_list);
+  mesh.get_boundary_info().build_node_list
+    (boundary_node_list, boundary_node_boundary_id_list);
 
   if (verbose)
     {
@@ -2095,7 +2110,7 @@ void Nemesis_IO_Helper::write_nodesets(const MeshBase & mesh)
 
       // Try to find this boundary ID in the local list we created
       local_node_boundary_id_lists_iterator it =
-        local_node_boundary_id_lists.find(this->global_nodeset_ids[i]);
+        local_node_boundary_id_lists.find (cast_int<boundary_id_type>(this->global_nodeset_ids[i]));
 
       // No nodes found for this boundary ID on this processor
       if (it == local_node_boundary_id_lists.end())
@@ -2161,7 +2176,8 @@ void Nemesis_IO_Helper::write_sidesets(const MeshBase & mesh)
   std::vector< unsigned short int > bndry_side_list;
   std::vector< boundary_id_type > bndry_id_list;
 
-  mesh.boundary_info->build_side_list(bndry_elem_list, bndry_side_list, bndry_id_list);
+  mesh.get_boundary_info().build_side_list
+    (bndry_elem_list, bndry_side_list, bndry_id_list);
 
   // Integer looping, skipping non-local elements
   for (unsigned i=0; i<bndry_elem_list.size(); ++i)
@@ -2202,14 +2218,10 @@ void Nemesis_IO_Helper::write_sidesets(const MeshBase & mesh)
                   local_elem_boundary_id_side_lists[ bndry_id_list[i] ].push_back(conv.get_inverse_side_map( bndry_side_list[i] ));
                 }
               else
-                {
-                  libMesh::err << "Error, no Exodus mapping for Elem "
-                               << family[j]->id()
-                               << " on processor "
-                               << this->processor_id()
-                               << std::endl;
-                  libmesh_error();
-                }
+                libmesh_error_msg("Error, no Exodus mapping for Elem " \
+                                  << family[j]->id()                  \
+                                  << " on processor "                 \
+                                  << this->processor_id());
             }
         }
     }
@@ -2237,7 +2249,7 @@ void Nemesis_IO_Helper::write_sidesets(const MeshBase & mesh)
 
       // Try to find this boundary ID in the local list we created
       local_elem_boundary_id_lists_iterator it =
-        local_elem_boundary_id_lists.find(this->global_sideset_ids[i]);
+        local_elem_boundary_id_lists.find (cast_int<boundary_id_type>(this->global_sideset_ids[i]));
 
       // No sides found for this boundary ID on this processor
       if (it == local_elem_boundary_id_lists.end())
@@ -2259,7 +2271,7 @@ void Nemesis_IO_Helper::write_sidesets(const MeshBase & mesh)
         {
           // Get iterator to sides vector as well
           local_elem_boundary_id_lists_iterator it_sides =
-            local_elem_boundary_id_side_lists.find(this->global_sideset_ids[i]);
+            local_elem_boundary_id_side_lists.find (cast_int<boundary_id_type>(this->global_sideset_ids[i]));
 
           libmesh_assert (it_sides != local_elem_boundary_id_side_lists.end());
 
@@ -2293,9 +2305,10 @@ void Nemesis_IO_Helper::write_sidesets(const MeshBase & mesh)
 void Nemesis_IO_Helper::write_nodal_coordinates(const MeshBase & mesh, bool /*use_discontinuous*/)
 {
   // Make sure that the reference passed in is really a ParallelMesh
-  // const ParallelMesh& pmesh = libmesh_cast_ref<const ParallelMesh&>(mesh);
+  // const ParallelMesh& pmesh = cast_ref<const ParallelMesh&>(mesh);
 
-  unsigned local_num_nodes = this->exodus_node_num_to_libmesh.size();
+  unsigned local_num_nodes =
+    cast_int<unsigned int>(this->exodus_node_num_to_libmesh.size());
 
   x.resize(local_num_nodes);
   y.resize(local_num_nodes);
@@ -2312,15 +2325,12 @@ void Nemesis_IO_Helper::write_nodal_coordinates(const MeshBase & mesh, bool /*us
 
   if (local_num_nodes)
     {
-      if(_single_precision)
+      if (_single_precision)
         {
-          std::vector<float> x_single(local_num_nodes), y_single(local_num_nodes), z_single(local_num_nodes);
-          for (unsigned int i=0; i<local_num_nodes; ++i)
-            {
-              x_single[i] = static_cast<float>(x[i]);
-              y_single[i] = static_cast<float>(y[i]);
-              z_single[i] = static_cast<float>(z[i]);
-            }
+          std::vector<float>
+            x_single(x.begin(), x.end()),
+            y_single(y.begin(), y.end()),
+            z_single(z.begin(), z.end());
 
           ex_err = exII::ex_put_coord(ex_id, &x_single[0], &y_single[0], &z_single[0]);
         }
@@ -2376,7 +2386,8 @@ void Nemesis_IO_Helper::write_elements(const MeshBase & mesh, bool /*use_discont
       // Otherwise, write the actual block information and connectivity to file
       else
         {
-          int block = (*it).first;
+          subdomain_id_type block =
+            cast_int<subdomain_id_type>((*it).first);
           std::vector<int> & this_block_connectivity = (*it).second;
           std::vector<unsigned int> & elements_in_this_block = subdomain_map[block];
 
@@ -2420,7 +2431,7 @@ void Nemesis_IO_Helper::write_nodal_solution
  const std::vector<std::string>& names,
  int timestep)
 {
-  int num_vars = names.size();
+  int num_vars = cast_int<int>(names.size());
   //int num_values = values.size(); // Not used?
 
   for (int c=0; c<num_vars; c++)
@@ -2478,7 +2489,7 @@ std::string Nemesis_IO_Helper::construct_nemesis_filename(const std::string& bas
 
   // Find the length of the highest processor ID
   file_oss << (this->n_processors());
-  unsigned field_width = file_oss.str().size();
+  unsigned int field_width = cast_int<unsigned int>(file_oss.str().size());
 
   if (verbose)
     libMesh::out << "field_width=" << field_width << std::endl;

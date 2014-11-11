@@ -40,35 +40,32 @@ namespace libMesh
  * quadratic pyramids.  Paraview should support 13-node pyramids...
  *
  * The node numbering for the pyramid13 is given below:
-   \verbatim
-   PYRAMID13:
-                       o 4
-                     //|\
-                    // | \
-                   //  |  \
-                  //   |   \
-              12 o/    |    o 11
-                //     |     \
-               /o 9    o 10   \
-              //       |       \
-             //        |        \
-          3 o/.......o.|........o 2
-           ./       7  |       /
-          ./           |      /
-         ./            |     /
-        ./             |    /
-     8 o/              |   o 6
-      ./               |  /
-     ./                | /
-    ./                 |/
-    o--------o---------o
-    0        5         1
-
-   \endverbatim
+ * \verbatim
+ * PYRAMID13:
+ *                     o 4
+ *                   //|\
+ *                  // | \
+ *                 //  |  \
+ *                //   |   \
+ *            12 o/    |    o 11
+ *              //     |     \
+ *             /o 9    o 10   \
+ *            //       |       \
+ *           //        |        \
+ *        3 o/.......o.|........o 2
+ *         ./       7  |       /
+ *        ./           |      /
+ *       ./            |     /
+ *      ./             |    /
+ *   8 o/              |   o 6
+ *    ./               |  /
+ *   ./                | /
+ *  ./                 |/
+ *  o--------o---------o
+ *  0        5         1
+ *
+ * \endverbatim
  */
-
-// ------------------------------------------------------------
-// Pyramid class definition
 class Pyramid13 : public Pyramid
 {
 public:
@@ -193,7 +190,7 @@ protected:
   float embedding_matrix (const unsigned int,
                           const unsigned int,
                           const unsigned int) const
-  { libmesh_error(); return 0.; }
+  { libmesh_not_implemented(); return 0.; }
 
 #endif
 };

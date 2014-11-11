@@ -545,7 +545,7 @@ bool EquationSystems::has_mesh_data () const
 inline
 unsigned int EquationSystems::n_systems () const
 {
-  return libmesh_cast_int<unsigned int>(_systems.size());
+  return cast_int<unsigned int>(_systems.size());
 }
 
 
@@ -571,12 +571,6 @@ T_sys & EquationSystems::add_system (const std::string& name)
       // We now allow redundant add_system calls, to make it
       // easier to load data from files for user-derived system
       // subclasses
-      //      libMesh::err << "ERROR: There was already a system"
-      //<< " named " << name
-      //<< std::endl;
-
-      //      libmesh_error();
-
       ptr = &(this->get_system<T_sys>(name));
     }
 
@@ -613,14 +607,10 @@ const T_sys & EquationSystems::get_system (const unsigned int num) const
 
   // Check for errors
   if (pos == end)
-    {
-      libMesh::err << "ERROR: no system number " << num << " found!"
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: no system number " << num << " found!");
 
   // Attempt dynamic cast
-  return *libmesh_cast_ptr<T_sys*>(pos->second);
+  return *cast_ptr<T_sys*>(pos->second);
 }
 
 
@@ -641,14 +631,10 @@ T_sys & EquationSystems::get_system (const unsigned int num)
 
   // Check for errors
   if (pos == end)
-    {
-      libMesh::err << "ERROR: no system number " << num << " found!"
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: no system number " << num << " found!");
 
   // Attempt dynamic cast
-  return *libmesh_cast_ptr<T_sys*>(pos->second);
+  return *cast_ptr<T_sys*>(pos->second);
 }
 
 
@@ -664,14 +650,10 @@ const T_sys & EquationSystems::get_system (const std::string& name) const
 
   // Check for errors
   if (pos == _systems.end())
-    {
-      libMesh::err << "ERROR: no system named \"" << name << "\" found!"
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: no system named \"" << name << "\" found!");
 
   // Attempt dynamic cast
-  return *libmesh_cast_ptr<T_sys*>(pos->second);
+  return *cast_ptr<T_sys*>(pos->second);
 }
 
 
@@ -687,14 +669,10 @@ T_sys & EquationSystems::get_system (const std::string& name)
 
   // Check for errors
   if (pos == _systems.end())
-    {
-      libMesh::err << "ERROR: no system named " << name << " found!"
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: no system named " << name << " found!");
 
   // Attempt dynamic cast
-  return *libmesh_cast_ptr<T_sys*>(pos->second);
+  return *cast_ptr<T_sys*>(pos->second);
 }
 
 

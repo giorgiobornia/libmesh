@@ -39,10 +39,10 @@ namespace libMesh
 // ------------------------------------------------------------
 // EigenSystem implementation
 EigenSystem::EigenSystem (EquationSystems& es,
-                          const std::string& name,
-                          const unsigned int number
+                          const std::string& name_in,
+                          const unsigned int number_in
                           ) :
-  Parent           (es, name, number),
+  Parent           (es, name_in, number_in),
   matrix_A         (NULL),
   matrix_B         (NULL),
   eigen_solver     (EigenSolver<Number>::build(es.comm())),
@@ -88,26 +88,33 @@ void EigenSystem::set_eigenproblem_type (EigenProblemType ept)
 
   eigen_solver->set_eigenproblem_type(ept);
 
-  // libMesh::out<< "The Problem type is set to be: "<<std::endl;
+  // libMesh::out << "The Problem type is set to be: " << std::endl;
 
   switch (_eigen_problem_type)
     {
-    case HEP: // libMesh::out<<"Hermitian"<<std::endl;
+    case HEP:
+      // libMesh::out << "Hermitian" << std::endl;
       break;
 
-    case NHEP: // libMesh::out<<"Non-Hermitian"<<std::endl;
+    case NHEP:
+      // libMesh::out << "Non-Hermitian" << std::endl;
       break;
 
-    case GHEP: // libMesh::out<<"Gerneralized Hermitian"<<std::endl;
+    case GHEP:
+      // libMesh::out << "Gerneralized Hermitian" << std::endl;
       break;
 
-    case GNHEP: // libMesh::out<<"Generalized Non-Hermitian"<<std::endl;
+    case GNHEP:
+      // libMesh::out << "Generalized Non-Hermitian" << std::endl;
       break;
 
-    default: // libMesh::out<<"not properly specified"<<std::endl;
-      libmesh_error();
+    case GHIEP:
+      // libMesh::out << "Generalized indefinite Hermitian" << std::endl;
       break;
 
+    default:
+      // libMesh::out << "not properly specified" << std::endl;
+      libmesh_error_msg("Unrecognized _eigen_problem_type = " << _eigen_problem_type);
     }
 }
 
@@ -120,7 +127,9 @@ void EigenSystem::init_data ()
   Parent::init_data();
 
   // define the type of eigenproblem
-  if (_eigen_problem_type == GNHEP || _eigen_problem_type == GHEP)
+  if (_eigen_problem_type == GNHEP ||
+      _eigen_problem_type == GHEP  ||
+      _eigen_problem_type == GHIEP)
     _is_generalized_eigenproblem = true;
 
   // build the system matrix

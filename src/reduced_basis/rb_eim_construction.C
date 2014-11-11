@@ -68,6 +68,13 @@ RBEIMConstruction::RBEIMConstruction (EquationSystems& es,
 
   // attach empty RBAssemblyExpansion object
   set_rb_assembly_expansion(_empty_rb_assembly_expansion);
+
+  // We only do "L2 projection" solves in this class, hence
+  // we should set implicit_neighbor_dofs = false. This is
+  // important when we use DISCONTINUOUS basis functions, since
+  // otherwise the L2 projection matrix uses much more memory
+  // than necessary.
+  get_dof_map().set_implicit_neighbor_dofs(false);
 }
 
 RBEIMConstruction::~RBEIMConstruction ()
@@ -125,10 +132,7 @@ void RBEIMConstruction::set_best_fit_type_flag (const std::string& best_fit_type
         best_fit_type_flag = EIM_BEST_FIT;
       }
     else
-      {
-        libMesh::out << "Error: invalid best_fit_type in input file" << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("Error: invalid best_fit_type in input file");
 }
 
 void RBEIMConstruction::print_info()
@@ -257,7 +261,7 @@ void RBEIMConstruction::enrich_RB_space()
   // this allows us to compute EIM_rhs appropriately
   solution->localize(*_ghosted_meshfunction_vector, this->get_dof_map().get_send_list());
 
-  RBEIMEvaluation& eim_eval = libmesh_cast_ref<RBEIMEvaluation&>(get_rb_evaluation());
+  RBEIMEvaluation& eim_eval = cast_ref<RBEIMEvaluation&>(get_rb_evaluation());
 
   // If we have at least one basis function we need to use
   // rb_solve to find the EIM interpolation error, otherwise just use solution as is
@@ -294,13 +298,13 @@ void RBEIMConstruction::enrich_RB_space()
   Point optimal_point;
   Number optimal_value = 0.;
   unsigned int optimal_var;
-  dof_id_type optimal_elem_id;
+  dof_id_type optimal_elem_id = DofObject::invalid_id;
 
   // Compute truth representation via projection
   MeshBase& mesh = this->get_mesh();
 
   AutoPtr<DGFEMContext> c = this->build_context();
-  DGFEMContext &context  = libmesh_cast_ref<DGFEMContext&>(*c);
+  DGFEMContext &context  = cast_ref<DGFEMContext&>(*c);
 
   this->init_context(context);
 
@@ -333,6 +337,9 @@ void RBEIMConstruction::enrich_RB_space()
             }
         }
     }
+
+  // In debug mode, assert that we found an optimal_elem_id
+  libmesh_assert_not_equal_to(optimal_elem_id, DofObject::invalid_id);
 
   Real global_abs_value = std::abs(optimal_value);
   unsigned int proc_ID_index;
@@ -375,12 +382,8 @@ void RBEIMConstruction::enrich_RB_space()
 void RBEIMConstruction::initialize_parametrized_functions_in_training_set()
 {
   if(!serial_training_set)
-    {
-      libMesh::err << "Error: We must have serial_training_set==true in "
-                   << "RBEIMConstruction::initialize_parametrized_functions_in_training_set"
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("Error: We must have serial_training_set==true in " \
+                      << "RBEIMConstruction::initialize_parametrized_functions_in_training_set");
 
   libMesh::out << "Initializing parametrized functions in training set..." << std::endl;
   // initialize rb_eval's parameters
@@ -419,10 +422,10 @@ Real RBEIMConstruction::compute_best_fit_error()
       {
         // compute the rhs by performing inner products
         DenseVector<Number> best_fit_rhs(RB_size);
+
+        inner_product_matrix->vector_mult(*inner_product_storage_vector, *solution);
         for(unsigned int i=0; i<RB_size; i++)
           {
-            inner_product_matrix->vector_mult(*inner_product_storage_vector, *solution);
-
             best_fit_rhs(i) = inner_product_storage_vector->dot(get_rb_evaluation().get_basis_function(i));
           }
 
@@ -446,10 +449,7 @@ Real RBEIMConstruction::compute_best_fit_error()
         break;
       }
     default:
-      {
-        libMesh::out << "Should not reach here" << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("Should not reach here");
     }
 
   // load the error into solution
@@ -500,14 +500,14 @@ Real RBEIMConstruction::truth_solve(int plot_solution)
   // Otherwise, we have to compute the projection
   else
     {
-      RBEIMEvaluation& eim_eval = libmesh_cast_ref<RBEIMEvaluation&>(get_rb_evaluation());
+      RBEIMEvaluation& eim_eval = cast_ref<RBEIMEvaluation&>(get_rb_evaluation());
       eim_eval.set_parameters( get_parameters() );
 
       // Compute truth representation via projection
       const MeshBase& mesh = this->get_mesh();
 
       AutoPtr<DGFEMContext> c = this->build_context();
-      DGFEMContext &context  = libmesh_cast_ref<DGFEMContext&>(*c);
+      DGFEMContext &context  = cast_ref<DGFEMContext&>(*c);
 
       this->init_context(context);
 
@@ -521,25 +521,32 @@ Real RBEIMConstruction::truth_solve(int plot_solution)
           context.pre_fe_reinit(*this, *el);
           context.elem_fe_reinit();
 
-          for(unsigned int var=0; var<n_vars(); var++)
+          // All variables should have the same quadrature rule, hence
+          // we can get JxW and xyz based on first_elem_fe.
+          FEBase* first_elem_fe = NULL;
+          context.get_element_fe( 0, first_elem_fe );
+          unsigned int n_qpoints = context.get_element_qrule().n_points();
+          const std::vector<Real> &JxW = first_elem_fe->get_JxW();
+          const std::vector<Point> &xyz = first_elem_fe->get_xyz();
+
+          // Loop over qp before var because parametrized functions often use
+          // some caching based on qp.
+          for (unsigned int qp=0; qp<n_qpoints; qp++)
             {
-              FEBase* elem_fe = NULL;
-              context.get_element_fe( var, elem_fe );
-              const std::vector<Real> &JxW = elem_fe->get_JxW();
+              for (unsigned int var=0; var<n_vars(); var++)
+                {
+                  FEBase* elem_fe = NULL;
+                  context.get_element_fe( var, elem_fe );
+                  const std::vector<std::vector<Real> >& phi = elem_fe->get_phi();
 
-              const std::vector<std::vector<Real> >& phi = elem_fe->get_phi();
+                  DenseSubVector<Number>& subresidual_var = context.get_elem_residual( var );
 
-              const std::vector<Point> &xyz = elem_fe->get_xyz();
+                  unsigned int n_var_dofs = cast_int<unsigned int>(context.get_dof_indices( var ).size());
 
-              unsigned int n_qpoints = context.get_element_qrule().n_points();
-              unsigned int n_var_dofs = libmesh_cast_int<unsigned int>
-                (context.get_dof_indices( var ).size());
-
-              DenseSubVector<Number>& subresidual_var = context.get_elem_residual( var );
-
-              for(unsigned int qp=0; qp<n_qpoints; qp++)
-                for(unsigned int i=0; i != n_var_dofs; i++)
-                  subresidual_var(i) += JxW[qp] * eim_eval.evaluate_parametrized_function(var, xyz[qp], *(*el)) * phi[i][qp];
+                  Number eval_result = eim_eval.evaluate_parametrized_function(var, xyz[qp], *(*el));
+                  for (unsigned int i=0; i != n_var_dofs; i++)
+                    subresidual_var(i) += JxW[qp] * eval_result * phi[i][qp];
+                }
             }
 
           // Apply constraints, e.g. periodic constraints
@@ -552,10 +559,8 @@ Real RBEIMConstruction::truth_solve(int plot_solution)
       // Solve to find the best fit, then solution stores the truth representation
       // of the function to be approximated
       solve();
-      if(assert_convergence)
-      {
+      if (assert_convergence)
         check_convergence();
-      }
 
       if(reuse_preconditioner)
         {
@@ -568,7 +573,7 @@ Real RBEIMConstruction::truth_solve(int plot_solution)
   if(plot_solution > 0)
     {
 #ifdef LIBMESH_HAVE_EXODUS_API
-      ExodusII_IO(get_mesh()).write_equation_systems ("truth.e",
+      ExodusII_IO(get_mesh()).write_equation_systems ("truth.exo",
                                                       this->get_equation_systems());
 #endif
     }
@@ -600,7 +605,7 @@ void RBEIMConstruction::update_RB_system_matrices()
 
   unsigned int RB_size = get_rb_evaluation().get_n_basis_functions();
 
-  RBEIMEvaluation& eim_eval = libmesh_cast_ref<RBEIMEvaluation&>(get_rb_evaluation());
+  RBEIMEvaluation& eim_eval = cast_ref<RBEIMEvaluation&>(get_rb_evaluation());
 
   // update the EIM interpolation matrix
   for(unsigned int j=0; j<RB_size; j++)

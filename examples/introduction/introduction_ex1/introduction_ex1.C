@@ -48,21 +48,16 @@ int main (int argc, char** argv)
   // a filename to write the mesh into.
   if (argc < 4)
     {
-      if (init.comm().rank() == 0)
-        std::cerr << "Usage: " << argv[0] << " -d 2 in.mesh [-o out.mesh]"
-                  << std::endl;
-
       // This handy function will print the file name, line number,
-      // and then abort.  Currently the library does not use C++
-      // exception handling.
-      libmesh_error();
+      // specified message, and then throw an exception.
+      libmesh_error_msg("Usage: " << argv[0] << " -d 2 in.mesh [-o out.mesh]");
     }
 
   // Get the dimensionality of the mesh from argv[2]
   const unsigned int dim = std::atoi(argv[2]);
 
   // Skip higher-dimensional examples on a lower-dimensional libMesh build
-  libmesh_example_assert(dim <= LIBMESH_DIM, "2D/3D support");
+  libmesh_example_requires(dim <= LIBMESH_DIM, "2D/3D support");
 
   // Create a mesh, with dimension to be overridden later, on the
   // default MPI communicator.
@@ -71,7 +66,7 @@ int main (int argc, char** argv)
   // We may need XDR support compiled in to read binary .xdr files
   std::string input_filename = argv[3];
 #ifndef LIBMESH_HAVE_XDR
-  libmesh_example_assert(input_filename.rfind(".xdr") >=
+  libmesh_example_requires(input_filename.rfind(".xdr") >=
                          input_filename.size(), "XDR support");
 #endif
 
@@ -88,7 +83,7 @@ int main (int argc, char** argv)
       // We may need XDR support compiled in to read binary .xdr files
       std::string output_filename = argv[5];
 #ifndef LIBMESH_HAVE_XDR
-      libmesh_example_assert(output_filename.rfind(".xdr") >=
+      libmesh_example_requires(output_filename.rfind(".xdr") >=
                              output_filename.size(), "XDR support");
 #endif
 

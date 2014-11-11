@@ -65,6 +65,7 @@ ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ac_cxx_rtti.m4 \
 	$(top_srcdir)/m4/all_static.m4 \
 	$(top_srcdir)/m4/ax_boost_base.m4 \
+	$(top_srcdir)/m4/ax_cxx_compile_stdcxx_11.m4 \
 	$(top_srcdir)/m4/ax_openmp.m4 $(top_srcdir)/m4/ax_pthread.m4 \
 	$(top_srcdir)/m4/ax_split_version.m4 \
 	$(top_srcdir)/m4/ax_tls.m4 $(top_srcdir)/m4/backtrace.m4 \
@@ -72,12 +73,12 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ac_cxx_rtti.m4 \
 	$(top_srcdir)/m4/config_environment.m4 \
 	$(top_srcdir)/m4/config_summary.m4 \
 	$(top_srcdir)/m4/coverage.m4 $(top_srcdir)/m4/cppunit.m4 \
-	$(top_srcdir)/m4/demangle.m4 $(top_srcdir)/m4/eigen.m4 \
-	$(top_srcdir)/m4/exodus.m4 $(top_srcdir)/m4/feexcept.m4 \
-	$(top_srcdir)/m4/fparser.m4 $(top_srcdir)/m4/glpk.m4 \
-	$(top_srcdir)/m4/gmv.m4 $(top_srcdir)/m4/gz.m4 \
-	$(top_srcdir)/m4/hdf5.m4 $(top_srcdir)/m4/laspack.m4 \
-	$(top_srcdir)/m4/libhilbert.m4 \
+	$(top_srcdir)/m4/cxx11.m4 $(top_srcdir)/m4/demangle.m4 \
+	$(top_srcdir)/m4/eigen.m4 $(top_srcdir)/m4/exodus.m4 \
+	$(top_srcdir)/m4/feexcept.m4 $(top_srcdir)/m4/fparser.m4 \
+	$(top_srcdir)/m4/glpk.m4 $(top_srcdir)/m4/gmv.m4 \
+	$(top_srcdir)/m4/gz.m4 $(top_srcdir)/m4/hdf5.m4 \
+	$(top_srcdir)/m4/laspack.m4 $(top_srcdir)/m4/libhilbert.m4 \
 	$(top_srcdir)/m4/libmesh_compiler_features.m4 \
 	$(top_srcdir)/m4/libmesh_core_features.m4 \
 	$(top_srcdir)/m4/libmesh_method.m4 \
@@ -90,7 +91,8 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ac_cxx_rtti.m4 \
 	$(top_srcdir)/m4/nemesis.m4 $(top_srcdir)/m4/netcdf.m4 \
 	$(top_srcdir)/m4/parmetis.m4 $(top_srcdir)/m4/petsc.m4 \
 	$(top_srcdir)/m4/precision.m4 \
-	$(top_srcdir)/m4/prefix_config.m4 $(top_srcdir)/m4/sfc.m4 \
+	$(top_srcdir)/m4/prefix_config.m4 $(top_srcdir)/m4/qhull.m4 \
+	$(top_srcdir)/m4/sanitize.m4 $(top_srcdir)/m4/sfc.m4 \
 	$(top_srcdir)/m4/slepc.m4 $(top_srcdir)/m4/sstream.m4 \
 	$(top_srcdir)/m4/strstream.m4 $(top_srcdir)/m4/tbb.m4 \
 	$(top_srcdir)/m4/tecio.m4 $(top_srcdir)/m4/tecplot.m4 \
@@ -110,8 +112,9 @@ am__libdbg_la_SOURCES_DIST = src/BigBitVec.C src/FixBitVec.C \
 	src/Hilbert.C src/hilbert_mpi_ops.C \
 	include/Hilbert/GetLocation.hpp include/Hilbert/SetBits.hpp \
 	include/Hilbert/Common.hpp include/Hilbert/BigBitVec.hpp \
-	include/Hilbert/FixBitVec.hpp include/Hilbert/Algorithm.hpp \
-	include/Hilbert/GetBits.hpp include/Hilbert/GrayCodeRank.hpp \
+	include/Hilbert/BitVecType.hpp include/Hilbert/FixBitVec.hpp \
+	include/Hilbert/Algorithm.hpp include/Hilbert/GetBits.hpp \
+	include/Hilbert/GrayCodeRank.hpp \
 	include/Hilbert/SetLocation.hpp include/Hilbert.hpp \
 	include/hilbert.h
 am__dirstamp = $(am__leading_dot)dirstamp
@@ -132,8 +135,9 @@ am__libdevel_la_SOURCES_DIST = src/BigBitVec.C src/FixBitVec.C \
 	src/Hilbert.C src/hilbert_mpi_ops.C \
 	include/Hilbert/GetLocation.hpp include/Hilbert/SetBits.hpp \
 	include/Hilbert/Common.hpp include/Hilbert/BigBitVec.hpp \
-	include/Hilbert/FixBitVec.hpp include/Hilbert/Algorithm.hpp \
-	include/Hilbert/GetBits.hpp include/Hilbert/GrayCodeRank.hpp \
+	include/Hilbert/BitVecType.hpp include/Hilbert/FixBitVec.hpp \
+	include/Hilbert/Algorithm.hpp include/Hilbert/GetBits.hpp \
+	include/Hilbert/GrayCodeRank.hpp \
 	include/Hilbert/SetLocation.hpp include/Hilbert.hpp \
 	include/hilbert.h
 am__objects_2 = src/libdevel_la-BigBitVec.lo \
@@ -150,8 +154,9 @@ am__liboprof_la_SOURCES_DIST = src/BigBitVec.C src/FixBitVec.C \
 	src/Hilbert.C src/hilbert_mpi_ops.C \
 	include/Hilbert/GetLocation.hpp include/Hilbert/SetBits.hpp \
 	include/Hilbert/Common.hpp include/Hilbert/BigBitVec.hpp \
-	include/Hilbert/FixBitVec.hpp include/Hilbert/Algorithm.hpp \
-	include/Hilbert/GetBits.hpp include/Hilbert/GrayCodeRank.hpp \
+	include/Hilbert/BitVecType.hpp include/Hilbert/FixBitVec.hpp \
+	include/Hilbert/Algorithm.hpp include/Hilbert/GetBits.hpp \
+	include/Hilbert/GrayCodeRank.hpp \
 	include/Hilbert/SetLocation.hpp include/Hilbert.hpp \
 	include/hilbert.h
 am__objects_3 = src/liboprof_la-BigBitVec.lo \
@@ -168,8 +173,9 @@ am__libopt_la_SOURCES_DIST = src/BigBitVec.C src/FixBitVec.C \
 	src/Hilbert.C src/hilbert_mpi_ops.C \
 	include/Hilbert/GetLocation.hpp include/Hilbert/SetBits.hpp \
 	include/Hilbert/Common.hpp include/Hilbert/BigBitVec.hpp \
-	include/Hilbert/FixBitVec.hpp include/Hilbert/Algorithm.hpp \
-	include/Hilbert/GetBits.hpp include/Hilbert/GrayCodeRank.hpp \
+	include/Hilbert/BitVecType.hpp include/Hilbert/FixBitVec.hpp \
+	include/Hilbert/Algorithm.hpp include/Hilbert/GetBits.hpp \
+	include/Hilbert/GrayCodeRank.hpp \
 	include/Hilbert/SetLocation.hpp include/Hilbert.hpp \
 	include/hilbert.h
 am__objects_4 = src/libopt_la-BigBitVec.lo src/libopt_la-FixBitVec.lo \
@@ -185,8 +191,9 @@ am__libprof_la_SOURCES_DIST = src/BigBitVec.C src/FixBitVec.C \
 	src/Hilbert.C src/hilbert_mpi_ops.C \
 	include/Hilbert/GetLocation.hpp include/Hilbert/SetBits.hpp \
 	include/Hilbert/Common.hpp include/Hilbert/BigBitVec.hpp \
-	include/Hilbert/FixBitVec.hpp include/Hilbert/Algorithm.hpp \
-	include/Hilbert/GetBits.hpp include/Hilbert/GrayCodeRank.hpp \
+	include/Hilbert/BitVecType.hpp include/Hilbert/FixBitVec.hpp \
+	include/Hilbert/Algorithm.hpp include/Hilbert/GetBits.hpp \
+	include/Hilbert/GrayCodeRank.hpp \
 	include/Hilbert/SetLocation.hpp include/Hilbert.hpp \
 	include/hilbert.h
 am__objects_5 = src/libprof_la-BigBitVec.lo \
@@ -351,6 +358,7 @@ GREP = @GREP@
 GXX_VERSION = @GXX_VERSION@
 GZSTREAM_INCLUDE = @GZSTREAM_INCLUDE@
 GZSTREAM_LIB = @GZSTREAM_LIB@
+HAVE_CXX11 = @HAVE_CXX11@
 HAVE_DOT = @HAVE_DOT@
 HAVE_GCOV_TOOLS = @HAVE_GCOV_TOOLS@
 HDF5_CFLAGS = @HDF5_CFLAGS@
@@ -437,6 +445,7 @@ PTHREAD_CC = @PTHREAD_CC@
 PTHREAD_CFLAGS = @PTHREAD_CFLAGS@
 PTHREAD_LIBS = @PTHREAD_LIBS@
 PWD = @PWD@
+QHULL_LIBS = @QHULL_LIBS@
 RANLIB = @RANLIB@
 RPATHFLAG = @RPATHFLAG@
 SED = @SED@
@@ -562,6 +571,7 @@ pkg_sources = \
 	include/Hilbert/SetBits.hpp \
 	include/Hilbert/Common.hpp \
 	include/Hilbert/BigBitVec.hpp \
+	include/Hilbert/BitVecType.hpp \
 	include/Hilbert/FixBitVec.hpp \
 	include/Hilbert/Algorithm.hpp \
 	include/Hilbert/GetBits.hpp \
@@ -580,8 +590,8 @@ pkg_sources = \
 # 
 AUTOMAKE_OPTIONS = subdir-objects 
 AM_CPPFLAGS = $(pkg_cppflags) # any defined package-specific include paths
-AM_CFLAGS = 
-AM_CXXFLAGS = 
+AM_CFLAGS = $(pkg_cflags)
+AM_CXXFLAGS = $(pkg_cxxflags)
 AM_LDFLAGS = $(libmesh_LDFLAGS)
 
 ######################################################################

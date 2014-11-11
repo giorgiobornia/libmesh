@@ -1,10 +1,4 @@
-AUTOMAKE_OPTIONS = subdir-objects 
-
-AM_CPPFLAGS = $(CPPFLAGS_OPT)
-AM_CFLAGS   = $(CFLAGS_OPT)
-AM_CXXFLAGS = $(CXXFLAGS_OPT)
-
-AM_CPPFLAGS += -I$(srcdir)/fpoptimizer
+pkg_cppflags = -I$(srcdir)/fpoptimizer
 
 
 FEATURE_FLAGS =
@@ -31,7 +25,14 @@ FEATURE_FLAGS += -DFP_SUPPORT_COMPLEX_FLOAT_TYPE
 FEATURE_FLAGS += -DFP_SUPPORT_COMPLEX_LONG_DOUBLE_TYPE
 #FEATURE_FLAGS += -DFP_USE_STRTOLD
 
-FEATURE_FLAGS += -DFUNCTIONPARSER_SUPPORT_DEBUGGING
+if FPARSER_SUPPORT_DEBUGGING
+  FEATURE_FLAGS += -DFUNCTIONPARSER_SUPPORT_DEBUGGING
+endif
+
+# Wrap code that uses std::move in fparser for compilers that don't support it
+if HAVE_CXX11_MOVE
+  FEATURE_FLAGS += -DFP_SUPPORT_CXX11_MOVE
+endif
 
 EXTRA_DIST      = # none, append below
 BUILT_SOURCES   = # none, append below
@@ -44,7 +45,7 @@ noinst_PROGRAMS = # none, append below
 # parsed_function.h
 includedir = $(prefix)/include/libmesh
 
-include_HEADERS = fparser.hh
+include_HEADERS = fparser.hh fparser_ad.hh
 
 
 EXTRA_DIST += util/bytecoderules.dat util/bytecoderules_header.txt
@@ -103,12 +104,16 @@ EXTRA_DIST += $(FPOPTIMIZER_CC_FILES) fpoptimizer/fpoptimizer_header.txt fpoptim
 
 
 
-noinst_LTLIBRARIES     = libfparser.la
-libfparser_la_SOURCES  = fparser.cc
-libfparser_la_CPPFLAGS = $(AM_CPPFLAGS) $(FEATURE_FLAGS)
+pkg_sources = fparser.cc fparser_ad.cc
+if FPARSER_SUPPORT_JIT
+  pkg_sources += lib/sha1.cpp
+  pkg_cppflags += -DFPARSER_JIT_COMPILER="\"$(CXX)\""
+endif
+
+pkg_cppflags += $(FEATURE_FLAGS)
 
 
-# util/tree_grammar_parser is a utility which is required to build 
+# util/tree_grammar_parser is a utility which is required to build
 # fpoptimizer/grammar_data.cc.  But this file itself is only needed
 # when we are compiling with optimization support enabled.
 #
@@ -121,6 +126,8 @@ util_tree_grammar_parser_SOURCES   = \
                                  fparser_mpfr.hh \
                                  fparser.hh \
 			 	 fparser.cc \
+                                 fparser_ad.hh \
+			 	 fparser_ad.cc \
                                  fpoptimizer/logic_comparisons.hh \
                                  fpoptimizer/constantfolding.hh \
                                  fpoptimizer/logic_ifoperations.hh \
@@ -142,8 +149,11 @@ util_tree_grammar_parser_SOURCES   = \
                                  lib/functional.hh \
                                  lib/crc32.hh \
                                  lib/autoptr.hh \
+                                 lib/sha1.h \
+                                 lib/sha1.cpp \
                                  extrasrc/fpaux.hh \
                                  extrasrc/fptypes.hh \
+                                 extrasrc/fp_opcode_add.inc \
                                  fparser_gmpint.hh extrasrc/fp_identifier_parser.inc
 
   util_bytecoderules_parser_CXXFLAGS = # nothing fancy - don't use our compile flags for this utility code lest it be horribly slow
@@ -152,7 +162,7 @@ util_tree_grammar_parser_SOURCES   = \
   # 'util/make_function_name_parser' is used to create extrasrc/fp_identifier_parser.inc,
   # but it seems to only define a snippet.  So for now we use the distributed version
   # of that file rather than treating it as a built source.
-  # util_make_function_name_parser_SOURCES  = util/make_function_name_parser.cc util/cpp_compress.cc 
+  # util_make_function_name_parser_SOURCES  = util/make_function_name_parser.cc util/cpp_compress.cc
 
   util_cpp_compress_CXXFLAGS = # nothing fancy - don't use our compile flags for this utility code lest it be horribly slow
   util_cpp_compress_SOURCES  = util/cpp_compress.hh util/cpp_compress.cc util/cpp_compress_main.cc
@@ -160,10 +170,11 @@ util_tree_grammar_parser_SOURCES   = \
 
 # when doing 'make clean' we need to remove the generated sources
 CLEANFILES += fpoptimizer/grammar_data.cc
-DISTCLEANFILES += util/tree_grammar_parser # in case it wasn't conditionally cleaned
+# in case they weren't conditionally cleaned:
+DISTCLEANFILES += util/bytecoderules_parser
+DISTCLEANFILES += util/cpp_compress
+DISTCLEANFILES += util/tree_grammar_parser
 
-
-if FPARSER_DEVEL
 
 # extrasrc/fp_opcode_add.inc is a generated source, and this rule specifies how we build it.
 extrasrc/fp_opcode_add.inc: \
@@ -179,6 +190,14 @@ extrasrc/fp_opcode_add.inc: \
 		| util/cpp_compress \
 		>> $@
 
+BUILT_SOURCES += extrasrc/fp_opcode_add.inc
+
+fparser.cc: extrasrc/fp_opcode_add.inc
+
+if FPARSER_DEVEL
+
+  BUILT_SOURCES += fpoptimizer/grammar_data.cc
+
   # Build up utility programs used to define parsing, not needed
   # for installation
   noinst_PROGRAMS           += util/tree_grammar_parser
@@ -186,13 +205,8 @@ extrasrc/fp_opcode_add.inc: \
   noinst_PROGRAMS           += util/cpp_compress
   # noinst_PROGRAMS           += util/make_function_name_parser
 
-fparser.cc: extrasrc/fp_opcode_add.inc
-
-  BUILT_SOURCES += extrasrc/fp_opcode_add.inc
-  BUILT_SOURCES += fpoptimizer/grammar_data.cc
-
-if FPARSER_SUPPORT_OPTIMIZER 
-    libfparser_la_SOURCES += $(FPOPTIMIZER_CC_FILES)
+if FPARSER_SUPPORT_OPTIMIZER
+    pkg_sources += $(FPOPTIMIZER_CC_FILES)
 endif
 
    # when doing 'make clean' we need to remove the generated sources
@@ -202,6 +216,8 @@ else !FPARSER_DEVEL
   SUBDIRS = extrasrc
 
 if FPARSER_SUPPORT_OPTIMIZER
-  libfparser_la_SOURCES += fpoptimizer.cc
+  pkg_sources += fpoptimizer.cc
 endif
 endif
+
+include $(top_srcdir)/contrib/Make.common

@@ -94,15 +94,14 @@ int main (int argc, char** argv)
 
   // This example uses an ExodusII input file
 #ifndef LIBMESH_HAVE_EXODUS_API
-  libmesh_example_assert(false, "--enable-exodus");
+  libmesh_example_requires(false, "--enable-exodus");
 #endif
 
-  // The example sparsity augmentation code needs more work to be
-  // Laspack-compatible
-  libmesh_example_assert(libMesh::default_solver_package() == PETSC_SOLVERS, "--enable-petsc");
+  // The sparsity augmentation code requires PETSc
+  libmesh_example_requires(libMesh::default_solver_package() == PETSC_SOLVERS, "--enable-petsc");
 
   // Skip this 3D example if libMesh was compiled as 1D or 2D-only.
-  libmesh_example_assert(3 <= LIBMESH_DIM, "3D support");
+  libmesh_example_requires(3 <= LIBMESH_DIM, "3D support");
 
   GetPot command_line (argc, argv);
 
@@ -235,7 +234,7 @@ void assemble_poisson(EquationSystems& es,
         for (unsigned int side=0; side<elem->n_sides(); side++)
           if (elem->neighbor(side) == NULL)
             {
-              if( mesh.boundary_info->has_boundary_id (elem,side,MIN_Z_BOUNDARY) )
+              if( mesh.get_boundary_info().has_boundary_id (elem,side,MIN_Z_BOUNDARY) )
                 {
                   fe_elem_face->reinit(elem, side);
 
@@ -257,7 +256,7 @@ void assemble_poisson(EquationSystems& es,
           if (elem->neighbor(side) == NULL)
             {
               // Found the lower side of the crack. Assemble terms due to lower and upper in here.
-              if( mesh.boundary_info->has_boundary_id (elem,side,CRACK_BOUNDARY_LOWER) )
+              if( mesh.get_boundary_info().has_boundary_id (elem,side,CRACK_BOUNDARY_LOWER) )
                 {
                   fe_elem_face->reinit(elem, side);
 

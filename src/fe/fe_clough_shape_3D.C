@@ -35,18 +35,14 @@ Real FE<3,CLOUGH>::shape(const ElemType,
                          const unsigned int,
                          const Point&)
 {
-  libMesh::err << "Clough-Tocher elements require the real element\n"
-               << "to construct gradient-based degrees of freedom."
-               << std::endl;
-
-  libmesh_error();
+  libmesh_error_msg("Clough-Tocher elements require the real element \nto construct gradient-based degrees of freedom.");
   return 0.;
 }
 
 
 
 template <>
-Real FE<3,CLOUGH>::shape(const Elem* elem,
+Real FE<3,CLOUGH>::shape(const Elem* libmesh_dbg_var(elem),
                          const Order,
                          const unsigned int,
                          const Point&)
@@ -66,18 +62,14 @@ Real FE<3,CLOUGH>::shape_deriv(const ElemType,
                                const unsigned int,
                                const Point&)
 {
-  libMesh::err << "Clough-Tocher elements require the real element\n"
-               << "to construct gradient-based degrees of freedom."
-               << std::endl;
-
-  libmesh_error();
+  libmesh_error_msg("Clough-Tocher elements require the real element \nto construct gradient-based degrees of freedom.");
   return 0.;
 }
 
 
 
 template <>
-Real FE<3,CLOUGH>::shape_deriv(const Elem* elem,
+Real FE<3,CLOUGH>::shape_deriv(const Elem* libmesh_dbg_var(elem),
                                const Order,
                                const unsigned int,
                                const unsigned int,
@@ -91,7 +83,7 @@ Real FE<3,CLOUGH>::shape_deriv(const Elem* elem,
 
 
 template <>
-Real FE<3,CLOUGH>::shape_second_deriv(const Elem* elem,
+Real FE<3,CLOUGH>::shape_second_deriv(const Elem* libmesh_dbg_var(elem),
                                       const Order,
                                       const unsigned int,
                                       const unsigned int,

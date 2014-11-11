@@ -53,7 +53,7 @@ PetscErrorCode DMLibMeshGetBlocks(DM dm, PetscInt *n, char*** blocknames)
   if(!islibmesh) SETERRQ2(((PetscObject)dm)->comm, PETSC_ERR_ARG_WRONG, "Got DM oftype %s, not of type %s", ((PetscObject)dm)->type_name, DMLIBMESH);
   DM_libMesh *dlm = (DM_libMesh *)(dm->data);
   PetscValidPointer(n,2);
-  *n = dlm->blockids->size();
+  *n = cast_int<PetscInt>(dlm->blockids->size());
   if(!blocknames) PetscFunctionReturn(0);
   ierr = PetscMalloc(*n*sizeof(char*), blocknames); CHKERRQ(ierr);
   i = 0;
@@ -77,7 +77,7 @@ PetscErrorCode DMLibMeshGetVariables(DM dm, PetscInt *n, char*** varnames)
   if(!islibmesh) SETERRQ2(((PetscObject)dm)->comm, PETSC_ERR_ARG_WRONG, "Got DM oftype %s, not of type %s", ((PetscObject)dm)->type_name, DMLIBMESH);
   DM_libMesh *dlm = (DM_libMesh *)(dm->data);
   PetscValidPointer(n,2);
-  *n = dlm->varids->size();
+  *n = cast_int<PetscInt>(dlm->varids->size());
   if(!varnames) PetscFunctionReturn(0);
   ierr = PetscMalloc(*n*sizeof(char*), varnames); CHKERRQ(ierr);
   i = 0;
@@ -227,7 +227,7 @@ static PetscErrorCode  DMCreateFieldDecomposition_libMesh(DM dm, PetscInt *len, 
   IS emb;
   if(dlm->decomposition_type != DMLIBMESH_FIELD_DECOMPOSITION) PetscFunctionReturn(0);
 
-  *len = dlm->decomposition->size();
+  *len = cast_int<PetscInt>(dlm->decomposition->size());
   if(namelist) {ierr = PetscMalloc(*len*sizeof(char*), namelist);  CHKERRQ(ierr);}
   if(islist)   {ierr = PetscMalloc(*len*sizeof(IS),    islist);    CHKERRQ(ierr);}
   if(dmlist)   {ierr = PetscMalloc(*len*sizeof(DM),    dmlist);    CHKERRQ(ierr);}
@@ -249,7 +249,7 @@ static PetscErrorCode  DMCreateFieldDecomposition_libMesh(DM dm, PetscInt *len, 
       if(!islist) continue;
       /* Iterate only over this DM's blocks. */
       for(std::map<std::string, unsigned int>::const_iterator bit = dlm->blockids->begin(); bit != dlm->blockids->end(); ++bit) {
-        unsigned int b = bit->second;
+        subdomain_id_type b = cast_int<subdomain_id_type>(bit->second);
         MeshBase::const_element_iterator el     = sys->get_mesh().active_local_subdomain_elements_begin(b);
         MeshBase::const_element_iterator end_el = sys->get_mesh().active_local_subdomain_elements_end(b);
         for ( ; el != end_el; ++el) {
@@ -278,7 +278,10 @@ static PetscErrorCode  DMCreateFieldDecomposition_libMesh(DM dm, PetscInt *len, 
         darray[i] = *it;
         ++i;
       }
-      ierr = ISCreateGeneral(((PetscObject)dm)->comm, dindices.size(),darray, PETSC_OWN_POINTER, &dis); CHKERRQ(ierr);
+      ierr = ISCreateGeneral(((PetscObject)dm)->comm,
+                             cast_int<PetscInt>(dindices.size()),
+                             darray, PETSC_OWN_POINTER, &dis);
+      CHKERRQ(ierr);
       if(dlm->embedding) {
         /* Create a relative embedding into the parent's index space. */
 #if PETSC_RELEASE_LESS_THAN(3,3,1)
@@ -332,7 +335,7 @@ static PetscErrorCode  DMCreateDomainDecomposition_libMesh(DM dm, PetscInt *len,
   NonlinearImplicitSystem *sys = dlm->sys;
   IS emb;
   if(dlm->decomposition_type != DMLIBMESH_DOMAIN_DECOMPOSITION) PetscFunctionReturn(0);
-  *len = dlm->decomposition->size();
+  *len = cast_int<PetscInt>(dlm->decomposition->size());
   if(namelist)      {ierr = PetscMalloc(*len*sizeof(char*), namelist);  CHKERRQ(ierr);}
   if(innerislist)   {ierr = PetscMalloc(*len*sizeof(IS),    innerislist);    CHKERRQ(ierr);}
   if(outerislist)   *outerislist = PETSC_NULL; /* FIX: allow mesh-based overlap. */
@@ -344,7 +347,7 @@ static PetscErrorCode  DMCreateDomainDecomposition_libMesh(DM dm, PetscInt *len,
     std::map<unsigned int,std::string>   dblocknames;
     unsigned int                         dbcount = 0;
     for(std::set<unsigned int>::const_iterator bit = (*dlm->decomposition)[d].begin(); bit != (*dlm->decomposition)[d].end(); ++bit){
-      unsigned int b = *bit;
+      subdomain_id_type b = cast_int<subdomain_id_type>(*bit);
       std::string bname = (*dlm->blocknames)[b];
       dblockids.insert(std::pair<std::string, unsigned int>(bname,b));
       dblocknames.insert(std::pair<unsigned int,std::string>(b,bname));
@@ -382,7 +385,10 @@ static PetscErrorCode  DMCreateDomainDecomposition_libMesh(DM dm, PetscInt *len,
         darray[i] = *it;
         ++i;
       }
-      ierr = ISCreateGeneral(((PetscObject)dm)->comm, dindices.size(),darray, PETSC_OWN_POINTER, &dis); CHKERRQ(ierr);
+      ierr = ISCreateGeneral(((PetscObject)dm)->comm,
+                             cast_int<PetscInt>(dindices.size()),
+                             darray, PETSC_OWN_POINTER, &dis);
+      CHKERRQ(ierr);
       if(dlm->embedding) {
         /* Create a relative embedding into the parent's index space. */
 #if PETSC_RELEASE_LESS_THAN(3,3,1)
@@ -541,6 +547,11 @@ struct token {
   const  char* s;
   struct token *next;
 };
+
+
+// The following functions are only needed for older PETScs.
+#if PETSC_RELEASE_LESS_THAN(3,3,1)
+
 #undef __FUNCT__
 #define __FUNCT__ "DMLibMeshParseDecompositionDescriptor_Private"
 static PetscErrorCode  DMLibMeshParseDecompositionDescriptor_Private(DM dm, const char* ddesc, PetscInt* dtype, PetscInt* dcount, PetscInt** dsizes, char ****dlists)
@@ -716,6 +727,9 @@ static PetscErrorCode  DMCreateDomainDecompositionDM_libMesh(DM dm, const char* 
   PetscFunctionReturn(0);
 }
 
+#endif
+
+
 #undef __FUNCT__
 #define __FUNCT__ "DMlibMeshFunction"
 static PetscErrorCode DMlibMeshFunction(DM dm, Vec x, Vec r)
@@ -728,8 +742,8 @@ static PetscErrorCode DMlibMeshFunction(DM dm, Vec x, Vec r)
   NonlinearImplicitSystem* _sys;
   ierr = DMLibMeshGetSystem(dm, _sys); CHKERRQ(ierr);
   NonlinearImplicitSystem& sys = *_sys;
-  PetscVector<Number>& X_sys = *libmesh_cast_ptr<PetscVector<Number>* >(sys.solution.get());
-  PetscVector<Number>& R_sys = *libmesh_cast_ptr<PetscVector<Number>* >(sys.rhs);
+  PetscVector<Number>& X_sys = *cast_ptr<PetscVector<Number>* >(sys.solution.get());
+  PetscVector<Number>& R_sys = *cast_ptr<PetscVector<Number>* >(sys.rhs);
   PetscVector<Number> X_global(x, _sys->comm()), R(r, _sys->comm());
 
   // Use the systems update() to get a good local version of the parallel solution
@@ -747,16 +761,10 @@ static PetscErrorCode DMlibMeshFunction(DM dm, Vec x, Vec r)
   // if the user has provided both function pointers and objects only the pointer
   // will be used, so catch that as an error
   if (_sys->nonlinear_solver->residual && _sys->nonlinear_solver->residual_object)
-    {
-      libMesh::err << "ERROR: cannot specifiy both a function and object to compute the Residual!" << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: cannot specifiy both a function and object to compute the Residual!");
 
   if (_sys->nonlinear_solver->matvec && _sys->nonlinear_solver->residual_and_jacobian_object)
-    {
-      libMesh::err << "ERROR: cannot specifiy both a function and object to compute the combined Residual & Jacobian!" << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: cannot specifiy both a function and object to compute the combined Residual & Jacobian!");
 
   if (_sys->nonlinear_solver->residual != NULL)
     _sys->nonlinear_solver->residual(*(_sys->current_local_solution.get()), R, *_sys);
@@ -771,7 +779,7 @@ static PetscErrorCode DMlibMeshFunction(DM dm, Vec x, Vec r)
     _sys->nonlinear_solver->residual_and_jacobian_object->residual_and_jacobian(*(_sys->current_local_solution.get()), &R, NULL, *_sys);
 
   else
-    libmesh_error();
+    libmesh_error_msg("Error! Unable to compute residual and/or Jacobian!");
 
   R.close();
   X_global.close();
@@ -794,7 +802,11 @@ static PetscErrorCode SNESFunction_DMlibMesh(SNES, Vec x, Vec r, void *ctx)
 
 #undef __FUNCT__
 #define __FUNCT__ "DMlibMeshJacobian"
+#if PETSC_RELEASE_LESS_THAN(3,5,0)
 static PetscErrorCode DMlibMeshJacobian(DM dm, Vec x, Mat jac, Mat pc, MatStructure *msflag)
+#else
+static PetscErrorCode DMlibMeshJacobian(DM dm, Vec x, Mat jac, Mat pc)
+#endif
 {
   PetscErrorCode ierr;
   PetscFunctionBegin;
@@ -804,8 +816,8 @@ static PetscErrorCode DMlibMeshJacobian(DM dm, Vec x, Mat jac, Mat pc, MatStruct
 
   PetscMatrix<Number>  the_pc(pc,sys.comm());
   PetscMatrix<Number>  Jac(jac,sys.comm());
-  PetscVector<Number>& X_sys = *libmesh_cast_ptr<PetscVector<Number>*>(sys.solution.get());
-  PetscMatrix<Number>& Jac_sys = *libmesh_cast_ptr<PetscMatrix<Number>*>(sys.matrix);
+  PetscVector<Number>& X_sys = *cast_ptr<PetscVector<Number>*>(sys.solution.get());
+  PetscMatrix<Number>& Jac_sys = *cast_ptr<PetscMatrix<Number>*>(sys.matrix);
   PetscVector<Number>  X_global(x, sys.comm());
 
   // Set the dof maps
@@ -827,16 +839,10 @@ static PetscErrorCode DMlibMeshJacobian(DM dm, Vec x, Mat jac, Mat pc, MatStruct
   // if the user has provided both function pointers and objects only the pointer
   // will be used, so catch that as an error
   if (sys.nonlinear_solver->jacobian && sys.nonlinear_solver->jacobian_object)
-    {
-      libMesh::err << "ERROR: cannot specifiy both a function and object to compute the Jacobian!" << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: cannot specifiy both a function and object to compute the Jacobian!");
 
   if (sys.nonlinear_solver->matvec && sys.nonlinear_solver->residual_and_jacobian_object)
-    {
-      libMesh::err << "ERROR: cannot specifiy both a function and object to compute the combined Residual & Jacobian!" << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: cannot specifiy both a function and object to compute the combined Residual & Jacobian!");
 
   if (sys.nonlinear_solver->jacobian != NULL)
     sys.nonlinear_solver->jacobian(*(sys.current_local_solution.get()), the_pc, sys);
@@ -851,25 +857,34 @@ static PetscErrorCode DMlibMeshJacobian(DM dm, Vec x, Mat jac, Mat pc, MatStruct
     sys.nonlinear_solver->residual_and_jacobian_object->residual_and_jacobian(*(sys.current_local_solution.get()), NULL, &the_pc, sys);
 
   else
-    libmesh_error();
+    libmesh_error_msg("Error! Unable to compute residual and/or Jacobian!");
 
   the_pc.close();
   Jac.close();
   X_global.close();
-
+#if PETSC_RELEASE_LESS_THAN(3,5,0)
   *msflag = SAME_NONZERO_PATTERN;
+#endif
   PetscFunctionReturn(0);
 }
 
 #if !PETSC_RELEASE_LESS_THAN(3,3,1)
 #undef  __FUNCT__
 #define __FUNCT__ "SNESJacobian_DMlibMesh"
+#if PETSC_RELEASE_LESS_THAN(3,5,0)
 static PetscErrorCode SNESJacobian_DMlibMesh(SNES,Vec x,Mat *jac,Mat *pc, MatStructure* flag, void* ctx)
+#else
+static PetscErrorCode SNESJacobian_DMlibMesh(SNES,Vec x,Mat jac,Mat pc, void* ctx)
+#endif
 {
   DM dm = (DM)ctx;
   PetscErrorCode ierr;
   PetscFunctionBegin;
+#if PETSC_RELEASE_LESS_THAN(3,5,0)
   ierr = DMlibMeshJacobian(dm,x,*jac,*pc,flag); CHKERRQ(ierr);
+#else
+  ierr = DMlibMeshJacobian(dm,x,jac,pc); CHKERRQ(ierr);
+#endif
   PetscFunctionReturn(0);
 }
 #endif
@@ -885,9 +900,13 @@ static PetscErrorCode DMVariableBounds_libMesh(DM dm, Vec xl, Vec xu)
   PetscVector<Number> XL(xl, sys.comm());
   PetscVector<Number> XU(xu, sys.comm());
   PetscFunctionBegin;
-
-  ierr = VecSet(xl, SNES_VI_NINF); CHKERRQ(ierr);
-  ierr = VecSet(xu, SNES_VI_INF);  CHKERRQ(ierr);
+#if PETSC_VERSION_LESS_THAN(3,5,0) && PETSC_VERSION_RELEASE
+  ierr = VecSet(xl, SNES_VI_NINF);CHKERRQ(ierr);
+  ierr = VecSet(xu, SNES_VI_INF);CHKERRQ(ierr);
+#else
+  ierr = VecSet(xl, PETSC_NINFINITY);CHKERRQ(ierr);
+  ierr = VecSet(xu, PETSC_INFINITY);CHKERRQ(ierr);
+#endif
   if (sys.nonlinear_solver->bounds != NULL)
     sys.nonlinear_solver->bounds(XL,XU,sys);
   else if (sys.nonlinear_solver->bounds_object != NULL)

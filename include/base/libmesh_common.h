@@ -249,14 +249,6 @@ extern OStreamProxy err;
 #define libmesh_dbg_var(var)
 #endif
 
-// The libmesh_dbg_var() macro indicates that an argument to a function
-// is used only in debug mode (i.e., when NDEBUG is not defined).
-#ifndef NDEBUG
-#define libmesh_dbg_var(var) var
-#else
-#define libmesh_dbg_var(var)
-#endif
-
 // The libmesh_assert() macro acts like C's assert(), but throws a
 // libmesh_error() (including stack trace, etc) instead of just exiting
 #ifdef NDEBUG
@@ -399,8 +391,8 @@ extern OStreamProxy err;
     LIBMESH_THROW(libMesh::ConvergenceFailure());       \
   } while(0)
 
-// The libmesh_example_assert() macro prints a message and calls
-// "return 0;" if the assertion specified by the macro is not true.  This
+// The libmesh_example_requires() macro prints a message and calls
+// "return 77;" if the condition specified by the macro is not true.  This
 // macro is used in the example executables, which should run when the
 // configure-time libMesh options support them but which should exit
 // without failure otherwise.
@@ -409,16 +401,56 @@ extern OStreamProxy err;
 // "return" from main to immediately exit successfully - std::exit()
 // gets seen by at least some MPI stacks as failure.
 //
-// We now return 77, the automake code for a skipped test.
+// 77 is the automake code for a skipped test.
 
-#define libmesh_example_assert(asserted, requirement)                   \
+#define libmesh_example_requires(condition, option)                     \
   do {                                                                  \
-    if (!(asserted)) {                                                  \
-      libMesh::out << "Assertion `" #asserted "' failed.  Configuring libMesh with " requirement " may be required to run this code." << std::endl; \
+    if (!(condition)) {                                                 \
+      libMesh::out << "Configuring libMesh with " #option " is required to run this example." << std::endl; \
       return 77;                                                        \
     } } while(0)
 
-// libmesh_cast_ref and libmesh_cast_ptr do a dynamic cast and assert
+// The libmesh_do_once macro helps us avoid redundant repeated
+// repetitions of the same warning messages
+#undef libmesh_do_once
+#define libmesh_do_once(do_this)                \
+  do {                                          \
+    static bool did_this_already = false;       \
+    if (!did_this_already) {                    \
+      did_this_already = true;                  \
+      do_this;                                  \
+    } } while (0)
+
+
+// The libmesh_warning macro outputs a file/line/time stamped warning
+// message, if warnings are enabled.
+#ifdef LIBMESH_ENABLE_WARNINGS
+#define libmesh_warning(message)                                        \
+  libmesh_do_once(libMesh::out << message                               \
+                  << __FILE__ << ", line " << __LINE__ << ", compiled " << __DATE__ << " at " << __TIME__ << " ***" << std::endl;)
+#else
+#define libmesh_warning(message)  ((void) 0)
+#endif
+
+// The libmesh_experimental macro warns that you are using
+// bleeding-edge code
+#undef libmesh_experimental
+#define libmesh_experimental()                                          \
+  libmesh_warning("*** Warning, This code is untested, experimental, or likely to see future API changes: ");
+
+
+// The libmesh_deprecated macro warns that you are using obsoleted code
+#undef libmesh_deprecated
+#define libmesh_deprecated()                                            \
+  libmesh_warning("*** Warning, This code is deprecated, and likely to be removed in future library versions! ");
+
+// A function template for ignoring unused variables.  This is a way
+// to shut up unused variable compiler warnings on a case by case
+// basis.
+template<class T> inline void libmesh_ignore( const T& ) { }
+
+
+// cast_ref and cast_ptr do a dynamic cast and assert
 // the result, if we have RTTI enabled and we're in debug or
 // development modes, but they just do a faster static cast if we're
 // in optimized mode.
@@ -426,9 +458,9 @@ extern OStreamProxy err;
 // Use these casts when you're certain that a cast will succeed in
 // correct code but you want to be able to double-check.
 template <typename Tnew, typename Told>
-inline Tnew libmesh_cast_ref(Told& oldvar)
+inline Tnew cast_ref(Told& oldvar)
 {
-#if !defined(NDEBUG) && defined(LIBMESH_HAVE_RTTI)
+#if !defined(NDEBUG) && defined(LIBMESH_HAVE_RTTI) && defined(LIBMESH_ENABLE_EXCEPTIONS)
   try
     {
       Tnew newvar = dynamic_cast<Tnew>(oldvar);
@@ -449,10 +481,18 @@ inline Tnew libmesh_cast_ref(Told& oldvar)
 #endif
 }
 
+template <typename Tnew, typename Told>
+inline Tnew libmesh_cast_ref(Told& oldvar)
+{
+  // we use the less redundantly named libMesh::cast_ref now
+  libmesh_deprecated();
+  return cast_ref<Tnew>(oldvar);
+}
+
 // We use two different function names to avoid an odd overloading
 // ambiguity bug with icc 10.1.008
 template <typename Tnew, typename Told>
-inline Tnew libmesh_cast_ptr (Told* oldvar)
+inline Tnew cast_ptr (Told* oldvar)
 {
 #if !defined(NDEBUG) && defined(LIBMESH_HAVE_RTTI)
   Tnew newvar = dynamic_cast<Tnew>(oldvar);
@@ -473,7 +513,15 @@ inline Tnew libmesh_cast_ptr (Told* oldvar)
 }
 
 
-// libmesh_cast_int asserts that the value of the castee is within the
+template <typename Tnew, typename Told>
+inline Tnew libmesh_cast_ptr (Told* oldvar)
+{
+  // we use the less redundantly named libMesh::cast_ptr now
+  return cast_ptr<Tnew>(oldvar);
+}
+
+
+// cast_int asserts that the value of the castee is within the
 // bounds which are exactly representable by the output type, if we're
 // in debug or development modes, but it just does a faster static
 // cast if we're in optimized mode.
@@ -481,7 +529,7 @@ inline Tnew libmesh_cast_ptr (Told* oldvar)
 // Use these casts when you're certain that a cast will succeed in
 // correct code but you want to be able to double-check.
 template <typename Tnew, typename Told>
-inline Tnew libmesh_cast_int (Told oldvar)
+inline Tnew cast_int (Told oldvar)
 {
   libmesh_assert_equal_to
     (oldvar, static_cast<Told>(static_cast<Tnew>(oldvar)));
@@ -490,45 +538,12 @@ inline Tnew libmesh_cast_int (Told oldvar)
 }
 
 
-// The libmesh_do_once macro helps us avoid redundant repeated
-// repetitions of the same warning messages
-#undef libmesh_do_once
-#define libmesh_do_once(do_this)                \
-  do {                                          \
-    static bool did_this_already = false;       \
-    if (!did_this_already) {                    \
-      did_this_already = true;                  \
-      do_this;                                  \
-    } } while (0)
-
-
-// The libmesh_experimental macro warns that you are using
-// bleeding-edge code
-#undef libmesh_experimental
-#ifdef LIBMESH_ENABLE_WARNINGS
-#define libmesh_experimental()                                          \
-  libmesh_do_once(libMesh::out << "*** Warning, This code is untested, experimental, or likely to see future API changes: " \
-                  << __FILE__ << ", line " << __LINE__ << ", compiled " << __DATE__ << " at " << __TIME__ << " ***" << std::endl;)
-#else
-#define libmesh_experimental()  ((void) 0)
-#endif
-
-
-// The libmesh_deprecated macro warns that you are using obsoleted code
-#undef libmesh_deprecated
-#ifdef LIBMESH_ENABLE_WARNINGS
-#define libmesh_deprecated()                                            \
-  libmesh_do_once(libMesh::out << "*** Warning, This code is deprecated, and likely to be removed in future library versions! " \
-                  << __FILE__ << ", line " << __LINE__ << ", compiled " << __DATE__ << " at " << __TIME__ << " ***" << std::endl;)
-#else
-#define libmesh_deprecated()  ((void) 0)
-#endif
-
-
-// A function template for ignoring unused variables.  This is a way
-// to shut up unused variable compiler warnings on a case by case
-// basis.
-template<class T> inline void libmesh_ignore( const T& ) { }
+template <typename Tnew, typename Told>
+inline Tnew libmesh_cast_int (Told oldvar)
+{
+  // we use the less redundantly named libMesh::cast_int now
+  return cast_int<Tnew>(oldvar);
+}
 
 
 // build a integer representation of version

@@ -56,7 +56,7 @@ public:
   /**
    * Constructor.
    */
-  RBEIMEvaluation (const libMesh::Parallel::Communicator &comm 
+  RBEIMEvaluation (const libMesh::Parallel::Communicator &comm_in
                    LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
 
   /**
@@ -93,6 +93,11 @@ public:
    * been attached to this system.
    */
   unsigned int get_n_parametrized_functions() const;
+
+  /**
+   * Get a writable reference to the interpolation points mesh.
+   */
+  SerialMesh& get_interpolation_points_mesh();
 
   /**
    * @return the value of the parametrized function that is being
@@ -173,7 +178,7 @@ public:
    * the interpolation points were identified.
    */
   std::vector<unsigned int> interpolation_points_var;
-  
+
   /**
    * The corresponding list of elements at which
    * the interpolation points were identified.

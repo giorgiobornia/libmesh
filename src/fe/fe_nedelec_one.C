@@ -24,6 +24,7 @@
 #include "libmesh/elem.h"
 #include "libmesh/threads.h"
 #include "libmesh/tensor_value.h"
+#include "libmesh/string_to_enum.h"
 
 namespace libMesh
 {
@@ -97,11 +98,7 @@ void nedelec_one_nodal_soln(const Elem* elem,
             }
 
           default:
-            {
-              libmesh_error();
-
-              break;
-            }
+            libmesh_error_msg("ERROR: Invalid ElemType " << Utility::enum_to_string(elem_type) << " selected for NEDELEC_ONE FE family!");
 
           } // switch(elem_type)
 
@@ -145,9 +142,7 @@ void nedelec_one_nodal_soln(const Elem* elem,
       } // case FIRST
 
     default:
-      {
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR: Invalid total order " << Utility::enum_to_string(totalorder) << " selected for NEDELEC_ONE FE family!");
 
     }//switch (totalorder)
 
@@ -177,23 +172,19 @@ unsigned int nedelec_one_n_dofs(const ElemType t, const Order o)
           case HEX27:
             return 12;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for FIRST order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
     default:
-      libmesh_error();
+      libmesh_error_msg("ERROR: Invalid Order " << Utility::enum_to_string(o) << " selected for NEDELEC_ONE FE family!");
     }
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0;
 }
 
@@ -224,7 +215,7 @@ unsigned int nedelec_one_n_dofs_at_node(const ElemType t,
                   return 1;
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("ERROR: Invalid node ID " << n);
                 }
             }
           case QUAD8:
@@ -243,7 +234,7 @@ unsigned int nedelec_one_n_dofs_at_node(const ElemType t,
                   return 1;
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("ERROR: Invalid node ID " << n);
                 }
             }
           case QUAD9:
@@ -263,7 +254,7 @@ unsigned int nedelec_one_n_dofs_at_node(const ElemType t,
                   return 1;
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("ERROR: Invalid node ID " << n);
                 }
             }
           case TET10:
@@ -284,7 +275,7 @@ unsigned int nedelec_one_n_dofs_at_node(const ElemType t,
                   return 1;
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("ERROR: Invalid node ID " << n);
                 }
             }
 
@@ -316,7 +307,7 @@ unsigned int nedelec_one_n_dofs_at_node(const ElemType t,
                   return 1;
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("ERROR: Invalid node ID " << n);
                 }
             }
           case HEX27:
@@ -354,28 +345,24 @@ unsigned int nedelec_one_n_dofs_at_node(const ElemType t,
                   return 1;
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("ERROR: Invalid node ID " << n);
                 }
             }
+
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for FIRST order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
     default:
-      libmesh_error();
+      libmesh_error_msg("ERROR: Invalid Order " << Utility::enum_to_string(o) << " selected for NEDELEC_ONE FE family!");
     }
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0;
-
 }
 
 
@@ -384,7 +371,7 @@ unsigned int nedelec_one_n_dofs_at_node(const ElemType t,
 void nedelec_one_compute_constraints (DofConstraints &/*constraints*/,
                                       DofMap &/*dof_map*/,
                                       const unsigned int /*variable_number*/,
-                                      const Elem* elem,
+                                      const Elem* libmesh_dbg_var(elem),
                                       const unsigned Dim)
 {
   // Only constrain elements in 2,3D.
@@ -501,9 +488,7 @@ void nedelec_one_compute_constraints (DofConstraints &/*constraints*/,
 } // anonymous namespace
 
 #define NEDELEC_LOW_D_ERROR_MESSAGE                                     \
-  libMesh::err << "ERROR: This method makes no sense for low-D elements!" \
-  << std::endl;                                                         \
-  libmesh_error();
+  libmesh_error_msg("ERROR: This method makes no sense for low-D elements!");
 
 
 // Do full-specialization for every dimension, instead

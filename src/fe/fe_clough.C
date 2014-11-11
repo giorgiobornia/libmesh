@@ -21,6 +21,7 @@
 #include "libmesh/elem.h"
 #include "libmesh/fe.h"
 #include "libmesh/fe_interface.h"
+#include "libmesh/string_to_enum.h"
 
 
 namespace libMesh
@@ -83,9 +84,7 @@ void clough_nodal_soln(const Elem* elem,
       }
 
     default:
-      {
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR: Invalid total order " << totalorder);
     }
 } // clough_nodal_soln()
 
@@ -94,6 +93,9 @@ void clough_nodal_soln(const Elem* elem,
 
 unsigned int clough_n_dofs(const ElemType t, const Order o)
 {
+  if (t == INVALID_ELEM)
+    return 0;
+
   switch (o)
     {
       // Piecewise cubic shape functions with linear flux edges
@@ -105,14 +107,7 @@ unsigned int clough_n_dofs(const ElemType t, const Order o)
             return 9;
 
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for " << o << "th order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
       // Piecewise cubic Clough-Tocher element
@@ -124,24 +119,15 @@ unsigned int clough_n_dofs(const ElemType t, const Order o)
             return 12;
 
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for " << o << "th order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
     default:
-      {
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR: Invalid Order " << Utility::enum_to_string(o) << " selected for CLOUGH FE family!");
     }
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0;
 } // clough_n_dofs()
 
@@ -176,20 +162,12 @@ unsigned int clough_n_dofs_at_node(const ElemType t,
                   return 0;
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("ERROR: Invalid node ID " << n << " selected for TRI6!");
                 }
             }
 
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for " << o << "th order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
-
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
       // The third-order clough shape functions
@@ -213,30 +191,19 @@ unsigned int clough_n_dofs_at_node(const ElemType t,
                   return 1;
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("ERROR: Invalid node ID " << n << " selected for TRI6!");
                 }
             }
 
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for " << o << "th order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
-
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
     default:
-      {
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR: Invalid Order " << Utility::enum_to_string(o) << " selected for CLOUGH FE family!");
     }
 
-  libmesh_error();
-
+  libmesh_error_msg("We'll never get here!");
   return 0;
 } // clough_n_dofs_at_node()
 
@@ -259,22 +226,16 @@ unsigned int clough_n_dofs_per_elem(const ElemType t, const Order o)
             return 0;
 
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for " << o << "th order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
-
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
-      // Otherwise no DOFS per element
+
     default:
-      libmesh_error();
-      return 0;
+      libmesh_error_msg("ERROR: Invalid Order " << Utility::enum_to_string(o) << " selected for CLOUGH FE family!");
     }
+
+  libmesh_error_msg("We'll never get here!");
+  return 0;
 } // clough_n_dofs_per_elem()
 
 } // anonymous

@@ -88,10 +88,7 @@ void RBEvaluation::set_rb_theta_expansion(RBThetaExpansion& rb_theta_expansion_i
 RBThetaExpansion& RBEvaluation::get_rb_theta_expansion()
 {
   if(!is_rb_theta_expansion_initialized())
-    {
-      libMesh::out << "Error: rb_theta_expansion hasn't been initialized yet" << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("Error: rb_theta_expansion hasn't been initialized yet");
 
   return *rb_theta_expansion;
 }
@@ -114,11 +111,7 @@ void RBEvaluation::resize_data_structures(const unsigned int Nmax,
   START_LOG("resize_data_structures()", "RBEvaluation");
 
   if(Nmax < this->get_n_basis_functions())
-    {
-      libMesh::err << "Error: Cannot set Nmax to be less than the "
-                   << "current number of basis functions."  << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("Error: Cannot set Nmax to be less than the current number of basis functions.");
 
   // Resize/clear inner product matrix
   if(compute_RB_inner_product)
@@ -221,11 +214,7 @@ Real RBEvaluation::rb_solve(unsigned int N)
   START_LOG("rb_solve()", "RBEvaluation");
 
   if(N > get_n_basis_functions())
-    {
-      libMesh::err << "ERROR: N cannot be larger than the number "
-                   << "of basis functions in rb_solve" << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: N cannot be larger than the number of basis functions in rb_solve");
 
   const RBParameters& mu = get_parameters();
 
@@ -379,7 +368,6 @@ Real RBEvaluation::compute_residual_dual_norm(const unsigned int N)
       //     Sometimes this is negative due to rounding error,
       //     but when this occurs the error is on the order of 1.e-10,
       //     so shouldn't affect error bound much...
-      //     libmesh_error();
       residual_norm_sq = std::abs(residual_norm_sq);
     }
 
@@ -430,11 +418,8 @@ void RBEvaluation::clear_riesz_representors()
     {
       for(unsigned int i=0; i<Aq_representor[q_a].size(); i++)
         {
-          if(Aq_representor[q_a][i])
-            {
-              delete Aq_representor[q_a][i];
-              Aq_representor[q_a][i] = NULL;
-            }
+          delete Aq_representor[q_a][i];
+          Aq_representor[q_a][i] = NULL;
         }
     }
 
@@ -483,7 +468,7 @@ void RBEvaluation::write_offline_data_to_files(const std::string& directory_name
       file_name.str("");
       file_name << directory_name << "/discrete_parameter_values" << suffix;
       std::string discrete_param_file_name = file_name.str();
-    
+
       write_parameter_data_to_files(continuous_param_file_name,
                                     discrete_param_file_name,
                                     write_binary_data);
@@ -1017,9 +1002,37 @@ void RBEvaluation::read_in_vectors(System& sys,
                                    const std::string& data_name,
                                    const bool read_binary_vectors)
 {
-  START_LOG("read_in_vectors()", "RBEvaluation");
+  std::vector< std::vector<NumericVector<Number>*>* > vectors_vec;
+  vectors_vec.push_back(&vectors);
 
-  //libMesh::out << "Reading in the basis functions..." << std::endl;
+  std::vector<std::string> directory_name_vec;
+  directory_name_vec.push_back(directory_name);
+
+  std::vector<std::string> data_name_vec;
+  data_name_vec.push_back(data_name);
+
+  read_in_vectors_from_multiple_files(sys,
+                                      vectors_vec,
+                                      directory_name_vec,
+                                      data_name_vec,
+                                      read_binary_vectors);
+}
+
+void RBEvaluation::read_in_vectors_from_multiple_files(System& sys,
+                                                       std::vector< std::vector<NumericVector<Number>*>* > multiple_vectors,
+                                                       const std::vector<std::string>& multiple_directory_names,
+                                                       const std::vector<std::string>& multiple_data_names,
+                                                       const bool read_binary_vectors)
+{
+  START_LOG("read_in_vectors_from_multiple_files()", "RBEvaluation");
+
+  unsigned int n_files = multiple_vectors.size();
+  unsigned int n_directories = multiple_directory_names.size();
+  unsigned int n_data_names = multiple_data_names.size();
+  libmesh_assert( (n_files == n_directories) && (n_files == n_data_names) );
+
+  if (n_files == 0)
+    return;
 
   // Make sure processors are synced up before we begin
   this->comm().barrier();
@@ -1028,7 +1041,9 @@ void RBEvaluation::read_in_vectors(System& sys,
   const std::string basis_function_suffix = (read_binary_vectors ? ".xdr" : ".dat");
   struct stat stat_info;
 
-  file_name << directory_name << "/" << data_name << "_header" << basis_function_suffix;
+  // Assume that all the headers are the same, hence we can just use the first one.
+  file_name << multiple_directory_names[0] << "/"
+            << multiple_data_names[0] << "_header" << basis_function_suffix;
   Xdr header_data(file_name.str(),
                   read_binary_vectors ? DECODE : READ);
 
@@ -1050,60 +1065,25 @@ void RBEvaluation::read_in_vectors(System& sys,
   // before writing out the data
   MeshTools::Private::globally_renumber_nodes_and_elements(sys.get_mesh());
 
-
-  const bool read_legacy_format = false;
-  if (read_legacy_format)
+  for (unsigned int data_index=0; data_index<n_directories; data_index++)
     {
-      // Use System::read_serialized_data to read in the basis functions
-      // into this->solution and then swap with the appropriate
-      // of basis function.
-      for(unsigned int i=0; i<vectors.size(); i++)
-        {
-          file_name.str(""); // reset the string
-          file_name << directory_name << "/" << data_name << i << basis_function_suffix;
+      std::vector<NumericVector<Number>*>& vectors = *multiple_vectors[data_index];
 
-          // On processor zero check to be sure the file exists
-          if (this->processor_id() == 0)
-            {
-              int stat_result = stat(file_name.str().c_str(), &stat_info);
-
-              if (stat_result != 0)
-                {
-                  libMesh::out << "File does not exist: " << file_name.str() << std::endl;
-                  libmesh_error();
-                }
-            }
-
-          Xdr vector_data(file_name.str(),
-                          read_binary_vectors ? DECODE : READ);
-
-          // The bf_data needs to know which version to read.
-          vector_data.set_version(LIBMESH_VERSION_ID(ver_major, ver_minor, ver_patch));
-
-          sys.read_serialized_data(vector_data, false);
-
-          vectors[i] = NumericVector<Number>::build(sys.comm()).release();
-          vectors[i]->init (sys.n_dofs(), sys.n_local_dofs(), false, PARALLEL);
-
-          // No need to copy, just swap
-          // *vectors[i] = *solution;
-          vectors[i]->swap(*sys.solution);
-        }
-    }
-
-  //------------------------------------------------------
-  // new implementation
-  else
-    {
       // Allocate storage for each vector
-      for(unsigned int i=0; i<vectors.size(); i++)
+      for (unsigned int i=0; i<vectors.size(); i++)
         {
           vectors[i] = NumericVector<Number>::build(sys.comm()).release();
-          vectors[i]->init (sys.n_dofs(), sys.n_local_dofs(), false, PARALLEL);
+
+          vectors[i]->init (sys.n_dofs(),
+                            sys.n_local_dofs(),
+                            false,
+                            PARALLEL);
         }
 
       file_name.str("");
-      file_name << directory_name << "/" << data_name << "_data" << basis_function_suffix;
+      file_name << multiple_directory_names[data_index]
+                << "/" << multiple_data_names[data_index]
+                << "_data" << basis_function_suffix;
 
       // On processor zero check to be sure the file exists
       if (this->processor_id() == 0)
@@ -1111,10 +1091,7 @@ void RBEvaluation::read_in_vectors(System& sys,
           int stat_result = stat(file_name.str().c_str(), &stat_info);
 
           if (stat_result != 0)
-            {
-              libMesh::out << "File does not exist: " << file_name.str() << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("File does not exist: " << file_name.str());
         }
 
       Xdr vector_data(file_name.str(),
@@ -1125,14 +1102,11 @@ void RBEvaluation::read_in_vectors(System& sys,
 
       sys.read_serialized_vectors (vector_data, vectors);
     }
-  //------------------------------------------------------
 
   // Undo the temporary renumbering
   sys.get_mesh().fix_broken_node_and_element_numbering();
 
-  //libMesh::out << "Finished reading in the basis functions..." << std::endl;
-
-  STOP_LOG("read_in_vectors()", "RBEvaluation");
+  STOP_LOG("read_in_vectors_from_multiple_files()", "RBEvaluation");
 }
 
 std::string RBEvaluation::get_io_version_string()

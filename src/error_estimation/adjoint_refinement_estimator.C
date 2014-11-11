@@ -100,8 +100,6 @@ void AdjointRefinementEstimator::estimate_error (const System& _system,
     system.solution->clone().release();
   NumericVector<Number> * coarse_local_solution =
     system.current_local_solution->clone().release();
-  // And make copies of the projected solution
-  NumericVector<Number> * projected_solution;
 
   // And we'll need to temporarily change solution projection settings
   bool old_projection_setting;
@@ -126,6 +124,18 @@ void AdjointRefinementEstimator::estimate_error (const System& _system,
       newsol->swap(*system.solution);
       system.update();
     }
+
+  // Get coarse grid adjoint solutions.  This should be a relatively
+  // quick (especially with preconditioner reuse) way to get a good
+  // initial guess for the fine grid adjoint solutions.  More
+  // importantly, subtracting off a coarse adjoint approximation gives
+  // us better local error indication, and subtracting off *some* lift
+  // function is necessary for correctness if we have heterogeneous
+  // adjoint Dirichlet conditions.
+
+  // Solve the adjoint problem(s) on the coarse FE space
+  system.adjoint_solve(_qoi_set);
+
 
   // Loop over all the adjoint problems and, if any have heterogenous
   // Dirichlet conditions, get the corresponding coarse lift
@@ -178,10 +188,27 @@ void AdjointRefinementEstimator::estimate_error (const System& _system,
 
   // Copy the projected coarse grid solutions, which will be
   // overwritten by solve()
-  projected_solution = NumericVector<Number>::build(mesh.comm()).release();
-  projected_solution->init(system.solution->size(), true, SERIAL);
-  system.solution->localize(*projected_solution,
-                            system.get_dof_map().get_send_list());
+  std::vector<NumericVector<Number> *> coarse_adjoints;
+  for (unsigned int j=0; j != system.qoi.size(); j++)
+    {
+      if (_qoi_set.has_index(j))
+        {
+          NumericVector<Number> *coarse_adjoint =
+            NumericVector<Number>::build(mesh.comm()).release();
+
+          // Can do "fast" init since we're overwriting this in a sec
+          coarse_adjoint->init(system.solution->size(),
+                               system.solution->local_size(),
+                               true,
+                               system.get_adjoint_solution(j).type());
+
+          *coarse_adjoint = system.get_adjoint_solution(j);
+
+          coarse_adjoints.push_back(coarse_adjoint);
+        }
+      else
+        coarse_adjoints.push_back(NULL);
+    }
 
   // Rebuild the rhs with the projected primal solution
   (dynamic_cast<ImplicitSystem&>(system)).assembly(true, false);
@@ -199,7 +226,7 @@ void AdjointRefinementEstimator::estimate_error (const System& _system,
 
   // Loop over all the adjoint solutions and get the QoI error
   // contributions from all of them.  While we're looping anyway we'll
-  // handle heterogenous adjoint BCs
+  // pull off the coarse adjoints
   for (unsigned int j=0; j != system.qoi.size(); j++)
     {
       // Skip this QoI if not in the QoI Set
@@ -207,18 +234,11 @@ void AdjointRefinementEstimator::estimate_error (const System& _system,
         {
           // If the adjoint solution has heterogeneous dirichlet
           // values, then to get a proper error estimate here we need
-          // to subtract off a coarse grid lift function.  We won't
-          // need the lift function afterward.  We won't even need the
-          // fine adjoint solution afterward, so we'll modify it here.
-          if (system.get_dof_map().has_adjoint_dirichlet_boundaries(j))
-            {
-              std::ostringstream liftfunc_name;
-              liftfunc_name << "adjoint_lift_function" << j;
-              system.get_adjoint_solution(j) -=
-                system.get_vector(liftfunc_name.str());
-
-              system.remove_vector(liftfunc_name.str());
-            }
+          // to subtract off a coarse grid lift function.  In any case
+          // we can get a better error estimate by separating off a
+          // coarse representation of the adjoint solution, so we'll
+          // use that for our lift function.
+          system.get_adjoint_solution(j) -= *coarse_adjoints[j];
 
           computed_global_QoI_errors[j] = projected_residual.dot(system.get_adjoint_solution(j));
         }
@@ -240,95 +260,97 @@ void AdjointRefinementEstimator::estimate_error (const System& _system,
   // over the nodes each element contains, and then query it for the number of coarse
   // grid elements it was a node of
 
-  // We will be iterating over all the active elements in the fine mesh that live on
-  // this processor
-  MeshBase::const_element_iterator elem_it = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator elem_end = mesh.active_local_elements_end();
-
   // Keep track of which nodes we have already dealt with
   LIBMESH_BEST_UNORDERED_SET<dof_id_type> processed_node_ids;
 
-  // Start loop over elems
-  for(; elem_it != elem_end; ++elem_it)
-    {
-      // Pointer to this element
-      const Elem* elem = *elem_it;
+  // We will be iterating over all the active elements in the fine mesh that live on
+  // this processor
+  {
+    MeshBase::const_element_iterator elem_it = mesh.active_local_elements_begin();
+    const MeshBase::const_element_iterator elem_end = mesh.active_local_elements_end();
 
-      // Loop over the nodes in the element
-      for(unsigned int n=0; n != elem->n_nodes(); ++n)
-        {
-          // Get a pointer to the current node
-          Node* node = elem->get_node(n);
+    // Start loop over elems
+    for(; elem_it != elem_end; ++elem_it)
+      {
+        // Pointer to this element
+        const Elem* elem = *elem_it;
 
-          // Get the id of this node
-          dof_id_type node_id = node->id();
+        // Loop over the nodes in the element
+        for(unsigned int n=0; n != elem->n_nodes(); ++n)
+          {
+            // Get a pointer to the current node
+            Node* node = elem->get_node(n);
 
-          // If we havent already processed this node, do so now
-          if(processed_node_ids.find(node_id) == processed_node_ids.end())
-            {
-              // Declare a neighbor_set to be filled by the find_point_neighbors
-              std::set<const Elem *> fine_grid_neighbor_set;
+            // Get the id of this node
+            dof_id_type node_id = node->id();
 
-              // Call find_point_neighbors to fill the neighbor_set
-              elem->find_point_neighbors(*node, fine_grid_neighbor_set);
+            // If we havent already processed this node, do so now
+            if(processed_node_ids.find(node_id) == processed_node_ids.end())
+              {
+                // Declare a neighbor_set to be filled by the find_point_neighbors
+                std::set<const Elem *> fine_grid_neighbor_set;
 
-              // A vector to hold the coarse grid parents neighbors
-              std::vector<dof_id_type> coarse_grid_neighbors;
+                // Call find_point_neighbors to fill the neighbor_set
+                elem->find_point_neighbors(*node, fine_grid_neighbor_set);
 
-              // Iterators over the fine grid neighbors set
-              std::set<const Elem*>::iterator fine_neighbor_it = fine_grid_neighbor_set.begin();
-              const std::set<const Elem*>::iterator fine_neighbor_end = fine_grid_neighbor_set.end();
+                // A vector to hold the coarse grid parents neighbors
+                std::vector<dof_id_type> coarse_grid_neighbors;
 
-              // Loop over all the fine neighbors of this node
-              for(; fine_neighbor_it != fine_neighbor_end ; ++fine_neighbor_it)
-                {
-                  // Pointer to the current fine neighbor element
-                  const Elem* fine_elem = *fine_neighbor_it;
+                // Iterators over the fine grid neighbors set
+                std::set<const Elem*>::iterator fine_neighbor_it = fine_grid_neighbor_set.begin();
+                const std::set<const Elem*>::iterator fine_neighbor_end = fine_grid_neighbor_set.end();
 
-                  // Find the element id for the corresponding coarse grid element
-                  const Elem* coarse_elem = fine_elem;
-                  for (unsigned int j = 0; j != number_h_refinements; ++j)
-                    {
-                      libmesh_assert (coarse_elem->parent());
+                // Loop over all the fine neighbors of this node
+                for(; fine_neighbor_it != fine_neighbor_end ; ++fine_neighbor_it)
+                  {
+                    // Pointer to the current fine neighbor element
+                    const Elem* fine_elem = *fine_neighbor_it;
 
-                      coarse_elem = coarse_elem->parent();
-                    }
+                    // Find the element id for the corresponding coarse grid element
+                    const Elem* coarse_elem = fine_elem;
+                    for (unsigned int j = 0; j != number_h_refinements; ++j)
+                      {
+                        libmesh_assert (coarse_elem->parent());
 
-                  // Loop over the existing coarse neighbors and check if this one is
-                  // already in there
-                  const dof_id_type coarse_id = coarse_elem->id();
-                  std::size_t j = 0;
-                  for (; j != coarse_grid_neighbors.size(); j++)
-                    {
-                      // If the set already contains this element break out of the loop
-                      if(coarse_grid_neighbors[j] == coarse_id)
-                        {
-                          break;
-                        }
-                    }
+                        coarse_elem = coarse_elem->parent();
+                      }
 
-                  // If we didn't leave the loop even at the last element,
-                  // this is a new neighbour, put in the coarse_grid_neighbor_set
-                  if(j == coarse_grid_neighbors.size())
-                    {
-                      coarse_grid_neighbors.push_back(coarse_id);
-                    }
+                    // Loop over the existing coarse neighbors and check if this one is
+                    // already in there
+                    const dof_id_type coarse_id = coarse_elem->id();
+                    std::size_t j = 0;
+                    for (; j != coarse_grid_neighbors.size(); j++)
+                      {
+                        // If the set already contains this element break out of the loop
+                        if(coarse_grid_neighbors[j] == coarse_id)
+                          {
+                            break;
+                          }
+                      }
 
-                } // End loop over fine neighbors
+                    // If we didn't leave the loop even at the last element,
+                    // this is a new neighbour, put in the coarse_grid_neighbor_set
+                    if(j == coarse_grid_neighbors.size())
+                      {
+                        coarse_grid_neighbors.push_back(coarse_id);
+                      }
 
-              // Set the shared_neighbour index for this node to the
-              // size of the coarse grid neighbor set
-              shared_element_count[node_id] =
-                libmesh_cast_int<unsigned int>(coarse_grid_neighbors.size());
+                  } // End loop over fine neighbors
 
-              // Add this node to processed_node_ids vector
-              processed_node_ids.insert(node_id);
+                // Set the shared_neighbour index for this node to the
+                // size of the coarse grid neighbor set
+                shared_element_count[node_id] =
+                  cast_int<unsigned int>(coarse_grid_neighbors.size());
 
-            } // End if not processed node
+                // Add this node to processed_node_ids vector
+                processed_node_ids.insert(node_id);
 
-        } // End loop over nodes
+              } // End if not processed node
 
-    }  // End loop over elems
+          } // End loop over nodes
+
+      }  // End loop over elems
+  }
 
   // Get a DoF map, will be used to get the nodal dof_indices for each element
   DofMap &dof_map = system.get_dof_map();
@@ -406,6 +428,14 @@ void AdjointRefinementEstimator::estimate_error (const System& _system,
 
     } // End loop over QoIs
 
+  for (unsigned int j=0; j != system.qoi.size(); j++)
+    {
+      if (_qoi_set.has_index(j))
+        {
+          delete coarse_adjoints[j];
+        }
+    }
+
   // Don't bother projecting the solution; we'll restore from backup
   // after coarsening
   system.project_solution_on_reinit() = false;
@@ -437,7 +467,6 @@ void AdjointRefinementEstimator::estimate_error (const System& _system,
   delete coarse_solution;
   *system.current_local_solution = *coarse_local_solution;
   delete coarse_local_solution;
-  delete projected_solution;
 
   for (System::vectors_iterator vec = system.vectors_begin(); vec !=
          system.vectors_end(); ++vec)

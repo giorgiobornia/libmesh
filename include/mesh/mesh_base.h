@@ -75,8 +75,8 @@ public:
    * The mesh dimension can be changed (and may automatically be
    * changed by mesh generation/loading) later.
    */
-  MeshBase (const Parallel::Communicator &comm,
-            unsigned int dim=1);
+  MeshBase (const Parallel::Communicator &comm_in,
+            unsigned char dim=1);
 
 #ifndef LIBMESH_DISABLE_COMMWORLD
   /**
@@ -84,7 +84,7 @@ public:
    * The mesh dimension can be changed (and may automatically be
    * changed by mesh generation/loading) later.
    */
-  MeshBase (unsigned int dim=1);
+  MeshBase (unsigned char dim=1);
 #endif
 
   /**
@@ -103,16 +103,19 @@ public:
   virtual ~MeshBase ();
 
   /**
-   * This class holds the boundary information.  It can store nodes, edges,
-   * and faces with a corresponding id that facilitates setting boundary
-   * conditions.
-   */
-  AutoPtr<BoundaryInfo> boundary_info;
-
-  /**
    * A partitioner to use at each prepare_for_use()
    */
   virtual AutoPtr<Partitioner> &partitioner() { return _partitioner; }
+
+  /**
+   * The information about boundary ids on the mesh
+   */
+  const BoundaryInfo& get_boundary_info() const { return *boundary_info; }
+
+  /**
+   * Writeable information about boundary ids on the mesh
+   */
+  BoundaryInfo& get_boundary_info() { return *boundary_info; }
 
   /**
    * Deletes all the data that are currently stored.
@@ -153,12 +156,12 @@ public:
    * then this will return the largest such dimension.
    */
   unsigned int mesh_dimension () const
-  { return static_cast<unsigned int>(_dim); }
+  { return cast_int<unsigned int>(_dim); }
 
   /**
    * Resets the logical dimension of the mesh.
    */
-  void set_mesh_dimension (unsigned int d)
+  void set_mesh_dimension (unsigned char d)
   { _dim = d; }
 
   /**
@@ -166,7 +169,7 @@ public:
    * defined at compile time in the header \p libmesh_common.h.
    */
   unsigned int spatial_dimension () const
-  { return static_cast<unsigned int>(LIBMESH_DIM); }
+  { return cast_int<unsigned int>(LIBMESH_DIM); }
 
   /**
    * Returns the number of nodes in the mesh. This function and others must
@@ -704,10 +707,6 @@ public:
    */
   subdomain_id_type get_id_by_name(const std::string& name) const;
 
-public:
-
-
-
   /**
    * Elem iterator accessor functions.  These must be defined in
    * Concrete base classes.
@@ -728,6 +727,10 @@ public:
   virtual element_iterator not_subactive_elements_end       () = 0;
   virtual element_iterator local_elements_begin             () = 0;
   virtual element_iterator local_elements_end               () = 0;
+  virtual element_iterator semilocal_elements_begin         () = 0;
+  virtual element_iterator semilocal_elements_end           () = 0;
+  virtual element_iterator facelocal_elements_begin         () = 0;
+  virtual element_iterator facelocal_elements_end           () = 0;
   virtual element_iterator not_local_elements_begin         () = 0;
   virtual element_iterator not_local_elements_end           () = 0;
   virtual element_iterator active_local_elements_begin      () = 0;
@@ -779,6 +782,10 @@ public:
   virtual const_element_iterator not_subactive_elements_end       () const = 0;
   virtual const_element_iterator local_elements_begin             () const = 0;
   virtual const_element_iterator local_elements_end               () const = 0;
+  virtual const_element_iterator semilocal_elements_begin         () const = 0;
+  virtual const_element_iterator semilocal_elements_end           () const = 0;
+  virtual const_element_iterator facelocal_elements_begin         () const = 0;
+  virtual const_element_iterator facelocal_elements_end           () const = 0;
   virtual const_element_iterator not_local_elements_begin         () const = 0;
   virtual const_element_iterator not_local_elements_end           () const = 0;
   virtual const_element_iterator active_local_elements_begin      () const = 0;
@@ -843,6 +850,19 @@ public:
   const std::map<subdomain_id_type, std::string>& get_subdomain_name_map () const
   { return _block_id_to_name; }
 
+
+
+  /**
+   * This class holds the boundary information.  It can store nodes, edges,
+   * and faces with a corresponding id that facilitates setting boundary
+   * conditions.
+   *
+   * Direct access to this class will be removed in future libMesh
+   * versions.  Use the \p get_boundary_info() accessor instead.
+   */
+  AutoPtr<BoundaryInfo> boundary_info;
+
+
 protected:
 
   /**
@@ -873,7 +893,7 @@ protected:
   /**
    * The logical dimension of the mesh.
    */
-  unsigned int _dim;
+  unsigned char _dim;
 
   /**
    * Flag indicating if the mesh has been prepared for use.

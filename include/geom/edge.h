@@ -39,9 +39,6 @@ class Mesh;
  * The \p Edge is an element in 1D. It can be thought of as a
  * line segment.
  */
-
-// ------------------------------------------------------------
-// Edge class definition
 class Edge : public Elem
 {
 public:
@@ -148,8 +145,7 @@ public:
    * The \p Elem::build_edge() member makes no sense for edges.
    */
   AutoPtr<Elem> build_edge (const unsigned int) const
-  //{ libmesh_assert_less (i, n_nodes()); AutoPtr<DofObject> ap(new Node(*get_node(i))); return ap; }
-  { libmesh_error(); AutoPtr<Elem> ap(NULL); return ap; }
+  { libmesh_not_implemented(); AutoPtr<Elem> ap(NULL); return ap; }
 
 
 protected:
@@ -166,7 +162,7 @@ protected:
    */
   unsigned int side_children_matrix (const unsigned int,
                                      const unsigned int) const
-  { libmesh_error(); return 0; }
+  { libmesh_not_implemented(); return 0; }
 
 #endif
 

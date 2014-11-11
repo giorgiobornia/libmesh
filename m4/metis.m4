@@ -4,8 +4,8 @@ dnl -------------------------------------------------------------
 AC_DEFUN([CONFIGURE_METIS],
 [
   AC_ARG_ENABLE(metis,
-                AC_HELP_STRING([--enable-metis],
-                               [build with Metis graph partitioning suppport]),
+                AS_HELP_STRING([--disable-metis],
+                               [build without Metis graph partitioning suppport]),
 		[case "${enableval}" in
 		  yes)  enablemetis=yes ;;
 		   no)  enablemetis=no ;;
@@ -14,7 +14,7 @@ AC_DEFUN([CONFIGURE_METIS],
 		 [enablemetis=$enableoptional])
 
  AC_ARG_WITH(metis,
-             AC_HELP_STRING([--with-metis=<internal,PETSc>],
+             AS_HELP_STRING([--with-metis=<internal,PETSc>],
                             [metis to use.
 			      interal: build from contrib.
 			      PETSc: rely on PETSc]),

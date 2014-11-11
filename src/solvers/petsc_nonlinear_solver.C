@@ -85,6 +85,7 @@ extern "C"
     libmesh_assert(r);
     libmesh_assert(ctx);
 
+    // No way to safety-check this cast, since we got a void*...
     PetscNonlinearSolver<Number>* solver =
       static_cast<PetscNonlinearSolver<Number>*> (ctx);
 
@@ -95,13 +96,13 @@ extern "C"
       PetscInt n_iterations = 0;
       ierr = SNESGetIterationNumber(snes, &n_iterations);
       CHKERRABORT(solver->comm().get(),ierr);
-      solver->_current_nonlinear_iteration_number = static_cast<unsigned>(n_iterations);
+      solver->_current_nonlinear_iteration_number = cast_int<unsigned>(n_iterations);
     }
 
     NonlinearImplicitSystem &sys = solver->system();
 
-    PetscVector<Number>& X_sys = *libmesh_cast_ptr<PetscVector<Number>*>(sys.solution.get());
-    PetscVector<Number>& R_sys = *libmesh_cast_ptr<PetscVector<Number>*>(sys.rhs);
+    PetscVector<Number>& X_sys = *cast_ptr<PetscVector<Number>*>(sys.solution.get());
+    PetscVector<Number>& R_sys = *cast_ptr<PetscVector<Number>*>(sys.rhs);
     PetscVector<Number> X_global(x, sys.comm()), R(r, sys.comm());
 
     // Use the systems update() to get a good local version of the parallel solution
@@ -123,23 +124,25 @@ extern "C"
     // if the user has provided both function pointers and objects only the pointer
     // will be used, so catch that as an error
     if (solver->residual && solver->residual_object)
-      {
-        libMesh::err << "ERROR: cannot specifiy both a function and object to compute the Residual!" << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR: cannot specifiy both a function and object to compute the Residual!");
 
     if (solver->matvec && solver->residual_and_jacobian_object)
-      {
-        libMesh::err << "ERROR: cannot specifiy both a function and object to compute the combined Residual & Jacobian!" << std::endl;
-        libmesh_error();
-      }
-    //-----------------------------------------------------------------------------
+      libmesh_error_msg("ERROR: cannot specifiy both a function and object to compute the combined Residual & Jacobian!");
 
-    if      (solver->residual != NULL)                     solver->residual                                            (*sys.current_local_solution.get(), R, sys);
-    else if (solver->residual_object != NULL)              solver->residual_object->residual                           (*sys.current_local_solution.get(), R, sys);
-    else if (solver->matvec   != NULL)                     solver->matvec                                              (*sys.current_local_solution.get(), &R, NULL, sys);
-    else if (solver->residual_and_jacobian_object != NULL) solver->residual_and_jacobian_object->residual_and_jacobian (*sys.current_local_solution.get(), &R, NULL, sys);
-    else libmesh_error();
+    if (solver->residual != NULL)
+      solver->residual(*sys.current_local_solution.get(), R, sys);
+
+    else if (solver->residual_object != NULL)
+      solver->residual_object->residual(*sys.current_local_solution.get(), R, sys);
+
+    else if (solver->matvec != NULL)
+      solver->matvec (*sys.current_local_solution.get(), &R, NULL, sys);
+
+    else if (solver->residual_and_jacobian_object != NULL)
+      solver->residual_and_jacobian_object->residual_and_jacobian (*sys.current_local_solution.get(), &R, NULL, sys);
+
+    else
+      libmesh_error_msg("Error! Unable to compute residual and/or Jacobian!");
 
     R.close();
     X_global.close();
@@ -153,8 +156,13 @@ extern "C"
 
   //---------------------------------------------------------------
   // this function is called by PETSc to evaluate the Jacobian at X
+#if PETSC_RELEASE_LESS_THAN(3,5,0)
   PetscErrorCode
   __libmesh_petsc_snes_jacobian (SNES snes, Vec x, Mat *jac, Mat *pc, MatStructure *msflag, void *ctx)
+#else
+  PetscErrorCode
+  __libmesh_petsc_snes_jacobian (SNES snes, Vec x, Mat jac, Mat pc, void *ctx)
+#endif
   {
     START_LOG("jacobian()", "PetscNonlinearSolver");
 
@@ -162,6 +170,7 @@ extern "C"
 
     libmesh_assert(ctx);
 
+    // No way to safety-check this cast, since we got a void*...
     PetscNonlinearSolver<Number>* solver =
       static_cast<PetscNonlinearSolver<Number>*> (ctx);
 
@@ -172,15 +181,19 @@ extern "C"
       PetscInt n_iterations = 0;
       ierr = SNESGetIterationNumber(snes, &n_iterations);
       CHKERRABORT(solver->comm().get(),ierr);
-      solver->_current_nonlinear_iteration_number = static_cast<unsigned>(n_iterations);
+      solver->_current_nonlinear_iteration_number = cast_int<unsigned>(n_iterations);
     }
 
     NonlinearImplicitSystem &sys = solver->system();
-
+#if PETSC_RELEASE_LESS_THAN(3,5,0)
     PetscMatrix<Number> PC(*pc, sys.comm());
     PetscMatrix<Number> Jac(*jac, sys.comm());
-    PetscVector<Number>& X_sys = *libmesh_cast_ptr<PetscVector<Number>*>(sys.solution.get());
-    PetscMatrix<Number>& Jac_sys = *libmesh_cast_ptr<PetscMatrix<Number>*>(sys.matrix);
+#else
+    PetscMatrix<Number> PC(pc, sys.comm());
+    PetscMatrix<Number> Jac(jac, sys.comm());
+#endif
+    PetscVector<Number>& X_sys = *cast_ptr<PetscVector<Number>*>(sys.solution.get());
+    PetscMatrix<Number>& Jac_sys = *cast_ptr<PetscMatrix<Number>*>(sys.matrix);
     PetscVector<Number> X_global(x, sys.comm());
 
     // Set the dof maps
@@ -204,30 +217,32 @@ extern "C"
     // if the user has provided both function pointers and objects only the pointer
     // will be used, so catch that as an error
     if (solver->jacobian && solver->jacobian_object)
-      {
-        libMesh::err << "ERROR: cannot specify both a function and object to compute the Jacobian!" << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR: cannot specify both a function and object to compute the Jacobian!");
 
     if (solver->matvec && solver->residual_and_jacobian_object)
-      {
-        libMesh::err << "ERROR: cannot specify both a function and object to compute the combined Residual & Jacobian!" << std::endl;
-        libmesh_error();
-      }
-    //-----------------------------------------------------------------------------
+      libmesh_error_msg("ERROR: cannot specify both a function and object to compute the combined Residual & Jacobian!");
 
-    if      (solver->jacobian != NULL)                     solver->jacobian                                            (*sys.current_local_solution.get(), PC, sys);
-    else if (solver->jacobian_object != NULL)              solver->jacobian_object->jacobian                           (*sys.current_local_solution.get(), PC, sys);
-    else if (solver->matvec   != NULL)                     solver->matvec                                              (*sys.current_local_solution.get(), NULL, &PC, sys);
-    else if (solver->residual_and_jacobian_object != NULL) solver->residual_and_jacobian_object->residual_and_jacobian (*sys.current_local_solution.get(), NULL, &PC, sys);
-    else libmesh_error();
+    if (solver->jacobian != NULL)
+      solver->jacobian(*sys.current_local_solution.get(), PC, sys);
+
+    else if (solver->jacobian_object != NULL)
+      solver->jacobian_object->jacobian(*sys.current_local_solution.get(), PC, sys);
+
+    else if (solver->matvec != NULL)
+      solver->matvec(*sys.current_local_solution.get(), NULL, &PC, sys);
+
+    else if (solver->residual_and_jacobian_object != NULL)
+      solver->residual_and_jacobian_object->residual_and_jacobian (*sys.current_local_solution.get(), NULL, &PC, sys);
+
+    else
+      libmesh_error_msg("Error! Unable to compute residual and/or Jacobian!");
 
     PC.close();
     Jac.close();
     X_global.close();
-
+#if PETSC_RELEASE_LESS_THAN(3,5,0)
     *msflag = SAME_NONZERO_PATTERN;
-
+#endif
     STOP_LOG("jacobian()", "PetscNonlinearSolver");
 
     return ierr;
@@ -373,7 +388,7 @@ PetscNonlinearSolver<T>::build_mat_null_space(NonlinearImplicitSystem::ComputeVe
     {
       Vec *modes;
       PetscScalar *dots;
-      PetscInt nmodes = sp.size();
+      PetscInt nmodes = cast_int<PetscInt>(sp.size());
 
 #if PETSC_RELEASE_LESS_THAN(3,5,0)
       ierr = PetscMalloc2(nmodes,Vec,&modes,nmodes,PetscScalar,&dots);
@@ -384,7 +399,7 @@ PetscNonlinearSolver<T>::build_mat_null_space(NonlinearImplicitSystem::ComputeVe
 
       for (PetscInt i=0; i<nmodes; ++i)
         {
-          PetscVector<T>* pv = libmesh_cast_ptr<PetscVector<T>*>(sp[i]);
+          PetscVector<T>* pv = cast_ptr<PetscVector<T>*>(sp[i]);
           Vec v = pv->vec();
 
           ierr = VecDuplicate(v, modes+i);
@@ -441,9 +456,9 @@ PetscNonlinearSolver<T>::solve (SparseMatrix<T>&  jac_in,  // System Jacobian Ma
   this->init ();
 
   // Make sure the data passed in are really of Petsc types
-  PetscMatrix<T>* jac = libmesh_cast_ptr<PetscMatrix<T>*>(&jac_in);
-  PetscVector<T>* x   = libmesh_cast_ptr<PetscVector<T>*>(&x_in);
-  PetscVector<T>* r   = libmesh_cast_ptr<PetscVector<T>*>(&r_in);
+  PetscMatrix<T>* jac = cast_ptr<PetscMatrix<T>*>(&jac_in);
+  PetscVector<T>* x   = cast_ptr<PetscVector<T>*>(&x_in);
+  PetscVector<T>* r   = cast_ptr<PetscVector<T>*>(&r_in);
 
   PetscErrorCode ierr=0;
   PetscInt n_iterations =0;
@@ -549,10 +564,17 @@ PetscNonlinearSolver<T>::solve (SparseMatrix<T>&  jac_in,  // System Jacobian Ma
   ierr = SNESGetLinearSolveIterations(_snes, &_n_linear_iterations);
   LIBMESH_CHKERRABORT(ierr);
 
-  ierr = SNESGetFunctionNorm(_snes,&final_residual_norm);
-  LIBMESH_CHKERRABORT(ierr);
-
 #endif
+
+  // SNESGetFunction has been around forever and should work on all
+  // versions of PETSc.  This is also now the recommended approach
+  // according to the documentation for the PETSc 3.5.1 release:
+  // http://www.mcs.anl.gov/petsc/documentation/changes/35.html
+  Vec f;
+  ierr = SNESGetFunction(_snes, &f, 0, 0);
+  LIBMESH_CHKERRABORT(ierr);
+  ierr = VecNorm(f, NORM_2, &final_residual_norm);
+  LIBMESH_CHKERRABORT(ierr);
 
   // Get and store the reason for convergence
   SNESGetConvergedReason(_snes, &_reason);

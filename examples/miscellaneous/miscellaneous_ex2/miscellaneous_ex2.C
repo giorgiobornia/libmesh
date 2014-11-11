@@ -70,7 +70,7 @@
 // Define matrix and vector data types for the global
 // equation system.  These are base classes,
 // from which specific implementations, like
-// the PETSc or LASPACK implementations, are derived.
+// the PETSc and Eigen implementations, are derived.
 #include "libmesh/sparse_matrix.h"
 #include "libmesh/numeric_vector.h"
 
@@ -116,18 +116,12 @@ int main (int argc, char** argv)
 
   // This example is designed for complex numbers.
 #ifndef LIBMESH_USE_COMPLEX_NUMBERS
-  libmesh_example_assert(false, "--enable-complex");
+  libmesh_example_requires(false, "--enable-complex");
 #else
 
   // Check for proper usage.
   if (argc < 3)
-    {
-      if (init.comm().rank() == 0)
-        std::cerr << "Usage: " << argv[0] << " -f [frequency]"
-                  << std::endl;
-
-      libmesh_error();
-    }
+    libmesh_error_msg("Usage: " << argv[0] << " -f [frequency]");
 
   if (init.comm().size() > 1)
     {
@@ -156,7 +150,7 @@ int main (int argc, char** argv)
   const unsigned int n_frequencies = 3;
 
   // Skip this 2D example if libMesh was compiled as 1D-only.
-  libmesh_example_assert(2 <= LIBMESH_DIM, "2D support");
+  libmesh_example_requires(2 <= LIBMESH_DIM, "2D support");
 
   // Create a mesh, with dimension to be overridden later, distributed
   // across the default MPI communicator.
@@ -353,7 +347,7 @@ void assemble_helmholtz(EquationSystems& es,
   const std::vector<std::vector<RealGradient> >& dphi = fe->get_dphi();
 
   // Now this is slightly different from example 4.
-  // We will not add directly to the overall (PETSc/LASPACK) matrix,
+  // We will not add directly to the global matrix,
   // but to the additional matrices "stiffness_mass" and "damping".
   // The same holds for the right-hand-side vector Fe, which we will
   // later on store in the additional vector "rhs".

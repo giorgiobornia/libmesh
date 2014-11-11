@@ -64,7 +64,8 @@ void SparseMatrix<T>::add_block_matrix (const DenseMatrix<T> &dm,
 {
   libmesh_assert_equal_to (dm.m() / brows.size(), dm.n() / bcols.size());
 
-  const numeric_index_type blocksize = dm.m() / brows.size();
+  const numeric_index_type blocksize = cast_int<numeric_index_type>
+    (dm.m() / brows.size());
 
   libmesh_assert_equal_to (dm.m()%blocksize, 0);
   libmesh_assert_equal_to (dm.n()%blocksize, 0);
@@ -174,12 +175,8 @@ SparseMatrix<T>::build(const Parallel::Communicator &comm,
       }
 #endif
 
-
     default:
-      libMesh::err << "ERROR:  Unrecognized solver package: "
-                   << solver_package
-                   << std::endl;
-      libmesh_error();
+      libmesh_error_msg("ERROR:  Unrecognized solver package: " << solver_package);
     }
 
   AutoPtr<SparseMatrix<T> > ap(NULL);
@@ -225,10 +222,7 @@ void SparseMatrix<T>::print(std::ostream& os, const bool sparse) const
   libmesh_assert (this->initialized());
 
   if(!this->_dof_map)
-    {
-      os << std::endl << "Error!  Trying to print a matrix with no dof_map set!" << std::endl << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("Error!  Trying to print a matrix with no dof_map set!");
 
   // We'll print the matrix from processor 0 to make sure
   // it's serialized properly

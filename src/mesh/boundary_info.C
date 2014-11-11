@@ -172,9 +172,12 @@ void BoundaryInfo::sync (const std::set<boundary_id_type> &requested_boundary_id
 
   /**
    * The boundary mesh elements will be one lower dimension than the
-   * interior mesh elements
+   * interior mesh elements.
+   *
+   * cast_int will scream if the interior is a 0-D mesh
    */
-  boundary_mesh.set_mesh_dimension(_mesh.mesh_dimension() - 1);
+  boundary_mesh.set_mesh_dimension
+    (cast_int<unsigned char>(_mesh.mesh_dimension() - 1));
 
   /**
    * Re-create the boundary mesh.
@@ -528,14 +531,9 @@ void BoundaryInfo::add_node(const Node* node,
                             const boundary_id_type id)
 {
   if (id == invalid_id)
-    {
-      libMesh::err << "ERROR: You may not set a boundary ID of "
-                   << invalid_id << std::endl
-                   << " That is reserved for internal use.\n"
-                   << std::endl;
-
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: You may not set a boundary ID of "   \
+                      << invalid_id                                \
+                      << "\n That is reserved for internal use.");
 
   // A convenient typedef
   typedef std::multimap<const Node*, boundary_id_type>::const_iterator Iter;
@@ -573,14 +571,9 @@ void BoundaryInfo::add_node(const Node* node,
       boundary_id_type id=ids[i];
 
       if (id == invalid_id)
-        {
-          libMesh::err << "ERROR: You may not set a boundary ID of "
-                       << invalid_id << std::endl
-                       << " That is reserved for internal use.\n"
-                       << std::endl;
-
-          libmesh_error();
-        }
+        libmesh_error_msg("ERROR: You may not set a boundary ID of "    \
+                          << invalid_id                                 \
+                          << "\n That is reserved for internal use.");
 
       bool already_inserted = false;
       for (Iter p = pos.first;p != pos.second; ++p)
@@ -625,14 +618,9 @@ void BoundaryInfo::add_edge(const Elem* elem,
   libmesh_assert_equal_to (elem->level(), 0);
 
   if (id == invalid_id)
-    {
-      libMesh::err << "ERROR: You may not set a boundary ID of "
-                   << invalid_id << std::endl
-                   << " That is reserved for internal use.\n"
-                   << std::endl;
-
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: You may not set a boundary ID of "        \
+                      << invalid_id                                     \
+                      << "\n That is reserved for internal use.");
 
   // A convenient typedef
   typedef std::multimap<const Elem*, std::pair<unsigned short int, boundary_id_type> >::
@@ -681,14 +669,9 @@ void BoundaryInfo::add_edge(const Elem* elem,
       boundary_id_type id=ids[i];
 
       if (id == invalid_id)
-        {
-          libMesh::err << "ERROR: You may not set a boundary ID of "
-                       << invalid_id << std::endl
-                       << " That is reserved for internal use.\n"
-                       << std::endl;
-
-          libmesh_error();
-        }
+        libmesh_error_msg("ERROR: You may not set a boundary ID of "   \
+                          << invalid_id                                \
+                          << "\n That is reserved for internal use.");
 
       bool already_inserted = false;
       for (Iter p = pos.first;p != pos.second; ++p)
@@ -730,14 +713,9 @@ void BoundaryInfo::add_side(const Elem* elem,
   libmesh_assert_equal_to (elem->level(), 0);
 
   if (id == invalid_id)
-    {
-      libMesh::err << "ERROR: You may not set a boundary ID of "
-                   << invalid_id << std::endl
-                   << " That is reserved for internal use.\n"
-                   << std::endl;
-
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: You may not set a boundary ID of "        \
+                      << invalid_id                                     \
+                      << "\n That is reserved for internal use.");
 
   // A convenient typedef
   typedef std::multimap<const Elem*, std::pair<unsigned short int, boundary_id_type> >::
@@ -786,14 +764,9 @@ void BoundaryInfo::add_side(const Elem* elem,
       boundary_id_type id=ids[i];
 
       if (id == invalid_id)
-        {
-          libMesh::err << "ERROR: You may not set a boundary ID of "
-                       << invalid_id << std::endl
-                       << " That is reserved for internal use.\n"
-                       << std::endl;
-
-          libmesh_error();
-        }
+        libmesh_error_msg("ERROR: You may not set a boundary ID of "    \
+                          << invalid_id                                 \
+                          << "\n That is reserved for internal use.");
 
       bool already_inserted = false;
       for (Iter p = pos.first;p != pos.second; ++p)
@@ -859,7 +832,7 @@ unsigned int BoundaryInfo::n_boundary_ids(const Node* node) const
 
   std::pair<Iter, Iter> pos = _boundary_node_id.equal_range(node);
 
-  return libmesh_cast_int<unsigned int>
+  return cast_int<unsigned int>
     (std::distance(pos.first, pos.second));
 }
 
@@ -1437,7 +1410,9 @@ unsigned int BoundaryInfo::side_with_boundary_id(const Elem* const elem,
   return libMesh::invalid_uint;
 }
 
-void BoundaryInfo::build_node_boundary_ids(std::vector<boundary_id_type> &b_ids)
+void
+BoundaryInfo::build_node_boundary_ids(std::vector<boundary_id_type> &b_ids)
+const
 {
   b_ids.clear();
 
@@ -1453,7 +1428,9 @@ void BoundaryInfo::build_node_boundary_ids(std::vector<boundary_id_type> &b_ids)
     }
 }
 
-void BoundaryInfo::build_side_boundary_ids(std::vector<boundary_id_type> &b_ids)
+void
+BoundaryInfo::build_side_boundary_ids(std::vector<boundary_id_type> &b_ids)
+const
 {
   b_ids.clear();
 
@@ -1628,12 +1605,12 @@ void BoundaryInfo::build_side_list_from_node_list()
     {
       const Elem* elem = *el;
 
-      for (unsigned side=0; side<elem->n_sides(); ++side)
+      for (unsigned short side=0; side<elem->n_sides(); ++side)
         {
           AutoPtr<Elem> side_elem = elem->build_side(side);
 
           // map from nodeset_id to count for that ID
-          std::map<dof_id_type, unsigned> nodesets_node_count;
+          std::map<boundary_id_type, unsigned> nodesets_node_count;
           for (unsigned node_num=0; node_num < side_elem->n_nodes(); ++node_num)
             {
               Node* node = side_elem->get_node(node_num);
@@ -1642,21 +1619,25 @@ void BoundaryInfo::build_side_list_from_node_list()
               // For each nodeset that this node is a member of, increment the associated
               // nodeset ID count
               for (pos = range.first; pos != range.second; ++pos)
-                {
-                  nodesets_node_count[pos->second]++;
-                }
+                nodesets_node_count[pos->second]++;
             }
 
-          // Now check to see what nodeset_counts have the correct number of nodes in them
-          for (std::map<dof_id_type, unsigned>::const_iterator nodesets = nodesets_node_count.begin();
-               nodesets != nodesets_node_count.end(); ++nodesets)
-            {
-              if (nodesets->second == side_elem->n_nodes())
-                {
-                  // Add this side to the sideset
-                  add_side(elem, side, nodesets->first);
-                }
-            }
+          // Now check to see what nodeset_counts have the correct
+          // number of nodes in them.  For any that do, add this side to
+          // the sideset, making sure the sideset inherits the
+          // nodeset's name, if there is one.
+          std::map<boundary_id_type, unsigned>::const_iterator nodesets = nodesets_node_count.begin();
+          for (; nodesets != nodesets_node_count.end(); ++nodesets)
+            if (nodesets->second == side_elem->n_nodes())
+              {
+                add_side(elem, side, nodesets->first);
+
+                // Let the sideset inherit any non-empty name from the nodeset
+                std::string& nset_name = nodeset_name(nodesets->first);
+
+                if (nset_name != "")
+                  sideset_name(nodesets->first) = nset_name;
+              }
         } // end for side
     } // end for el
 }
@@ -1686,6 +1667,61 @@ void BoundaryInfo::build_side_list (std::vector<dof_id_type>&        el,
     }
 }
 
+void BoundaryInfo::build_active_side_list (std::vector<dof_id_type>&        el,
+                                           std::vector<unsigned short int>& sl,
+                                           std::vector<boundary_id_type>&   il) const
+{
+  std::multimap<const Elem*,
+    std::pair<unsigned short int,
+    boundary_id_type> >::const_iterator pos;
+
+  for (pos=_boundary_side_id.begin(); pos != _boundary_side_id.end();
+       ++pos)
+    {
+      // Don't add remote sides
+      if (pos->first->is_remote())
+        continue;
+
+      // Loop over the sides of possible children
+      std::vector< const Elem * > family;
+#ifdef LIBMESH_ENABLE_AMR
+      pos->first->active_family_tree_by_side(family, pos->second.first);
+#else
+      family.push_back(pos->first);
+#endif
+
+      // Populate the list items
+      for (std::vector<const Elem *>::iterator elem_it = family.begin(); elem_it != family.end(); elem_it++)
+        {
+          el.push_back ((*elem_it)->id());
+          sl.push_back (pos->second.first);
+          il.push_back (pos->second.second);
+        }
+    }
+}
+
+
+void BoundaryInfo::build_edge_list (std::vector<dof_id_type>&        el,
+                                    std::vector<unsigned short int>& sl,
+                                    std::vector<boundary_id_type>&   il) const
+{
+  // Reserve the size, then use push_back
+  el.reserve (_boundary_side_id.size());
+  sl.reserve (_boundary_side_id.size());
+  il.reserve (_boundary_side_id.size());
+
+  std::multimap<const Elem*,
+    std::pair<unsigned short int,
+    boundary_id_type> >::const_iterator pos;
+
+  for (pos=_boundary_edge_id.begin(); pos != _boundary_edge_id.end();
+       ++pos)
+    {
+      el.push_back (pos->first->id());
+      sl.push_back (pos->second.first);
+      il.push_back (pos->second.second);
+    }
+}
 
 
 void BoundaryInfo::print_info(std::ostream& out_stream) const
@@ -1842,9 +1878,33 @@ void BoundaryInfo::print_summary(std::ostream& out_stream) const
     }
 }
 
+
+const std::string& BoundaryInfo::get_sideset_name(boundary_id_type id) const
+{
+  static const std::string empty_string;
+  std::map<boundary_id_type, std::string>::const_iterator it = 
+    _ss_id_to_name.find(id);
+  if (it == _ss_id_to_name.end())
+    return empty_string;
+  else
+    return it->second;
+}
+
+
 std::string& BoundaryInfo::sideset_name(boundary_id_type id)
 {
   return _ss_id_to_name[id];
+}
+
+const std::string& BoundaryInfo::get_nodeset_name(boundary_id_type id) const
+{
+  static const std::string empty_string;
+  std::map<boundary_id_type, std::string>::const_iterator it = 
+    _ns_id_to_name.find(id);
+  if (it == _ns_id_to_name.end())
+    return empty_string;
+  else
+    return it->second;
 }
 
 std::string& BoundaryInfo::nodeset_name(boundary_id_type id)
@@ -1874,8 +1934,7 @@ boundary_id_type BoundaryInfo::get_id_by_name(const std::string& name) const
         return iter->first;
     }
 
-  libMesh::err << "The sideset/nodeset named " << name << " does not exist in mesh!" << std::endl;
-  libmesh_error();
+  libmesh_error_msg("The sideset/nodeset named " << name << " does not exist in mesh!");
 }
 
 } // namespace libMesh

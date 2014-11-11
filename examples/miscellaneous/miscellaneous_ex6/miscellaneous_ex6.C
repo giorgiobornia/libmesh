@@ -54,14 +54,14 @@ int main (int argc, char** argv)
   // Initialize libMesh and any dependent libaries, like in example 2.
   LibMeshInit init (argc, argv);
 
-  libmesh_example_assert(2 <= LIBMESH_DIM, "2D support");
+  libmesh_example_requires(2 <= LIBMESH_DIM, "2D support");
 
   std::cout << "Triangulating an L-shaped domain with holes" << std::endl;
 
   // 1.) 2D triangulation of L-shaped domain with three holes of different shape
   triangulate_domain(init.comm());
 
-  libmesh_example_assert(3 <= LIBMESH_DIM, "3D support");
+  libmesh_example_requires(3 <= LIBMESH_DIM, "3D support");
 
   std::cout << "Tetrahedralizing a prismatic domain with a hole" << std::endl;
 
@@ -155,6 +155,9 @@ void triangulate_domain(const Parallel::Communicator& comm)
   // Write the result to file
   mesh.write("delaunay_l_shaped_hole.e");
 
+#else
+  // Avoid compiler warnings
+  libmesh_ignore(comm);
 #endif // LIBMESH_HAVE_TRIANGLE
 }
 
@@ -313,10 +316,7 @@ void add_cube_convex_hull_to_mesh(MeshBase& mesh, Point lower_limit, Point upper
 
                 // Check for not found
                 if (it == node_id_map.end())
-                  {
-                    libMesh::err << "Node id " << old_elem->node(i) << " not found in map!" << std::endl;
-                    libmesh_error();
-                  }
+                  libmesh_error_msg("Node id " << old_elem->node(i) << " not found in map!");
 
                 // Mapping to node ID in input mesh
                 unsigned new_node_id = (*it).second;

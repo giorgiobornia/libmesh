@@ -269,16 +269,12 @@ void MeshData::read (const std::string& name)
     this->read_tetgen (name);
 
   else
-    {
-      libMesh::err << " ERROR: Unrecognized file extension: " << name
-                   << "\n   I understand the following:\n\n"
-                   << "     *.xta  -- Internal ASCII data format\n"
-                   << "     *.xtr  -- Internal binary data format\n"
-                   << "     *.unv  -- I-deas format\n"
-                   << std::endl;
-      libmesh_error();
+    libmesh_error_msg(" ERROR: Unrecognized file extension: " << name   \
+                      << "\n   I understand the following:\n\n"         \
+                      << "     *.xta  -- Internal ASCII data format\n"  \
+                      << "     *.xtr  -- Internal binary data format\n" \
+                      << "     *.unv  -- I-deas format");
 
-    }
   STOP_LOG("read()", "MeshData");
 }
 
@@ -316,16 +312,11 @@ void MeshData::write (const std::string& name)
       write_unv (name);
 
     else
-      {
-        libMesh::err << " ERROR: Unrecognized file extension: " << name
-                     << "\n   I understand the following:\n\n"
-                     << "     *.xta  -- Internal ASCII data format\n"
-                     << "     *.xtr  -- Internal binary data format\n"
-                     << "     *.unv  -- I-deas format\n"
-                     << std::endl;
-        libmesh_error();
-
-      }
+      libmesh_error_msg(" ERROR: Unrecognized file extension: " << name   \
+                        << "\n   I understand the following:\n\n"         \
+                        << "     *.xta  -- Internal ASCII data format\n"  \
+                        << "     *.xtr  -- Internal binary data format\n" \
+                        << "     *.unv  -- I-deas format");
   }
   STOP_LOG("write()", "MeshData");
 }
@@ -391,13 +382,8 @@ const Node* MeshData::foreign_id_to_node (const unsigned int fid) const
         const Node*>::const_iterator pos = _id_node.find(fid);
 
       if (pos == _id_node.end())
-        {
-          libMesh::err << "ERROR: Have no Node* associated with the foreign id = "
-                       << fid
-                       << std::endl;
-          libmesh_error();
-          return NULL;
-        }
+        libmesh_error_msg("ERROR: Have no Node* associated with the foreign id = " << fid);
+
       else
         return pos->second;
     }
@@ -407,8 +393,7 @@ const Node* MeshData::foreign_id_to_node (const unsigned int fid) const
     // under its current id
     return this->_mesh.node_ptr(fid);
 
-  // should never get here
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return NULL;
 }
 
@@ -430,14 +415,8 @@ unsigned int MeshData::node_to_foreign_id (const Node* n) const
         unsigned int>::const_iterator pos = _node_id.find(n);
 
       if (pos == _node_id.end())
-        {
-          libMesh::err << "ERROR: No foreign id stored for the node "
-                       << "with the libMesh id = "
-                       << n->id()
-                       << std::endl;
-          libmesh_error();
-          return 0;
-        }
+        libmesh_error_msg("ERROR: No foreign id stored for the node with the libMesh id = " << n->id());
+
       else
         return pos->second;
     }
@@ -446,8 +425,7 @@ unsigned int MeshData::node_to_foreign_id (const Node* n) const
     // return libMesh's node id
     return n->id();
 
-  // should never get here
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0;
 }
 
@@ -469,13 +447,8 @@ const Elem* MeshData::foreign_id_to_elem (const unsigned int fid) const
         const Elem*>::const_iterator pos = _id_elem.find(fid);
 
       if (pos == _id_elem.end())
-        {
-          libMesh::err << "ERROR: Have no Elem* associated with the foreign id = "
-                       << fid
-                       << std::endl;
-          libmesh_error();
-          return NULL;
-        }
+        libmesh_error_msg("ERROR: Have no Elem* associated with the foreign id = " << fid);
+
       else
         return pos->second;
     }
@@ -484,8 +457,7 @@ const Elem* MeshData::foreign_id_to_elem (const unsigned int fid) const
     // return element using the libMesh id
     return this->_mesh.elem(fid);
 
-  // should never get here
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return NULL;
 }
 
@@ -507,14 +479,8 @@ unsigned int MeshData::elem_to_foreign_id (const Elem* e) const
         unsigned int>::const_iterator pos = _elem_id.find(e);
 
       if (pos == _elem_id.end())
-        {
-          libMesh::err << "ERROR: No foreign id stored for the element "
-                       << "with the libMesh id = "
-                       << e->id()
-                       << std::endl;
-          libmesh_error();
-          return 0;
-        }
+        libmesh_error_msg("ERROR: No foreign id stored for the element with the libMesh id = " << e->id());
+
       else
         return pos->second;
     }
@@ -523,8 +489,7 @@ unsigned int MeshData::elem_to_foreign_id (const Elem* e) const
     // return libMesh's element id
     return e->id();
 
-  // should never get here
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0;
 }
 
@@ -543,11 +508,7 @@ void MeshData::insert_node_data (std::map<const Node*,
   libmesh_assert (this->_node_id_map_closed);
 
   if (this->_node_data_closed)
-    {
-      libMesh::err << "ERROR: Nodal data already closed!  Use clear() first!"
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: Nodal data already closed!  Use clear() first!");
 
   libmesh_assert (this->_node_data.empty());
 
@@ -563,18 +524,14 @@ void MeshData::insert_node_data (std::map<const Node*,
   // entry as reference length, and compare this
   // with the length of the 1st, 2nd...
   libmesh_assert (nd_pos != nd_end);
-  const unsigned int reference_length = (*nd_pos).second.size();
+  const std::size_t reference_length = (*nd_pos).second.size();
 
   // advance, so that we compare with the 1st
   ++nd_pos;
 
   for (; nd_pos != nd_end; ++nd_pos)
     if ( (*nd_pos).second.size() != reference_length)
-      {
-        libMesh::err << "ERROR: Size mismatch."
-                     << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR: Size mismatch.");
 #endif
 
   // copy over
@@ -607,11 +564,7 @@ void MeshData::insert_elem_data (std::map<const Elem*,
   libmesh_assert (this->_elem_id_map_closed);
 
   if (this->_elem_data_closed)
-    {
-      libMesh::err << "ERROR: Element data already closed!  Use clear() first!"
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: Element data already closed!  Use clear() first!");
 
   libmesh_assert (this->_elem_data.empty());
 
@@ -623,16 +576,12 @@ void MeshData::insert_elem_data (std::map<const Elem*,
 
   // Compare entity-by-entity that the
   // sizes of the std::vector's are identical.
-  const unsigned int reference_length = (*ed_pos).second.size();
+  const std::size_t reference_length = (*ed_pos).second.size();
   ++ed_pos;
 
   for (; ed_pos != ed_end; ++ed_pos)
     if ( (*ed_pos).second.size() != reference_length)
-      {
-        libMesh::err << "ERROR: Size mismatch."
-                     << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR: Size mismatch.");
 #endif
 
   // copy over
@@ -666,7 +615,7 @@ unsigned int MeshData::n_val_per_node () const
       std::map<const Node*,
         std::vector<Number> >::const_iterator pos = _node_data.begin();
       libmesh_assert (pos != _node_data.end());
-      return (pos->second.size());
+      return cast_int<unsigned int>(pos->second.size());
     }
   else
     return 0;
@@ -675,12 +624,12 @@ unsigned int MeshData::n_val_per_node () const
 
 
 
-unsigned int MeshData::n_node_data () const
+dof_id_type MeshData::n_node_data () const
 {
   libmesh_assert (this->_active || this->_compatibility_mode);
   libmesh_assert (this->_node_data_closed);
 
-  return this->_node_data.size();
+  return cast_int<dof_id_type>(this->_node_data.size());
 }
 
 
@@ -696,7 +645,7 @@ unsigned int MeshData::n_val_per_elem () const
       std::map<const Elem*,
         std::vector<Number> >::const_iterator pos = _elem_data.begin();
       libmesh_assert (pos != _elem_data.end());
-      return (pos->second.size());
+      return cast_int<unsigned int>(pos->second.size());
     }
   else
     return 0;
@@ -705,12 +654,12 @@ unsigned int MeshData::n_val_per_elem () const
 
 
 
-unsigned int MeshData::n_elem_data () const
+dof_id_type MeshData::n_elem_data () const
 {
   libmesh_assert (this->_active || this->_compatibility_mode);
   libmesh_assert (this->_elem_data_closed);
 
-  return _elem_data.size();
+  return cast_int<dof_id_type>(_elem_data.size());
 }
 
 

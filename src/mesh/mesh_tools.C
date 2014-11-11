@@ -662,7 +662,7 @@ void MeshTools::get_not_subactive_node_ids(const MeshBase& mesh,
 dof_id_type MeshTools::n_elem (const MeshBase::const_element_iterator &begin,
                                const MeshBase::const_element_iterator &end)
 {
-  return std::distance(begin, end);
+  return cast_int<dof_id_type>(std::distance(begin, end));
 }
 
 
@@ -670,7 +670,7 @@ dof_id_type MeshTools::n_elem (const MeshBase::const_element_iterator &begin,
 dof_id_type MeshTools::n_nodes (const MeshBase::const_node_iterator &begin,
                                 const MeshBase::const_node_iterator &end)
 {
-  return std::distance(begin, end);
+  return cast_int<dof_id_type>(std::distance(begin, end));
 }
 
 
@@ -977,9 +977,9 @@ void MeshTools::libmesh_assert_equal_n_systems (const MeshBase &mesh)
 
 
 
+#ifdef LIBMESH_ENABLE_AMR
 void MeshTools::libmesh_assert_old_dof_objects (const MeshBase &mesh)
 {
-#ifdef LIBMESH_ENABLE_AMR
   MeshBase::const_element_iterator el =
     mesh.elements_begin();
   const MeshBase::const_element_iterator el_end =
@@ -1003,8 +1003,10 @@ void MeshTools::libmesh_assert_old_dof_objects (const MeshBase &mesh)
             libmesh_assert(elem->get_node(n)->old_dof_object);
         }
     }
-#endif // LIBMESH_ENABLE_AMR
 }
+#else
+void MeshTools::libmesh_assert_old_dof_objects (const MeshBase &) {}
+#endif // LIBMESH_ENABLE_AMR
 
 
 

@@ -504,6 +504,12 @@ public:
   virtual void elem_edge_reinit(Real theta);
 
   /**
+   * Gives derived classes the opportunity to reinitialize data needed
+   * for nonlocal calculations at a new point within a timestep
+   */
+  virtual void nonlocal_reinit(Real theta);
+
+  /**
    * Reinitializes local data vectors/matrices on the current geometric element
    */
   virtual void pre_fe_reinit(const System&, const Elem *e);
@@ -607,6 +613,12 @@ public:
   { _mesh_z_var = z_var; }
 
   /**
+   * Test for current Elem object
+   */
+  bool has_elem() const
+  { return (elem != NULL); }
+
+  /**
    * Accessor for current Elem object
    */
   const Elem& get_elem() const
@@ -694,10 +706,10 @@ protected:
   std::vector<FEAbstract*> _edge_fe_var;
 
   /**
-   * Saved pointer to BoundaryInfo on the mesh for this System.  Used
-   * to answer boundary id requests.
+   * Saved reference to BoundaryInfo on the mesh for this System.
+   * Used to answer boundary id requests.
    */
-  BoundaryInfo* _boundary_info;
+  const BoundaryInfo& _boundary_info;
 
   /**
    * Current element for element_* to examine
@@ -766,14 +778,14 @@ inline
 void FEMContext::get_element_fe( unsigned int var, FEGenericBase<OutputShape> *& fe ) const
 {
   libmesh_assert_less ( var, _element_fe_var.size() );
-  fe = libmesh_cast_ptr<FEGenericBase<OutputShape>*>( _element_fe_var[var] );
+  fe = cast_ptr<FEGenericBase<OutputShape>*>( _element_fe_var[var] );
 }
 
 inline
 FEBase* FEMContext::get_element_fe( unsigned int var ) const
 {
   libmesh_assert_less ( var, _element_fe_var.size() );
-  return libmesh_cast_ptr<FEBase*>( _element_fe_var[var] );
+  return cast_ptr<FEBase*>( _element_fe_var[var] );
 }
 
 template<typename OutputShape>
@@ -781,14 +793,14 @@ inline
 void FEMContext::get_side_fe( unsigned int var, FEGenericBase<OutputShape> *& fe ) const
 {
   libmesh_assert_less ( var, _side_fe_var.size() );
-  fe = libmesh_cast_ptr<FEGenericBase<OutputShape>*>( _side_fe_var[var] );
+  fe = cast_ptr<FEGenericBase<OutputShape>*>( _side_fe_var[var] );
 }
 
 inline
 FEBase* FEMContext::get_side_fe( unsigned int var ) const
 {
   libmesh_assert_less ( var, _side_fe_var.size() );
-  return libmesh_cast_ptr<FEBase*>( _side_fe_var[var] );
+  return cast_ptr<FEBase*>( _side_fe_var[var] );
 }
 
 template<typename OutputShape>
@@ -796,14 +808,14 @@ inline
 void FEMContext::get_edge_fe( unsigned int var, FEGenericBase<OutputShape> *& fe ) const
 {
   libmesh_assert_less ( var, _edge_fe_var.size() );
-  fe = libmesh_cast_ptr<FEGenericBase<OutputShape>*>( _edge_fe_var[var] );
+  fe = cast_ptr<FEGenericBase<OutputShape>*>( _edge_fe_var[var] );
 }
 
 inline
 FEBase* FEMContext::get_edge_fe( unsigned int var ) const
 {
   libmesh_assert_less ( var, _edge_fe_var.size() );
-  return libmesh_cast_ptr<FEBase*>( _edge_fe_var[var] );
+  return cast_ptr<FEBase*>( _edge_fe_var[var] );
 }
 
 

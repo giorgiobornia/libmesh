@@ -85,12 +85,11 @@ public:
 
 private:
 
+  /**
+   * Just uses a Gauss rule in 1D.
+   */
   void init_1D (const ElemType,
-                unsigned int =0)
-  {
-    // See about making this non-pure virtual in the base class?
-    libmesh_error();
-  }
+                unsigned int =0);
 
   /**
    * More efficient rules for QUADs

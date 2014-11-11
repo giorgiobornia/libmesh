@@ -59,20 +59,18 @@ public:
   ~SingletonCache()
   {
     for (unsigned int e=0; e<elem_list.size(); e++)
-      if (elem_list[e])
-        {
-          delete elem_list[e];
-          elem_list[e] = NULL;
-        }
+      {
+        delete elem_list[e];
+        elem_list[e] = NULL;
+      }
 
     elem_list.clear();
 
     for (unsigned int n=0; n<node_list.size(); n++)
-      if (node_list[n])
-        {
-          delete node_list[n];
-          node_list[n] = NULL;
-        }
+      {
+        delete node_list[n];
+        node_list[n] = NULL;
+      }
 
     node_list.clear();
   }
@@ -111,7 +109,7 @@ Elem* read_ref_elem (const ElemType Type,
   in >> elem_type;
 
   libmesh_assert_less (elem_type, INVALID_ELEM);
-  libmesh_assert_equal_to (elem_type, Type);
+  libmesh_assert_equal_to (elem_type, static_cast<unsigned int>(Type));
   libmesh_assert_equal_to (n_nodes, Elem::type_to_n_nodes_map[elem_type]);
 
   // Construct the elem
@@ -141,8 +139,7 @@ Elem* read_ref_elem (const ElemType Type,
     {
       delete elem;
       elem = NULL;
-      libMesh::err << "ERROR while creating element singleton!\n";
-      libmesh_error();
+      libmesh_error_msg("ERROR while creating element singleton!");
     }
 
   else
@@ -202,6 +199,7 @@ void init_ref_elem_table()
     ref_elem_file[PRISM18]  = ElemDataStrings::one_prism18;
 
     ref_elem_file[PYRAMID5] = ElemDataStrings::one_pyramid;
+    ref_elem_file[PYRAMID13] = ElemDataStrings::one_pyramid13;
     ref_elem_file[PYRAMID14] = ElemDataStrings::one_pyramid14;
   }
 

@@ -24,6 +24,7 @@
 #include "libmesh/reference_counted_object.h"
 
 // C++ includes
+#include <set>
 
 namespace libMesh
 {
@@ -39,13 +40,17 @@ class Elem;
 namespace Trees
 {
 /**
- * \p enum defining how to build the tree.  \p NODES will populate
- * the tree with nodes and then replace the nodes with element
+ * \p enum defining how to build the tree.  \p NODES will populate the
+ * tree with nodes and then replace the nodes with element
  * connectivity, \p ELEMENTS will populate the tree with the elements
- * directly.
+ * directly.  LOCAL_ELEMENTS will populate the tree only with elements
+ * from the current processor.  This experimental capability may be
+ * useful if you do not wish to include off-processor elements in the
+ * search for a Point.
  */
 enum BuildType {NODES=0,
                 ELEMENTS,
+                LOCAL_ELEMENTS,
                 INVALID_BUILD_TYPE };
 }
 
@@ -53,22 +58,16 @@ enum BuildType {NODES=0,
  * This is the base class for trees, it allows pointer
  * usage of trees.
  */
-
-// ------------------------------------------------------------
-// TreeBase class definition
 class TreeBase : public ReferenceCountedObject<TreeBase>
 {
 protected:
-
   /**
    * Constructor.  Protected.
    */
   explicit
   TreeBase (const MeshBase& m);
 
-
 public:
-
   /**
    * Destructor.
    */
@@ -90,9 +89,10 @@ public:
   virtual unsigned int n_active_bins() const = 0;
 
   /**
-   * @returns a pointer to the element containing point p.
+   * @returns a pointer to the element containing point p,
+   * optionally restricted to a set of allowed subdomains.
    */
-  virtual const Elem* find_element(const Point& p) const = 0;
+  virtual const Elem* find_element(const Point& p, const std::set<subdomain_id_type> *allowed_subdomains = NULL) const = 0;
 
 protected:
 
@@ -101,9 +101,7 @@ protected:
    * at construction.
    */
   const MeshBase& mesh;
-
 };
-
 
 // ------------------------------------------------------------
 // TreeBase class inline methods

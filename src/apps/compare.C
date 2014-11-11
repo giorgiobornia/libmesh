@@ -98,7 +98,7 @@ void usage(char *progName)
 
 void process_cmd_line(int argc, char **argv,
                       std::vector<std::string>& names,
-                      unsigned int& dim,
+                      unsigned char& dim,
                       double& threshold,
                       XdrMODE& format,
                       bool& verbose,
@@ -142,7 +142,7 @@ void process_cmd_line(int argc, char **argv,
            */
         case 'd':
           {
-            dim = atoi(optarg);
+            dim = cast_int<unsigned char>(atoi(optarg));
             break;
           }
 
@@ -316,7 +316,7 @@ int main (int argc, char** argv)
 
   // default values
   std::vector<std::string> names;
-  unsigned int dim                = static_cast<unsigned int>(-1);
+  unsigned char dim               = static_cast<unsigned char>(-1);
   double threshold                = TOLERANCE;
   XdrMODE format                  = READ;
   bool verbose                    = false;
@@ -331,13 +331,11 @@ int main (int argc, char** argv)
                    quiet);
 
 
-  if (dim == static_cast<unsigned int>(-1))
-    {
-      libMesh::out << "ERROR:  you must specify the dimension on "
-                   << "the command line!\n\n"
-                   << argv[0] << " -d 3 ... for example\n\n";
-      libmesh_error();
-    }
+  if (dim == static_cast<unsigned char>(-1))
+    libmesh_error_msg("ERROR:  you must specify the dimension on "      \
+                      << "the command line!\n\n"                        \
+                      << argv[0]                                        \
+                      << " -d 3 ... for example");
 
   if (quiet)
     verbose = false;
@@ -345,7 +343,7 @@ int main (int argc, char** argv)
   if (verbose)
     {
       libMesh::out << "Settings:" << std::endl
-                   << " dimensionality = " << dim << std::endl
+                   << " dimensionality = " << +dim << std::endl
                    << " mesh           = " << names[0] << std::endl
                    << " left system    = " << names[1] << std::endl
                    << " right system   = " << names[2] << std::endl
@@ -389,10 +387,7 @@ int main (int argc, char** argv)
       right_system.read (names[2], format);
     }
   else
-    {
-      libMesh::out << "Bad input specified." << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("Bad input specified.");
 
   are_equal = do_compare (left_system, right_system, threshold, verbose);
 

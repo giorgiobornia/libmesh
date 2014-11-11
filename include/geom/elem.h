@@ -87,9 +87,6 @@ class PointLocatorBase;
  *
  * \author Benjamin S. Kirk, 2002-2007
  */
-
-// ------------------------------------------------------------
-// Elem class definition
 class Elem : public ReferenceCountedObject<Elem>,
              public DofObject
 {
@@ -601,7 +598,7 @@ public:
    * for an abstract Elem, it is an error.
    */
   virtual std::pair<Real,Real> qual_bounds (const ElemQuality) const
-  { libmesh_error(); return std::make_pair(0.,0.); }
+  { libmesh_not_implemented(); return std::make_pair(0.,0.); }
 
   /**
    * @returns true if the point p is contained in this element,
@@ -1113,7 +1110,7 @@ public:
    * all zero point would very likely lead to unexpected
    * behavior.
    */
-  virtual Point origin () const { libmesh_error(); return Point(); }
+  virtual Point origin () const { libmesh_not_implemented(); return Point(); }
 
 #endif
 
@@ -1140,19 +1137,6 @@ public:
 
 #endif
 
-
-  //--------------------------------------------------------
-  /**
-   * Convenient way to communicate elements.  This struct
-   * packes up an element so that it can easily be communicated through
-   * an MPI array.
-   *
-   * \author Benjamin S. Kirk
-   * \date 2008
-   */
-  class PackedElem;
-
-  unsigned int packed_size() const;
 
 protected:
 
@@ -1189,12 +1173,16 @@ protected:
 
 
 
+public:
+
   /**
    * Replaces this element with \p NULL for all of
    * its neighbors.  This is useful when deleting an
    * element.
    */
   void nullify_neighbors ();
+
+protected:
 
   /**
    * Pointers to the nodes we are connected to.
@@ -1208,12 +1196,18 @@ protected:
   Elem** _elemlinks;
 
 #ifdef LIBMESH_ENABLE_AMR
-
   /**
    * Pointers to this element's children.
    */
   Elem** _children;
+#endif
 
+  /**
+   * The subdomain to which this element belongs.
+   */
+  subdomain_id_type _sbd_id;
+
+#ifdef LIBMESH_ENABLE_AMR
   /**
    * h refinement flag. This is stored as an unsigned char
    * to save space.
@@ -1237,26 +1231,7 @@ protected:
    * been padding anyway.
    */
   unsigned char _p_level;
-
 #endif
-
-  /**
-   * The subdomain to which this element belongs.
-   */
-  subdomain_id_type _sbd_id;
-
-  /**
-   * Make the classes that need to access our build
-   * member friends.  These classes do not really fit
-   * the profile of what a "friend" should be, but
-   * if we are going to protect the constructor and
-   * the build method, there's no way around it.
-   *
-   * Do we *really* need to protect the build member?
-   * It would seem that we are just getting around it
-   * by using friends!
-   */
-  friend class MeshRefinement;    // (Elem::nullify_neighbors)
 };
 
 // ------------------------------------------------------------
@@ -1282,11 +1257,14 @@ Elem::Elem(const unsigned int nn,
   _elemlinks(elemlinkdata),
 #ifdef LIBMESH_ENABLE_AMR
   _children(NULL),
-  _rflag(Elem::DO_NOTHING),
-  _pflag(Elem::DO_NOTHING),
-  _p_level(0),
 #endif
   _sbd_id(0)
+#ifdef LIBMESH_ENABLE_AMR
+  ,
+  _rflag(Elem::DO_NOTHING),
+  _pflag(Elem::DO_NOTHING),
+  _p_level(0)
+#endif
 {
   this->processor_id() = DofObject::invalid_processor_id;
 
@@ -1832,10 +1810,7 @@ unsigned int Elem::which_child_am_i (const Elem* e) const
     if (this->child(c) == e)
       return c;
 
-  libMesh::err << "ERROR:  which_child_am_i() was called with a non-child!"
-               << std::endl;
-
-  libmesh_error();
+  libmesh_error_msg("ERROR:  which_child_am_i() was called with a non-child!");
 
   return libMesh::invalid_uint;
 }
@@ -1853,7 +1828,7 @@ Elem::RefinementState Elem::refinement_flag () const
 inline
 void Elem::set_refinement_flag(RefinementState rflag)
 {
-  _rflag = libmesh_cast_int<RefinementState>(rflag);
+  _rflag = cast_int<RefinementState>(rflag);
 }
 
 
@@ -1869,7 +1844,7 @@ Elem::RefinementState Elem::p_refinement_flag () const
 inline
 void Elem::set_p_refinement_flag(RefinementState pflag)
 {
-  _pflag = libmesh_cast_int<unsigned char>(pflag);
+  _pflag = cast_int<unsigned char>(pflag);
 }
 
 
@@ -1909,8 +1884,8 @@ void Elem::set_p_level(unsigned int p)
       // our parent's, but we have to check every other child to see
       else if (parent_p_level == _p_level && _p_level < p)
         {
-          _p_level = libmesh_cast_int<unsigned char>(p);
-          parent_p_level = libmesh_cast_int<unsigned char>(p);
+          _p_level = cast_int<unsigned char>(p);
+          parent_p_level = cast_int<unsigned char>(p);
           for (unsigned int c=0; c != this->parent()->n_children(); c++)
             parent_p_level = std::min(parent_p_level,
                                       this->parent()->child(c)->p_level());
@@ -1922,7 +1897,7 @@ void Elem::set_p_level(unsigned int p)
         }
     }
 
-  _p_level = libmesh_cast_int<unsigned char>(p);
+  _p_level = cast_int<unsigned char>(p);
 }
 
 
@@ -1930,7 +1905,7 @@ void Elem::set_p_level(unsigned int p)
 inline
 void Elem::hack_p_level(unsigned int p)
 {
-  _p_level = libmesh_cast_int<unsigned char>(p);
+  _p_level = cast_int<unsigned char>(p);
 }
 
 
@@ -2021,196 +1996,6 @@ dof_id_type Elem::compute_key (dof_id_type n0,
 }
 
 
-
-//-----------------------------------------------------------------
-/**
- * Convenient way to communicate elements.  This class
- * packes up an element so that it can easily be communicated through
- * an MPI array.
- *
- * \author Benjamin S. Kirk
- * \date 2008
- */
-class Elem::PackedElem
-{
-private:
-
-  /**
-   * Iterator pointing to the beginning of this packed element's index buffer.
-   */
-  const std::vector<largest_id_type>::const_iterator _buf_begin;
-
-public:
-
-  /**
-   * Constructor.  Takes an input iterator pointing to the
-   * beginning of the connectivity block for this element.
-   */
-  PackedElem (const std::vector<largest_id_type>::const_iterator _buf_in) :
-    _buf_begin(_buf_in)
-  {}
-
-  /**
-   * An \p Elem can be packed into an integer array which is
-   * \p header_size + elem->n_nodes() in length.
-   */
-  static const unsigned int header_size; /* = 10 with AMR, 4 without */
-
-  /**
-   * For each element the serialization is of the form
-   * [ level p_level r_flag p_r_flag etype processor_id subdomain_id
-   *  self_ID parent_ID which_child node_0 node_1 ... node_n
-   *  dof_object_buffer_1 ...]
-   * We cannot use unsigned int because parent_ID can be negative
-   */
-  static void pack (std::vector<largest_id_type> &conn, const Elem* elem);
-
-  /**
-   * Unpacks this packed element.  Returns a pointer to the new element.
-   * Takes a pointer to the parent, which is required unless this packed
-   * element is at level 0.
-   */
-  Elem * unpack (MeshBase &mesh, Elem *parent = NULL) const;
-
-  /**
-   * \p return the level of this packed element.
-   */
-  unsigned int level () const
-  {
-    return static_cast<unsigned int>(*_buf_begin);
-  }
-
-  /**
-   * \p return the p-level of this packed element.
-   */
-  unsigned int p_level () const
-  {
-    return static_cast<unsigned int>(*(_buf_begin+1));
-  }
-
-#ifdef LIBMESH_ENABLE_AMR
-  /**
-   * \p return the refinement state of this packed element.
-   */
-  Elem::RefinementState refinement_flag () const
-  {
-    // libmesh_assert_greater_equal (*(_buf_begin+2), 0);
-    libmesh_assert_less (*(_buf_begin+2), INVALID_REFINEMENTSTATE);
-    return static_cast<Elem::RefinementState>(*(_buf_begin+2));
-  }
-
-  /**
-   * \p return the p-refinement state of this packed element.
-   */
-  Elem::RefinementState p_refinement_flag () const
-  {
-    // libmesh_assert_greater_equal (*(_buf_begin+3), 0);
-    libmesh_assert_less (*(_buf_begin+3), INVALID_REFINEMENTSTATE);
-    return static_cast<Elem::RefinementState>(*(_buf_begin+3));
-  }
-#endif // LIBMESH_ENABLE_AMR
-
-  /**
-   * \p return the element type of this packed element.
-   */
-  ElemType type () const
-  {
-    // libmesh_assert_greater_equal (*(_buf_begin+4), 0);
-    libmesh_assert_less (*(_buf_begin+4), INVALID_ELEM);
-    return static_cast<ElemType>(*(_buf_begin+4));
-  }
-
-  /**
-   * \p return the processor id of this packed element.
-   */
-  processor_id_type processor_id () const
-  {
-    // libmesh_assert_greater_equal (*(_buf_begin+5), 0);
-    libmesh_assert_less (static_cast<unsigned int>(*(_buf_begin+5)),
-                         libMesh::global_n_processors() ||
-                         static_cast<processor_id_type>(*(_buf_begin+5)) == DofObject::invalid_processor_id);
-    return static_cast<processor_id_type>(*(_buf_begin+5));
-  }
-
-  /**
-   * \p return the subdomain id of this packed element.
-   */
-  subdomain_id_type subdomain_id () const
-  {
-    return static_cast<subdomain_id_type>(*(_buf_begin+6));
-  }
-
-  /**
-   * \p return the id of this packed element.
-   */
-  dof_id_type id () const
-  {
-    return static_cast<dof_id_type>(*(_buf_begin+7));
-  }
-
-  /**
-   * \p return the parent id of this packed element.
-   */
-  int parent_id () const
-  {
-    return *(_buf_begin+8);
-  }
-
-  /**
-   * \p return which child this packed element is.
-   */
-  unsigned int which_child_am_i () const
-  {
-    return static_cast<unsigned int>(*(_buf_begin+9));
-  }
-
-  /**
-   * \p return the number of nodes in this packed element
-   */
-  unsigned int n_nodes () const
-  {
-    return Elem::type_to_n_nodes_map[this->type()];
-  }
-
-  /**
-   * \p return the global index of the packed element's nth node.
-   */
-  unsigned int node (const unsigned int n) const
-  {
-    return static_cast<unsigned int>(*(_buf_begin+header_size+n));
-  }
-
-  /**
-   * \p return the number of neighbors of the packed element
-   */
-  unsigned int n_neighbors() const
-  {
-    return Elem::type_to_n_sides_map[this->type()];
-  }
-
-  /**
-   * \p return the global index of the packed element's nth neighbor
-   */
-  unsigned int neighbor (const unsigned int n) const
-  {
-    return static_cast<unsigned int>
-      (*(_buf_begin + header_size + this->n_nodes() + n));
-  }
-
-
-  std::vector<largest_id_type>::const_iterator indices() const
-  {
-    return _buf_begin + header_size + this->n_nodes() +
-      this->n_neighbors();
-  }
-
-  unsigned int packed_size() const
-  {
-    return this->header_size + this->n_nodes() +
-      this->n_neighbors() +
-      DofObject::unpackable_indexing_size(this->indices());
-  }
-}; // end class PackedElem
 
 /**
  * The definition of the protected nested SideIter class.
@@ -2363,15 +2148,6 @@ variant_filter_iterator<Elem::Predicate,
     variant_filter_iterator<Elem::Predicate,
     Elem*>(d,e,p) {}
 };
-
-
-inline
-unsigned int
-Elem::packed_size() const
-{
-  return PackedElem::header_size + this->n_nodes() +
-    this->n_neighbors() + this->packed_indexing_size();
-}
 
 
 } // namespace libMesh

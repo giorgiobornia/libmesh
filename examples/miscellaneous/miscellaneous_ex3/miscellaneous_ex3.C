@@ -392,20 +392,11 @@ int main (int argc, char** argv)
   LibMeshInit init (argc, argv);
 
 #if !defined(LIBMESH_HAVE_PETSC) && !defined(LIBMESH_HAVE_TRILINOS)
-  if (init.comm().rank() == 0)
-    std::cerr << "ERROR: This example requires libMesh to be\n"
-              << "compiled with nonlinear solver support from\n"
-              << "PETSc or Trilinos!"
-              << std::endl;
-  return 0;
+  libmesh_example_requires(false, "--enable-petsc or --enable-trilinos");
 #endif
 
 #ifndef LIBMESH_ENABLE_AMR
-  if (init.comm().rank() == 0)
-    std::cerr << "ERROR: This example requires libMesh to be\n"
-              << "compiled with AMR support!"
-              << std::endl;
-  return 0;
+  libmesh_example_requires(false, "--enable-amr");
 #else
 
   // Create a GetPot object to parse the command line
@@ -414,14 +405,9 @@ int main (int argc, char** argv)
   // Check for proper calling arguments.
   if (argc < 3)
     {
-      if (init.comm().rank() == 0)
-        std::cerr << "Usage:\n"
-                  <<"\t " << argv[0] << " -r 2"
-                  << std::endl;
-
       // This handy function will print the file name, line number,
-      // and then abort.
-      libmesh_error();
+      // specified message, and then throw an exception.
+      libmesh_error_msg("Usage:\n" << "\t " << argv[0] << " -r 2");
     }
 
   // Brief message to the user regarding the program name
@@ -454,10 +440,7 @@ int main (int argc, char** argv)
 
   // Cannot use dicontinuous basis.
   if ((family == "MONOMIAL") || (family == "XYZ"))
-    {
-      std::cout << "ex19 currently requires a C^0 (or higher) FE basis." << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("This example requires a C^0 (or higher) FE basis.");
 
   if ( command_line.search(1, "-pre") )
     {
@@ -473,7 +456,7 @@ int main (int argc, char** argv)
     }
 
   // Skip this 2D example if libMesh was compiled as 1D-only.
-  libmesh_example_assert(2 <= LIBMESH_DIM, "2D support");
+  libmesh_example_requires(2 <= LIBMESH_DIM, "2D support");
 
   // Create a mesh, with dimension to be overridden by the file,
   // distributed across the default MPI communicator.

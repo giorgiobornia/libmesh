@@ -39,11 +39,11 @@ PointLocatorTree::PointLocatorTree (const MeshBase& mesh,
   PointLocatorBase (mesh,master),
   _tree            (NULL),
   _element         (NULL),
-  _out_of_mesh_mode(false)
+  _out_of_mesh_mode(false),
+  _build_type(Trees::NODES)
 {
-  this->init(Trees::NODES);
+  this->init(_build_type);
 }
-
 
 
 
@@ -53,11 +53,11 @@ PointLocatorTree::PointLocatorTree (const MeshBase& mesh,
   PointLocatorBase (mesh,master),
   _tree            (NULL),
   _element         (NULL),
-  _out_of_mesh_mode(false)
+  _out_of_mesh_mode(false),
+  _build_type(build_type)
 {
-  this->init(build_type);
+  this->init(_build_type);
 }
-
 
 
 
@@ -65,7 +65,6 @@ PointLocatorTree::~PointLocatorTree ()
 {
   this->clear ();
 }
-
 
 
 
@@ -85,28 +84,43 @@ void PointLocatorTree::clear ()
 
 
 
+void PointLocatorTree::init()
+{
+  this->init(_build_type);
+}
 
 
-void PointLocatorTree::init (const Trees::BuildType build_type)
+
+void PointLocatorTree::init (Trees::BuildType build_type)
 {
   libmesh_assert (!this->_tree);
 
   if (this->_initialized)
     {
-      libMesh::err << "ERROR: Already initialized!  Will ignore this call..."
-                   << std::endl;
+      // Warn that we are already initialized
+      libMesh::err << "Warning: PointLocatorTree already initialized!  Will ignore this call..." << std::endl;
+
+      // Further warn if we try to init() again with a different build_type
+      if (_build_type != build_type)
+        {
+          libMesh::err << "Warning: PointLocatorTree is using build_type = " << _build_type << ".\n"
+                       << "Your requested build_type, " << build_type << " will not be used!" << std::endl;
+        }
     }
 
   else
-
     {
+      // Let the requested build_type override the _build_type we were
+      // constructed with.  This is no big deal since we have not been
+      // initialized before.
+      _build_type = build_type;
 
       if (this->_master == NULL)
         {
           START_LOG("init(no master)", "PointLocatorTree");
 
           if (this->_mesh.mesh_dimension() == 3)
-            _tree = new Trees::OctTree (this->_mesh, 200, build_type);
+            _tree = new Trees::OctTree (this->_mesh, 200, _build_type);
           else
             {
               // A 1D/2D mesh in 3D space needs special consideration.
@@ -130,13 +144,13 @@ void PointLocatorTree::init (const Trees::BuildType build_type)
               }
 
               if (!is_planar_xy)
-                _tree = new Trees::OctTree (this->_mesh, 200, build_type);
+                _tree = new Trees::OctTree (this->_mesh, 200, _build_type);
               else
 #endif
 #if LIBMESH_DIM > 1
-                _tree = new Trees::QuadTree (this->_mesh, 200, build_type);
+                _tree = new Trees::QuadTree (this->_mesh, 200, _build_type);
 #else
-              _tree = new Trees::BinaryTree (this->_mesh, 200, build_type);
+              _tree = new Trees::BinaryTree (this->_mesh, 200, _build_type);
 #endif
             }
 
@@ -144,25 +158,19 @@ void PointLocatorTree::init (const Trees::BuildType build_type)
         }
 
       else
-
         {
           // We are _not_ the master.  Let our Tree point to
           // the master's tree.  But for this we first transform
           // the master in a state for which we are friends.
           // And make sure the master @e has a tree!
           const PointLocatorTree* my_master =
-            libmesh_cast_ptr<const PointLocatorTree*>(this->_master);
+            cast_ptr<const PointLocatorTree*>(this->_master);
 
           if (my_master->initialized())
             this->_tree = my_master->_tree;
           else
-            {
-              libMesh::err << "ERROR: Initialize master first, then servants!"
-                           << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Initialize master first, then servants!");
         }
-
 
       // Not all PointLocators may own a tree, but all of them
       // use their own element pointer.  Let the element pointer
@@ -173,62 +181,64 @@ void PointLocatorTree::init (const Trees::BuildType build_type)
       this->_element = NULL;
     }
 
-
   // ready for take-off
   this->_initialized = true;
 }
 
 
 
-
-
-const Elem* PointLocatorTree::operator() (const Point& p) const
+const Elem* PointLocatorTree::operator() (const Point& p, const std::set<subdomain_id_type> *allowed_subdomains) const
 {
   libmesh_assert (this->_initialized);
 
   START_LOG("operator()", "PointLocatorTree");
 
+  // If we're provided with an allowed_subdomains list and have a cached element, make sure it complies
+  if (allowed_subdomains && this->_element && !allowed_subdomains->count(this->_element->subdomain_id())) this->_element = NULL;
+
   // First check the element from last time before asking the tree
   if (this->_element==NULL || !(this->_element->contains_point(p)))
     {
       // ask the tree
-      this->_element = this->_tree->find_element (p);
+      this->_element = this->_tree->find_element (p,allowed_subdomains);
 
       if (this->_element == NULL)
         {
-          /* No element seems to contain this point.  If out-of-mesh
-             mode is enabled, just return NULL.  If not, however, we
-             have to perform a linear search before we call \p
-             libmesh_error() since in the case of curved elements, the
-             bounding box computed in \p TreeNode::insert(const
-             Elem*) might be slightly inaccurate.  */
-          if(!_out_of_mesh_mode)
+          // No element seems to contain this point. Thus:
+          // 1.) If _out_of_mesh_mode == true, we can just return NULL
+          //     without searching further.
+          // 2.) If _out_of_mesh_mode == false, we perform a linear
+          //     search over all active (possibly local) elements.
+          //     The idea here is that, in the case of curved elements,
+          //     the bounding box computed in \p TreeNode::insert(const
+          //     Elem*) might be slightly inaccurate and therefore we may
+          //     have generated a false negative.
+          if (_out_of_mesh_mode == false)
             {
-              START_LOG("linear search", "PointLocatorTree");
-              MeshBase::const_element_iterator       pos     = this->_mesh.active_elements_begin();
-              const MeshBase::const_element_iterator end_pos = this->_mesh.active_elements_end();
+              this->_element = this->perform_linear_search(p, allowed_subdomains, /*use_close_to_point*/ false);
 
-              for ( ; pos != end_pos; ++pos)
-                if ((*pos)->contains_point(p))
-                  {
-                    STOP_LOG("linear search", "PointLocatorTree");
-                    STOP_LOG("operator()", "PointLocatorTree");
-                    return this->_element = (*pos);
-                  }
+              STOP_LOG("operator()", "PointLocatorTree");
+              return this->_element;
+            }
 
-              /*
-                if (this->_element == NULL)
-                {
-                libMesh::err << std::endl
-                << " ******** Serious Problem.  Could not find an Element "
-                << "in the Mesh"
-                << std:: endl
-                << " ******** that contains the Point "
-                << p;
-                libmesh_error();
-                }
-              */
-              STOP_LOG("linear search", "PointLocatorTree");
+          // If we haven't found the element, we may want to do a linear
+          // search using a tolerance. We only do this if _out_of_mesh_mode == true,
+          // since we're looking for a point that may be outside of the mesh (within the
+          // specified tolerance).
+          if( _use_close_to_point_tol )
+            {
+              libMesh::out << "Performing linear search using close-to-point tolerance "
+                           << _close_to_point_tol
+                           << std::endl;
+
+              this->_element =
+                this->perform_linear_search(p,
+                                            allowed_subdomains,
+                                            /*use_close_to_point*/ true,
+                                            _close_to_point_tol);
+
+              STOP_LOG("operator()", "PointLocatorTree");
+              return this->_element;
             }
         }
     }
@@ -236,40 +246,92 @@ const Elem* PointLocatorTree::operator() (const Point& p) const
   // If we found an element, it should be active
   libmesh_assert (!this->_element || this->_element->active());
 
+  // If we found an element and have a restriction list, they better match
+  libmesh_assert (!this->_element || !allowed_subdomains || allowed_subdomains->count(this->_element->subdomain_id()));
+
   STOP_LOG("operator()", "PointLocatorTree");
 
   // return the element
   return this->_element;
 }
 
-void PointLocatorTree::enable_out_of_mesh_mode (void)
+
+
+const Elem* PointLocatorTree::perform_linear_search(const Point& p,
+                                                    const std::set<subdomain_id_type> *allowed_subdomains,
+                                                    bool use_close_to_point,
+                                                    Real close_to_point_tolerance) const
 {
-  /* Out-of-mesh mode is currently only supported if all of the
-     elements have affine mappings.  The reason is that for quadratic
-     mappings, it is not easy to construct a relyable bounding box of
-     the element, and thus, the fallback linear search in \p
-     operator() is required.  Hence, out-of-mesh mode would be
-     extremely slow.  */
-  if(!_out_of_mesh_mode)
+  START_LOG("perform_linear_search", "PointLocatorTree");
+
+  // The type of iterator depends on the Trees::BuildType
+  // used for this PointLocator.  If it's
+  // TREE_LOCAL_ELEMENTS, we only want to double check
+  // local elements during this linear search.
+  MeshBase::const_element_iterator pos =
+    this->_build_type == Trees::LOCAL_ELEMENTS ?
+    this->_mesh.active_local_elements_begin() : this->_mesh.active_elements_begin();
+
+  const MeshBase::const_element_iterator end_pos =
+    this->_build_type == Trees::LOCAL_ELEMENTS ?
+    this->_mesh.active_local_elements_end() : this->_mesh.active_elements_end();
+
+  for ( ; pos != end_pos; ++pos)
+    {
+      if (!allowed_subdomains ||
+          allowed_subdomains->count((*pos)->subdomain_id()))
+        {
+          if(!use_close_to_point)
+            {
+              if ((*pos)->contains_point(p))
+                {
+                  STOP_LOG("perform_linear_search", "PointLocatorTree");
+                  return (*pos);
+                }
+            }
+          else
+            {
+              if ((*pos)->close_to_point(p, close_to_point_tolerance))
+                {
+                  STOP_LOG("perform_linear_search", "PointLocatorTree");
+                  return (*pos);
+                }
+            }
+        }
+    }
+
+  STOP_LOG("perform_linear_search", "PointLocatorTree");
+  return NULL;
+}
+
+
+void PointLocatorTree::enable_out_of_mesh_mode ()
+{
+  // Out-of-mesh mode is currently only supported if all of the
+  // elements have affine mappings.  The reason is that for quadratic
+  // mappings, it is not easy to construct a reliable bounding box of
+  // the element, and thus, the fallback linear search in \p
+  // operator() is required.  Hence, out-of-mesh mode would be
+  // extremely slow.
+  if (_out_of_mesh_mode == false)
     {
 #ifdef DEBUG
       MeshBase::const_element_iterator       pos     = this->_mesh.active_elements_begin();
       const MeshBase::const_element_iterator end_pos = this->_mesh.active_elements_end();
       for ( ; pos != end_pos; ++pos)
         if (!(*pos)->has_affine_map())
-          {
-            libMesh::err << "ERROR: Out-of-mesh mode is currently only supported if all elements have affine mappings." << std::endl;
-            libmesh_error();
-          }
+          libmesh_error_msg("ERROR: Out-of-mesh mode is currently only supported if all elements have affine mappings.");
 #endif
 
       _out_of_mesh_mode = true;
     }
 }
 
-void PointLocatorTree::disable_out_of_mesh_mode (void)
+
+void PointLocatorTree::disable_out_of_mesh_mode ()
 {
   _out_of_mesh_mode = false;
 }
+
 
 } // namespace libMesh

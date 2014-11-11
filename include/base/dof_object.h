@@ -395,17 +395,16 @@ private:
                                      const unsigned int var) const;
 
   /**
-   * The \p id of the \p DofObject
-   */
-  dof_id_type _id;
-
-
-  /**
    * A globally unique id, guarenteed not to change as the mesh is repartioned or adapted
    */
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
   unique_id_type _unique_id;
 #endif
+
+  /**
+   * The \p id of the \p DofObject
+   */
+  dof_id_type _id;
 
   /**
    * The \p processor_id of the \p DofObject.
@@ -421,26 +420,34 @@ private:
   /**
    * DoF index information.  This is packed into a contiguous buffer of the following format:
    *
-   * [ns end_0 end_1 ... end_{ns-1} (ncv_0 idx_0 ncv_1 idx_1 ... ncv_nv idx_nv)_0 (ncv_0 idx_0 ncv_1 idx_1 ... ncv_nv idx_nv)_1 ... (ncv_0 idx_0 ncv_1 idx_1 ... ncv_nv idx_nv)_ns ]
+   * \verbatim
+   * [ns end_0 end_1 ... end_{ns-1} (ncv_0 idx_0 ncv_1 idx_1 ... ncv_nv idx_nv)_0
+   *                                (ncv_0 idx_0 ncv_1 idx_1 ... ncv_nv idx_nv)_1
+   *                                ...
+   *                                (ncv_0 idx_0 ncv_1 idx_1 ... ncv_nv idx_nv)_ns ]
+   * \endverbatim
    *
    * where 'end_s' is the index past the end of the variable group storage for system \p s.
    * Note that we specifically do not store the end for the last system - this always _idx_buf.size().
    *
    * Specifically, consider the case of 4 systems, with 3, 0, 1, 2 variable groups, respectively.  The _idx_buf then looks like:
-   \verbatim
-   [4 10 10 12 () (ncv_0 idx_0 ncv_1 idx_1 ncv_2 idx_2) () (ncv_0 idx_0) (ncv_0 idx_0 ncv_1 idx_1)]
-   [0  1  2  3         4     5     6     7     8     9         10    11      12    13    14    15]
-
-   \endverbatim
-   * The ending index is then given by
-   \verbatim
-   end_s = _idx_buf.size(), s == (ns-1),
-   = _idx_buf[s+1]    otherwise.
-   \endverbatim
+   *
+   * \verbatim
+   * [4 10 10 12 () (ncv_0 idx_0 ncv_1 idx_1 ncv_2 idx_2) () (ncv_0 idx_0) (ncv_0 idx_0 ncv_1 idx_1)]
+   * [0  1  2  3         4     5     6     7     8     9         10    11      12    13    14    15]
+   * \endverbatim
+   *
+   * The ending index is then given by:
+   *
+   * \verbatim
+   * end_s = _idx_buf.size(), s == (ns-1),
+   *       = _idx_buf[s+1]    otherwise.
+   * \endverbatim
+   *
    * The starting indices are not specifically stored, but rather inferred as follows:
    *
    * start_s = _idx_buf[s];
-
+   *
    * Now, the defining characteristic of the \p VariableGroup is that it supports
    * an arbitrary number of variables of the same type.  At the \p DofObject level, what
    * that means is that each \p Variable in the \p VariableGroup will have the same number
@@ -452,7 +459,7 @@ private:
    *
    * the DoF index for a particular component c of variable v within that group is then given by
    *
-   *  idx_var = idx_# + n_comp*v + c
+   * idx_var = idx_# + n_comp*v + c
    *
    * note there is a subtlety here - "variable v within that group" usually means nothing to the
    * user. This class is either indexed with variable group numbers, or variable numbers counted
@@ -474,6 +481,7 @@ private:
    * will recgnize later that  #/ncv_magic is simply a bitshift
    */
   static const index_t ncv_magic = 256; // = 2^8, in case we want to manually bitshift
+  static const index_t ncv_magic_exp = 8; // Let's manually bitshift
 
   /**
    * The starting index for system \p s.
@@ -502,10 +510,10 @@ DofObject::DofObject () :
 #ifdef LIBMESH_ENABLE_AMR
   old_dof_object(NULL),
 #endif
-  _id (invalid_id),
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
   _unique_id (invalid_unique_id),
 #endif
+  _id (invalid_id),
   _processor_id (invalid_processor_id)
 {
   this->invalidate();
@@ -643,7 +651,7 @@ unique_id_type & DofObject::set_unique_id ()
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
   return _unique_id;
 #else
-  libmesh_error();
+  libmesh_not_implemented();
 #endif
 }
 
@@ -705,7 +713,7 @@ inline
 unsigned int DofObject::n_systems () const
 {
   return _idx_buf.empty() ?
-    0 : libmesh_cast_int<unsigned int>(_idx_buf[0]);
+    0 : cast_int<unsigned int>(_idx_buf[0]);
 }
 
 
@@ -731,8 +739,8 @@ unsigned int DofObject::n_vars(const unsigned int s,
 
   libmesh_assert_less ((start_idx_sys + 2*vg), _idx_buf.size());
 
-  return (libmesh_cast_int<unsigned int>
-          (_idx_buf[start_idx_sys + 2*vg]) / ncv_magic);
+  return (cast_int<unsigned int>
+          (_idx_buf[start_idx_sys + 2*vg]) >> ncv_magic_exp);
 }
 
 
@@ -824,7 +832,7 @@ dof_id_type DofObject::dof_number(const unsigned int s,
       // << ncg << " "
       // << comp << '\n';
 
-      return libmesh_cast_int<dof_id_type>(base_idx + vig*ncg + comp);
+      return cast_int<dof_id_type>(base_idx + vig*ncg + comp);
     }
 }
 
@@ -859,7 +867,7 @@ unsigned int DofObject::start_idx (const unsigned int s) const
   libmesh_assert_less (s, this->n_systems());
   libmesh_assert_less (s, _idx_buf.size());
 
-  return libmesh_cast_int<unsigned int>(_idx_buf[s]);
+  return cast_int<unsigned int>(_idx_buf[s]);
 }
 
 
@@ -871,8 +879,8 @@ unsigned int DofObject::end_idx (const unsigned int s) const
   libmesh_assert_less (s, _idx_buf.size());
 
   return ((s+1) == this->n_systems()) ?
-    libmesh_cast_int<unsigned int>(_idx_buf.size()) :
-    libmesh_cast_int<unsigned int>(_idx_buf[s+1]);
+    cast_int<unsigned int>(_idx_buf.size()) :
+    cast_int<unsigned int>(_idx_buf[s+1]);
 }
 
 
@@ -934,8 +942,7 @@ unsigned int DofObject::var_to_vg (const unsigned int s,
       if (var < vg_end) return vg;
     }
 
-  // we should never get here
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0;
 }
 

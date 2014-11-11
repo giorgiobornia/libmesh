@@ -77,7 +77,13 @@ inline bool global_idx_mapping_equality (const std::pair<unsigned int, unsigned 
 
 // ------------------------------------------------------------
 // Nemesis_IO class members
-Nemesis_IO::Nemesis_IO (MeshBase& mesh, bool single_precision) :
+Nemesis_IO::Nemesis_IO (MeshBase& mesh,
+#if defined(LIBMESH_HAVE_EXODUS_API) && defined(LIBMESH_HAVE_NEMESIS_API)
+                        bool single_precision
+#else
+                        bool
+#endif
+                        ) :
   MeshInput<MeshBase> (mesh, /*is_parallel_format=*/true),
   MeshOutput<MeshBase> (mesh, /*is_parallel_format=*/true),
   ParallelObject (mesh),
@@ -183,11 +189,7 @@ void Nemesis_IO::read (const std::string& base_filename)
 
   // Do some error checking
   if (nemhelper->num_external_nodes)
-    {
-      libMesh::err << "ERROR: there should be no external nodes in an element-based partitioning!"
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: there should be no external nodes in an element-based partitioning!");
 
   libmesh_assert_equal_to (nemhelper->num_nodes,
                            (nemhelper->num_internal_nodes +
@@ -264,9 +266,9 @@ void Nemesis_IO::read (const std::string& base_filename)
   // we own all the nodes on this processor.  We will then interrogate the
   // node cmaps and see if a lower-rank processor is associated with any of
   // our nodes.  If so, then that processor owns the node, not us...
-  std::vector<unsigned short int> node_ownership (nemhelper->num_internal_nodes +
-                                                  nemhelper->num_border_nodes,
-                                                  this->processor_id());
+  std::vector<processor_id_type> node_ownership (nemhelper->num_internal_nodes +
+                                                 nemhelper->num_border_nodes,
+                                                 this->processor_id());
 
   // a map from processor id to cmap number, to be used later
   std::map<unsigned int, unsigned int> pid_to_cmap_map;
@@ -283,7 +285,7 @@ void Nemesis_IO::read (const std::string& base_filename)
 
       // In all the samples I have seen, node_cmap_ids[cmap] is the processor
       // rank of the remote processor...
-      const unsigned short int adjcnt_pid_idx = nemhelper->node_cmap_ids[cmap];
+      const int adjcnt_pid_idx = nemhelper->node_cmap_ids[cmap];
 
       libmesh_assert_less (adjcnt_pid_idx, this->n_processors());
       libmesh_assert_not_equal_to (adjcnt_pid_idx, this->processor_id());
@@ -307,7 +309,8 @@ void Nemesis_IO::read (const std::string& base_filename)
           // if the adjacent processor is lower rank than the current
           // owner for this node, then it will get the node...
           node_ownership[local_node_idx] =
-            std::min(node_ownership[local_node_idx], adjcnt_pid_idx);
+            std::min(node_ownership[local_node_idx],
+                     cast_int<processor_id_type>(adjcnt_pid_idx));
         }
     } // We now should have established proper node ownership.
 
@@ -422,13 +425,12 @@ void Nemesis_IO::read (const std::string& base_filename)
     {
       const unsigned int local_node_idx  = nemhelper->node_mapi[i]-1;
 #ifndef NDEBUG
-      const unsigned int global_node_idx = nemhelper->node_num_map[local_node_idx]-1;
       const unsigned int owning_pid_idx  = node_ownership[local_node_idx];
 #endif
 
       // an internal node we do not own? huh??
       libmesh_assert_equal_to (owning_pid_idx, this->processor_id());
-      libmesh_assert_less (global_node_idx, to_uint(nemhelper->num_nodes_global));
+      libmesh_assert_less (my_next_node, to_uint(nemhelper->num_nodes_global));
 
       // "Catch" the node pointer after addition, make sure the
       // ID matches the requested value.
@@ -634,8 +636,8 @@ void Nemesis_IO::read (const std::string& base_filename)
                     mesh.add_point (Point(nemhelper->x[local_node_idx],
                                           nemhelper->y[local_node_idx],
                                           nemhelper->z[local_node_idx]),
-                                    global_node_idx,
-                                    source_pid_idx);
+                                    cast_int<dof_id_type>(global_node_idx),
+                                    cast_int<processor_id_type>(source_pid_idx));
 
                   // Make sure the node we added has the ID we thought it would
                   if (added_node->id() != global_node_idx)
@@ -800,7 +802,8 @@ void Nemesis_IO::read (const std::string& base_filename)
       if (!nemhelper->num_elem_this_blk) continue;
 
       // Set subdomain ID based on the block ID.
-      int subdomain_id = nemhelper->block_ids[i];
+      subdomain_id_type subdomain_id =
+        cast_int<subdomain_id_type>(nemhelper->block_ids[i]);
 
       // Create a type string (this uses the null-terminated string ctor).
       const std::string type_str ( &(nemhelper->elem_type[0]) );
@@ -837,14 +840,11 @@ void Nemesis_IO::read (const std::string& base_filename)
           // Check to see that really is the case.  Note that my_next_elem was post-incremented, so
           // subtract 1 when performing the check.
           if (elem->id() != my_next_elem-1)
-            {
-              libMesh::err << "Unexpected ID "
-                           << elem->id()
-                           << " set by parallel mesh. (expecting "
-                           << my_next_elem-1
-                           << ")." << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("Unexpected ID "  \
+                              << elem->id()                             \
+                              << " set by parallel mesh. (expecting "   \
+                              << my_next_elem-1                         \
+                              << ").");
 
           // Set all the nodes for this element
           if (_verbose)
@@ -876,8 +876,8 @@ void Nemesis_IO::read (const std::string& base_filename)
     }
 
   // Get the max dimension seen on the current processor
-  unsigned int max_dim_seen = 0;
-  for (unsigned int i=1; i<elems_of_dimension.size(); ++i)
+  unsigned char max_dim_seen = 0;
+  for (unsigned char i=1; i<elems_of_dimension.size(); ++i)
     if (elems_of_dimension[i])
       max_dim_seen = i;
 
@@ -890,7 +890,7 @@ void Nemesis_IO::read (const std::string& base_filename)
     {
       // Print the max element dimension from all processors
       libMesh::out << "[" << this->processor_id() << "] "
-                   << "max_dim_seen=" << max_dim_seen << std::endl;
+                   << "max_dim_seen=" << +max_dim_seen << std::endl;
     }
 
   // Set the mesh dimension to the largest encountered for an element
@@ -898,14 +898,11 @@ void Nemesis_IO::read (const std::string& base_filename)
 
 #if LIBMESH_DIM < 3
   if (mesh.mesh_dimension() > LIBMESH_DIM)
-    {
-      libMesh::err << "Cannot open dimension " <<
-        mesh.mesh_dimension() <<
-        " mesh file when configured without " <<
-        mesh.mesh_dimension() << "D support." <<
-        std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("Cannot open dimension "   \
+                      << mesh.mesh_dimension()                          \
+                      << " mesh file when configured without "          \
+                      << mesh.mesh_dimension()                          \
+                      << "D support." );
 #endif
 
 
@@ -957,11 +954,8 @@ void Nemesis_IO::read (const std::string& base_filename)
     this->comm().sum(sum_num_elem_all_sidesets);
 
     if (sum_num_global_side_counts != sum_num_elem_all_sidesets)
-      {
-        libMesh::err << "Error! global side count reported by Nemesis does not "
-                     << "match the side count reported by the individual files!" << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("Error! global side count reported by Nemesis does not " \
+                        << "match the side count reported by the individual files!");
   }
 #endif
 
@@ -1016,11 +1010,12 @@ void Nemesis_IO::read (const std::string& base_filename)
       Elem* elem = mesh.elem(my_elem_offset + (nemhelper->elem_list[e]-1)/*Exodus numbering is 1-based!*/);
 
       if (elem == NULL)
-        {
-          libMesh::err << "Mesh returned a NULL pointer when asked for element "
-                       << my_elem_offset << " + " << nemhelper->elem_list[e] << " = " << my_elem_offset+nemhelper->elem_list[e] << std::endl;
-          libmesh_error();
-        }
+        libmesh_error_msg("Mesh returned a NULL pointer when asked for element " \
+                          << my_elem_offset                           \
+                          << " + "                                    \
+                          << nemhelper->elem_list[e]                  \
+                          << " = "                                    \
+                          << my_elem_offset+nemhelper->elem_list[e]);
 
       // The side numberings in libmesh and exodus are not 1:1, so we need to map
       // whatever side number is stored in Exodus into a libmesh side number using
@@ -1031,9 +1026,11 @@ void Nemesis_IO::read (const std::string& base_filename)
       // Finally, we are ready to add the element and its side to the BoundaryInfo object.
       // Call the version of add_side which takes a pointer, since we have already gone to
       // the trouble of getting said pointer...
-      mesh.boundary_info->add_side (elem,
-                                    conv.get_side_map(nemhelper->side_list[e]-1/*Exodus numbering is 1-based*/),
-                                    nemhelper->id_list[e]);
+      mesh.get_boundary_info().add_side 
+        (elem,
+         cast_int<unsigned short>
+           (conv.get_side_map(nemhelper->side_list[e]-1/*Exodus numbering is 1-based*/)),
+         cast_int<boundary_id_type>(nemhelper->id_list[e]));
     }
 
   // Debugging: make sure there are as many boundary conditions in the
@@ -1042,17 +1039,13 @@ void Nemesis_IO::read (const std::string& base_filename)
   // local number of boundary conditions (and is therefore cheap)
   // which should match nemhelper->elem_list.size().
   {
-    std::size_t nbcs = mesh.boundary_info->n_boundary_conds();
+    std::size_t nbcs = mesh.get_boundary_info().n_boundary_conds();
     if (nbcs != nemhelper->elem_list.size())
-      {
-        libMesh::err << "[" << this->processor_id() << "] ";
-        libMesh::err << "BoundaryInfo contains "
-                     << nbcs
-                     << " boundary conditions, while the Exodus file had "
-                     << nemhelper->elem_list.size()
-                     << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("[" << this->processor_id() << "] "   \
+                        << "BoundaryInfo contains "                     \
+                        << nbcs                                         \
+                        << " boundary conditions, while the Exodus file had " \
+                        << nemhelper->elem_list.size());
   }
 
   // Read global nodeset parameters?  We might be able to use this to verify
@@ -1096,10 +1089,7 @@ void Nemesis_IO::read (const std::string& base_filename)
         {
           // Don't run past the end of our node map!
           if (to_uint(nemhelper->node_list[node]-1) >= nemhelper->node_num_map.size())
-            {
-              libMesh::err << "Error, index is past the end of node_num_map array!" << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("Error, index is past the end of node_num_map array!");
 
           // We should be able to use the node_num_map data structure set up previously to determine
           // the proper global node index.
@@ -1115,7 +1105,9 @@ void Nemesis_IO::read (const std::string& base_filename)
             }
 
           // Add the node to the BoundaryInfo object with the proper nodeset_id
-          mesh.boundary_info->add_node(global_node_id, nodeset_id);
+          mesh.get_boundary_info().add_node
+            (cast_int<dof_id_type>(global_node_id),
+             cast_int<boundary_id_type>(nodeset_id));
         }
     }
 
@@ -1144,15 +1136,14 @@ void Nemesis_IO::read (const std::string& base_filename)
     return;
 
   // Gather neighboring elements so that the mesh has the proper "ghost" neighbor information.
-  MeshCommunication().gather_neighboring_elements(libmesh_cast_ref<ParallelMesh&>(mesh));
+  MeshCommunication().gather_neighboring_elements(cast_ref<ParallelMesh&>(mesh));
 }
 
 #else
 
 void Nemesis_IO::read (const std::string& )
 {
-  libMesh::err <<  "ERROR, Nemesis API is not defined!" << std::endl;
-  libmesh_error();
+  libmesh_error_msg("ERROR, Nemesis API is not defined!");
 }
 
 #endif // #if defined(LIBMESH_HAVE_EXODUS_API) && defined(LIBMESH_HAVE_NEMESIS_API)
@@ -1205,7 +1196,7 @@ void Nemesis_IO::write (const std::string& base_filename)
   // once we have written all this stuff.
   nemhelper->ex_err = exII::ex_update(nemhelper->ex_id);
 
-  if( (mesh.boundary_info->n_edge_conds() > 0) &&
+  if( (mesh.get_boundary_info().n_edge_conds() > 0) &&
       _verbose )
     {
       libMesh::out << "Warning: Mesh contains edge boundary IDs, but these "
@@ -1218,8 +1209,7 @@ void Nemesis_IO::write (const std::string& base_filename)
 
 void Nemesis_IO::write (const std::string& )
 {
-  libMesh::err <<  "ERROR, Nemesis API is not defined!" << std::endl;
-  libmesh_error();
+  libmesh_error_msg("ERROR, Nemesis API is not defined!");
 }
 
 #endif // #if defined(LIBMESH_HAVE_EXODUS_API) && defined(LIBMESH_HAVE_NEMESIS_API)
@@ -1245,8 +1235,7 @@ void Nemesis_IO::write_timestep (const std::string&,
                                  const int,
                                  const Real)
 {
-  libMesh::err <<  "ERROR, Nemesis API is not defined!" << std::endl;
-  libmesh_error();
+  libmesh_error_msg("ERROR, Nemesis API is not defined!");
 }
 
 #endif // #if defined(LIBMESH_HAVE_EXODUS_API) && defined(LIBMESH_HAVE_NEMESIS_API)
@@ -1286,7 +1275,7 @@ void Nemesis_IO::write_nodal_data (const std::string& base_filename,
           nemhelper->write_nodesets(mesh);
           nemhelper->write_sidesets(mesh);
 
-          if( (mesh.boundary_info->n_edge_conds() > 0) &&
+          if( (mesh.get_boundary_info().n_edge_conds() > 0) &&
               _verbose )
             {
               libMesh::out << "Warning: Mesh contains edge boundary IDs, but these "
@@ -1319,10 +1308,7 @@ void Nemesis_IO::write_nodal_data (const std::string& ,
                                    const std::vector<Number>& ,
                                    const std::vector<std::string>& )
 {
-
-  libMesh::err <<  "ERROR, Nemesis API is not defined.\n"
-               << std::endl;
-  libmesh_error();
+  libmesh_error_msg("ERROR, Nemesis API is not defined.");
 }
 
 
@@ -1338,12 +1324,8 @@ void Nemesis_IO::write_global_data (const std::vector<Number>& soln,
                                     const std::vector<std::string>& names)
 {
   if (!nemhelper->opened_for_writing)
-    {
-      libMesh::err << "ERROR, Nemesis file must be initialized "
-                   << "before outputting global variables.\n"
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR, Nemesis file must be initialized before outputting global variables.");
+
 #ifdef LIBMESH_USE_COMPLEX_NUMBERS
 
   std::vector<std::string> complex_names = nemhelper->get_complex_names(names);
@@ -1394,9 +1376,7 @@ void Nemesis_IO::write_global_data (const std::vector<Number>& soln,
 void Nemesis_IO::write_global_data (const std::vector<Number>&,
                                     const std::vector<std::string>&)
 {
-  libMesh::err <<  "ERROR, Nemesis API is not defined.\n"
-               << std::endl;
-  libmesh_error();
+  libmesh_error_msg("ERROR, Nemesis API is not defined.");
 }
 
 #endif // #if defined(LIBMESH_HAVE_EXODUS_API) && defined(LIBMESH_HAVE_NEMESIS_API)
@@ -1408,12 +1388,7 @@ void Nemesis_IO::write_global_data (const std::vector<Number>&,
 void Nemesis_IO::write_information_records (const std::vector<std::string>& records)
 {
   if (!nemhelper->opened_for_writing)
-    {
-      libMesh::err << "ERROR, Nemesis file must be initialized "
-                   << "before outputting information records.\n"
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR, Nemesis file must be initialized before outputting information records.");
 
   // Call the Exodus writer implementation
   nemhelper->write_information_records( records );
@@ -1424,10 +1399,7 @@ void Nemesis_IO::write_information_records (const std::vector<std::string>& reco
 
 void Nemesis_IO::write_information_records ( const std::vector<std::string>& )
 {
-
-  libMesh::err <<  "ERROR, Nemesis API is not defined.\n"
-               << std::endl;
-  libmesh_error();
+  libmesh_error_msg("ERROR, Nemesis API is not defined.");
 }
 
 #endif // #if defined(LIBMESH_HAVE_EXODUS_API) && defined(LIBMESH_HAVE_NEMESIS_API)

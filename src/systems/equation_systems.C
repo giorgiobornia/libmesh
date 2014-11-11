@@ -404,12 +404,7 @@ System & EquationSystems::add_system (const std::string& sys_type,
 #endif
 
   else
-    {
-      libMesh::err << "ERROR: Unknown system type: "
-                   << sys_type
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: Unknown system type: " << sys_type);
 
   // Return a reference to the new system
   //return (*this)(name);
@@ -426,12 +421,7 @@ void EquationSystems::delete_system (const std::string& name)
   libmesh_deprecated();
 
   if (!_systems.count(name))
-    {
-      libMesh::err << "ERROR: no system named "
-                   << name  << std::endl;
-
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: no system named " << name);
 
   delete _systems[name];
 
@@ -492,14 +482,10 @@ void EquationSystems::build_variable_names (std::vector<std::string>& var_names,
       {
         // Check current system is listed in system_names, and skip pos if not
         bool use_current_system = (system_names == NULL);
-        if(!use_current_system)
-          {
-            use_current_system = std::find( system_names->begin(), system_names->end(), pos->first ) != system_names->end();
-          }
-        if(!use_current_system)
-          {
-            continue;
-          }
+        if (!use_current_system)
+          use_current_system = system_names->count(pos->first);
+        if (!use_current_system)
+          continue;
 
         for (unsigned int vn=0; vn<pos->second->n_vars(); vn++)
           {
@@ -532,14 +518,10 @@ void EquationSystems::build_variable_names (std::vector<std::string>& var_names,
     {
       // Check current system is listed in system_names, and skip pos if not
       bool use_current_system = (system_names == NULL);
-      if(!use_current_system)
-        {
-          use_current_system = std::find( system_names->begin(), system_names->end(), pos->first ) != system_names->end();
-        }
-      if(!use_current_system)
-        {
-          continue;
-        }
+      if (!use_current_system)
+        use_current_system = system_names->count(pos->first);
+      if (!use_current_system)
+        continue;
 
       for (unsigned int vn=0; vn<pos->second->n_vars(); vn++)
         {
@@ -569,8 +551,7 @@ void EquationSystems::build_variable_names (std::vector<std::string>& var_names,
                       var_names[var_num++] = var_name+"_z";
                       break;
                     default:
-                      libMesh::err << "Invalid dim in build_variable_names" << std::endl;
-                      libmesh_error();
+                      libmesh_error_msg("Invalid dim in build_variable_names");
                     }
                 }
               else
@@ -589,7 +570,7 @@ void EquationSystems::build_solution_vector (std::vector<Number>&,
                                              const std::string&) const
 {
   //TODO:[BSK] re-implement this from the method below
-  libmesh_error();
+  libmesh_not_implemented();
 
   //   // Get a reference to the named system
   //   const System& system = this->get_system(system_name);
@@ -706,14 +687,10 @@ void EquationSystems::build_solution_vector (std::vector<Number>& soln,
       {
         // Check current system is listed in system_names, and skip pos if not
         bool use_current_system = (system_names == NULL);
-        if(!use_current_system)
-          {
-            use_current_system = std::find( system_names->begin(), system_names->end(), pos->first ) != system_names->end();
-          }
-        if(!use_current_system)
-          {
-            continue;
-          }
+        if (!use_current_system)
+          use_current_system = system_names->count(pos->first);
+        if (!use_current_system)
+          continue;
 
         for (unsigned int vn=0; vn<pos->second->n_vars(); vn++)
           {
@@ -736,7 +713,9 @@ void EquationSystems::build_solution_vector (std::vector<Number>& soln,
   const MeshBase::element_iterator e_end = _mesh.active_local_elements_end();
 
   // Get the number of local nodes
-  dof_id_type n_local_nodes = std::distance(_mesh.local_nodes_begin(), _mesh.local_nodes_end());
+  dof_id_type n_local_nodes = cast_int<dof_id_type>
+    (std::distance(_mesh.local_nodes_begin(),
+                   _mesh.local_nodes_end()));
 
   // Create a NumericVector to hold the parallel solution
   AutoPtr<NumericVector<Number> > parallel_soln_ptr = NumericVector<Number>::build(_communicator);
@@ -765,14 +744,10 @@ void EquationSystems::build_solution_vector (std::vector<Number>& soln,
     {
       // Check current system is listed in system_names, and skip pos if not
       bool use_current_system = (system_names == NULL);
-      if(!use_current_system)
-        {
-          use_current_system = std::find( system_names->begin(), system_names->end(), pos->first ) != system_names->end();
-        }
-      if(!use_current_system)
-        {
-          continue;
-        }
+      if (!use_current_system)
+        use_current_system = system_names->count(pos->first);
+      if (!use_current_system)
+        continue;
 
       const System& system  = *(pos->second);
       const unsigned int nv_sys = system.n_vars();
@@ -896,7 +871,9 @@ void EquationSystems::get_solution (std::vector<Number>& soln,
   libmesh_assert_equal_to (ne, _mesh.max_elem_id());
 
   // Get the number of local elements
-  dof_id_type n_local_elems = std::distance(_mesh.local_elements_begin(), _mesh.local_elements_end());
+  dof_id_type n_local_elems = cast_int<dof_id_type>
+    (std::distance(_mesh.local_elements_begin(),
+                   _mesh.local_elements_end()));
 
   // If the names vector has entries, we will only populate the soln vector
   // with names included in that list.  Note: The names vector may be
@@ -1018,27 +995,23 @@ void EquationSystems::build_discontinuous_solution_vector (std::vector<Number>& 
   // in each system listed in system_names
   unsigned int nv = 0;
 
-  const_system_iterator       pos = _systems.begin();
-  const const_system_iterator end = _systems.end();
+  {
+    const_system_iterator       pos = _systems.begin();
+    const const_system_iterator end = _systems.end();
 
-  for (; pos != end; ++pos)
-    {
-      // Check current system is listed in system_names, and skip pos if not
-      bool use_current_system = (system_names == NULL);
-      if(!use_current_system)
-        {
-          use_current_system =
-            (std::find( system_names->begin(), system_names->end(), pos->first )
-               != system_names->end());
-        }
-      if(!use_current_system)
-        {
+    for (; pos != end; ++pos)
+      {
+        // Check current system is listed in system_names, and skip pos if not
+        bool use_current_system = (system_names == NULL);
+        if (!use_current_system)
+          use_current_system = system_names->count(pos->first);
+        if (!use_current_system)
           continue;
-        }
 
-      const System& system  = *(pos->second);
-      nv += system.n_vars();
-    }
+        const System& system  = *(pos->second);
+        nv += system.n_vars();
+      }
+  }
 
   unsigned int tw=0;
 
@@ -1067,78 +1040,75 @@ void EquationSystems::build_discontinuous_solution_vector (std::vector<Number>& 
   // loop over the elements and build the nodal solution
   // from the element solution.  Then insert this nodal solution
   // into the vector passed to build_solution_vector.
-  pos = _systems.begin();
+  {
+    const_system_iterator       pos = _systems.begin();
+    const const_system_iterator end = _systems.end();
 
-  for (; pos != end; ++pos)
-    {
-      // Check current system is listed in system_names, and skip pos if not
-      bool use_current_system = (system_names == NULL);
-      if(!use_current_system)
-        {
-          use_current_system =
-            (std::find( system_names->begin(), system_names->end(), pos->first )
-               != system_names->end());
-        }
-      if(!use_current_system)
-        {
+    for (; pos != end; ++pos)
+      {
+        // Check current system is listed in system_names, and skip pos if not
+        bool use_current_system = (system_names == NULL);
+        if (!use_current_system)
+          use_current_system = system_names->count(pos->first);
+        if (!use_current_system)
           continue;
-        }
 
-      const System& system  = *(pos->second);
-      const unsigned int nv_sys = system.n_vars();
+        const System& system  = *(pos->second);
+        const unsigned int nv_sys = system.n_vars();
 
-      system.update_global_solution (sys_soln, 0);
+        system.update_global_solution (sys_soln, 0);
 
-      if (_mesh.processor_id() == 0)
-        {
-          std::vector<Number>       elem_soln;   // The finite element solution
-          std::vector<Number>       nodal_soln;  // The FE solution interpolated to the nodes
-          std::vector<dof_id_type>  dof_indices; // The DOF indices for the finite element
+        if (_mesh.processor_id() == 0)
+          {
+            std::vector<Number>       elem_soln;   // The finite element solution
+            std::vector<Number>       nodal_soln;  // The FE solution interpolated to the nodes
+            std::vector<dof_id_type>  dof_indices; // The DOF indices for the finite element
 
-          for (unsigned int var=0; var<nv_sys; var++)
-            {
-              const FEType& fe_type    = system.variable_type(var);
+            for (unsigned int var=0; var<nv_sys; var++)
+              {
+                const FEType& fe_type    = system.variable_type(var);
 
-              MeshBase::element_iterator       it       = _mesh.active_elements_begin();
-              const MeshBase::element_iterator end_elem = _mesh.active_elements_end();
+                MeshBase::element_iterator       it       = _mesh.active_elements_begin();
+                const MeshBase::element_iterator end_elem = _mesh.active_elements_end();
 
-              unsigned int nn=0;
+                unsigned int nn=0;
 
-              for ( ; it != end_elem; ++it)
-                {
-                  const Elem* elem = *it;
-                  system.get_dof_map().dof_indices (elem, dof_indices, var);
+                for ( ; it != end_elem; ++it)
+                  {
+                    const Elem* elem = *it;
+                    system.get_dof_map().dof_indices (elem, dof_indices, var);
 
-                  elem_soln.resize(dof_indices.size());
+                    elem_soln.resize(dof_indices.size());
 
-                  for (unsigned int i=0; i<dof_indices.size(); i++)
-                    elem_soln[i] = sys_soln[dof_indices[i]];
+                    for (unsigned int i=0; i<dof_indices.size(); i++)
+                      elem_soln[i] = sys_soln[dof_indices[i]];
 
-                  FEInterface::nodal_soln (dim,
-                                           fe_type,
-                                           elem,
-                                           elem_soln,
-                                           nodal_soln);
+                    FEInterface::nodal_soln (dim,
+                                             fe_type,
+                                             elem,
+                                             elem_soln,
+                                             nodal_soln);
 
 #ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
-                  // infinite elements should be skipped...
-                  if (!elem->infinite())
+                    // infinite elements should be skipped...
+                    if (!elem->infinite())
 #endif
-                    {
-                      libmesh_assert_equal_to (nodal_soln.size(), elem->n_nodes());
+                      {
+                        libmesh_assert_equal_to (nodal_soln.size(), elem->n_nodes());
 
-                      for (unsigned int n=0; n<elem->n_nodes(); n++)
-                        {
-                          soln[nv*(nn++) + (var + var_num)] +=
-                            nodal_soln[n];
-                        }
-                    }
-                }
-            }
-        }
+                        for (unsigned int n=0; n<elem->n_nodes(); n++)
+                          {
+                            soln[nv*(nn++) + (var + var_num)] +=
+                              nodal_soln[n];
+                          }
+                      }
+                  }
+              }
+          }
 
-      var_num += nv_sys;
-    }
+        var_num += nv_sys;
+      }
+  }
 
   STOP_LOG("build_discontinuous_solution_vector()", "EquationSystems");
 }

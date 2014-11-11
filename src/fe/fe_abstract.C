@@ -129,8 +129,7 @@ AutoPtr<FEAbstract> FEAbstract::build( const unsigned int dim,
             }
 
           default:
-            libMesh::out << "ERROR: Bad FEType.family= " << fet.family << std::endl;
-            libmesh_error();
+            libmesh_error_msg("ERROR: Bad FEType.family= " << fet.family);
           }
       }
       // 1D
@@ -213,8 +212,7 @@ AutoPtr<FEAbstract> FEAbstract::build( const unsigned int dim,
             }
 
           default:
-            libMesh::out << "ERROR: Bad FEType.family= " << fet.family << std::endl;
-            libmesh_error();
+            libmesh_error_msg("ERROR: Bad FEType.family= " << fet.family);
           }
       }
 
@@ -304,9 +302,14 @@ AutoPtr<FEAbstract> FEAbstract::build( const unsigned int dim,
               return ap;
             }
 
+          case SUBDIVISION:
+            {
+              AutoPtr<FEAbstract> ap(new FESubdivision(fet));
+              return ap;
+            }
+
           default:
-            libMesh::out << "ERROR: Bad FEType.family= " << fet.family << std::endl;
-            libmesh_error();
+            libmesh_error_msg("ERROR: Bad FEType.family= " << fet.family);
           }
       }
 
@@ -317,11 +320,7 @@ AutoPtr<FEAbstract> FEAbstract::build( const unsigned int dim,
         switch (fet.family)
           {
           case CLOUGH:
-            {
-              libMesh::out << "ERROR: Clough-Tocher elements currently only support 1D and 2D"
-                           << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Clough-Tocher elements currently only support 1D and 2D");
 
           case HERMITE:
             {
@@ -398,16 +397,15 @@ AutoPtr<FEAbstract> FEAbstract::build( const unsigned int dim,
             }
 
           default:
-            libMesh::out << "ERROR: Bad FEType.family= " << fet.family << std::endl;
-            libmesh_error();
+            libmesh_error_msg("ERROR: Bad FEType.family= " << fet.family);
           }
       }
 
     default:
-      libmesh_error();
+      libmesh_error_msg("Invalid dimension dim = " << dim);
     }
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   AutoPtr<FEAbstract> ap(NULL);
   return ap;
 }
@@ -701,13 +699,10 @@ void FEAbstract::get_refspace_nodes(const ElemType itemType, std::vector<Point>&
 
         return;
       }
+
     default:
-      {
-        libMesh::err << "ERROR: Unknown element type " << itemType << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR: Unknown element type " << itemType);
     }
-  return;
 }
 
 bool FEAbstract::on_reference_element(const Point& p, const ElemType t, const Real eps)
@@ -892,8 +887,7 @@ bool FEAbstract::on_reference_element(const Point& p, const ElemType t, const Re
 #endif
 
     default:
-      libMesh::err << "ERROR: Unknown element type " << t << std::endl;
-      libmesh_error();
+      libmesh_error_msg("ERROR: Unknown element type " << t);
     }
 
   // If we get here then the point is _not_ in the
@@ -1113,12 +1107,13 @@ void FEAbstract::compute_periodic_node_constraints (NodeConstraints &constraints
 
   // Look at the element faces.  Check to see if we need to
   // build constraints.
-  for (unsigned int s=0; s<elem->n_sides(); s++)
+  for (unsigned short int s=0; s<elem->n_sides(); s++)
     {
       if (elem->neighbor(s))
         continue;
 
-      const std::vector<boundary_id_type>& bc_ids = mesh.boundary_info->boundary_ids (elem, s);
+      const std::vector<boundary_id_type>& bc_ids =
+        mesh.get_boundary_info().boundary_ids (elem, s);
       for (std::vector<boundary_id_type>::const_iterator id_it=bc_ids.begin(); id_it!=bc_ids.end(); ++id_it)
         {
           const boundary_id_type boundary_id = *id_it;
@@ -1137,7 +1132,8 @@ void FEAbstract::compute_periodic_node_constraints (NodeConstraints &constraints
               if (neigh->level() <= elem->level())
                 {
                   unsigned int s_neigh =
-                    mesh.boundary_info->side_with_boundary_id (neigh, periodic->pairedboundary);
+                    mesh.get_boundary_info().side_with_boundary_id
+                      (neigh, periodic->pairedboundary);
                   libmesh_assert_not_equal_to (s_neigh, libMesh::invalid_uint);
 
 #ifdef LIBMESH_ENABLE_AMR

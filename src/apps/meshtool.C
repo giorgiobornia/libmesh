@@ -191,7 +191,7 @@ void process_cmd_line(int argc, char **argv,
                       std::vector<std::string>& names,
                       unsigned int& n_subdomains,
                       unsigned int& n_rsteps,
-                      unsigned int& dim,
+                      unsigned char& dim,
                       double& dist_fact,
                       bool& verbose,
                       BoundaryMeshWriteMode& write_bndry,
@@ -304,7 +304,7 @@ void process_cmd_line(int argc, char **argv,
            */
         case 'd':
           {
-            dim = atoi(optarg);
+            dim = cast_int<unsigned char>(atoi(optarg));
             break;
           }
 
@@ -514,7 +514,7 @@ int main (int argc, char** argv)
 
   unsigned int n_subdomains = 1;
   unsigned int n_rsteps = 0;
-  unsigned int dim = static_cast<unsigned int>(-1); // invalid dimension
+  unsigned char dim = static_cast<unsigned char>(-1); // invalid dimension
   double dist_fact = 0.;
   bool verbose = false;
   BoundaryMeshWriteMode write_bndry = BM_DISABLED;
@@ -558,7 +558,7 @@ int main (int argc, char** argv)
                    x_sym, y_sym, z_sym);
 
   AutoPtr<Mesh> mesh_ptr;
-  if (dim == static_cast<unsigned int>(-1))
+  if (dim == static_cast<unsigned char>(-1))
     {
       mesh_ptr.reset(new Mesh(init.comm()));
     }
@@ -594,7 +594,7 @@ int main (int argc, char** argv)
       if (verbose)
         {
           mesh.print_info();
-          mesh.boundary_info->print_summary();
+          mesh.get_boundary_info().print_summary();
         }
 
     }
@@ -649,7 +649,7 @@ int main (int argc, char** argv)
       if (verbose)
         {
           mesh.print_info();
-          mesh.boundary_info->print_summary();
+          mesh.get_boundary_info().print_summary();
         }
 
     }
@@ -796,7 +796,7 @@ int main (int argc, char** argv)
         }
 
       else
-        libmesh_error();
+        libmesh_error_msg("Invalid value, convert_second_order = " << convert_second_order);
 
       if (verbose)
         libMesh::out << message << std::endl;
@@ -806,7 +806,7 @@ int main (int argc, char** argv)
       if (verbose)
         {
           mesh.print_info();
-          mesh.boundary_info->print_summary();
+          mesh.get_boundary_info().print_summary();
         }
     }
 
@@ -829,7 +829,7 @@ int main (int argc, char** argv)
       if (verbose)
         {
           mesh.print_info();
-          mesh.boundary_info->print_summary();
+          mesh.get_boundary_info().print_summary();
         }
     }
 
@@ -934,7 +934,7 @@ int main (int argc, char** argv)
             else if (names.size() == 3)
               new_mesh.write(names[1], soln, var_names);
             else
-              libmesh_error();
+              libmesh_error_msg("Invalid names.size() = " << names.size());
           }
         else
           {
@@ -943,7 +943,7 @@ int main (int argc, char** argv)
             else if (names.size() == 3)
               mesh.write(names[1], soln, var_names);
             else
-              libmesh_error();
+              libmesh_error_msg("Invalid names.size() = " << names.size());
           }
 
 
@@ -953,21 +953,21 @@ int main (int argc, char** argv)
          */
         if (write_bndry != BM_DISABLED)
           {
-            BoundaryMesh boundary_mesh (mesh.comm(),
-                                        mesh.mesh_dimension()-1);
+            BoundaryMesh boundary_mesh
+              (mesh.comm(), cast_int<unsigned char>(mesh.mesh_dimension()-1));
             MeshData boundary_mesh_data (boundary_mesh);
 
             std::string boundary_name = "bndry_";
             boundary_name += names[1];
 
             if (write_bndry == BM_MESH_ONLY)
-              mesh.boundary_info->sync(boundary_mesh);
+              mesh.get_boundary_info().sync(boundary_mesh);
 
             else if  (write_bndry == BM_WITH_MESHDATA)
-              mesh.boundary_info->sync(boundary_mesh, &boundary_mesh_data, &mesh_data);
+              mesh.get_boundary_info().sync(boundary_mesh, &boundary_mesh_data, &mesh_data);
 
             else
-              libmesh_error();
+              libmesh_error_msg("Invalid value write_bndry = " << write_bndry);
 
             if (names.size() == 2)
               boundary_mesh.write(boundary_name);

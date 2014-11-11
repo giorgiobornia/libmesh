@@ -99,14 +99,14 @@ System::System (const System& other) :
   _mesh(other._mesh),
   _sys_number(other._sys_number)
 {
-  libmesh_error();
+  libmesh_not_implemented();
 }
 
 
 
 System& System::operator= (const System&)
 {
-  libmesh_error();
+  libmesh_not_implemented();
 }
 
 
@@ -119,8 +119,8 @@ System::~System ()
     _assemble_system_function =
     _constrain_system_function =  NULL;
 
-  _qoi_evaluate_function =
-    _qoi_evaluate_derivative_function =  NULL;
+  _qoi_evaluate_function = NULL;
+  _qoi_evaluate_derivative_function =  NULL;
 
   // NULL-out user-provided objects.
   _init_system_object             = NULL;
@@ -215,6 +215,7 @@ void System::clear ()
 
     _vectors.clear();
     _vector_projections.clear();
+    _vector_is_adjoint.clear();
     _vector_types.clear();
     _can_add_vectors = true;
   }
@@ -298,8 +299,7 @@ void System::init_data ()
                              _dof_map->get_send_list(), false,
                              GHOSTED);
 #else
-          libMesh::err << "Cannot initialize ghosted vectors when they are not enabled." << std::endl;
-          libmesh_error();
+          libmesh_error_msg("Cannot initialize ghosted vectors when they are not enabled.");
 #endif
         }
       else if (type == SERIAL)
@@ -325,7 +325,9 @@ void System::restrict_vectors ()
       NumericVector<Number>* v = pos->second;
 
       if (_vector_projections[pos->first])
-        this->project_vector (*v);
+        {
+          this->project_vector (*v, this->vector_is_adjoint(pos->first));
+        }
       else
         {
           ParallelType type = _vector_types[pos->first];
@@ -337,8 +339,7 @@ void System::restrict_vectors ()
                                  _dof_map->get_send_list(), false,
                                  GHOSTED);
 #else
-              libMesh::err << "Cannot initialize ghosted vectors when they are not enabled." << std::endl;
-              libmesh_error();
+              libmesh_error_msg("Cannot initialize ghosted vectors when they are not enabled.");
 #endif
             }
           else
@@ -492,13 +493,17 @@ void System::assemble_qoi (const QoISet& qoi_indices)
 
 
 
-void System::assemble_qoi_derivative (const QoISet& qoi_indices)
+void System::assemble_qoi_derivative
+  (const QoISet& qoi_indices,
+   bool include_liftfunc,
+   bool apply_constraints)
 {
   // Log how long the user's assembly code takes
   START_LOG("assemble_qoi_derivative()", "System");
 
   // Call the user-specified quantity of interest function
-  this->user_QOI_derivative(qoi_indices);
+  this->user_QOI_derivative(qoi_indices, include_liftfunc,
+                            apply_constraints);
 
   // Stop logging the user code
   STOP_LOG("assemble_qoi_derivative()", "System");
@@ -664,7 +669,7 @@ void System::update_global_solution (std::vector<Number>& global_soln) const
 
 
 void System::update_global_solution (std::vector<Number>& global_soln,
-                                     const unsigned int   dest_proc) const
+                                     const processor_id_type dest_proc) const
 {
   global_soln.resize        (solution->size());
 
@@ -688,6 +693,9 @@ NumericVector<Number> & System::add_vector (const std::string& vec_name,
 
   _vector_types.insert (std::make_pair (vec_name, type));
 
+  // Vectors are primal by default
+  _vector_is_adjoint.insert (std::make_pair (vec_name, -1));
+
   // Initialize it if necessary
   if (!_can_add_vectors)
     {
@@ -698,8 +706,7 @@ NumericVector<Number> & System::add_vector (const std::string& vec_name,
                      _dof_map->get_send_list(), false,
                      GHOSTED);
 #else
-          libMesh::err << "Cannot initialize ghosted vectors when they are not enabled." << std::endl;
-          libmesh_error();
+          libmesh_error_msg("Cannot initialize ghosted vectors when they are not enabled.");
 #endif
         }
       else
@@ -721,6 +728,7 @@ void System::remove_vector (const std::string& vec_name)
 
   _vectors.erase(vec_name);
   _vector_projections.erase(vec_name);
+  _vector_is_adjoint.erase(vec_name);
   _vector_types.erase(vec_name);
 }
 
@@ -788,13 +796,7 @@ const NumericVector<Number> & System::get_vector (const std::string& vec_name) c
   const_vectors_iterator pos = _vectors.find(vec_name);
 
   if (pos == _vectors.end())
-    {
-      libMesh::err << "ERROR: vector "
-                   << vec_name
-                   << " does not exist in this system!"
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: vector " << vec_name << " does not exist in this system!");
 
   return *(pos->second);
 }
@@ -807,13 +809,7 @@ NumericVector<Number> & System::get_vector (const std::string& vec_name)
   vectors_iterator pos = _vectors.find(vec_name);
 
   if (pos == _vectors.end())
-    {
-      libMesh::err << "ERROR: vector "
-                   << vec_name
-                   << " does not exist in this system!"
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: vector " << vec_name << " does not exist in this system!");
 
   return *(pos->second);
 }
@@ -885,6 +881,8 @@ const std::string & System::vector_name (const NumericVector<Number> & vec_refer
   return v->first;
 }
 
+
+
 void System::set_vector_preservation (const std::string &vec_name,
                                       bool preserve)
 {
@@ -899,6 +897,27 @@ bool System::vector_preservation (const std::string &vec_name) const
     return false;
 
   return _vector_projections.find(vec_name)->second;
+}
+
+
+
+void System::set_vector_as_adjoint (const std::string &vec_name,
+                                    int qoi_num)
+{
+  // We reserve -1 for vectors which get primal constraints, -2 for
+  // vectors which get no constraints
+  libmesh_assert_greater_equal(qoi_num, -2);
+  _vector_is_adjoint[vec_name] = qoi_num;
+}
+
+
+
+int System::vector_is_adjoint (const std::string &vec_name) const
+{
+  libmesh_assert(_vector_is_adjoint.find(vec_name) !=
+                 _vector_is_adjoint.end());
+
+  return _vector_is_adjoint.find(vec_name)->second;
 }
 
 
@@ -959,7 +978,9 @@ NumericVector<Number> & System::add_adjoint_solution (unsigned int i)
   std::ostringstream adjoint_name;
   adjoint_name << "adjoint_solution" << i;
 
-  return this->add_vector(adjoint_name.str());
+  NumericVector<Number> &returnval = this->add_vector(adjoint_name.str());
+  this->set_vector_as_adjoint(adjoint_name.str(), i);
+  return returnval;
 }
 
 
@@ -989,7 +1010,9 @@ NumericVector<Number> & System::add_weighted_sensitivity_adjoint_solution (unsig
   std::ostringstream adjoint_name;
   adjoint_name << "weighted_sensitivity_adjoint_solution" << i;
 
-  return this->add_vector(adjoint_name.str());
+  NumericVector<Number> &returnval = this->add_vector(adjoint_name.str());
+  this->set_vector_as_adjoint(adjoint_name.str(), i);
+  return returnval;
 }
 
 
@@ -1086,11 +1109,7 @@ unsigned int System::add_variable (const std::string& var,
         if (this->variable_type(v) == type)
           return _variables[v].number();
 
-        libMesh::err << "ERROR: incompatible variable "
-                     << var
-                     << " has already been added for this system!"
-                     << std::endl;
-        libmesh_error();
+        libmesh_error_msg("ERROR: incompatible variable " << var << " has already been added for this system!");
       }
 
   // Optimize for VariableGroups here - if the user is adding multiple
@@ -1135,7 +1154,8 @@ unsigned int System::add_variable (const std::string& var,
       // were violated
       if (should_be_in_vg)
         {
-          const unsigned int curr_n_vars = this->n_vars();
+          const unsigned short curr_n_vars = cast_int<unsigned short>
+            (this->n_vars());
 
           vg.append (var);
 
@@ -1178,14 +1198,11 @@ unsigned int System::add_variables (const std::vector<std::string> &vars,
           if (this->variable_type(v) == type)
             return _variables[v].number();
 
-          libMesh::err << "ERROR: incompatible variable "
-                       << vars[ov]
-                       << " has already been added for this system!"
-                       << std::endl;
-          libmesh_error();
+          libmesh_error_msg("ERROR: incompatible variable " << vars[ov] << " has already been added for this system!");
         }
 
-  const unsigned int curr_n_vars = this->n_vars();
+  const unsigned short curr_n_vars = cast_int<unsigned short>
+    (this->n_vars());
 
   const unsigned int next_first_component = this->n_components();
 
@@ -1199,10 +1216,11 @@ unsigned int System::add_variables (const std::vector<std::string> &vars,
   const VariableGroup &vg (_variable_groups.back());
 
   // Add each component of the group individually
-  for (unsigned int v=0; v<vars.size(); v++)
+  for (unsigned short v=0; v<vars.size(); v++)
     {
       _variables.push_back (vg(v));
-      _variable_numbers[vars[v]] = curr_n_vars+v;
+      _variable_numbers[vars[v]] = cast_int<unsigned short>
+        (curr_n_vars+v);
     }
 
   libmesh_assert_equal_to ((curr_n_vars+vars.size()), this->n_vars());
@@ -1213,7 +1231,7 @@ unsigned int System::add_variables (const std::vector<std::string> &vars,
   // _dof_map->add_variable_group (vg);
 
   // Return the number of the new variable
-  return curr_n_vars+vars.size()-1;
+  return cast_int<unsigned int>(curr_n_vars+vars.size()-1);
 }
 
 
@@ -1244,13 +1262,8 @@ unsigned short int System::variable_number (const std::string& var) const
     pos = _variable_numbers.find(var);
 
   if (pos == _variable_numbers.end())
-    {
-      libMesh::err << "ERROR: variable "
-                   << var
-                   << " does not exist in this system!"
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: variable " << var << " does not exist in this system!");
+
   libmesh_assert_equal_to (_variables[pos->second].name(), var);
 
   return pos->second;
@@ -1372,7 +1385,7 @@ Real System::discrete_var_norm(const NumericVector<Number>& v,
   if(norm_type == DISCRETE_L_INF)
     return v.subset_linfty_norm(var_indices);
   else
-    libmesh_error();
+    libmesh_error_msg("Invalid norm_type = " << norm_type);
 }
 
 
@@ -1429,7 +1442,7 @@ Real System::calculate_norm(const NumericVector<Number>& v,
           if(norm_type0 == DISCRETE_L_INF)
             return v.linfty_norm();
           else
-            libmesh_error();
+            libmesh_error_msg("Invalid norm_type0 = " << norm_type0);
         }
 
       for (unsigned int var=0; var != this->n_vars(); ++var)
@@ -1539,7 +1552,7 @@ Real System::calculate_norm(const NumericVector<Number>& v,
 
           const unsigned int n_qp = qrule->n_points();
 
-          const unsigned int n_sf = libmesh_cast_int<unsigned int>
+          const unsigned int n_sf = cast_int<unsigned int>
             (dof_indices.size());
 
           // Begin the loop over the Quadrature points.
@@ -1857,9 +1870,9 @@ void System::attach_QOI_object (QOI& qoi_in)
 
 
 
-void System::attach_QOI_derivative(void fptr(EquationSystems&,
-                                             const std::string&,
-                                             const QoISet&))
+void System::attach_QOI_derivative
+  (void fptr(EquationSystems&, const std::string&,
+             const QoISet&, bool, bool))
 {
   libmesh_assert(fptr);
 
@@ -1949,16 +1962,22 @@ void System::user_QOI (const QoISet& qoi_indices)
 
 
 
-void System::user_QOI_derivative (const QoISet& qoi_indices)
+void System::user_QOI_derivative
+  (const QoISet& qoi_indices,
+   bool include_liftfunc,
+   bool apply_constraints)
 {
   // Call the user-provided quantity of interest derivative,
   // if it was provided
   if (_qoi_evaluate_derivative_function != NULL)
-    this->_qoi_evaluate_derivative_function(_equation_systems, this->name(), qoi_indices);
+    this->_qoi_evaluate_derivative_function
+      (_equation_systems, this->name(), qoi_indices, include_liftfunc,
+       apply_constraints);
 
   // ...or the user-provided QOI derivative function object.
   else if (_qoi_evaluate_derivative_object != NULL)
-    this->_qoi_evaluate_derivative_object->qoi_derivative(qoi_indices);
+    this->_qoi_evaluate_derivative_object->qoi_derivative
+      (qoi_indices, include_liftfunc, apply_constraints);
 }
 
 
@@ -2029,7 +2048,7 @@ Number System::point_value(unsigned int var, const Point &p, const Elem &e) cons
   dof_map.dof_indices (&e, dof_indices, var);
 
   // Get the no of dofs assciated with this point
-  const unsigned int num_dofs = libmesh_cast_int<unsigned int>
+  const unsigned int num_dofs = cast_int<unsigned int>
     (dof_indices.size());
 
   FEType fe_type = dof_map.variable_type(var);
@@ -2127,7 +2146,7 @@ Gradient System::point_gradient(unsigned int var, const Point &p, const Elem &e)
   dof_map.dof_indices (&e, dof_indices, var);
 
   // Get the no of dofs assciated with this point
-  const unsigned int num_dofs = libmesh_cast_int<unsigned int>
+  const unsigned int num_dofs = cast_int<unsigned int>
     (dof_indices.size());
 
   FEType fe_type = dof_map.variable_type(var);
@@ -2225,7 +2244,7 @@ Tensor System::point_hessian(unsigned int var, const Point &p, const Elem &e) co
   dof_map.dof_indices (&e, dof_indices, var);
 
   // Get the no of dofs assciated with this point
-  const unsigned int num_dofs = libmesh_cast_int<unsigned int>
+  const unsigned int num_dofs = cast_int<unsigned int>
     (dof_indices.size());
 
   FEType fe_type = dof_map.variable_type(var);
@@ -2256,17 +2275,15 @@ Tensor System::point_hessian(unsigned int var, const Point &p, const Elem &e) co
 #else
 Tensor System::point_hessian(unsigned int, const Point &, const bool) const
 {
-  // We can only accumulate a hessian with --enable-second
-  libmesh_error();
+  libmesh_error_msg("We can only accumulate a hessian with --enable-second");
 
   // Avoid compiler warnings
   return Tensor();
 }
 
-Tensor System::point_hessian(unsigned int var, const Point &p, const Elem &e) const
+Tensor System::point_hessian(unsigned int, const Point &, const Elem &) const
 {
-  // We can only accumulate a hessian with --enable-second
-  libmesh_error();
+  libmesh_error_msg("We can only accumulate a hessian with --enable-second");
 
   // Avoid compiler warnings
   return Tensor();

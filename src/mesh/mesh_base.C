@@ -42,9 +42,9 @@ namespace libMesh
 
 // ------------------------------------------------------------
 // MeshBase class member functions
-MeshBase::MeshBase (const Parallel::Communicator &comm,
-                    unsigned int d) :
-  ParallelObject (comm),
+MeshBase::MeshBase (const Parallel::Communicator &comm_in,
+                    unsigned char d) :
+  ParallelObject (comm_in),
   boundary_info  (new BoundaryInfo(*this)),
   _n_parts       (1),
   _dim           (d),
@@ -64,7 +64,7 @@ MeshBase::MeshBase (const Parallel::Communicator &comm,
 
 
 #ifndef LIBMESH_DISABLE_COMMWORLD
-MeshBase::MeshBase (unsigned int d) :
+MeshBase::MeshBase (unsigned char d) :
   ParallelObject (CommWorld),
   boundary_info  (new BoundaryInfo(*this)),
   _n_parts       (1),
@@ -129,7 +129,7 @@ void MeshBase::prepare_for_use (const bool skip_renumber_nodes_and_elements, con
 
   if (!this->is_serial())
     {
-      unsigned int dim = this->mesh_dimension();
+      unsigned char dim = this->mesh_dimension();
       this->comm().max(dim);
       this->set_mesh_dimension(dim);
     }
@@ -196,7 +196,7 @@ void MeshBase::clear ()
   _is_prepared = false;
 
   // Clear boundary information
-  this->boundary_info->clear();
+  this->get_boundary_info().clear();
 
   // Clear our point locator.
   this->clear_point_locator();
@@ -232,7 +232,7 @@ subdomain_id_type MeshBase::n_subdomains() const
 
   this->subdomain_ids (ids);
 
-  return ids.size();
+  return cast_int<subdomain_id_type>(ids.size());
 }
 
 
@@ -453,8 +453,7 @@ subdomain_id_type MeshBase::get_id_by_name(const std::string& name) const
         return iter->first;
     }
 
-  libMesh::err << "Block '" << name << "' does not exist in mesh" << std::endl;
-  libmesh_error();
+  libmesh_error_msg("Block '" << name << "' does not exist in mesh");
 }
 
 

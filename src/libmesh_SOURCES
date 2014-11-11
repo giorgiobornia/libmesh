@@ -86,6 +86,7 @@ libmesh_SOURCES =  \
         src/fe/fe_scalar_shape_1D.C \
         src/fe/fe_scalar_shape_2D.C \
         src/fe/fe_scalar_shape_3D.C \
+        src/fe/fe_subdivision_2D.C \
         src/fe/fe_szabab.C \
         src/fe/fe_szabab_shape_0D.C \
         src/fe/fe_szabab_shape_1D.C \
@@ -142,6 +143,7 @@ libmesh_SOURCES =  \
         src/geom/edge_edge4.C \
         src/geom/edge_inf_edge2.C \
         src/geom/elem.C \
+        src/geom/elem_cutter.C \
         src/geom/elem_quality.C \
         src/geom/elem_refinement.C \
         src/geom/elem_type.C \
@@ -155,6 +157,7 @@ libmesh_SOURCES =  \
         src/geom/face_quad9.C \
         src/geom/face_tri.C \
         src/geom/face_tri3.C \
+        src/geom/face_tri3_subdivision.C \
         src/geom/face_tri6.C \
         src/geom/node.C \
         src/geom/node_elem.C \
@@ -200,6 +203,7 @@ libmesh_SOURCES =  \
         src/mesh/mesh_smoother.C \
         src/mesh/mesh_smoother_laplace.C \
         src/mesh/mesh_smoother_vsmoother.C \
+        src/mesh/mesh_subdivision_support.C \
         src/mesh/mesh_tetgen_interface.C \
         src/mesh/mesh_tetgen_wrapper.C \
         src/mesh/mesh_tools.C \
@@ -280,6 +284,7 @@ libmesh_SOURCES =  \
         src/quadrature/quadrature_clough_1D.C \
         src/quadrature/quadrature_clough_2D.C \
         src/quadrature/quadrature_clough_3D.C \
+        src/quadrature/quadrature_composite.C \
         src/quadrature/quadrature_conical.C \
         src/quadrature/quadrature_conical_2D.C \
         src/quadrature/quadrature_conical_3D.C \
@@ -287,6 +292,10 @@ libmesh_SOURCES =  \
         src/quadrature/quadrature_gauss_1D.C \
         src/quadrature/quadrature_gauss_2D.C \
         src/quadrature/quadrature_gauss_3D.C \
+        src/quadrature/quadrature_gauss_lobatto.C \
+        src/quadrature/quadrature_gauss_lobatto_1D.C \
+        src/quadrature/quadrature_gauss_lobatto_2D.C \
+        src/quadrature/quadrature_gauss_lobatto_3D.C \
         src/quadrature/quadrature_gm.C \
         src/quadrature/quadrature_gm_3D.C \
         src/quadrature/quadrature_grid.C \
@@ -296,6 +305,7 @@ libmesh_SOURCES =  \
         src/quadrature/quadrature_jacobi.C \
         src/quadrature/quadrature_jacobi_1D.C \
         src/quadrature/quadrature_monomial.C \
+        src/quadrature/quadrature_monomial_1D.C \
         src/quadrature/quadrature_monomial_2D.C \
         src/quadrature/quadrature_monomial_3D.C \
         src/quadrature/quadrature_rules.C \

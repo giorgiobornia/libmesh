@@ -338,7 +338,7 @@ public:
    */
   void add_vector (const NumericVector<T>&,
                    const SparseMatrix<T>&)
-  { libmesh_error(); }
+  { libmesh_not_implemented(); }
 
   /**
    * \f$U+=V\f$ where U and V are type
@@ -357,7 +357,7 @@ public:
    */
   void add_vector_transpose (const NumericVector<T>&,
                              const SparseMatrix<T>&)
-  { libmesh_error(); }
+  { libmesh_not_implemented(); }
 
   /**
    * \f$ U=v \f$ where v is a \p std::vector<T>
@@ -491,9 +491,9 @@ private:
 // DistributedVector inline methods
 template <typename T>
 inline
-DistributedVector<T>::DistributedVector (const Parallel::Communicator &comm,
+DistributedVector<T>::DistributedVector (const Parallel::Communicator &comm_in,
                                          const ParallelType ptype)
-  : NumericVector<T>(comm, ptype),
+  : NumericVector<T>(comm_in, ptype),
     _global_size      (0),
     _local_size       (0),
     _first_local_index(0),
@@ -506,10 +506,10 @@ DistributedVector<T>::DistributedVector (const Parallel::Communicator &comm,
 
 template <typename T>
 inline
-DistributedVector<T>::DistributedVector (const Parallel::Communicator &comm,
+DistributedVector<T>::DistributedVector (const Parallel::Communicator &comm_in,
                                          const numeric_index_type n,
                                          const ParallelType ptype)
-  : NumericVector<T>(comm, ptype)
+  : NumericVector<T>(comm_in, ptype)
 {
   this->init(n, n, false, ptype);
 }
@@ -518,11 +518,11 @@ DistributedVector<T>::DistributedVector (const Parallel::Communicator &comm,
 
 template <typename T>
 inline
-DistributedVector<T>::DistributedVector (const Parallel::Communicator &comm,
+DistributedVector<T>::DistributedVector (const Parallel::Communicator &comm_in,
                                          const numeric_index_type n,
                                          const numeric_index_type n_local,
                                          const ParallelType ptype)
-  : NumericVector<T>(comm, ptype)
+  : NumericVector<T>(comm_in, ptype)
 {
   this->init(n, n_local, false, ptype);
 }
@@ -531,12 +531,12 @@ DistributedVector<T>::DistributedVector (const Parallel::Communicator &comm,
 
 template <typename T>
 inline
-DistributedVector<T>::DistributedVector (const Parallel::Communicator &comm,
+DistributedVector<T>::DistributedVector (const Parallel::Communicator &comm_in,
                                          const numeric_index_type n,
                                          const numeric_index_type n_local,
                                          const std::vector<numeric_index_type>& ghost,
                                          const ParallelType ptype)
-  : NumericVector<T>(comm, ptype)
+  : NumericVector<T>(comm_in, ptype)
 {
   this->init(n, n_local, ghost, false, ptype);
 }
@@ -618,11 +618,7 @@ void DistributedVector<T>::init (const numeric_index_type n,
 
   // No other options without MPI!
   if (n != n_local)
-    {
-      libMesh::err << "ERROR:  MPI is required for n != n_local!"
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR:  MPI is required for n != n_local!");
 
 #endif
 
@@ -892,7 +888,7 @@ template <typename T>
 inline
 void DistributedVector<T>::swap (NumericVector<T> &other)
 {
-  DistributedVector<T>& v = libmesh_cast_ref<DistributedVector<T>&>(other);
+  DistributedVector<T>& v = cast_ref<DistributedVector<T>&>(other);
 
   std::swap(_global_size, v._global_size);
   std::swap(_local_size, v._local_size);

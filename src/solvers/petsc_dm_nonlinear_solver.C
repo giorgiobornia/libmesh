@@ -88,10 +88,8 @@ void PetscDMNonlinearSolver<T>::init(const char* name)
 
   // Attaching a DM with the function and Jacobian callbacks to SNES.
   ierr = DMCreateLibMesh(this->comm().get(), this->system(), &dm); LIBMESH_CHKERRABORT(ierr);
-    if (name) 
-      {
-        ierr = DMSetOptionsPrefix(dm,name);    LIBMESH_CHKERRABORT(ierr);
-      }
+  if (name)
+    ierr = DMSetOptionsPrefix(dm,name);    LIBMESH_CHKERRABORT(ierr);
   ierr = DMSetFromOptions(dm);               LIBMESH_CHKERRABORT(ierr);
   ierr = DMSetUp(dm);                        LIBMESH_CHKERRABORT(ierr);
   ierr = SNESSetDM(this->_snes, dm);         LIBMESH_CHKERRABORT(ierr);
@@ -131,11 +129,11 @@ PetscDMNonlinearSolver<T>::solve (SparseMatrix<T>& jac_in,  // System Jacobian M
   this->init ();
 
   // Make sure the data passed in are really of Petsc types
-  libmesh_cast_ptr<PetscMatrix<T>*>(&jac_in);
-  libmesh_cast_ptr<PetscVector<T>*>(&r_in);
+  cast_ptr<PetscMatrix<T>*>(&jac_in);
+  cast_ptr<PetscVector<T>*>(&r_in);
 
   // Extract solution vector
-  PetscVector<T>* x = libmesh_cast_ptr<PetscVector<T>*>(&x_in);
+  PetscVector<T>* x = cast_ptr<PetscVector<T>*>(&x_in);
 
   PetscErrorCode ierr=0;
   PetscInt n_iterations =0;
@@ -159,8 +157,19 @@ PetscDMNonlinearSolver<T>::solve (SparseMatrix<T>& jac_in,  // System Jacobian M
   ierr = SNESGetLinearSolveIterations(this->_snes, &this->_n_linear_iterations);
   LIBMESH_CHKERRABORT(ierr);
 
+#if PETSC_VERSION_LESS_THAN(3,5,0)
+  // SNESGetFunctionNorm was removed in PETSc 3.5.0
   ierr = SNESGetFunctionNorm(this->_snes,&final_residual_norm);
   LIBMESH_CHKERRABORT(ierr);
+#else
+  {
+    // PB: Not sure where r_in is coming from and it's not used here, so we'll
+    // just get the residual from PETSc
+    Vec r;
+    ierr = SNESGetFunction(this->_snes,&r,NULL,NULL);LIBMESH_CHKERRABORT(ierr);
+    ierr = VecNorm(r,NORM_2,&final_residual_norm);LIBMESH_CHKERRABORT(ierr);
+  }
+#endif
 
   // Get and store the reason for convergence
   SNESGetConvergedReason(this->_snes, &this->_reason);

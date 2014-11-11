@@ -93,8 +93,8 @@ bool Problem_Interface::computeF(const Epetra_Vector& x, Epetra_Vector& r,
   NonlinearImplicitSystem &sys = _solver->system();
 
   EpetraVector<Number> X_global(*const_cast<Epetra_Vector *>(&x), sys.comm()), R(r, sys.comm());
-  EpetraVector<Number>& X_sys = *libmesh_cast_ptr<EpetraVector<Number>*>(sys.solution.get());
-  EpetraVector<Number>& R_sys = *libmesh_cast_ptr<EpetraVector<Number>*>(sys.rhs);
+  EpetraVector<Number>& X_sys = *cast_ptr<EpetraVector<Number>*>(sys.solution.get());
+  EpetraVector<Number>& R_sys = *cast_ptr<EpetraVector<Number>*>(sys.rhs);
 
   // Use the systems update() to get a good local version of the parallel solution
   X_global.swap(X_sys);
@@ -114,17 +114,10 @@ bool Problem_Interface::computeF(const Epetra_Vector& x, Epetra_Vector& r,
   // will be used, so catch that as an error
 
   if (_solver->residual && _solver->residual_object)
-    {
-      libMesh::err << "ERROR: cannot specifiy both a function and object to compute the Residual!" << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: cannot specifiy both a function and object to compute the Residual!");
 
   if (_solver->matvec && _solver->residual_and_jacobian_object)
-    {
-      libMesh::err << "ERROR: cannot specifiy both a function and object to compute the combined Residual & Jacobian!" << std::endl;
-      libmesh_error();
-    }
-  //-----------------------------------------------------------------------------
+    libmesh_error_msg("ERROR: cannot specifiy both a function and object to compute the combined Residual & Jacobian!");
 
   if      (_solver->residual != NULL)                     _solver->residual                                            (*sys.current_local_solution.get(), R, sys);
   else if (_solver->residual_object != NULL)              _solver->residual_object->residual                           (*sys.current_local_solution.get(), R, sys);
@@ -148,7 +141,7 @@ bool Problem_Interface::computeJacobian(const Epetra_Vector & x,
   NonlinearImplicitSystem &sys = _solver->system();
 
   EpetraMatrix<Number> Jac(&dynamic_cast<Epetra_FECrsMatrix &>(jac), sys.comm());
-  EpetraVector<Number>& X_sys = *libmesh_cast_ptr<EpetraVector<Number>*>(sys.solution.get());
+  EpetraVector<Number>& X_sys = *cast_ptr<EpetraVector<Number>*>(sys.solution.get());
   EpetraVector<Number> X_global(*const_cast<Epetra_Vector *>(&x), sys.comm());
 
   // Set the dof maps
@@ -166,23 +159,17 @@ bool Problem_Interface::computeJacobian(const Epetra_Vector & x,
   // if the user has provided both function pointers and objects only the pointer
   // will be used, so catch that as an error
   if (_solver->jacobian && _solver->jacobian_object)
-    {
-      libMesh::err << "ERROR: cannot specify both a function and object to compute the Jacobian!" << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: cannot specify both a function and object to compute the Jacobian!");
 
   if (_solver->matvec && _solver->residual_and_jacobian_object)
-    {
-      libMesh::err << "ERROR: cannot specify both a function and object to compute the combined Residual & Jacobian!" << std::endl;
-      libmesh_error();
-    }
-  //-----------------------------------------------------------------------------
+    libmesh_error_msg("ERROR: cannot specify both a function and object to compute the combined Residual & Jacobian!");
 
   if      (_solver->jacobian != NULL)                     _solver->jacobian                                            (*sys.current_local_solution.get(), Jac, sys);
   else if (_solver->jacobian_object != NULL)              _solver->jacobian_object->jacobian                           (*sys.current_local_solution.get(), Jac, sys);
   else if (_solver->matvec   != NULL)                     _solver->matvec                                              (*sys.current_local_solution.get(), NULL, &Jac, sys);
   else if (_solver->residual_and_jacobian_object != NULL) _solver->residual_and_jacobian_object->residual_and_jacobian (*sys.current_local_solution.get(), NULL, &Jac, sys);
-  else libmesh_error();
+  else
+    libmesh_error_msg("Error! Unable to compute residual and/or Jacobian!");
 
   Jac.close();
   X_global.close();
@@ -208,7 +195,7 @@ bool Problem_Interface::computePreconditioner(const Epetra_Vector & x,
   TrilinosPreconditioner<Number> & tpc = dynamic_cast<TrilinosPreconditioner<Number> &>(prec);
 
   EpetraMatrix<Number> Jac(dynamic_cast<Epetra_FECrsMatrix *>(tpc.mat()),sys.comm());
-  EpetraVector<Number>& X_sys = *libmesh_cast_ptr<EpetraVector<Number>*>(sys.solution.get());
+  EpetraVector<Number>& X_sys = *cast_ptr<EpetraVector<Number>*>(sys.solution.get());
   EpetraVector<Number> X_global(*const_cast<Epetra_Vector *>(&x), sys.comm());
 
   // Set the dof maps
@@ -226,23 +213,17 @@ bool Problem_Interface::computePreconditioner(const Epetra_Vector & x,
   // if the user has provided both function pointers and objects only the pointer
   // will be used, so catch that as an error
   if (_solver->jacobian && _solver->jacobian_object)
-    {
-      libMesh::err << "ERROR: cannot specify both a function and object to compute the Jacobian!" << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: cannot specify both a function and object to compute the Jacobian!");
 
   if (_solver->matvec && _solver->residual_and_jacobian_object)
-    {
-      libMesh::err << "ERROR: cannot specify both a function and object to compute the combined Residual & Jacobian!" << std::endl;
-      libmesh_error();
-    }
-  //-----------------------------------------------------------------------------
+    libmesh_error_msg("ERROR: cannot specify both a function and object to compute the combined Residual & Jacobian!");
 
   if      (_solver->jacobian != NULL)                     _solver->jacobian                                            (*sys.current_local_solution.get(), Jac, sys);
   else if (_solver->jacobian_object != NULL)              _solver->jacobian_object->jacobian                           (*sys.current_local_solution.get(), Jac, sys);
   else if (_solver->matvec   != NULL)                     _solver->matvec                                              (*sys.current_local_solution.get(), NULL, &Jac, sys);
   else if (_solver->residual_and_jacobian_object != NULL) _solver->residual_and_jacobian_object->residual_and_jacobian (*sys.current_local_solution.get(), NULL, &Jac, sys);
-  else libmesh_error();
+  else
+    libmesh_error_msg("Error! Unable to compute residual and/or Jacobian!");
 
   Jac.close();
   X_global.close();
@@ -282,7 +263,7 @@ NoxNonlinearSolver<T>::solve (SparseMatrix<T>&  /* jac_in */,  // System Jacobia
   if (this->user_presolve)
     this->user_presolve(this->system());
 
-  EpetraVector<T> * x_epetra = libmesh_cast_ptr<EpetraVector<T>*>(&x_in);
+  EpetraVector<T> * x_epetra = cast_ptr<EpetraVector<T>*>(&x_in);
   // Creating a Teuchos::RCP as they do in NOX examples does not work here - we get some invalid memory references
   // thus we make a local copy
   NOX::Epetra::Vector x(*x_epetra->vec());
@@ -328,7 +309,8 @@ NoxNonlinearSolver<T>::solve (SparseMatrix<T>&  /* jac_in */,  // System Jacobia
           // PJNFK
           lsParams.set("Preconditioner", "User Defined");
 
-          TrilinosPreconditioner<Number> * trilinos_pc = libmesh_cast_ptr<TrilinosPreconditioner<Number> *>(this->_preconditioner);
+          TrilinosPreconditioner<Number> * trilinos_pc =
+            cast_ptr<TrilinosPreconditioner<Number> *>(this->_preconditioner);
           pc = Teuchos::rcp(trilinos_pc);
 
           Teuchos::RCP<NOX::Epetra::Interface::Preconditioner> iPrec(_interface);
@@ -342,7 +324,7 @@ NoxNonlinearSolver<T>::solve (SparseMatrix<T>&  /* jac_in */,  // System Jacobia
 
           // full jacobian
           NonlinearImplicitSystem & sys = _interface->_solver->system();
-          EpetraMatrix<Number> & jacSys = *libmesh_cast_ptr<EpetraMatrix<Number>*>(sys.matrix);
+          EpetraMatrix<Number> & jacSys = *cast_ptr<EpetraMatrix<Number>*>(sys.matrix);
           Teuchos::RCP<Epetra_RowMatrix> jacMat = Teuchos::rcp(jacSys.mat());
 
           Teuchos::RCP<NOX::Epetra::Interface::Jacobian> iJac(_interface);
