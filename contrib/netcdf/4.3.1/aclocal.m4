@@ -1,4 +1,4 @@
-# generated automatically by aclocal 1.12.5 -*- Autoconf -*-
+# generated automatically by aclocal 1.12.1 -*- Autoconf -*-
 
 # Copyright (C) 1996-2012 Free Software Foundation, Inc.
 
@@ -19,11 +19,120 @@ You have another version of autoconf.  It may work, but is not guaranteed to.
 If you have problems, you may need to regenerate the build system entirely.
 To do so, use the procedure documented by the package, typically 'autoreconf'.])])
 
+# longlong.m4 serial 14
+dnl Copyright (C) 1999-2007, 2009-2010 Free Software Foundation, Inc.
+dnl This file is free software; the Free Software Foundation
+dnl gives unlimited permission to copy and/or distribute it,
+dnl with or without modifications, as long as this notice is preserved.
+
+dnl From Paul Eggert.
+
+# Define HAVE_LONG_LONG_INT if 'long long int' works.
+# This fixes a bug in Autoconf 2.61, but can be removed once we
+# assume 2.62 everywhere.
+
+# Note: If the type 'long long int' exists but is only 32 bits large
+# (as on some very old compilers), HAVE_LONG_LONG_INT will not be
+# defined. In this case you can treat 'long long int' like 'long int'.
+
+AC_DEFUN([AC_TYPE_LONG_LONG_INT],
+[
+  AC_CACHE_CHECK([for long long int], [ac_cv_type_long_long_int],
+    [AC_LINK_IFELSE(
+       [_AC_TYPE_LONG_LONG_SNIPPET],
+       [dnl This catches a bug in Tandem NonStop Kernel (OSS) cc -O circa 2004.
+        dnl If cross compiling, assume the bug isn't important, since
+        dnl nobody cross compiles for this platform as far as we know.
+        AC_RUN_IFELSE(
+          [AC_LANG_PROGRAM(
+             [[@%:@include <limits.h>
+               @%:@ifndef LLONG_MAX
+               @%:@ define HALF \
+                        (1LL << (sizeof (long long int) * CHAR_BIT - 2))
+               @%:@ define LLONG_MAX (HALF - 1 + HALF)
+               @%:@endif]],
+             [[long long int n = 1;
+               int i;
+               for (i = 0; ; i++)
+                 {
+                   long long int m = n << i;
+                   if (m >> i != n)
+                     return 1;
+                   if (LLONG_MAX / 2 < m)
+                     break;
+                 }
+               return 0;]])],
+          [ac_cv_type_long_long_int=yes],
+          [ac_cv_type_long_long_int=no],
+          [ac_cv_type_long_long_int=yes])],
+       [ac_cv_type_long_long_int=no])])
+  if test $ac_cv_type_long_long_int = yes; then
+    AC_DEFINE([HAVE_LONG_LONG_INT], [1],
+      [Define to 1 if the system has the type `long long int'.])
+  fi
+])
+
+# Define HAVE_UNSIGNED_LONG_LONG_INT if 'unsigned long long int' works.
+# This fixes a bug in Autoconf 2.61, but can be removed once we
+# assume 2.62 everywhere.
+
+# Note: If the type 'unsigned long long int' exists but is only 32 bits
+# large (as on some very old compilers), AC_TYPE_UNSIGNED_LONG_LONG_INT
+# will not be defined. In this case you can treat 'unsigned long long int'
+# like 'unsigned long int'.
+
+AC_DEFUN([AC_TYPE_UNSIGNED_LONG_LONG_INT],
+[
+  AC_CACHE_CHECK([for unsigned long long int],
+    [ac_cv_type_unsigned_long_long_int],
+    [AC_LINK_IFELSE(
+       [_AC_TYPE_LONG_LONG_SNIPPET],
+       [ac_cv_type_unsigned_long_long_int=yes],
+       [ac_cv_type_unsigned_long_long_int=no])])
+  if test $ac_cv_type_unsigned_long_long_int = yes; then
+    AC_DEFINE([HAVE_UNSIGNED_LONG_LONG_INT], [1],
+      [Define to 1 if the system has the type `unsigned long long int'.])
+  fi
+])
+
+# Expands to a C program that can be used to test for simultaneous support
+# of 'long long' and 'unsigned long long'. We don't want to say that
+# 'long long' is available if 'unsigned long long' is not, or vice versa,
+# because too many programs rely on the symmetry between signed and unsigned
+# integer types (excluding 'bool').
+AC_DEFUN([_AC_TYPE_LONG_LONG_SNIPPET],
+[
+  AC_LANG_PROGRAM(
+    [[/* For now, do not test the preprocessor; as of 2007 there are too many
+         implementations with broken preprocessors.  Perhaps this can
+         be revisited in 2012.  In the meantime, code should not expect
+         #if to work with literals wider than 32 bits.  */
+      /* Test literals.  */
+      long long int ll = 9223372036854775807ll;
+      long long int nll = -9223372036854775807LL;
+      unsigned long long int ull = 18446744073709551615ULL;
+      /* Test constant expressions.   */
+      typedef int a[((-9223372036854775807LL < 0 && 0 < 9223372036854775807ll)
+                     ? 1 : -1)];
+      typedef int b[(18446744073709551615ULL <= (unsigned long long int) -1
+                     ? 1 : -1)];
+      int i = 63;]],
+    [[/* Test availability of runtime routines for shift and division.  */
+      long long int llmax = 9223372036854775807ll;
+      unsigned long long int ullmax = 18446744073709551615ull;
+      return ((ll << 63) | (ll >> 63) | (ll < i) | (ll > i)
+              | (llmax / ll) | (llmax % ll)
+              | (ull << 63) | (ull >> 63) | (ull << i) | (ull >> i)
+              | (ullmax / ull) | (ullmax % ull));]])
+])
+
 # Copyright (C) 2002-2012 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
 # with or without modifications, as long as this notice is preserved.
+
+# serial 8
 
 # AM_AUTOMAKE_VERSION(VERSION)
 # ----------------------------
@@ -34,7 +143,7 @@ AC_DEFUN([AM_AUTOMAKE_VERSION],
 [am__api_version='1.12'
 dnl Some users find AM_AUTOMAKE_VERSION and mistake it for a way to
 dnl require some minimum version.  Point them to the right macro.
-m4_if([$1], [1.12.5], [],
+m4_if([$1], [1.12.1], [],
       [AC_FATAL([Do not call $0, use AM_INIT_AUTOMAKE([$1]).])])dnl
 ])
 
@@ -50,7 +159,7 @@ m4_define([_AM_AUTOCONF_VERSION], [])
 # Call AM_AUTOMAKE_VERSION and AM_AUTOMAKE_VERSION so they can be traced.
 # This function is AC_REQUIREd by AM_INIT_AUTOMAKE.
 AC_DEFUN([AM_SET_CURRENT_AUTOMAKE_VERSION],
-[AM_AUTOMAKE_VERSION([1.12.5])dnl
+[AM_AUTOMAKE_VERSION([1.12.1])dnl
 m4_ifndef([AC_AUTOCONF_VERSION],
   [m4_copy([m4_PACKAGE_VERSION], [AC_AUTOCONF_VERSION])])dnl
 _AM_AUTOCONF_VERSION(m4_defn([AC_AUTOCONF_VERSION]))])
@@ -62,6 +171,8 @@ _AM_AUTOCONF_VERSION(m4_defn([AC_AUTOCONF_VERSION]))])
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
 # with or without modifications, as long as this notice is preserved.
+
+# serial 2
 
 # For projects using AC_CONFIG_AUX_DIR([foo]), Autoconf sets
 # $ac_aux_dir to '$srcdir/foo'.  In other projects, it is set to
@@ -116,6 +227,8 @@ am_aux_dir=`cd $ac_aux_dir && pwd`
 # gives unlimited permission to copy and/or distribute it,
 # with or without modifications, as long as this notice is preserved.
 
+# serial 10
+
 # AM_CONDITIONAL(NAME, SHELL-CONDITION)
 # -------------------------------------
 # Define a conditional.
@@ -147,6 +260,7 @@ fi])])
 # gives unlimited permission to copy and/or distribute it,
 # with or without modifications, as long as this notice is preserved.
 
+# serial 17
 
 # There are a few dirty hacks below to avoid letting 'AC_PROG_CC' be
 # written in clear, in which case automake, when reading aclocal.m4,
@@ -338,6 +452,7 @@ _AM_SUBST_NOTMAKE([am__nodep])dnl
 # gives unlimited permission to copy and/or distribute it,
 # with or without modifications, as long as this notice is preserved.
 
+# serial 6
 
 # _AM_OUTPUT_DEPENDENCY_COMMANDS
 # ------------------------------
@@ -414,6 +529,8 @@ AC_DEFUN([AM_OUTPUT_DEPENDENCY_COMMANDS],
 # gives unlimited permission to copy and/or distribute it,
 # with or without modifications, as long as this notice is preserved.
 
+# serial 19
+
 # This macro actually does too much.  Some checks are only needed if
 # your package does certain things.  But this isn't really a big deal.
 
@@ -488,11 +605,7 @@ AM_MISSING_PROG([MAKEINFO], [makeinfo])
 AC_REQUIRE([AM_PROG_INSTALL_SH])dnl
 AC_REQUIRE([AM_PROG_INSTALL_STRIP])dnl
 AC_REQUIRE([AC_PROG_MKDIR_P])dnl
-# For better backward compatibility.  To be removed once Automake 1.9.x
-# dies out for good.  For more background, see:
-# <http://lists.gnu.org/archive/html/automake/2012-07/msg00001.html>
-# <http://lists.gnu.org/archive/html/automake/2012-07/msg00014.html>
-AC_SUBST([mkdir_p], ['$(MKDIR_P)'])
+AC_SUBST([mkdir_p], ["$MKDIR_P"])dnl
 # We need awk for the "check" target.  The system "awk" is bad on
 # some platforms.
 AC_REQUIRE([AC_PROG_AWK])dnl
@@ -565,6 +678,8 @@ echo "timestamp for $_am_arg" >`AS_DIRNAME(["$_am_arg"])`/stamp-h[]$_am_stamp_co
 # gives unlimited permission to copy and/or distribute it,
 # with or without modifications, as long as this notice is preserved.
 
+# serial 8
+
 # AM_PROG_INSTALL_SH
 # ------------------
 # Define $install_sh.
@@ -585,6 +700,8 @@ AC_SUBST([install_sh])])
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
 # with or without modifications, as long as this notice is preserved.
+
+# serial 2
 
 # Check whether the underlying file-system supports filenames
 # with a leading dot.  For instance MS-DOS doesn't.
@@ -607,6 +724,8 @@ AC_SUBST([am__leading_dot])])
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
 # with or without modifications, as long as this notice is preserved.
+
+# serial 7
 
 # AM_MAINTAINER_MODE([DEFAULT-MODE])
 # ----------------------------------
@@ -644,6 +763,8 @@ AU_DEFUN([jm_MAINTAINER_MODE], [AM_MAINTAINER_MODE])
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
 # with or without modifications, as long as this notice is preserved.
+
+# serial 5
 
 # AM_MAKE_INCLUDE()
 # -----------------
@@ -693,6 +814,8 @@ rm -f confinc confmf
 # gives unlimited permission to copy and/or distribute it,
 # with or without modifications, as long as this notice is preserved.
 
+# serial 6
+
 # AM_PROG_CC_C_O
 # --------------
 # Like AC_PROG_CC_C_O, but changed for automake.
@@ -727,12 +850,15 @@ m4_define([AC_PROG_CC],
 # gives unlimited permission to copy and/or distribute it,
 # with or without modifications, as long as this notice is preserved.
 
+# serial 7
+
 # AM_MISSING_PROG(NAME, PROGRAM)
 # ------------------------------
 AC_DEFUN([AM_MISSING_PROG],
 [AC_REQUIRE([AM_MISSING_HAS_RUN])
 $1=${$1-"${am_missing_run}$2"}
 AC_SUBST($1)])
+
 
 # AM_MISSING_HAS_RUN
 # ------------------
@@ -766,6 +892,8 @@ fi
 # gives unlimited permission to copy and/or distribute it,
 # with or without modifications, as long as this notice is preserved.
 
+# serial 6
+
 # _AM_MANGLE_OPTION(NAME)
 # -----------------------
 AC_DEFUN([_AM_MANGLE_OPTION],
@@ -796,6 +924,8 @@ AC_DEFUN([_AM_IF_OPTION],
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
 # with or without modifications, as long as this notice is preserved.
+
+# serial 9
 
 # AM_SANITY_CHECK
 # ---------------
@@ -878,6 +1008,8 @@ rm -f conftest.file
 # gives unlimited permission to copy and/or distribute it,
 # with or without modifications, as long as this notice is preserved.
 
+# serial 3
+
 # AM_SILENT_RULES([DEFAULT])
 # --------------------------
 # Enable less verbose build rules; with the default set to DEFAULT
@@ -938,6 +1070,8 @@ _AM_SUBST_NOTMAKE([AM_BACKSLASH])dnl
 # gives unlimited permission to copy and/or distribute it,
 # with or without modifications, as long as this notice is preserved.
 
+# serial 2
+
 # AM_PROG_INSTALL_STRIP
 # ---------------------
 # One issue with vendor 'install' (even GNU) is that you can't
@@ -966,6 +1100,8 @@ AC_SUBST([INSTALL_STRIP_PROGRAM])])
 # gives unlimited permission to copy and/or distribute it,
 # with or without modifications, as long as this notice is preserved.
 
+# serial 3
+
 # _AM_SUBST_NOTMAKE(VARIABLE)
 # ---------------------------
 # Prevent Automake from outputting VARIABLE = @VARIABLE@ in Makefile.in.
@@ -984,6 +1120,8 @@ AC_DEFUN([AM_SUBST_NOTMAKE], [_AM_SUBST_NOTMAKE($@)])
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
 # with or without modifications, as long as this notice is preserved.
+
+# serial 3
 
 # _AM_PROG_TAR(FORMAT)
 # --------------------
