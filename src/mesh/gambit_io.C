@@ -37,6 +37,7 @@
 // anonymous namespace to hold local data
 namespace
 {
+using namespace libMesh;
 
 /**
  * Defines a structure to hold boundary element information.
@@ -329,6 +330,8 @@ void init_eletypes()
 
 // ------------------------------------------------------------
 // ------------------------------------------------------------
+namespace libMesh
+{
 
 
 // GambitIO  members
@@ -520,3 +523,5 @@ else {
 
 }
 
+
+} // namespace libMesh

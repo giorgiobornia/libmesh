@@ -24,6 +24,10 @@
 #include "libmesh/mesh_input.h"
 #include "libmesh/mesh_output.h"
 
+
+namespace libMesh
+{
+
 // Forward declarations
 // class MeshBase;
 
@@ -148,5 +152,7 @@ bool & GambitIO::binary ()
   return _binary;
 }
 
+
+} // namespace libMesh
 
 #endif // #define __gambit_io_h__

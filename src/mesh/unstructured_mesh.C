@@ -731,8 +731,8 @@ void UnstructuredMesh::read (const std::string& name,
                                 << "     *.bz2  -- any above format bzip2'ed\n" \
                                 << "     *.xz   -- any above format xzipped\n" \
                                 << "     *.cpa  -- libMesh Checkpoint ASCII format\n" \
-                                << "     *.cpr  -- libMesh Checkpoint binary format\n");
-                                << "     *.gam  -- Gambit neutral format (originally .neu) \n"
+                                << "     *.cpr  -- libMesh Checkpoint binary format\n" \
+                                << "     *.gam  -- Gambit neutral format (originally .neu) \n");
             }
 
           // If we temporarily decompressed a file, remove the
