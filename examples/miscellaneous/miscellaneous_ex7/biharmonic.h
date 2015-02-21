@@ -14,22 +14,6 @@ using libMesh::Point;
 using libMesh::Real;
 using libMesh::UnstructuredMesh;
 
-// libmesh_error() and libmesh_assert() macros with a message
-#define ERROR(message)                                  \
-  do {                                                  \
-    libMesh::err << "Error: " << message << "\n";       \
-    libmesh_error();                                    \
-  } while(0)
-
-#define ASSERT(asserted, message)                                       \
-  do {                                                                  \
-    if(!(asserted)) {                                                   \
-      libMesh::err << "Assertion '" #asserted "' violated: " #message;  \
-      libmesh_error();                                                  \
-    }                                                                   \
-  } while(0)
-
-
 /**
  * The Biharmonic class encapsulates most of the data structures
  * necessary to calculate the biharmonic residual and Jacobian,
@@ -72,7 +56,7 @@ public:
    * Static creation/destruction routines.  FIXME - this looks like
    * object-oriented C, can we get rid of it?
    */
-  static void Create(Biharmonic** b, const Parallel::Communicator &comm);
+  static void Create(Biharmonic** b, const libMesh::Parallel::Communicator &comm);
   static void Destroy(Biharmonic** b);
 
 

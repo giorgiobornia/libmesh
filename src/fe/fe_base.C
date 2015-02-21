@@ -75,7 +75,7 @@ const Elem* primary_boundary_point_neighbor
       // one of its sides is on a relevant boundary and that side
       // contains this vertex
       bool vertex_on_periodic_side = false;
-      for (unsigned int ns = 0;
+      for (unsigned short int ns = 0;
            ns != pt_neighbor->n_sides(); ++ns)
         {
           const std::vector<boundary_id_type> bc_ids =
@@ -138,7 +138,7 @@ const Elem* primary_boundary_edge_neighbor
       // one of its sides is on this periodic boundary and that
       // side contains this edge
       bool vertex_on_periodic_side = false;
-      for (unsigned int ns = 0;
+      for (unsigned short int ns = 0;
            ns != e_neighbor->n_sides(); ++ns)
         {
           const std::vector<boundary_id_type>& bc_ids =
@@ -263,8 +263,7 @@ FEGenericBase<Real>::build (const unsigned int dim,
             }
 
           default:
-            libMesh::out << "ERROR: Bad FEType.family= " << fet.family << std::endl;
-            libmesh_error();
+            libmesh_error_msg("ERROR: Bad FEType.family= " << fet.family);
           }
       }
       // 1D
@@ -341,8 +340,7 @@ FEGenericBase<Real>::build (const unsigned int dim,
             }
 
           default:
-            libMesh::out << "ERROR: Bad FEType.family= " << fet.family << std::endl;
-            libmesh_error();
+            libmesh_error_msg("ERROR: Bad FEType.family= " << fet.family);
           }
       }
 
@@ -419,9 +417,15 @@ FEGenericBase<Real>::build (const unsigned int dim,
               AutoPtr<FEBase> ap(new FEScalar<2>(fet));
               return ap;
             }
+
+          case SUBDIVISION:
+            {
+              AutoPtr<FEBase> ap(new FESubdivision(fet));
+              return ap;
+            }
+
           default:
-            libMesh::out << "ERROR: Bad FEType.family= " << fet.family << std::endl;
-            libmesh_error();
+            libmesh_error_msg("ERROR: Bad FEType.family= " << fet.family);
           }
       }
 
@@ -432,11 +436,7 @@ FEGenericBase<Real>::build (const unsigned int dim,
         switch (fet.family)
           {
           case CLOUGH:
-            {
-              libMesh::out << "ERROR: Clough-Tocher elements currently only support 1D and 2D"
-                           << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Clough-Tocher elements currently only support 1D and 2D");
 
           case HERMITE:
             {
@@ -501,16 +501,15 @@ FEGenericBase<Real>::build (const unsigned int dim,
             }
 
           default:
-            libMesh::out << "ERROR: Bad FEType.family= " << fet.family << std::endl;
-            libmesh_error();
+            libmesh_error_msg("ERROR: Bad FEType.family= " << fet.family);
           }
       }
 
     default:
-      libmesh_error();
+      libmesh_error_msg("Invalid dimension dim = " << dim);
     }
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   AutoPtr<FEBase> ap(NULL);
   return ap;
 }
@@ -538,10 +537,7 @@ FEGenericBase<RealGradient>::build (const unsigned int dim,
               return ap;
             }
           default:
-            {
-              libMesh::out << "ERROR: Bad FEType.family= " << fet.family << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad FEType.family= " << fet.family);
           }
       }
     case 1:
@@ -554,10 +550,7 @@ FEGenericBase<RealGradient>::build (const unsigned int dim,
               return ap;
             }
           default:
-            {
-              libMesh::out << "ERROR: Bad FEType.family= " << fet.family << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad FEType.family= " << fet.family);
           }
       }
     case 2:
@@ -575,10 +568,7 @@ FEGenericBase<RealGradient>::build (const unsigned int dim,
               return ap;
             }
           default:
-            {
-              libMesh::out << "ERROR: Bad FEType.family= " << fet.family << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad FEType.family= " << fet.family);
           }
       }
     case 3:
@@ -596,19 +586,15 @@ FEGenericBase<RealGradient>::build (const unsigned int dim,
               return ap;
             }
           default:
-            {
-              libMesh::out << "ERROR: Bad FEType.family= " << fet.family << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad FEType.family= " << fet.family);
           }
       }
 
     default:
-      libmesh_error();
-
+      libmesh_error_msg("Invalid dimension dim = " << dim);
     } // switch(dim)
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   AutoPtr<FEVectorBase> ap(NULL);
   return ap;
 }
@@ -639,11 +625,7 @@ FEGenericBase<Real>::build_InfFE (const unsigned int dim,
         switch (fet.radial_family)
           {
           case INFINITE_MAP:
-            {
-              libMesh::err << "ERROR: Don't build an infinite element " << std::endl
-                           << " with FEFamily = " << fet.radial_family << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Can't build an infinite element with FEFamily = " << fet.radial_family);
 
           case JACOBI_20_00:
             {
@@ -655,9 +637,7 @@ FEGenericBase<Real>::build_InfFE (const unsigned int dim,
                     return ap;
                   }
                 default:
-                  libMesh::err << "ERROR: Don't build an infinite element " << std::endl
-                               << " with InfMapType = " << fet.inf_map << std::endl;
-                  libmesh_error();
+                  libmesh_error_msg("ERROR: Can't build an infinite element with InfMapType = " << fet.inf_map);
                 }
             }
 
@@ -671,9 +651,7 @@ FEGenericBase<Real>::build_InfFE (const unsigned int dim,
                     return ap;
                   }
                 default:
-                  libMesh::err << "ERROR: Don't build an infinite element " << std::endl
-                               << " with InfMapType = " << fet.inf_map << std::endl;
-                  libmesh_error();
+                  libmesh_error_msg("ERROR: Can't build an infinite element with InfMapType = " << fet.inf_map);
                 }
             }
 
@@ -687,9 +665,7 @@ FEGenericBase<Real>::build_InfFE (const unsigned int dim,
                     return ap;
                   }
                 default:
-                  libMesh::err << "ERROR: Don't build an infinite element " << std::endl
-                               << " with InfMapType = " << fet.inf_map << std::endl;
-                  libmesh_error();
+                  libmesh_error_msg("ERROR: Can't build an infinite element with InfMapType = " << fet.inf_map);
                 }
             }
 
@@ -703,19 +679,13 @@ FEGenericBase<Real>::build_InfFE (const unsigned int dim,
                     return ap;
                   }
                 default:
-                  libMesh::err << "ERROR: Don't build an infinite element " << std::endl
-                               << " with InfMapType = " << fet.inf_map << std::endl;
-                  libmesh_error();
+                  libmesh_error_msg("ERROR: Can't build an infinite element with InfMapType = " << fet.inf_map);
                 }
             }
 
-
-
           default:
-            libMesh::err << "ERROR: Bad FEType.radial_family= " << fet.radial_family << std::endl;
-            libmesh_error();
+            libmesh_error_msg("ERROR: Bad FEType.radial_family= " << fet.radial_family);
           }
-
       }
 
 
@@ -727,11 +697,7 @@ FEGenericBase<Real>::build_InfFE (const unsigned int dim,
         switch (fet.radial_family)
           {
           case INFINITE_MAP:
-            {
-              libMesh::err << "ERROR: Don't build an infinite element " << std::endl
-                           << " with FEFamily = " << fet.radial_family << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Can't build an infinite element with FEFamily = " << fet.radial_family);
 
           case JACOBI_20_00:
             {
@@ -743,9 +709,7 @@ FEGenericBase<Real>::build_InfFE (const unsigned int dim,
                     return ap;
                   }
                 default:
-                  libMesh::err << "ERROR: Don't build an infinite element " << std::endl
-                               << " with InfMapType = " << fet.inf_map << std::endl;
-                  libmesh_error();
+                  libmesh_error_msg("ERROR: Don't build an infinite element with InfMapType = " << fet.inf_map);
                 }
             }
 
@@ -759,9 +723,7 @@ FEGenericBase<Real>::build_InfFE (const unsigned int dim,
                     return ap;
                   }
                 default:
-                  libMesh::err << "ERROR: Don't build an infinite element " << std::endl
-                               << " with InfMapType = " << fet.inf_map << std::endl;
-                  libmesh_error();
+                  libmesh_error_msg("ERROR: Don't build an infinite element with InfMapType = " << fet.inf_map);
                 }
             }
 
@@ -775,9 +737,7 @@ FEGenericBase<Real>::build_InfFE (const unsigned int dim,
                     return ap;
                   }
                 default:
-                  libMesh::err << "ERROR: Don't build an infinite element " << std::endl
-                               << " with InfMapType = " << fet.inf_map << std::endl;
-                  libmesh_error();
+                  libmesh_error_msg("ERROR: Don't build an infinite element with InfMapType = " << fet.inf_map);
                 }
             }
 
@@ -791,19 +751,13 @@ FEGenericBase<Real>::build_InfFE (const unsigned int dim,
                     return ap;
                   }
                 default:
-                  libMesh::err << "ERROR: Don't build an infinite element " << std::endl
-                               << " with InfMapType = " << fet.inf_map << std::endl;
-                  libmesh_error();
+                  libmesh_error_msg("ERROR: Don't build an infinite element with InfMapType = " << fet.inf_map);
                 }
             }
 
-
-
           default:
-            libMesh::err << "ERROR: Bad FEType.radial_family= " << fet.radial_family << std::endl;
-            libmesh_error();
+            libmesh_error_msg("ERROR: Bad FEType.radial_family= " << fet.radial_family);
           }
-
       }
 
 
@@ -815,11 +769,7 @@ FEGenericBase<Real>::build_InfFE (const unsigned int dim,
         switch (fet.radial_family)
           {
           case INFINITE_MAP:
-            {
-              libMesh::err << "ERROR: Don't build an infinite element " << std::endl
-                           << " with FEFamily = " << fet.radial_family << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Don't build an infinite element with FEFamily = " << fet.radial_family);
 
           case JACOBI_20_00:
             {
@@ -831,9 +781,7 @@ FEGenericBase<Real>::build_InfFE (const unsigned int dim,
                     return ap;
                   }
                 default:
-                  libMesh::err << "ERROR: Don't build an infinite element " << std::endl
-                               << " with InfMapType = " << fet.inf_map << std::endl;
-                  libmesh_error();
+                  libmesh_error_msg("ERROR: Don't build an infinite element with InfMapType = " << fet.inf_map);
                 }
             }
 
@@ -847,9 +795,7 @@ FEGenericBase<Real>::build_InfFE (const unsigned int dim,
                     return ap;
                   }
                 default:
-                  libMesh::err << "ERROR: Don't build an infinite element " << std::endl
-                               << " with InfMapType = " << fet.inf_map << std::endl;
-                  libmesh_error();
+                  libmesh_error_msg("ERROR: Don't build an infinite element with InfMapType = " << fet.inf_map);
                 }
             }
 
@@ -863,9 +809,7 @@ FEGenericBase<Real>::build_InfFE (const unsigned int dim,
                     return ap;
                   }
                 default:
-                  libMesh::err << "ERROR: Don't build an infinite element " << std::endl
-                               << " with InfMapType = " << fet.inf_map << std::endl;
-                  libmesh_error();
+                  libmesh_error_msg("ERROR: Don't build an infinite element with InfMapType = " << fet.inf_map);
                 }
             }
 
@@ -879,25 +823,20 @@ FEGenericBase<Real>::build_InfFE (const unsigned int dim,
                     return ap;
                   }
                 default:
-                  libMesh::err << "ERROR: Don't build an infinite element " << std::endl
-                               << " with InfMapType = " << fet.inf_map << std::endl;
-                  libmesh_error();
+                  libmesh_error_msg("ERROR: Don't build an infinite element with InfMapType = " << fet.inf_map);
                 }
             }
 
-
-
           default:
-            libMesh::err << "ERROR: Bad FEType.radial_family= " << fet.radial_family << std::endl;
-            libmesh_error();
+            libmesh_error_msg("ERROR: Bad FEType.radial_family= " << fet.radial_family);
           }
       }
 
     default:
-      libmesh_error();
+      libmesh_error_msg("Invalid dimension dim = " << dim);
     }
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   AutoPtr<FEBase> ap(NULL);
   return ap;
 }
@@ -910,7 +849,7 @@ FEGenericBase<RealGradient>::build_InfFE (const unsigned int,
                                           const FEType& )
 {
   // No vector types defined... YET.
-  libmesh_error();
+  libmesh_not_implemented();
   AutoPtr<FEVectorBase> ap(NULL);
   return ap;
 }
@@ -1202,7 +1141,7 @@ FEGenericBase<OutputType>::coarsened_dof_values(const NumericVector<Number> &old
               dof_map.dof_indices (child,
                                    child_dof_indices, var);
             const unsigned int child_n_dofs =
-              libmesh_cast_int<unsigned int>
+              cast_int<unsigned int>
               (child_dof_indices.size());
 
             temp_fe_type = base_fe_type;
@@ -1346,7 +1285,7 @@ FEGenericBase<OutputType>::coarsened_dof_values(const NumericVector<Number> &old
               dof_map.dof_indices (child,
                                    child_dof_indices, var);
             const unsigned int child_n_dofs =
-              libmesh_cast_int<unsigned int>
+              cast_int<unsigned int>
               (child_dof_indices.size());
 
             temp_fe_type = base_fe_type;
@@ -1479,7 +1418,7 @@ FEGenericBase<OutputType>::coarsened_dof_values(const NumericVector<Number> &old
         dof_map.dof_indices (child,
                              child_dof_indices, var);
       const unsigned int child_n_dofs =
-        libmesh_cast_int<unsigned int>
+        cast_int<unsigned int>
         (child_dof_indices.size());
 
       // Initialize both child and parent FE data
@@ -1722,7 +1661,7 @@ FEGenericBase<OutputType>::compute_proj_constraints (DofConstraints &constraints
               (const_cast<Elem *>(neigh))->hack_p_level(old_neigh_level);
 
             const unsigned int n_side_dofs =
-              libmesh_cast_int<unsigned int>(my_side_dofs.size());
+              cast_int<unsigned int>(my_side_dofs.size());
             libmesh_assert_equal_to (n_side_dofs, neigh_side_dofs.size());
 
             Ke.resize (n_side_dofs, n_side_dofs);
@@ -1943,12 +1882,13 @@ compute_periodic_constraints (DofConstraints &constraints,
 
   // Look at the element faces.  Check to see if we need to
   // build constraints.
-  for (unsigned int s=0; s<elem->n_sides(); s++)
+  for (unsigned short int s=0; s<elem->n_sides(); s++)
     {
       if (elem->neighbor(s))
         continue;
 
-      const std::vector<boundary_id_type>& bc_ids = mesh.boundary_info->boundary_ids (elem, s);
+      const std::vector<boundary_id_type>& bc_ids =
+        mesh.get_boundary_info().boundary_ids (elem, s);
       for (std::vector<boundary_id_type>::const_iterator id_it=bc_ids.begin(); id_it!=bc_ids.end(); ++id_it)
         {
           const boundary_id_type boundary_id = *id_it;
@@ -1961,10 +1901,7 @@ compute_periodic_constraints (DofConstraints &constraints,
               const Elem* neigh = boundaries.neighbor(boundary_id, *point_locator, elem, s);
 
               if (neigh == NULL)
-                {
-                  libMesh::err << "PeriodicBoundaries point locator object returned NULL!" << std::endl;
-                  libmesh_error();
-                }
+                libmesh_error_msg("PeriodicBoundaries point locator object returned NULL!");
 
               // periodic (and possibly h refinement) constraints:
               // constrain dofs shared between
@@ -1973,7 +1910,7 @@ compute_periodic_constraints (DofConstraints &constraints,
               if (neigh->level() <= elem->level())
                 {
                   unsigned int s_neigh =
-                    mesh.boundary_info->side_with_boundary_id (neigh, periodic->pairedboundary);
+                    mesh.get_boundary_info().side_with_boundary_id(neigh, periodic->pairedboundary);
                   libmesh_assert_not_equal_to (s_neigh, libMesh::invalid_uint);
 
 #ifdef LIBMESH_ENABLE_AMR
@@ -2038,7 +1975,7 @@ compute_periodic_constraints (DofConstraints &constraints,
 #endif // #ifdef LIBMESH_ENABLE_AMR
 
                   const unsigned int n_side_dofs =
-                    libmesh_cast_int<unsigned int>
+                    cast_int<unsigned int>
                     (my_side_dofs.size());
                   libmesh_assert_equal_to (n_side_dofs, neigh_side_dofs.size());
 
@@ -2163,8 +2100,8 @@ compute_periodic_constraints (DofConstraints &constraints,
                               if (!elem->is_node_on_side(n,new_s))
                                 continue;
 
-                              const std::vector<boundary_id_type>
-                                new_bc_ids = mesh.boundary_info->boundary_ids (elem, s);
+                              const std::vector<boundary_id_type> new_bc_ids =
+                                mesh.get_boundary_info().boundary_ids (elem, s);
                               for (std::vector<boundary_id_type>::const_iterator
                                      new_id_it=new_bc_ids.begin(); new_id_it!=new_bc_ids.end(); ++new_id_it)
                                 {
@@ -2180,7 +2117,8 @@ compute_periodic_constraints (DofConstraints &constraints,
                           // See if this vertex has point neighbors to
                           // defer to
                           if (primary_boundary_point_neighbor
-                              (elem, *my_node, *mesh.boundary_info, point_bcids) != elem)
+                              (elem, *my_node, mesh.get_boundary_info(), point_bcids)
+                              != elem)
                             continue;
 
                           // Find the complementary boundary id set
@@ -2222,9 +2160,10 @@ compute_periodic_constraints (DofConstraints &constraints,
                               if (!primary_elem)
                                 primary_elem = elem;
 
-                              const Elem *primary_neigh = primary_boundary_point_neighbor
-                                (neigh, neigh_pt, *mesh.boundary_info,
-                                 point_pairedids);
+                              const Elem *primary_neigh =
+                                primary_boundary_point_neighbor(neigh, neigh_pt,
+                                                                mesh.get_boundary_info(),
+                                                                point_pairedids);
 
                               libmesh_assert(primary_neigh);
 
@@ -2305,8 +2244,8 @@ compute_periodic_constraints (DofConstraints &constraints,
                               if (!elem->is_node_on_side(n,new_s))
                                 continue;
 
-                              const std::vector<boundary_id_type>&
-                                new_bc_ids = mesh.boundary_info->boundary_ids (elem, s);
+                              const std::vector<boundary_id_type>& new_bc_ids =
+                                mesh.get_boundary_info().boundary_ids (elem, s);
                               for (std::vector<boundary_id_type>::const_iterator
                                      new_id_it=new_bc_ids.begin(); new_id_it!=new_bc_ids.end(); ++new_id_it)
                                 {
@@ -2322,7 +2261,8 @@ compute_periodic_constraints (DofConstraints &constraints,
 
                           // See if this edge has neighbors to defer to
                           if (primary_boundary_edge_neighbor
-                              (elem, *e1, *e2, *mesh.boundary_info, edge_bcids) != elem)
+                              (elem, *e1, *e2, mesh.get_boundary_info(), edge_bcids)
+                              != elem)
                             continue;
 
                           // Find the complementary boundary id set
@@ -2369,8 +2309,8 @@ compute_periodic_constraints (DofConstraints &constraints,
                                 primary_elem = elem;
 
                               const Elem *primary_neigh = primary_boundary_edge_neighbor
-                                (neigh, neigh_pt1, neigh_pt2, *mesh.boundary_info,
-                                 edge_pairedids);
+                                (neigh, neigh_pt1, neigh_pt2,
+                                 mesh.get_boundary_info(), edge_pairedids);
 
                               libmesh_assert(primary_neigh);
 

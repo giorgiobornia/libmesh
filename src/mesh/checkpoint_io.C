@@ -289,7 +289,9 @@ void CheckpointIO::write_connectivity (Xdr &io) const
           for(unsigned int i=0; i<n_nodes; i++)
             conn_data[i] = elem.node(i);
 
-          io.data_stream(&elem_data[0], elem_data.size(), elem_data.size());
+          io.data_stream(&elem_data[0],
+                         cast_int<unsigned int>(elem_data.size()),
+                         cast_int<unsigned int>(elem_data.size()));
 
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
           largest_id_type unique_id = elem.unique_id();
@@ -303,7 +305,9 @@ void CheckpointIO::write_connectivity (Xdr &io) const
           io.data(p_level, "# p_level");
 #endif
 
-          io.data_stream(&conn_data[0], conn_data.size(), conn_data.size());
+          io.data_stream(&conn_data[0],
+                         cast_int<unsigned int>(conn_data.size()),
+                         cast_int<unsigned int>(conn_data.size()));
         }
     }
 }
@@ -318,7 +322,7 @@ void CheckpointIO::write_bcs (Xdr &io) const
   const MeshBase &mesh = MeshOutput<MeshBase>::mesh();
 
   // and our boundary info object
-  const BoundaryInfo &boundary_info = *mesh.boundary_info;
+  const BoundaryInfo &boundary_info = mesh.get_boundary_info();
 
   // Version 0.9.2+ introduces entity names
   write_bc_names(io, boundary_info, true);  // sideset names
@@ -345,7 +349,7 @@ void CheckpointIO::write_nodesets (Xdr &io) const
   const MeshBase &mesh = MeshOutput<MeshBase>::mesh();
 
   // and our boundary info object
-  const BoundaryInfo &boundary_info = *mesh.boundary_info;
+  const BoundaryInfo &boundary_info = mesh.get_boundary_info();
 
   std::vector<dof_id_type> node_id_list;
   std::vector<boundary_id_type> bc_id_list;
@@ -420,12 +424,7 @@ void CheckpointIO::read (const std::string& name)
         std::ifstream in (file_name_stream.str().c_str());
 
         if (!in.good())
-          {
-            libMesh::err << "ERROR: cannot locate specified file:\n\t"
-                         << file_name_stream.str()
-                         << std::endl;
-            libmesh_error();
-          }
+          libmesh_error_msg("ERROR: cannot locate specified file:\n\t" << file_name_stream.str());
       }
 
       Xdr io (file_name_stream.str(), this->binary() ? DECODE : READ);
@@ -439,10 +438,7 @@ void CheckpointIO::read (const std::string& name)
         io.data(parallel, "# parallel");
 
         if(static_cast<unsigned int>(parallel_mesh) != parallel)
-          {
-            libMesh::err << "Attempted to utilize a checkpoint file with an incompatible mesh distribution!" << std::endl;
-            libmesh_error();
-          }
+          libmesh_error_msg("Attempted to utilize a checkpoint file with an incompatible mesh distribution!");
       }
 
       // If this is a parallel mesh then we need to check to ensure we're reading this on the same number of procs
@@ -452,10 +448,7 @@ void CheckpointIO::read (const std::string& name)
           io.data(n_procs, "# n_procs");
 
           if(n_procs != this->n_processors())
-            {
-              libMesh::err << "Attempted to utilize a checkpoint file on " << this->n_processors() << " processors but it was written using " << n_procs << "!!";
-              libmesh_error();
-            }
+            libmesh_error_msg("Attempted to utilize a checkpoint file on " << this->n_processors() << " processors but it was written using " << n_procs << "!!");
         }
 
       // read subdomain names
@@ -489,10 +482,14 @@ void CheckpointIO::read_subdomain_names(Xdr &io)
 {
   MeshBase &mesh = MeshInput<MeshBase>::mesh();
 
-  std::map<subdomain_id_type, std::string> & subdomain_map = mesh.set_subdomain_name_map();
+  std::map<subdomain_id_type, std::string> & subdomain_map =
+    mesh.set_subdomain_name_map();
 
-  std::vector<header_id_type> subdomain_ids;   subdomain_ids.reserve(subdomain_map.size());
-  std::vector<std::string>  subdomain_names; subdomain_names.reserve(subdomain_map.size());
+  std::vector<header_id_type> subdomain_ids;
+  subdomain_ids.reserve(subdomain_map.size());
+
+  std::vector<std::string>  subdomain_names;
+  subdomain_names.reserve(subdomain_map.size());
 
   header_id_type n_subdomain_names = 0;
   io.data(n_subdomain_names, "# subdomain id to name map");
@@ -503,7 +500,8 @@ void CheckpointIO::read_subdomain_names(Xdr &io)
       io.data(subdomain_names);
 
       for(unsigned int i=0; i<subdomain_ids.size(); i++)
-        subdomain_map[subdomain_ids[i]] = subdomain_names[i];
+        subdomain_map[cast_int<subdomain_id_type>(subdomain_ids[i])] =
+          subdomain_names[i];
     }
 }
 
@@ -548,7 +546,8 @@ void CheckpointIO::read_nodes (Xdr &io)
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
       Node * node =
 #endif
-        mesh.add_point(p, id_pid[0], id_pid[1]);
+        mesh.add_point(p, cast_int<dof_id_type>(id_pid[0]),
+                       cast_int<processor_id_type>(id_pid[1]));
 
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
       node->set_unique_id() = unique_id;
@@ -578,7 +577,9 @@ void CheckpointIO::read_connectivity (Xdr &io)
         {
           // id type pid subdomain_id parent_id
           std::vector<largest_id_type> elem_data(5);
-          io.data_stream(&elem_data[0], elem_data.size(), elem_data.size());
+          io.data_stream
+            (&elem_data[0], cast_int<unsigned int>(elem_data.size()),
+             cast_int<unsigned int>(elem_data.size()));
 
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
           largest_id_type unique_id = 0;
@@ -595,13 +596,20 @@ void CheckpointIO::read_connectivity (Xdr &io)
 
           // Snag the node ids this element was connected to
           std::vector<largest_id_type> conn_data(n_nodes);
-          io.data_stream(&conn_data[0], conn_data.size(), conn_data.size());
+          io.data_stream
+            (&conn_data[0], cast_int<unsigned int>(conn_data.size()),
+             cast_int<unsigned int>(conn_data.size()));
 
-          const dof_id_type id                 = elem_data[0];
-          const ElemType elem_type             = static_cast<ElemType>(elem_data[1]);
-          const processor_id_type processor_id = elem_data[2];
-          const subdomain_id_type subdomain_id = elem_data[3];
-          const dof_id_type parent_id          = elem_data[4];
+          const dof_id_type id                 =
+            cast_int<dof_id_type>      (elem_data[0]);
+          const ElemType elem_type             =
+            static_cast<ElemType>      (elem_data[1]);
+          const processor_id_type proc_id      =
+            cast_int<processor_id_type>(elem_data[2]);
+          const subdomain_id_type subdomain_id =
+            cast_int<subdomain_id_type>(elem_data[3]);
+          const dof_id_type parent_id          =
+            cast_int<dof_id_type>      (elem_data[4]);
 
           Elem * parent = (parent_id == DofObject::invalid_processor_id) ? NULL : mesh.elem(parent_id);
 
@@ -616,7 +624,7 @@ void CheckpointIO::read_connectivity (Xdr &io)
             highest_elem_dim = elem->dim();
 
           elem->set_id()       = id;
-          elem->processor_id() = processor_id;
+          elem->processor_id() = proc_id;
           elem->subdomain_id() = subdomain_id;
 
 #ifdef LIBMESH_ENABLE_AMR
@@ -635,13 +643,14 @@ void CheckpointIO::read_connectivity (Xdr &io)
 
           // Connect all the nodes to this element
           for (unsigned int n=0; n<conn_data.size(); n++)
-            elem->set_node(n) = mesh.node_ptr(conn_data[n]);
+            elem->set_node(n) =
+              mesh.node_ptr(cast_int<dof_id_type>(conn_data[n]));
 
           mesh.add_elem(elem);
         }
     }
 
-  mesh.set_mesh_dimension(highest_elem_dim);
+  mesh.set_mesh_dimension(cast_int<unsigned char>(highest_elem_dim));
 }
 
 
@@ -652,7 +661,7 @@ void CheckpointIO::read_bcs (Xdr &io)
   MeshBase &mesh = MeshInput<MeshBase>::mesh();
 
   // and our boundary info object
-  BoundaryInfo &boundary_info = *mesh.boundary_info;
+  BoundaryInfo &boundary_info = mesh.get_boundary_info();
 
   // Version 0.9.2+ introduces entity names
   read_bc_names(io, boundary_info, true);  // sideset names
@@ -678,7 +687,7 @@ void CheckpointIO::read_nodesets (Xdr &io)
   MeshBase &mesh = MeshInput<MeshBase>::mesh();
 
   // and our boundary info object
-  BoundaryInfo &boundary_info = *mesh.boundary_info;
+  BoundaryInfo &boundary_info = mesh.get_boundary_info();
 
   std::vector<dof_id_type> node_id_list;
   std::vector<boundary_id_type> bc_id_list;

@@ -55,11 +55,7 @@ Real FE<2,SZABAB>::shape(const ElemType,
                          const unsigned int,
                          const Point&)
 {
-  libMesh::err << "Szabo-Babuska polynomials require the element type\n"
-               << "because edge orientation is needed."
-               << std::endl;
-
-  libmesh_error();
+  libmesh_error_msg("Szabo-Babuska polynomials require the element type \nbecause edge orientation is needed.");
   return 0.;
 }
 
@@ -110,7 +106,7 @@ Real FE<2,SZABAB>::shape(const Elem* elem,
                 case 5: return l3*l1*(-4.*sqrt6);
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid i = " << i);
                 }
             }
 
@@ -134,9 +130,8 @@ Real FE<2,SZABAB>::shape(const Elem* elem,
 
             }
 
-
           default:
-            libmesh_error();
+            libmesh_error_msg("Invalid element type = " << type);
           }
       }
 
@@ -185,7 +180,7 @@ Real FE<2,SZABAB>::shape(const Elem* elem,
                 case 9: return l1*l2*l3;
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid i = " << i);
                 }
             }
 
@@ -224,6 +219,9 @@ Real FE<2,SZABAB>::shape(const Elem* elem,
                 case 11: // edge 3 points
                   if (elem->point(0) > elem->point(3))f = -1.;
                   break;
+
+                default:
+                  libmesh_error_msg("Invalid shape function index i = " << i);
                 }
 
               return f*(FE<1,SZABAB>::shape(EDGE3, totalorder, i0[i], xi)*
@@ -231,7 +229,7 @@ Real FE<2,SZABAB>::shape(const Elem* elem,
             }
 
           default:
-            libmesh_error();
+            libmesh_error_msg("Invalid element type = " << type);
           }
       }
 
@@ -287,7 +285,7 @@ Real FE<2,SZABAB>::shape(const Elem* elem,
                 case 14: return l1*l2*l3*(2*l3-1);
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid i = " << i);
                 }
             }
 
@@ -322,6 +320,9 @@ Real FE<2,SZABAB>::shape(const Elem* elem,
                 case 14: // edge 3 points
                   if (elem->point(0) > elem->point(3))f = -1.;
                   break;
+
+                default:
+                  libmesh_error_msg("Invalid shape function index i = " << i);
                 }
 
               return f*(FE<1,SZABAB>::shape(EDGE3, totalorder, i0[i], xi)*
@@ -329,7 +330,7 @@ Real FE<2,SZABAB>::shape(const Elem* elem,
             }
 
           default:
-            libmesh_error();
+            libmesh_error_msg("Invalid element type = " << type);
           }
       }
 
@@ -395,7 +396,7 @@ Real FE<2,SZABAB>::shape(const Elem* elem,
                 case 20: return l1*l2*l3*(1.0+(-6.0+6.0*l3)*l3);
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid i = " << i);
                 }
             } // case TRI6
 
@@ -433,6 +434,9 @@ Real FE<2,SZABAB>::shape(const Elem* elem,
                 case 19:
                   if (elem->point(0) > elem->point(3))f = -1.;
                   break;
+
+                default:
+                  libmesh_error_msg("Invalid shape function index i = " << i);
                 }
 
               return f*(FE<1,SZABAB>::shape(EDGE3, totalorder, i0[i], xi)*
@@ -441,7 +445,7 @@ Real FE<2,SZABAB>::shape(const Elem* elem,
             } // case QUAD8/QUAD9
 
           default:
-            libmesh_error();
+            libmesh_error_msg("Invalid element type = " << type);
 
           } // switch type
 
@@ -516,7 +520,7 @@ Real FE<2,SZABAB>::shape(const Elem* elem,
 
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid i = " << i);
                 }
             } // case TRI6
 
@@ -554,6 +558,9 @@ Real FE<2,SZABAB>::shape(const Elem* elem,
                 case 22:
                   if (elem->point(0) > elem->point(3))f = -1.;
                   break;
+
+                default:
+                  libmesh_error_msg("Invalid shape function index i = " << i);
                 }
 
               return f*(FE<1,SZABAB>::shape(EDGE3, totalorder, i0[i], xi)*
@@ -562,7 +569,7 @@ Real FE<2,SZABAB>::shape(const Elem* elem,
             } // case QUAD8/QUAD9
 
           default:
-            libmesh_error();
+            libmesh_error_msg("Invalid element type = " << type);
 
           } // switch type
 
@@ -649,7 +656,7 @@ Real FE<2,SZABAB>::shape(const Elem* elem,
                 case 35: return 0.125*l1*l2*l3*(-8.0+(240.0+(-1680.0+(4480.0+(-5040.0+2016.0*l3)*l3)*l3)*l3)*l3);
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid i = " << i);
                 }
             } // case TRI6
 
@@ -691,6 +698,9 @@ Real FE<2,SZABAB>::shape(const Elem* elem,
                 case 27:
                   if (elem->point(0) > elem->point(3))f = -1.;
                   break;
+
+                default:
+                  libmesh_error_msg("Invalid shape function index i = " << i);
                 }
 
               return f*(FE<1,SZABAB>::shape(EDGE3, totalorder, i0[i], xi)*
@@ -699,7 +709,7 @@ Real FE<2,SZABAB>::shape(const Elem* elem,
             } // case QUAD8/QUAD9
 
           default:
-            libmesh_error();
+            libmesh_error_msg("Invalid element type = " << type);
 
           } // switch type
 
@@ -708,12 +718,10 @@ Real FE<2,SZABAB>::shape(const Elem* elem,
 
       // by default throw an error
     default:
-      libMesh::err << "ERROR: Unsupported polynomial order!" << std::endl;
-      libmesh_error();
-
+      libmesh_error_msg("ERROR: Unsupported polynomial order!");
     } // switch order
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0.;
 }
 
@@ -728,11 +736,7 @@ Real FE<2,SZABAB>::shape_deriv(const ElemType,
                                const unsigned int,
                                const Point&)
 {
-  libMesh::err << "Szabo-Babuska polynomials require the element type\n"
-               << "because edge orientation is needed."
-               << std::endl;
-
-  libmesh_error();
+  libmesh_error_msg("Szabo-Babuska polynomials require the element type \nbecause edge orientation is needed.");
   return 0.;
 }
 
@@ -792,9 +796,8 @@ Real FE<2,SZABAB>::shape_deriv(const Elem* elem,
                             FE<2,SZABAB>::shape(elem, order, i, pm))/2./eps;
                   }
 
-
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid j = " << j);
                 }
             }
 
@@ -827,12 +830,12 @@ Real FE<2,SZABAB>::shape_deriv(const Elem* elem,
                           FE<1,SZABAB>::shape_deriv(EDGE3, totalorder, i1[i], 0, eta));
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid j = " << j);
                 }
             }
 
           default:
-            libmesh_error();
+            libmesh_error_msg("Invalid element type = " << type);
           }
       }
 
@@ -876,7 +879,7 @@ Real FE<2,SZABAB>::shape_deriv(const Elem* elem,
 
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid j = " << j);
                 }
             }
 
@@ -911,6 +914,9 @@ Real FE<2,SZABAB>::shape_deriv(const Elem* elem,
                 case 11: // edge 3 points
                   if (elem->point(0) > elem->point(3))f = -1.;
                   break;
+
+                default:
+                  libmesh_error_msg("Invalid shape function index i = " << i);
                 }
 
 
@@ -927,12 +933,12 @@ Real FE<2,SZABAB>::shape_deriv(const Elem* elem,
                             FE<1,SZABAB>::shape_deriv(EDGE3, totalorder, i1[i], 0, eta));
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid j = " << j);
                 }
             }
 
           default:
-            libmesh_error();
+            libmesh_error_msg("Invalid element type = " << type);
           }
       }
 
@@ -978,7 +984,7 @@ Real FE<2,SZABAB>::shape_deriv(const Elem* elem,
 
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid j = " << j);
                 }
             }
 
@@ -1014,6 +1020,9 @@ Real FE<2,SZABAB>::shape_deriv(const Elem* elem,
                 case 14: // edge 3 points
                   if (elem->point(0) > elem->point(3))f = -1.;
                   break;
+
+                default:
+                  libmesh_error_msg("Invalid shape function index i = " << i);
                 }
 
 
@@ -1030,12 +1039,12 @@ Real FE<2,SZABAB>::shape_deriv(const Elem* elem,
                             FE<1,SZABAB>::shape_deriv(EDGE3, totalorder, i1[i], 0, eta));
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid j = " << j);
                 }
             }
 
           default:
-            libmesh_error();
+            libmesh_error_msg("Invalid element type = " << type);
           }
       }
 
@@ -1080,9 +1089,8 @@ Real FE<2,SZABAB>::shape_deriv(const Elem* elem,
                             FE<2,SZABAB>::shape(elem, order, i, pm))/2./eps;
                   }
 
-
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid j = " << j);
                 }
             }
 
@@ -1121,6 +1129,9 @@ Real FE<2,SZABAB>::shape_deriv(const Elem* elem,
                 case 19:
                   if (elem->point(0) > elem->point(3))f = -1.;
                   break;
+
+                default:
+                  libmesh_error_msg("Invalid shape function index i = " << i);
                 }
 
 
@@ -1137,12 +1148,12 @@ Real FE<2,SZABAB>::shape_deriv(const Elem* elem,
                             FE<1,SZABAB>::shape_deriv(EDGE3, totalorder, i1[i], 0, eta));
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid j = " << j);
                 }
             }
 
           default:
-            libmesh_error();
+            libmesh_error_msg("Invalid element type = " << type);
           }
       }
 
@@ -1185,9 +1196,8 @@ Real FE<2,SZABAB>::shape_deriv(const Elem* elem,
                             FE<2,SZABAB>::shape(elem, order, i, pm))/2./eps;
                   }
 
-
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid j = " << j);
                 }
             }
 
@@ -1226,6 +1236,9 @@ Real FE<2,SZABAB>::shape_deriv(const Elem* elem,
                 case 22:
                   if (elem->point(0) > elem->point(3))f = -1.;
                   break;
+
+                default:
+                  libmesh_error_msg("Invalid shape function index i = " << i);
                 }
 
 
@@ -1242,12 +1255,12 @@ Real FE<2,SZABAB>::shape_deriv(const Elem* elem,
                             FE<1,SZABAB>::shape_deriv(EDGE3, totalorder, i1[i], 0, eta));
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid j = " << j);
                 }
             }
 
           default:
-            libmesh_error();
+            libmesh_error_msg("Invalid element type = " << type);
           }
       }
 
@@ -1290,9 +1303,8 @@ Real FE<2,SZABAB>::shape_deriv(const Elem* elem,
                             FE<2,SZABAB>::shape(elem, order, i, pm))/2./eps;
                   }
 
-
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid j = " << j);
                 }
             }
 
@@ -1335,6 +1347,9 @@ Real FE<2,SZABAB>::shape_deriv(const Elem* elem,
                 case 27:
                   if (elem->point(0) > elem->point(3))f = -1.;
                   break;
+
+                default:
+                  libmesh_error_msg("Invalid shape function index i = " << i);
                 }
 
 
@@ -1351,12 +1366,12 @@ Real FE<2,SZABAB>::shape_deriv(const Elem* elem,
                             FE<1,SZABAB>::shape_deriv(EDGE3, totalorder, i1[i], 0, eta));
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid j = " << j);
                 }
             }
 
           default:
-            libmesh_error();
+            libmesh_error_msg("Invalid element type = " << type);
           }
       }
 
@@ -1364,12 +1379,10 @@ Real FE<2,SZABAB>::shape_deriv(const Elem* elem,
 
       // by default throw an error;call the orientation-independent shape functions
     default:
-      libMesh::err << "ERROR: Unsupported polynomial order!" << std::endl;
-      libmesh_error();
+      libmesh_error_msg("ERROR: Unsupported polynomial order!");
     }
 
-
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0.;
 }
 

@@ -390,7 +390,7 @@ void LegacyXdrIO::read_mesh (const std::string& name,
   else
     {
       // I don't know what type of mesh it is.
-      libmesh_error();
+      libmesh_error_msg("Unrecognized flag " << m.get_orig_flag());
     }
 
   // read in the nodal coordinates and form points.
@@ -485,11 +485,7 @@ void LegacyXdrIO::read_mesh (const std::string& name,
 
                             // If the parent was not previously added, we cannot continue.
                             if (it == parents.end())
-                              {
-                                libMesh::err << "Parent element with ID " << parent_ID
-                                             << " not found." << std::endl;
-                                libmesh_error();
-                              }
+                              libmesh_error_msg("Parent element with ID " << parent_ID << " not found.");
 
                             // Set the my_parent pointer
                             my_parent = (*it).second;
@@ -580,7 +576,7 @@ void LegacyXdrIO::read_mesh (const std::string& name,
                   }
                 else
                   // We can probably handle this, but we don't expect it
-                  libmesh_error();
+                  libmesh_error_msg("Unexpected NULL elem encountered while reading libmesh XDR file.");
               }
           }
         }
@@ -593,11 +589,7 @@ void LegacyXdrIO::read_mesh (const std::string& name,
 #ifdef DEBUG
       if (mesh_data != NULL)
         if (mesh_data->active())
-          {
-            libMesh::err << "ERROR: MeshData not implemented for MGF-style mesh."
-                         << std::endl;
-            libmesh_error();
-          }
+          libmesh_error_msg("ERROR: MeshData not implemented for MGF-style mesh.");
 #endif
 
       for (int ielm=0; ielm < numElem; ++ielm)
@@ -615,20 +607,17 @@ void LegacyXdrIO::read_mesh (const std::string& name,
     }
 
   // Set the mesh dimension to the largest encountered for an element
-  for (unsigned int i=0; i!=4; ++i)
+  for (unsigned char i=0; i!=4; ++i)
     if (elems_of_dimension[i])
       mesh.set_mesh_dimension(i);
 
 #if LIBMESH_DIM < 3
   if (mesh.mesh_dimension() > LIBMESH_DIM)
-    {
-      libMesh::err << "Cannot open dimension " <<
-        mesh.mesh_dimension() <<
-        " mesh file when configured without " <<
-        mesh.mesh_dimension() << "D support." <<
-        std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("Cannot open dimension "              \
+                      << mesh.mesh_dimension()                          \
+                      << " mesh file when configured without "          \
+                      << mesh.mesh_dimension()                          \
+                      << "D support." );
 #endif
 
   // tell the MeshData object that we are finished
@@ -658,7 +647,10 @@ void LegacyXdrIO::read_mesh (const std::string& name,
 
       // Add to the boundary_info
       for (int ibc=0; ibc < numBCs; ibc++)
-        mesh.boundary_info->add_side(bcs[0+ibc*3], bcs[1+ibc*3], bcs[2+ibc*3]);
+        mesh.get_boundary_info().add_side
+          (cast_int<dof_id_type>(bcs[0+ibc*3]),
+           cast_int<unsigned short>(bcs[1+ibc*3]),
+           cast_int<boundary_id_type>(bcs[2+ibc*3]));
     }
 }
 
@@ -745,8 +737,9 @@ void LegacyXdrIO::write_mesh (const std::string& name,
   }
 
 
-  const int                   numElem  = n_non_subactive;
-  const int                   numBCs   = mesh.boundary_info->n_boundary_conds();
+  const int numElem = n_non_subactive;
+  const int numBCs  =
+    cast_int<int>(mesh.get_boundary_info().n_boundary_conds());
 
   // Fill the etypes vector with all of the element types found in the mesh
   MeshTools::elem_types(mesh, etypes);
@@ -756,7 +749,7 @@ void LegacyXdrIO::write_mesh (const std::string& name,
 
   // Store a variable for the number of element types
   const unsigned int n_el_types =
-    libmesh_cast_int<unsigned int>(etypes.size());
+    cast_int<unsigned int>(etypes.size());
 
   m.set_num_levels(n_levels);
 
@@ -781,7 +774,7 @@ void LegacyXdrIO::write_mesh (const std::string& name,
   // for these meshes.
   if ((m.get_orig_flag() == LegacyXdrIO::DEAL) || (m.get_orig_flag() == LegacyXdrIO::LIBM))
     {
-      mh.set_n_blocks(etypes.size());
+      mh.set_n_blocks(cast_int<unsigned int>(etypes.size()));
       mh.set_block_elt_types(etypes);
       mh.set_num_elem_each_block(neeb);
     }
@@ -789,7 +782,7 @@ void LegacyXdrIO::write_mesh (const std::string& name,
     libmesh_assert_equal_to (etypes.size(), 1);
 
   mh.setNumEl(numElem);
-  mh.setNumNodes(node_map.size());
+  mh.setNumNodes(cast_int<int>(node_map.size()));
   mh.setStrSize(65536);
 
   // set a local variable for the total weight of the mesh
@@ -805,7 +798,7 @@ void LegacyXdrIO::write_mesh (const std::string& name,
     totalWeight = non_subactive_weight+2*numElem;
 
   else
-    libmesh_error();
+    libmesh_error_msg("Unrecognized flag " << m.get_orig_flag());
 
   // Set the total weight in the header
   mh.setSumWghts(totalWeight);
@@ -858,7 +851,7 @@ void LegacyXdrIO::write_mesh (const std::string& name,
                   nn = mesh.elem(e)->n_nodes() + 2;
 
                 else
-                  libmesh_error();
+                  libmesh_error_msg("Unrecognized orig_type = " << orig_type);
 
                 // Loop over the connectivity entries for this element and write to conn.
                 START_LOG("set connectivity", "LegacyXdrIO::write_mesh");
@@ -931,7 +924,7 @@ void LegacyXdrIO::write_mesh (const std::string& name,
       }
 
     // Put the nodes in the XDR file
-    m.coord(&coords[0], 3, node_map.size());
+    m.coord(&coords[0], 3, cast_int<int>(node_map.size()));
   }
 
 
@@ -950,7 +943,7 @@ void LegacyXdrIO::write_mesh (const std::string& name,
       std::vector<unsigned short int> side_list;
       std::vector<boundary_id_type> elem_id_list;
 
-      mesh.boundary_info->build_side_list (elem_list, side_list, elem_id_list);
+      mesh.get_boundary_info().build_side_list (elem_list, side_list, elem_id_list);
 
       for (int ibc=0;  ibc<numBCs; ibc++)
         {
@@ -1050,10 +1043,10 @@ void LegacyXdrIO::write_soln (const std::string& name,
   s.init((this->binary() ? XdrMGF::ENCODE : XdrMGF::W_ASCII), name.c_str(), 0); // mesh files are always number 0 ...
 
   // Build the header
-  sh.setWrtVar(var_names.size());
-  sh.setNumVar(var_names.size());
-  sh.setNumNodes(mesh.n_nodes());
-  sh.setNumBCs(mesh.boundary_info->n_boundary_conds());
+  sh.setWrtVar(cast_int<int>(var_names.size()));
+  sh.setNumVar(cast_int<int>(var_names.size()));
+  sh.setNumNodes(cast_int<int>(mesh.n_nodes()));
+  sh.setNumBCs(cast_int<int>(mesh.get_boundary_info().n_boundary_conds()));
   sh.setMeshCnt(0);
   sh.setKstep(0);
   sh.setTime(0.);
@@ -1074,7 +1067,7 @@ void LegacyXdrIO::write_soln (const std::string& name,
         var_title += '\0';
       }
 
-    sh.setVarTitle(var_title.c_str(), var_title.size());
+    sh.setVarTitle(var_title.c_str(), cast_int<int>(var_title.size()));
   }
 
   // Put the informationin the XDR file.

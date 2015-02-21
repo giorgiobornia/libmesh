@@ -35,7 +35,7 @@
 
 // libMesh includes
 #include "libmesh/libmesh.h"
-#include "libmesh/mesh.h"
+#include "libmesh/serial_mesh.h"
 #include "libmesh/mesh_generation.h"
 #include "libmesh/linear_implicit_system.h"
 #include "libmesh/equation_systems.h"
@@ -62,7 +62,7 @@ using namespace libMesh;
 bool compare_elements(const SerialMesh& mesh1, const SerialMesh& mesh2);
 void assemble_poisson(EquationSystems& es,
                       const std::string& system_name);
-void assemble_and_solve(Mesh&, EquationSystems&);
+void assemble_and_solve(MeshBase&, EquationSystems&);
 
 int main (int argc, char** argv)
 {
@@ -74,12 +74,8 @@ int main (int argc, char** argv)
 
   // Check for proper calling arguments.
   if (argc < 3)
-    {
-      std::cout << "Usage:\n"
-                <<"\t " << argv[0] << " -n 15"
-                << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("Usage:\n" << "\t " << argv[0] << " -n 15");
+
   // Brief message to the user regarding the program name
   // and command line arguments.
   else
@@ -96,7 +92,7 @@ int main (int argc, char** argv)
   const unsigned int dim = 3;
 
   // Skip higher-dimensional examples on a lower-dimensional libMesh build
-  libmesh_example_assert(dim <= LIBMESH_DIM, "3D support");
+  libmesh_example_requires(dim <= LIBMESH_DIM, "3D support");
 
   // Read number of elements used in each cube from command line
   int ps = 10;
@@ -104,14 +100,14 @@ int main (int argc, char** argv)
     ps = command_line.next(ps);
 
   // Generate eight meshes that will be stitched
-  Mesh mesh (init.comm());
-  Mesh mesh1(init.comm());
-  Mesh mesh2(init.comm());
-  Mesh mesh3(init.comm());
-  Mesh mesh4(init.comm());
-  Mesh mesh5(init.comm());
-  Mesh mesh6(init.comm());
-  Mesh mesh7(init.comm());
+  SerialMesh mesh (init.comm());
+  SerialMesh mesh1(init.comm());
+  SerialMesh mesh2(init.comm());
+  SerialMesh mesh3(init.comm());
+  SerialMesh mesh4(init.comm());
+  SerialMesh mesh5(init.comm());
+  SerialMesh mesh6(init.comm());
+  SerialMesh mesh7(init.comm());
   MeshTools::Generation::build_cube (mesh, ps, ps, ps, -1,    0,    0,  1,  0, 1, HEX8);
   MeshTools::Generation::build_cube (mesh1, ps, ps, ps,    0,  1,    0,  1,  0, 1, HEX8);
   MeshTools::Generation::build_cube (mesh2, ps, ps, ps, -1,    0, -1,    0,  0, 1, HEX8);
@@ -122,7 +118,7 @@ int main (int argc, char** argv)
   MeshTools::Generation::build_cube (mesh7, ps, ps, ps,    0,  1, -1,    0, -1, 0, HEX8);
 
   // Generate a single unstitched reference mesh
-  Mesh nostitch_mesh(init.comm());
+  SerialMesh nostitch_mesh(init.comm());
   MeshTools::Generation::build_cube (nostitch_mesh, ps*2, ps*2, ps*2, -1, 1, -1, 1, -1, 1, HEX8);
   STOP_LOG("Initialize and create cubes", "main");
 
@@ -146,12 +142,11 @@ int main (int argc, char** argv)
   STOP_LOG("Initialize and solve systems", "main");
 
   START_LOG("Result comparison", "main");
-  Real error_tol = 1e-10;
   ExactSolution comparison(equation_systems_stitch);
   comparison.attach_reference_solution(&equation_systems_nostitch);
   comparison.compute_error("Poisson", "u");
   Real error = comparison.l2_error("Poisson", "u");
-  libmesh_assert(error < error_tol);
+  libmesh_assert_less(error, TOLERANCE*sqrt(TOLERANCE));
   libMesh::out << "L2 error between stitched and non-stitched cases: " << error << std::endl;
   STOP_LOG("Result comparison", "main");
 
@@ -160,7 +155,7 @@ int main (int argc, char** argv)
   ExodusII_IO(mesh).write_equation_systems(
                                            "solution_stitch.exo",
                                            equation_systems_stitch);
-  ExodusII_IO(mesh).write_equation_systems(
+  ExodusII_IO(nostitch_mesh).write_equation_systems(
                                            "solution_nostitch.exo",
                                            equation_systems_nostitch);
 #endif // #ifdef LIBMESH_HAVE_EXODUS_API
@@ -169,7 +164,7 @@ int main (int argc, char** argv)
   return 0;
 }
 
-void assemble_and_solve(Mesh& mesh, EquationSystems& equation_systems)
+void assemble_and_solve(MeshBase& mesh, EquationSystems& equation_systems)
 {
   mesh.print_info();
 

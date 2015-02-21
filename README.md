@@ -6,15 +6,15 @@ For generic installation instructions, refer also to the INSTALL file.
 Build Process
 -------------
 0. ./bootstrap
-   (optional, needed if you will modify the GNU autotools build system)
-   
+   (optional, needed *only* if you add/modify m4 files or configure.ac)
+
 1. ./configure --prefix=/path/to/libmesh/install
 
 2. make
 
 3. make check
    (optional, runs the example programs and unit tests when possible)
-   
+
 4. make install
 
 
@@ -28,10 +28,10 @@ the library are:
 * opt: Fully Optimized mode, with little to no error checking. No debugging
   symbols are included in the resulting library.  Agressive optimization
   flags are used.
-    
+
 * dbg: Full debugging mode - all useful compiler warnings are enabled,
   as well as robust internal state checking.
-	 
+
 * devel: Use high levels of compiler optimization, but also enable internal
   state checking.  Debugging symbols are included, but the resulting
   code is not always easy to navigate in a debugger because of
@@ -70,9 +70,6 @@ the same source tree by creating a subdirectory for each compiler build:
 
 
 Dependencies
-============
-
-Requirements
 ------------
 
 libMesh has no required dependencies other than a reasonably modern C
@@ -86,6 +83,9 @@ We support a large number of optional packages, some of which are
 distributed inside the ./contrib directory and are compiler directly
 with libMesh, others can be used from third-party installation.  For a
 list of supported packages and optional dependencies see
-[here](http://libmesh.sourceforge.net/externalsoftware.php)
+[here](http://libmesh.github.io/externalsoftware.html)
 
-[![githalytics.com alpha](https://cruel-carlota.pagodabox.com/52c0727babae956821cca66c19c68908 "githalytics.com")](http://githalytics.com/libMesh/libmesh)
+License
+-------
+
+LibMesh is open source software distributed under the LGPL license, version 2.1.

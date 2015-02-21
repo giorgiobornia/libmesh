@@ -44,18 +44,10 @@ void InfFE<Dim,T_radial,T_base>::reinit(const Elem* inf_elem,
                                         const std::vector<Real>* const weights)
 {
   if (weights != NULL)
-    {
-      libMesh::err << "ERROR: User-specified weights for infinite elements "
-                   << "are not implemented!" << std::endl;
-      libmesh_not_implemented();
-    }
+    libmesh_not_implemented_msg("ERROR: User-specified weights for infinite elements are not implemented!");
 
   if (pts != NULL)
-    {
-      libMesh::err << "ERROR: User-specified points for infinite elements "
-                   << "are not implemented!" << std::endl;
-      libmesh_not_implemented();
-    }
+    libmesh_not_implemented_msg("ERROR: User-specified points for infinite elements are not implemented!");
 
   // We don't do this for 1D elements!
   libmesh_assert_not_equal_to (Dim, 1);
@@ -122,17 +114,10 @@ void InfFE<Dim,T_radial,T_base>::edge_reinit(const Elem*,
 {
   // We don't do this for 1D elements!
   //libmesh_assert_not_equal_to (Dim, 1);
-
-  libMesh::err << "ERROR: Edge conditions for infinite elements "
-               << "not implemented!" << std::endl;
-  libmesh_error();
+  libmesh_not_implemented_msg("ERROR: Edge conditions for infinite elements not implemented!");
 
   if (pts != NULL)
-    {
-      libMesh::err << "ERROR: User-specified points for infinite elements "
-                   << "not implemented!" << std::endl;
-      libmesh_error();
-    }
+    libmesh_not_implemented_msg("ERROR: User-specified points for infinite elements not implemented!");
 }
 
 
@@ -162,8 +147,8 @@ void InfFE<Dim,T_radial,T_base>::init_face_shape_functions(const std::vector<Poi
     libmesh_assert_equal_to (Dim, 3);
 
     AutoPtr<FEBase> ap_fb(FEBase::build(Dim-2, this->fe_type));
-    if (base_fe != NULL)
-      delete base_fe;
+
+    delete base_fe;
     base_fe = ap_fb.release();
     base_fe->attach_quadrature_rule(base_qrule);
   }
@@ -174,7 +159,7 @@ void InfFE<Dim,T_radial,T_base>::init_face_shape_functions(const std::vector<Poi
 
   // the number of quadrature points
   const unsigned int n_radial_qp =
-    libmesh_cast_int<unsigned int>(som.size());
+    cast_int<unsigned int>(som.size());
   const unsigned int n_base_qp   = base_qrule->n_points();
   const unsigned int n_total_qp  = n_radial_qp * n_base_qp;
 
@@ -191,7 +176,7 @@ void InfFE<Dim,T_radial,T_base>::init_face_shape_functions(const std::vector<Poi
     // the number of mapping shape functions
     // (Lagrange shape functions are used for mapping in the base)
     const unsigned int n_radial_mapping_sf =
-      libmesh_cast_int<unsigned int>(radial_map.size());
+      cast_int<unsigned int>(radial_map.size());
     const unsigned int n_base_mapping_shape_functions = Base::n_base_mapping_sf(base_mapping_elem_type,
                                                                                 base_mapping_order);
 

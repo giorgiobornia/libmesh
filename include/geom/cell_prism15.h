@@ -35,42 +35,38 @@ namespace libMesh
 /**
  * The \p Prism15 is an element in 3D composed of 15 nodes.
  * It is numbered like this:
- \verbatim
- PRISM15:
- 5
- o
- /:\
- / : \
- /  :  \
- /   :   \
- 14 o    :    o 13
- /     :     \
- /      :      \
- /       o 11    \
- 3 /        :        \4
- o---------o---------o
- |         :12       |
- |         :         |
- |         :         |
- |         o         |
- |        .2.        |
- |       .   .       |
- 9 o      .     .      o 10
- |     .       .     |
- |  8 o         o 7  |
- |   .           .   |
- |  .             .  |
- | .               . |
- |.                 .|
- o---------o---------o
- 0         6         1
-
-
- \endverbatim
-*/
-
-// ------------------------------------------------------------
-// Prism class definition
+ * \verbatim
+ * PRISM15:
+ *              5
+ *              o
+ *             /:\
+ *            / : \
+ *           /  :  \
+ *          /   :   \
+ *      14 o    :    o 13
+ *        /     :     \
+ *       /      :      \
+ *      /       o 11    \
+ *   3 /        :        \4
+ *    o---------o---------o
+ *    |         :12       |
+ *    |         :         |
+ *    |         :         |
+ *    |         o         |
+ *    |        .2.        |
+ *    |       .   .       |
+ *  9 o      .     .      o 10
+ *    |     .       .     |
+ *    |  8 o         o 7  |
+ *    |   .           .   |
+ *    |  .             .  |
+ *    | .               . |
+ *    |.                 .|
+ *    o---------o---------o
+ *    0         6         1
+ *
+ * \endverbatim
+ */
 class Prism15 : public Prism
 {
 public:
@@ -208,7 +204,7 @@ protected:
   float embedding_matrix (const unsigned int,
                           const unsigned int,
                           const unsigned int) const
-  { libmesh_error(); return 0.; }
+  { libmesh_not_implemented(); return 0.; }
 
 #endif
 

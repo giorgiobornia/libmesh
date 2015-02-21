@@ -79,8 +79,13 @@ public:
    * @returns the size of the vector.
    */
   virtual unsigned int size() const {
-    return libmesh_cast_int<unsigned int>(_val.size());
+    return cast_int<unsigned int>(_val.size());
   }
+
+  /**
+   * @returns true iff size() is 0
+   */
+  virtual bool empty() const { return _val.empty(); }
 
   /**
    * Set every element in the vector to 0.
@@ -88,9 +93,9 @@ public:
   virtual void zero();
 
   /**
-   * @returns the \p (i) element of the vector.
+   * @returns the \p (i) element of the vector as a const reference.
    */
-  T operator() (const unsigned int i) const;
+  const T & operator() (const unsigned int i) const;
 
   /**
    * @returns the \p (i,j) element of the vector as a writeable reference.
@@ -340,7 +345,7 @@ void DenseVector<T>::zero()
 
 template<typename T>
 inline
-T DenseVector<T>::operator () (const unsigned int i) const
+const T & DenseVector<T>::operator () (const unsigned int i) const
 {
   libmesh_assert_less (i, _val.size());
 
@@ -391,7 +396,7 @@ DenseVector<T>::add (const T2 factor,
   libmesh_assert_equal_to (this->size(), vec.size());
 
   for (unsigned int i=0; i<this->size(); i++)
-    (*this)(i) += factor*vec(i);
+    (*this)(i) += static_cast<T>(factor)*vec(i);
 }
 
 template<typename T>

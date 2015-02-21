@@ -181,7 +181,8 @@ void TetGenMeshInterface::triangulate_conformingDelaunayMesh_carvehole  (const s
   int facet_num = this->_mesh.n_elem();
 
   // allocate memory in "tetgenio" structure:
-  tetgen_wrapper.allocate_facetlist(facet_num, holes.size());
+  tetgen_wrapper.allocate_facetlist
+    (facet_num, cast_int<int>(holes.size()));
 
 
   // Set up tetgen data structures with existing facet information
@@ -213,13 +214,11 @@ void TetGenMeshInterface::triangulate_conformingDelaunayMesh_carvehole  (const s
             // Check to see if not found: this could also indicate the sequential
             // node map is not sorted...
             if (node_iter == _sequential_to_libmesh_node_map.end())
-              {
-                libMesh::err << "Global node " << libmesh_node_id << " not found in sequential node map!"  << std::endl;
-                libmesh_error();
-              }
+              libmesh_error_msg("Global node " << libmesh_node_id << " not found in sequential node map!");
 
-            std::vector<unsigned>::difference_type
-              sequential_index = std::distance(_sequential_to_libmesh_node_map.begin(), node_iter);
+            int sequential_index = cast_int<int>
+              (std::distance(_sequential_to_libmesh_node_map.begin(),
+                             node_iter));
 
             // Debugging:
             //    libMesh::out << "libmesh_node_id=" << libmesh_node_id
@@ -376,10 +375,7 @@ void TetGenMeshInterface::assign_nodes_to_elem(unsigned* node_labels, Elem* elem
       Node* current_node = this->_mesh.node_ptr( mapped_node_id );
 
       if (current_node == NULL)
-        {
-          libMesh::err << "Error! Mesh returned NULL node pointer!" << std::endl;
-          libmesh_error();
-        }
+        libmesh_error_msg("Error! Mesh returned NULL node pointer!");
 
       elem->set_node(j) = current_node;
     }
@@ -408,8 +404,7 @@ unsigned TetGenMeshInterface::check_hull_integrity()
       // Check for proper element type
       if (elem->type() != TRI3)
         {
-          //libMesh::err << "ERROR: Some of the elements in the original mesh were not TRI3!" << std::endl;
-          //libmesh_error();
+          //libmesh_error_msg("ERROR: Some of the elements in the original mesh were not TRI3!");
           return 1;
         }
 
@@ -417,8 +412,7 @@ unsigned TetGenMeshInterface::check_hull_integrity()
         {
           if (elem->neighbor(i) == NULL)
             {
-              // libMesh::err << "ERROR: Non-convex hull, cannot be tetrahedralized." << std::endl;
-              // libmesh_error();
+              // libmesh_error_msg("ERROR: Non-convex hull, cannot be tetrahedralized.");
               return 2;
             }
         }
@@ -444,10 +438,7 @@ void TetGenMeshInterface::process_hull_integrity_result(unsigned result)
           libMesh::err << "A constrained Delaunay triangulation requires a convex hull of TRI3 elements." << std::endl;
         }
 
-      libMesh::err << "Consider calling TetGenMeshInterface::pointset_convexhull() followed " << std::endl;
-      libMesh::err << "by Mesh::find_neighbors() first." << std::endl;
-
-      libmesh_error();
+      libmesh_error_msg("Consider calling TetGenMeshInterface::pointset_convexhull() followed by Mesh::find_neighbors() first.");
     }
 }
 

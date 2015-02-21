@@ -4,15 +4,20 @@ dnl -------------------------------------------------------------
 AC_DEFUN([CONFIGURE_NEMESIS],
 [
   AC_ARG_ENABLE(nemesis,
-                AC_HELP_STRING([--enable-nemesis],
-                               [build with NemesisII API support]),
+                AS_HELP_STRING([--disable-nemesis],
+                               [build without NemesisII API support]),
 		[case "${enableval}" in
 		  yes|new|v522) enablenemesis=yes ; nemesisversion="v5.22" ;;
 		      old|v309) enablenemesis=yes ; nemesisversion="v3.09" ;;
 		            no) enablenemesis=no  ; nemesisversion=no ;;
  		             *) AC_MSG_ERROR(bad value ${enableval} for --enable-nemesis) ;;
 		 esac],
-		 [enablenemesis=$enableexodus ; nemesisversion="v5.22"]) # if unspecified, depend on exodus
+                [enablenemesis=$enableexodus ; # if unspecified, depend on exodus 
+                 if (test "x$exodusversion" = "xv5.22"); then
+                   nemesisversion="v5.22"
+                 else
+                   nemesisversion="v3.09"
+                 fi])
 
 
   # Trump --enable-nemesis with --disable-mpi

@@ -87,7 +87,7 @@ MeshFunction::MeshFunction (const EquationSystems& eqn_systems,
 MeshFunction::~MeshFunction ()
 {
   // only delete the point locator when we are the master
-  if ((this->_point_locator != NULL) && (this->_master == NULL))
+  if (this->_master == NULL)
     delete this->_point_locator;
 }
 
@@ -116,16 +116,11 @@ void MeshFunction::init (const Trees::BuildType /*point_locator_build_type*/)
     {
       // we aren't the master
       const MeshFunction* master =
-        libmesh_cast_ptr<const MeshFunction*>(this->_master);
+        cast_ptr<const MeshFunction*>(this->_master);
 
       if (master->_point_locator == NULL)
-        {
-          libMesh::err << "ERROR: When the master-servant concept is used,"
-                       << std::endl
-                       << " the master has to be initialized first!"
-                       << std::endl;
-          libmesh_error();
-        }
+        libmesh_error_msg("ERROR: When the master-servant concept is used, the master has to be initialized first!");
+
       else
         {
           this->_point_locator = master->_point_locator;
@@ -230,12 +225,10 @@ void MeshFunction::operator() (const Point& p,
   if (this->_master != NULL)
     {
       const MeshFunction* master =
-        libmesh_cast_ptr<const MeshFunction*>(this->_master);
+        cast_ptr<const MeshFunction*>(this->_master);
       if(_out_of_mesh_mode!=master->_out_of_mesh_mode)
-        {
-          libMesh::err << "ERROR: If you use out-of-mesh-mode in connection with master mesh functions, you must enable out-of-mesh mode for both the master and the slave mesh function." << std::endl;
-          libmesh_error();
-        }
+        libmesh_error_msg("ERROR: If you use out-of-mesh-mode in connection with master mesh " \
+                          << "functions, you must enable out-of-mesh mode for both the master and the slave mesh function.");
     }
 #endif
 
@@ -274,7 +267,7 @@ void MeshFunction::operator() (const Point& p,
     {
       // resize the output vector to the number of output values
       // that the user told us
-      output.resize (libmesh_cast_int<unsigned int>
+      output.resize (cast_int<unsigned int>
                      (this->_system_vars.size()));
 
 
@@ -353,12 +346,10 @@ void MeshFunction::gradient (const Point& p,
   if (this->_master != NULL)
     {
       const MeshFunction* master =
-        libmesh_cast_ptr<const MeshFunction*>(this->_master);
+        cast_ptr<const MeshFunction*>(this->_master);
       if(_out_of_mesh_mode!=master->_out_of_mesh_mode)
-        {
-          libMesh::err << "ERROR: If you use out-of-mesh-mode in connection with master mesh functions, you must enable out-of-mesh mode for both the master and the slave mesh function." << std::endl;
-          libmesh_error();
-        }
+        libmesh_error_msg("ERROR: If you use out-of-mesh-mode in connection with master mesh " \
+                          << "functions, you must enable out-of-mesh mode for both the master and the slave mesh function.");
     }
 #endif
 
@@ -466,12 +457,10 @@ void MeshFunction::hessian (const Point& p,
   if (this->_master != NULL)
     {
       const MeshFunction* master =
-        libmesh_cast_ptr<const MeshFunction*>(this->_master);
+        cast_ptr<const MeshFunction*>(this->_master);
       if(_out_of_mesh_mode!=master->_out_of_mesh_mode)
-        {
-          libMesh::err << "ERROR: If you use out-of-mesh-mode in connection with master mesh functions, you must enable out-of-mesh mode for both the master and the slave mesh function." << std::endl;
-          libmesh_error();
-        }
+        libmesh_error_msg("ERROR: If you use out-of-mesh-mode in connection with master mesh " \
+                          << "functions, you must enable out-of-mesh mode for both the master and the slave mesh function.");
     }
 #endif
 
@@ -591,6 +580,21 @@ void MeshFunction::disable_out_of_mesh_mode(void)
   libmesh_assert (this->initialized());
   _point_locator->disable_out_of_mesh_mode();
   _out_of_mesh_mode = false;
+}
+
+void MeshFunction::set_point_locator_tolerance(Real tol)
+{
+  // We need to enable out_of_mesh mode in the point_locator
+  // in order for the point locator tolerance to be used.
+  _point_locator->enable_out_of_mesh_mode();
+
+  // Set the tolerance
+  _point_locator->set_close_to_point_tol(tol);
+}
+
+void MeshFunction::unset_point_locator_tolerance()
+{
+  _point_locator->unset_close_to_point_tol();
 }
 
 } // namespace libMesh

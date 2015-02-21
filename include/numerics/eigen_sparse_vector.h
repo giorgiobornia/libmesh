@@ -61,14 +61,14 @@ public:
    *  Dummy-Constructor. Dimension=0
    */
   explicit
-  EigenSparseVector (const Parallel::Communicator &comm,
+  EigenSparseVector (const Parallel::Communicator &comm_in,
                      const ParallelType = AUTOMATIC);
 
   /**
    * Constructor. Set dimension to \p n and initialize all elements with zero.
    */
   explicit
-  EigenSparseVector (const Parallel::Communicator &comm,
+  EigenSparseVector (const Parallel::Communicator &comm_in,
                      const numeric_index_type n,
                      const ParallelType = AUTOMATIC);
 
@@ -76,7 +76,7 @@ public:
    * Constructor. Set local dimension to \p n_local, the global dimension
    * to \p n, and initialize all elements with zero.
    */
-  EigenSparseVector (const Parallel::Communicator &comm,
+  EigenSparseVector (const Parallel::Communicator &comm_in,
                      const numeric_index_type n,
                      const numeric_index_type n_local,
                      const ParallelType = AUTOMATIC);
@@ -86,7 +86,7 @@ public:
    * dimension to \p n, but additionally reserve memory for the
    * indices specified by the \p ghost argument.
    */
-  EigenSparseVector (const Parallel::Communicator &comm,
+  EigenSparseVector (const Parallel::Communicator &comm_in,
                      const numeric_index_type N,
                      const numeric_index_type n_local,
                      const std::vector<numeric_index_type>& ghost,
@@ -324,21 +324,10 @@ public:
   void add (const T a, const NumericVector<T>& v);
 
   /**
-   * \f$ U+=v \f$ where v is a \p std::vector<T>
-   * and you
-   * want to specify WHERE to add it
+   * We override one NumericVector<T>::add_vector() method but don't
+   * want to hide the other defaults.
    */
-  void add_vector (const std::vector<T>& v,
-                   const std::vector<numeric_index_type>& dof_indices);
-
-  /**
-   * \f$ U+=V \f$ where U and V are type
-   * NumericVector<T> and you
-   * want to specify WHERE to add
-   * the NumericVector<T> V
-   */
-  void add_vector (const NumericVector<T>& V,
-                   const std::vector<numeric_index_type>& dof_indices);
+  using NumericVector<T>::add_vector;
 
   /**
    * \f$U+=A*V\f$, add the product of a \p SparseMatrix \p A
@@ -348,52 +337,11 @@ public:
                    const SparseMatrix<T> &);
 
   /**
-   * \f$U+=V \f$ where U and V are type
-   * DenseVector<T> and you
-   * want to specify WHERE to add
-   * the DenseVector<T> V
-   */
-  void add_vector (const DenseVector<T>& V,
-                   const std::vector<numeric_index_type>& dof_indices);
-
-  /**
    * \f$U+=A^T*V\f$, add the product of the transpose of a \p SparseMatrix \p A_trans
    * and a \p NumericVector \p V to \p this, where \p this=U.
    */
   void add_vector_transpose (const NumericVector<T> &,
                              const SparseMatrix<T> &);
-
-  /**
-   * \f$ U=v \f$ where v is a \p std::vector<T>
-   * and you want to specify WHERE to insert it
-   */
-  virtual void insert (const std::vector<T>& v,
-                       const std::vector<numeric_index_type>& dof_indices);
-
-  /**
-   * \f$U=V\f$, where U and V are type
-   * NumericVector<T> and you
-   * want to specify WHERE to insert
-   * the NumericVector<T> V
-   */
-  virtual void insert (const NumericVector<T>& V,
-                       const std::vector<numeric_index_type>& dof_indices);
-
-  /**
-   * \f$ U=V \f$ where V is type
-   * DenseVector<T> and you
-   * want to specify WHERE to insert it
-   */
-  virtual void insert (const DenseVector<T>& V,
-                       const std::vector<numeric_index_type>& dof_indices);
-
-  /**
-   * \f$ U=V \f$ where V is type
-   * DenseSubVector<T> and you
-   * want to specify WHERE to insert it
-   */
-  virtual void insert (const DenseSubVector<T>& V,
-                       const std::vector<numeric_index_type>& dof_indices);
 
   /**
    * Scale each element of the
@@ -489,9 +437,9 @@ private:
 // EigenSparseVector inline methods
 template <typename T>
 inline
-EigenSparseVector<T>::EigenSparseVector (const Parallel::Communicator &comm,
+EigenSparseVector<T>::EigenSparseVector (const Parallel::Communicator &comm_in,
                                          const ParallelType ptype)
-  : NumericVector<T>(comm, ptype)
+  : NumericVector<T>(comm_in, ptype)
 {
   this->_type = ptype;
 }
@@ -500,10 +448,10 @@ EigenSparseVector<T>::EigenSparseVector (const Parallel::Communicator &comm,
 
 template <typename T>
 inline
-EigenSparseVector<T>::EigenSparseVector (const Parallel::Communicator &comm,
+EigenSparseVector<T>::EigenSparseVector (const Parallel::Communicator &comm_in,
                                          const numeric_index_type n,
                                          const ParallelType ptype)
-  : NumericVector<T>(comm, ptype)
+  : NumericVector<T>(comm_in, ptype)
 {
   this->init(n, n, false, ptype);
 }
@@ -512,11 +460,11 @@ EigenSparseVector<T>::EigenSparseVector (const Parallel::Communicator &comm,
 
 template <typename T>
 inline
-EigenSparseVector<T>::EigenSparseVector (const Parallel::Communicator &comm,
+EigenSparseVector<T>::EigenSparseVector (const Parallel::Communicator &comm_in,
                                          const numeric_index_type n,
                                          const numeric_index_type n_local,
                                          const ParallelType ptype)
-  : NumericVector<T>(comm, ptype)
+  : NumericVector<T>(comm_in, ptype)
 {
   this->init(n, n_local, false, ptype);
 }
@@ -525,12 +473,12 @@ EigenSparseVector<T>::EigenSparseVector (const Parallel::Communicator &comm,
 
 template <typename T>
 inline
-EigenSparseVector<T>::EigenSparseVector (const Parallel::Communicator &comm,
+EigenSparseVector<T>::EigenSparseVector (const Parallel::Communicator &comm_in,
                                          const numeric_index_type N,
                                          const numeric_index_type n_local,
                                          const std::vector<numeric_index_type>& ghost,
                                          const ParallelType ptype)
-  : NumericVector<T>(comm, ptype)
+  : NumericVector<T>(comm_in, ptype)
 {
   this->init(N, n_local, ghost, false, ptype);
 }
@@ -775,7 +723,7 @@ template <typename T>
 inline
 void EigenSparseVector<T>::swap (NumericVector<T> &other)
 {
-  EigenSparseVector<T>& v = libmesh_cast_ref<EigenSparseVector<T>&>(other);
+  EigenSparseVector<T>& v = cast_ref<EigenSparseVector<T>&>(other);
 
   _vec.swap(v._vec);
 

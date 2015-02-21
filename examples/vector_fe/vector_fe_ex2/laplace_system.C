@@ -19,7 +19,6 @@
 
 #include "laplace_system.h"
 
-#include "libmesh/boundary_info.h"
 #include "libmesh/dof_map.h"
 #include "libmesh/fe_base.h"
 #include "libmesh/fe_interface.h"
@@ -81,7 +80,7 @@ void LaplaceSystem::init_dirichlet_bcs()
 
 void LaplaceSystem::init_context(DiffContext &context)
 {
-  FEMContext &c = libmesh_cast_ref<FEMContext&>(context);
+  FEMContext &c = cast_ref<FEMContext&>(context);
 
   // Get finite element object
   FEGenericBase<RealGradient>* fe;
@@ -105,7 +104,7 @@ void LaplaceSystem::init_context(DiffContext &context)
 bool LaplaceSystem::element_time_derivative (bool request_jacobian,
                                              DiffContext &context)
 {
-  FEMContext &c = libmesh_cast_ref<FEMContext&>(context);
+  FEMContext &c = cast_ref<FEMContext&>(context);
 
   // Get finite element object
   FEGenericBase<RealGradient>* fe = NULL;
@@ -177,7 +176,7 @@ bool LaplaceSystem::element_time_derivative (bool request_jacobian,
   bool LaplaceSystem::side_constraint (bool request_jacobian,
   DiffContext &context)
   {
-  FEMContext &c = libmesh_cast_ref<FEMContext&>(context);
+  FEMContext &c = cast_ref<FEMContext&>(context);
 
   // Get finite element object
   FEGenericBase<RealGradient>* side_fe = NULL;

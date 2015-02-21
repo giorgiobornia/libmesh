@@ -96,9 +96,10 @@ void DivaIO::write_stream (std::ostream& out_file)
 
 
 
-  BoundaryMesh boundary_mesh (the_mesh.comm(),
-                              the_mesh.mesh_dimension()-1);
-  the_mesh.boundary_info->sync(boundary_mesh);
+  BoundaryMesh boundary_mesh
+    (the_mesh.comm(),
+     cast_int<unsigned char>(the_mesh.mesh_dimension()-1));
+  the_mesh.get_boundary_info().sync(boundary_mesh);
 
 
   /**
@@ -232,7 +233,7 @@ void DivaIO::write_stream (std::ostream& out_file)
      */
     for(unsigned int e=0; e<the_mesh.n_elem(); e++)
       if (the_mesh.elem(e)->active())
-        for (unsigned int s=0; s<the_mesh.elem(e)->n_sides(); s++)
+        for (unsigned short s=0; s<the_mesh.elem(e)->n_sides(); s++)
           if (the_mesh.elem(e)->neighbor(s) == NULL)
             {
               const AutoPtr<Elem> side(the_mesh.elem(e)->build_side(s));
@@ -240,7 +241,7 @@ void DivaIO::write_stream (std::ostream& out_file)
               if ((side->type() == TRI3) ||
                   (side->type() == TRI6)  )
 
-                out_file << the_mesh.boundary_info->boundary_id(the_mesh.elem(e), s)
+                out_file << the_mesh.get_boundary_info().boundary_id(the_mesh.elem(e), s)
                          << '\n';
             }
 
@@ -250,7 +251,7 @@ void DivaIO::write_stream (std::ostream& out_file)
      */
     for(unsigned int e=0; e<the_mesh.n_elem(); e++)
       if (the_mesh.elem(e)->active())
-        for (unsigned int s=0; s<the_mesh.elem(e)->n_sides(); s++)
+        for (unsigned short s=0; s<the_mesh.elem(e)->n_sides(); s++)
           if (the_mesh.elem(e)->neighbor(s) == NULL)
             {
               const AutoPtr<Elem> side(the_mesh.elem(e)->build_side(s));
@@ -259,7 +260,7 @@ void DivaIO::write_stream (std::ostream& out_file)
                   (side->type() == QUAD8) ||
                   (side->type() == QUAD9))
 
-                out_file << the_mesh.boundary_info->boundary_id(the_mesh.elem(e), s);
+                out_file << the_mesh.get_boundary_info().boundary_id(the_mesh.elem(e), s);
             }
   }
 
@@ -355,9 +356,7 @@ void DivaIO::write_stream (std::ostream& out_file)
                      << the_mesh.elem(e)->node(5)+1 << '\n';
           }
         else if (the_mesh.elem(e)->type() == PRISM18)
-          {
-            libmesh_error();
-          }
+          libmesh_error_msg("PRISM18 element type not supported.");
       }
 
 

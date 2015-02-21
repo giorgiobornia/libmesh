@@ -68,7 +68,7 @@ public:
    * are identical because this is the only thing that makes
    * sense
    */
-  ParallelObject & operator= (const ParallelObject &other)
+  ParallelObject & operator= (const ParallelObject & libmesh_dbg_var(other))
   {
     libmesh_assert_equal_to (&_communicator, &other._communicator);
     return *this;
@@ -90,13 +90,13 @@ public:
    * @returns the number of processors in the group.
    */
   processor_id_type n_processors () const
-  { return libmesh_cast_int<processor_id_type>(_communicator.size()); }
+  { return cast_int<processor_id_type>(_communicator.size()); }
 
   /**
    * @returns the rank of this processor in the group.
    */
   processor_id_type processor_id () const
-  { return libmesh_cast_int<processor_id_type>(_communicator.rank()); }
+  { return cast_int<processor_id_type>(_communicator.rank()); }
 
 
 protected:

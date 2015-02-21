@@ -27,6 +27,7 @@
 // C++ includes
 #include <cstddef>
 #include <vector>
+#include <set>
 
 namespace libMesh
 {
@@ -46,15 +47,13 @@ template <unsigned int N>
 class TreeNode
 {
 public:
-
-
   /**
    * Constructor.  Takes a pointer to this node's
    * parent.  The pointer should only be NULL
    * for the top-level (root) node.
    */
   TreeNode (const MeshBase& m,
-            const unsigned int tbs,
+            unsigned int tbs,
             const TreeNode<N> *p = NULL);
 
   /**
@@ -77,14 +76,18 @@ public:
   bool active() const { return children.empty(); }
 
   /**
-   * Inserts \p Node \p nd into the TreeNode.
+   * Tries to insert \p Node \p nd into the TreeNode.
+   * Returns \p true iff \p nd is inserted into the TreeNode or one of
+   * its children.
    */
-  void insert (const Node* nd);
+  bool insert (const Node* nd);
 
   /**
    * Inserts \p Elem \p el into the TreeNode.
+   * Returns \p true iff \p el is inserted into the TreeNode or one of
+   * its children.
    */
-  void insert (const Elem* nd);
+  bool insert (const Elem* nd);
 
   /**
    * Refine the tree node into N children if it contains
@@ -98,17 +101,18 @@ public:
   void set_bounding_box (const std::pair<Point, Point>& bbox);
 
   /**
-   * @returns true if this TreeNode (or its children) contain node n,
-   * false otherwise.
+   * @returns true if this TreeNode (or its children) contain node n
+   * (within relative tolerance), false otherwise.
    */
-  bool bounds_node (const Node* nd) const
-  { libmesh_assert(nd); return bounds_point(*nd); }
+  bool bounds_node (const Node* nd,
+                    Real relative_tol = 0) const;
 
   /**
-   * @returns true if this TreeNode (or its children) contain point p,
-   * false otherwise.
+   * @returns true if this TreeNode (or its children) contain point p
+   * (within relative tolerance), false otherwise.
    */
-  bool bounds_point (const Point &p) const;
+  bool bounds_point (const Point &p,
+                     Real relative_tol = 0) const;
 
   /**
    * @returns the level of the node.
@@ -130,8 +134,7 @@ public:
   /**
    * Transforms node numbers to element pointers.
    */
-  void transform_nodes_to_elements (std::vector<std::vector<const Elem*> >&
-                                    nodes_to_elem);
+  void transform_nodes_to_elements (std::vector<std::vector<const Elem*> >& nodes_to_elem);
 
   /**
    * @returns the number of active bins below
@@ -140,34 +143,45 @@ public:
   unsigned int n_active_bins() const;
 
   /**
-   * @returns an element containing point p.
+   * @returns an element containing point p,
+   * but only if there's an element of dimension mesh.mesh_dimension(),
+   * optionally restricted to a set of allowed subdomains.
    */
-  const Elem* find_element (const Point& p) const;
+  const Elem* find_element (const Point& p,
+                            const std::set<subdomain_id_type>* allowed_subdomains = NULL,
+                            Real relative_tol = TOLERANCE) const;
+
+  /**
+   * @returns an element containing point p,
+   * but only if there's an element of dimension elem_dim,
+   * optionally restricted to a set of allowed subdomains.
+   */
+  const Elem* find_element (const Point& p,
+                            unsigned int elem_dim,
+                            const std::set<subdomain_id_type>* allowed_subdomains = NULL,
+                            Real relative_tol = TOLERANCE) const;
 
 
 private:
-
-
   /**
-   * Look for point \p p in our children.
+   * Look for point \p p in our children,
+   * but only for elements of dimension elem_dim
+   * optionally restricted to a set of allowed subdomains.
    */
-  const Elem* find_element_in_children (const Point& p) const;
+  const Elem* find_element_in_children (const Point& p,
+                                        unsigned int elem_dim,
+                                        const std::set<subdomain_id_type>* allowed_subdomains,
+                                        Real relative_tol) const;
 
   /**
    * Constructs the bounding box for child \p c.
    */
-  std::pair<Point, Point> create_bounding_box (const unsigned int c) const;
+  std::pair<Point, Point> create_bounding_box (unsigned int c) const;
 
   /**
    * Reference to the mesh.
    */
   const MeshBase& mesh;
-
-  /**
-   * The maximum number of things we should store before
-   * refining ourself.
-   */
-  const unsigned int tgt_bin_size;
 
   /**
    * Pointer to this node's parent.
@@ -198,10 +212,15 @@ private:
   std::vector<const Node*> nodes;
 
   /**
+   * The maximum number of things we should store before
+   * refining ourself.
+   */
+  const unsigned int tgt_bin_size;
+
+  /**
    * Does this node contain any infinite elements.
    */
   bool contains_ifems;
-
 };
 
 
@@ -213,11 +232,11 @@ private:
 template <unsigned int N>
 inline
 TreeNode<N>::TreeNode (const MeshBase& m,
-                       const unsigned int tbs,
+                       unsigned int tbs,
                        const TreeNode<N>* p) :
   mesh           (m),
-  tgt_bin_size   (tbs),
   parent         (p),
+  tgt_bin_size   (tbs),
   contains_ifems (false)
 {
   // libmesh_assert our children are empty, thus we are active.

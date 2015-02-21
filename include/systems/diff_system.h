@@ -124,7 +124,8 @@ public:
    * Assembles a residual in \p rhs and/or a jacobian in \p matrix,
    * as requested.
    */
-  virtual void assembly (bool get_residual, bool get_jacobian) = 0;
+  virtual void assembly (bool get_residual, bool get_jacobian,
+                         bool apply_heterogeneous_constraints = false) = 0;
 
   /**
    * Invokes the solver associated with the system.  For steady state
@@ -143,17 +144,21 @@ public:
    * We don't allow systems to be attached to each other
    */
   virtual AutoPtr<DifferentiablePhysics> clone_physics()
-  { libmesh_error();
+  {
+    libmesh_not_implemented();
     // dummy
-    return AutoPtr<DifferentiablePhysics>(this); }
+    return AutoPtr<DifferentiablePhysics>(this);
+  }
 
   /**
    * We don't allow systems to be attached to each other
    */
   virtual AutoPtr<DifferentiableQoI> clone()
-  { libmesh_error();
+  {
+    libmesh_not_implemented();
     // dummy
-    return AutoPtr<DifferentiableQoI>(this); }
+    return AutoPtr<DifferentiableQoI>(this);
+  }
 
   /**
    * Returns const reference to DifferentiablePhysics object. Note
@@ -293,6 +298,16 @@ public:
    * Set print_jacobians to true to print J whenever it is assembled.
    */
   bool print_jacobians;
+
+  /**
+   * Set print_element_solutions to true to print each U_elem input.
+   */
+  bool print_element_solutions;
+
+  /**
+   * Set print_element_residuals to true to print each R_elem contribution.
+   */
+  bool print_element_residuals;
 
   /**
    * Set print_element_jacobians to true to print each J_elem contribution.

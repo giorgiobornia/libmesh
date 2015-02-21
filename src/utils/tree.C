@@ -35,7 +35,7 @@ namespace libMesh
 // constructor
 template <unsigned int N>
 Tree<N>::Tree (const MeshBase& m,
-               const unsigned int target_bin_size,
+               unsigned int target_bin_size,
                const Trees::BuildType bt) :
   TreeBase(m),
   root(m,target_bin_size),
@@ -45,7 +45,6 @@ Tree<N>::Tree (const MeshBase& m,
   // box for the entire domain.
   root.set_bounding_box (MeshTools::bounding_box(mesh));
 
-
   if (build_type == Trees::NODES)
     {
       // Add all the nodes to the root node.  It will
@@ -54,7 +53,13 @@ Tree<N>::Tree (const MeshBase& m,
       const MeshBase::const_node_iterator end = mesh.nodes_end();
 
       for (; it != end; ++it)
-        root.insert (*it);
+        {
+#ifndef NDEBUG
+          bool node_was_inserted =
+#endif
+            root.insert (*it);
+          libmesh_assert(node_was_inserted);
+        }
 
       // Now the tree contains the nodes.
       // However, we want element pointers, so here we
@@ -72,18 +77,92 @@ Tree<N>::Tree (const MeshBase& m,
       MeshBase::const_element_iterator       it  = mesh.active_elements_begin();
       const MeshBase::const_element_iterator end = mesh.active_elements_end();
 
+      for (; it != end; ++it)
+        {
+#ifndef NDEBUG
+          bool elem_was_inserted =
+#endif
+            root.insert (*it);
+          libmesh_assert(elem_was_inserted);
+        }
+    }
+
+  else if (build_type == Trees::LOCAL_ELEMENTS)
+    {
+      // Add all active, local elements to the root node.  It will
+      // automatically build the tree for us.
+      MeshBase::const_element_iterator       it  = mesh.active_local_elements_begin();
+      const MeshBase::const_element_iterator end = mesh.active_local_elements_end();
 
       for (; it != end; ++it)
-        root.insert (*it);
+        {
+#ifndef NDEBUG
+          bool elem_was_inserted =
+#endif
+            root.insert (*it);
+          libmesh_assert(elem_was_inserted);
+        }
     }
+
+  else
+    libmesh_error_msg("Unknown build_type = " << build_type);
+}
+
+
+
+// copy-constructor is not implemented
+template <unsigned int N>
+Tree<N>::Tree (const Tree<N>& other_tree) :
+  TreeBase   (other_tree),
+  root       (other_tree.root),
+  build_type (other_tree.build_type)
+{
+  libmesh_not_implemented();
+}
+
+
+
+
+
+
+template <unsigned int N>
+void Tree<N>::print_nodes(std::ostream& my_out) const
+{
+  my_out << "Printing nodes...\n";
+  root.print_nodes(my_out);
 }
 
 
 
 template <unsigned int N>
-const Elem* Tree<N>::find_element(const Point& p) const
+void Tree<N>::print_elements(std::ostream& my_out) const
 {
-  return root.find_element(p);
+  my_out << "Printing elements...\n";
+  root.print_elements(my_out);
+}
+
+
+
+template <unsigned int N>
+const Elem*
+Tree<N>::find_element
+(const Point& p,
+ unsigned int elem_dim,
+ const std::set<subdomain_id_type> *allowed_subdomains,
+ Real relative_tol) const
+{
+  return root.find_element(p, elem_dim, allowed_subdomains, relative_tol);
+}
+
+
+
+template <unsigned int N>
+const Elem*
+Tree<N>::operator() (const Point& p,
+                     const std::set<subdomain_id_type> *allowed_subdomains,
+                     Real relative_tol) const
+{
+  return this->find_element(p, this->mesh.mesh_dimension(), allowed_subdomains, relative_tol);
 }
 
 

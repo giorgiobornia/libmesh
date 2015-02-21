@@ -34,6 +34,7 @@ AutoPtr<FETransformationBase<OutputShape> > FETransformationBase<OutputShape>::b
     case SZABAB:
     case CLOUGH: /* PB: Really H2 */
     case HERMITE: /* PB: Really H2 */
+    case SUBDIVISION:
     case LAGRANGE_VEC:
     case MONOMIAL: /* PB: Shouldn't this be L2 conforming? */
     case XYZ: /* PB: Shouldn't this be L2 conforming? */
@@ -64,11 +65,10 @@ AutoPtr<FETransformationBase<OutputShape> > FETransformationBase<OutputShape>::b
       }
 
     default:
-      libmesh_error();
+      libmesh_error_msg("Unknown family = " << fe_type.family);
     }
 
-  // Should never get here...
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   AutoPtr<FETransformationBase<OutputShape> > ap( NULL );
   return ap;
 }

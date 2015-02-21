@@ -35,8 +35,8 @@ libmesh_installed_LIBS=""
 # Allow for disable-optional
 # --------------------------------------------------------------
 AC_ARG_ENABLE(optional,
-              AC_HELP_STRING([--enable-optional],
-                             [en/disable optional external libraries]),
+              AS_HELP_STRING([--disable-optional],
+                             [build without most optional external libraries]),
 	      [case "${enableval}" in
 	      	  yes) enableoptional=yes ;;
 		   no) enableoptional=no ;;
@@ -55,11 +55,29 @@ fi
 
 
 # --------------------------------------------------------------
+# Allow user to specify --disable-strict-lgpl
+# By default libmesh is built only with LGPL-compatible contrib
+# libraries, but the user can pass --disable-strict-lgpl to configure
+# to turn on Laspack, Triangle, and Space-filling curves library
+# support.
+# --------------------------------------------------------------
+AC_ARG_ENABLE(strict-lgpl,
+              AS_HELP_STRING([--disable-strict-lgpl],
+                             [Compile libmesh with even non-LGPL-compatible contrib libraries]),
+              [case "${enableval}" in
+                  yes) enablestrictlgpl=yes ;;
+                  no) enablestrictlgpl=no ;;
+                  *) AC_MSG_ERROR(bad value ${enableval} for --enable-strict-lgpl) ;;
+               esac],
+              [enablestrictlgpl=yes])
+
+
+# --------------------------------------------------------------
 # Allow for disable-nested
 # --------------------------------------------------------------
 AC_ARG_ENABLE(nested,
-              AC_HELP_STRING([--enable-nested],
-                             [en/disable nested autoconf subpackages]),
+              AS_HELP_STRING([--disable-nested],
+                             [Do not use nested autoconf subpackages]),
 	      [case "${enableval}" in
 	      	  yes) enablenested=yes ;;
 		   no) enablenested=no ;;
@@ -133,8 +151,8 @@ fi
 # Pthread support -- enabled by default
 # -------------------------------------------------------------
 AC_ARG_ENABLE(pthreads,
-              AC_HELP_STRING([--enable-pthreads],
-                             [build with threading support via POSIX threads (pthreads)]),
+              AS_HELP_STRING([--disable-pthreads],
+                             [build without POSIX threading (pthreads) support]),
 		[case "${enableval}" in
 		  yes)  enablepthreads=yes ;;
 		   no)  enablepthreads=no ;;
@@ -162,8 +180,8 @@ fi
 # C++ Thread Support  -- enabled by default
 # -------------------------------------------------------------
 AC_ARG_ENABLE(cppthreads,
-             AC_HELP_STRING([--enable-cppthreads],
-                            [Build with C++ std::thread support]),
+             AS_HELP_STRING([--disable-cppthreads],
+                            [Build without C++ std::thread support]),
              enablecppthreads=$enableval,
              enablecppthreads=yes)
 if (test "$enablecppthreads" != no) ; then
@@ -174,12 +192,19 @@ fi
 
 
 # -------------------------------------------------------------
-# LASPACK iterative solvers -- enabled by default
+# LASPACK iterative solvers -- enabled unless
+# --enable-strict-lgpl is specified
 # -------------------------------------------------------------
-CONFIGURE_LASPACK
-if (test $enablelaspack = yes); then
-  libmesh_contrib_INCLUDES="$LASPACK_INCLUDE $libmesh_contrib_INCLUDES"
+if (test $enablestrictlgpl = yes) ; then
+  AC_MSG_RESULT([<<< Laspack support is disabled, configure with --disable-strict-lgpl to enable it >>>])
+  enablelaspack=no;
+else
+  CONFIGURE_LASPACK
+  if (test $enablelaspack = yes); then
+    libmesh_contrib_INCLUDES="$LASPACK_INCLUDE $libmesh_contrib_INCLUDES"
+  fi
 fi
+
 AM_CONDITIONAL(LIBMESH_ENABLE_LASPACK, test x$enablelaspack = xyes)
 AC_CONFIG_FILES([contrib/laspack/Makefile])
 # -------------------------------------------------------------
@@ -187,12 +212,19 @@ AC_CONFIG_FILES([contrib/laspack/Makefile])
 
 
 # -------------------------------------------------------------
-# Space filling curves -- enabled by default
+# Space filling curves -- enabled unless
+# --enable-strict-lgpl is specified
 # -------------------------------------------------------------
-CONFIGURE_SFC
-if (test $enablesfc = yes); then
-  libmesh_contrib_INCLUDES="$SFC_INCLUDE $libmesh_contrib_INCLUDES"
+if (test $enablestrictlgpl = yes) ; then
+  AC_MSG_RESULT([<<< The space filling curves partitioner is disabled, configure with --disable-strict-lgpl to enable it >>>])
+  enablesfc=no;
+else
+  CONFIGURE_SFC
+  if (test $enablesfc = yes); then
+    libmesh_contrib_INCLUDES="$SFC_INCLUDE $libmesh_contrib_INCLUDES"
+  fi
 fi
+
 AM_CONDITIONAL(LIBMESH_ENABLE_SFC, test x$enablesfc = xyes)
 AC_CONFIG_FILES([contrib/sfcurves/Makefile])
 # -------------------------------------------------------------
@@ -217,8 +249,8 @@ AC_CONFIG_FILES([contrib/gzstream/Makefile])
 # Compressed Files with bzip2
 # -------------------------------------------------------------
 AC_ARG_ENABLE(bzip2,
-              AC_HELP_STRING([--enable-bzip2],
-                             [build with bzip2 compressed I/O suppport]),
+              AS_HELP_STRING([--disable-bzip2],
+                             [build without bzip2 compressed I/O suppport]),
               enablebz2=$enableval,
               enablebz2=$enableoptional)
 
@@ -241,8 +273,8 @@ fi
 # Compressed Files with xz
 # -------------------------------------------------------------
 AC_ARG_ENABLE(xz,
-              AC_HELP_STRING([--enable-xz],
-                             [build with xz compressed I/O suppport]),
+              AS_HELP_STRING([--disable-xz],
+                             [build without xz compressed I/O suppport]),
               enablexz=$enableval,
               enablexz=$enableoptional)
 
@@ -349,14 +381,33 @@ AC_CONFIG_FILES([contrib/tetgen/Makefile])
 
 
 # -------------------------------------------------------------
-# Triangle -- enabled by default (it is distributed in contrib)
+# Triangle -- enabled unless --enable-strict-lgpl is specified
 # -------------------------------------------------------------
-CONFIGURE_TRIANGLE
-if (test $enabletriangle = yes); then
-  libmesh_contrib_INCLUDES="$TRIANGLE_INCLUDE $libmesh_contrib_INCLUDES"
+if (test $enablestrictlgpl = yes) ; then
+  AC_MSG_RESULT([<<< Triangle meshing support is disabled, configure with --disable-strict-lgpl to enable it >>>])
+  enabletriangle=no;
+else
+  CONFIGURE_TRIANGLE
+  if (test $enabletriangle = yes); then
+    libmesh_contrib_INCLUDES="$TRIANGLE_INCLUDE $libmesh_contrib_INCLUDES"
+  fi
 fi
+
 AM_CONDITIONAL(LIBMESH_ENABLE_TRIANGLE, test x$enabletriangle = xyes)
 AC_CONFIG_FILES([contrib/triangle/Makefile])
+# -------------------------------------------------------------
+
+
+
+# -------------------------------------------------------------
+# Qhull -- enabled by default
+# -------------------------------------------------------------
+CONFIGURE_QHULL
+if (test $enableqhull = yes); then
+  libmesh_contrib_INCLUDES="$QHULL_INCLUDE $libmesh_contrib_INCLUDES"
+fi
+AM_CONDITIONAL(LIBMESH_ENABLE_QHULL, test x$enableqhull = xyes)
+AC_CONFIG_FILES([contrib/qhull/qhull/Makefile])
 # -------------------------------------------------------------
 
 
@@ -512,8 +563,8 @@ AC_CONFIG_FILES([contrib/fparser/extrasrc/Makefile])
 # cppunit C++ unit testing -- enabled by default
 # -------------------------------------------------------------
 AC_ARG_ENABLE(cppunit,
-             AC_HELP_STRING([--enable-cppunit],
-                            [Build with cppunit C++ unit testing support]),
+             AS_HELP_STRING([--disable-cppunit],
+                            [Build without cppunit C++ unit testing support]),
 		[case "${enableval}" in
 		  yes)  enablecppunit=yes ;;
 		   no)  enablecppunit=no ;;

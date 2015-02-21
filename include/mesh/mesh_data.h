@@ -230,7 +230,7 @@ public:
    * @returns the number of nodes for which this
    * \p MeshData has data stored.
    */
-  unsigned int n_node_data () const;
+  dof_id_type n_node_data () const;
 
   /**
    * Returns the \p MeshData::const_node_data_iterator which points
@@ -308,7 +308,7 @@ public:
    * @returns the number of elements for which this
    * \p MeshData has data stored.
    */
-  unsigned int n_elem_data () const;
+  dof_id_type n_elem_data () const;
 
   /**
    * Returns a \p MeshData::const_elem_data_iterators which points
@@ -645,27 +645,27 @@ protected:
  * and are @e not part of such a dataset.  The text in brackets
  * after the # are the corresponding class members names.
  *
- \verbatim
-
- -1                                                                              # beginning of dataset
- 2414                                                                              # type of dataset: data at mesh entities
- 1                                                                          # R.  1: unique number of dataset (dataset_label)
- STRUCTURAL MODE     1                                                               # R.  2: text describing content (dataset_name)
- 1                                                                          # R.  3: data belongs to: nodes, elements,...
- #        (dataset_location)
- Default Model                                                                       # R.  4: user-specified text (id_lines_1_to_5[0])
- I-DEAS Master Series                                                                # R.  5: user-specified text (id_lines_1_to_5[1])
- 18-AUG-2003 20:00:12    HPUX11_64     MAR2003                                       # R.  6: user-specified text (id_lines_1_to_5[2])
- MODE   1 FREQUENCY       501.25 Hz                                                  # R.  7: user-specified text (id_lines_1_to_5[3])
- STRUCTURAL MODE     1                                                               # R.  8: user-specified text (id_lines_1_to_5[4])
- 0         2         3         8         2         6                        # R.  9: (model_type) (analysis_type)
- #        (data_characteristic) (result_type)
- #        (data_type) (nvaldc)
- 0         0         0         0         0         1         0         0    # R. 10: analysis-specific data (record_10)
- 0         0                                                                # R. 11: analysis-specific data (record_11)
- 0.00000E+00  0.50125E+03  0.99192E+07  0.10000E+01  0.00000E+00  0.00000E+00      # R. 12: analysis-specific data (record_12)
- 0.00000E+00  0.00000E+00  0.00000E+00  0.00000E+00  0.00000E+00  0.00000E+00      # R. 13: analysis-specific data (record_13)
- \endverbatim
+ * \verbatim
+ *
+ * -1                                                                           # beginning of dataset
+ * 2414                                                                         # type of dataset: data at mesh entities
+ * 1                                                                            # R.  1: unique number of dataset (dataset_label)
+ * STRUCTURAL MODE     1                                                        # R.  2: text describing content (dataset_name)
+ * 1                                                                            # R.  3: data belongs to: nodes, elements,...
+ * #        (dataset_location)
+ * Default Model                                                                # R.  4: user-specified text (id_lines_1_to_5[0])
+ * I-DEAS Master Series                                                         # R.  5: user-specified text (id_lines_1_to_5[1])
+ * 18-AUG-2003 20:00:12    HPUX11_64     MAR2003                                # R.  6: user-specified text (id_lines_1_to_5[2])
+ * MODE   1 FREQUENCY       501.25 Hz                                           # R.  7: user-specified text (id_lines_1_to_5[3])
+ * STRUCTURAL MODE     1                                                        # R.  8: user-specified text (id_lines_1_to_5[4])
+ * 0         2         3         8         2         6                          # R.  9: (model_type) (analysis_type)
+ * #        (data_characteristic) (result_type)
+ * #        (data_type) (nvaldc)
+ * 0         0         0         0         0         1         0         0      # R. 10: analysis-specific data (record_10)
+ * 0         0                                                                  # R. 11: analysis-specific data (record_11)
+ * 0.00000E+00  0.50125E+03  0.99192E+07  0.10000E+01  0.00000E+00  0.00000E+00 # R. 12: analysis-specific data (record_12)
+ * 0.00000E+00  0.00000E+00  0.00000E+00  0.00000E+00  0.00000E+00  0.00000E+00 # R. 13: analysis-specific data (record_13)
+ * \endverbatim
  *
  * For more details we refer to the general description of the I-DEAS
  * universal file format.
@@ -879,10 +879,7 @@ const std::vector<Number>& MeshData::get_data (const Node* node) const
 
 #ifdef DEBUG
   if (pos == _node_data.end())
-    {
-      libMesh::err << "ERROR: No data for this node.  Use has_data() first!" << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: No data for this node.  Use has_data() first!");
 #endif
 
   return pos->second;
@@ -962,10 +959,7 @@ const std::vector<Number>& MeshData::get_data (const Elem* elem) const
 
 #ifdef DEBUG
   if (pos == _elem_data.end())
-    {
-      libMesh::err << "ERROR: No data for this element.  Use has_data() first!" << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: No data for this element.  Use has_data() first!");
 #endif
 
   return pos->second;

@@ -430,6 +430,12 @@ public:
    */
   static AutoPtr<DirichletBoundary> build_zero_dirichlet_boundary_object();
 
+  /**
+   * Setter for the flag determining if convergence should be
+   * checked after each solve.
+   */
+  void set_convergence_assertion_flag(bool flag);
+
   //----------- PUBLIC DATA MEMBERS -----------//
 
   /**
@@ -440,6 +446,25 @@ public:
    * training.
    */
   std::vector<Real> training_error_bounds;
+
+  /**
+   * We store an extra linear solver object which we can optionally
+   * use for solving all systems in which the system matrix is set
+   * to inner_product_matrix.
+   */
+  AutoPtr< LinearSolver<Number> > inner_product_solver;
+
+  /**
+   * We also need a pointer to store the original linear solver in
+   * case we switch to inner_product_solver.
+   */
+  LinearSolver<Number> *original_linear_solver;
+
+  /**
+   * Boolean flag to indicate whether we use inner_product_solver or
+   * not.
+   */
+  bool use_inner_product_solver;
 
   /**
    * The inner product matrix.
@@ -564,6 +589,13 @@ public:
    * with an "empty" (i.e. N=0) reduced basis space.
    */
   bool use_empty_rb_solve_in_greedy;
+
+  /**
+   * A boolean flag to indicate whether or not the Fq representor norms
+   * have already been computed --- used to make sure that we don't
+   * recompute them unnecessarily.
+   */
+  bool Fq_representor_innerprods_computed;
 
 protected:
 
@@ -716,14 +748,8 @@ protected:
   bool get_convergence_assertion_flag() const;
 
   /**
-   * Setter for the flag determining if convergence should be
-   * checked after each solve.
-   */
-  void set_convergence_assertion_flag(bool flag);
-
-  /**
    * Check if the linear solver reports convergence.
-   * libmesh_error() is called when that is not the case.
+   * Throw an error when that is not the case.
    */
   void check_convergence();
 
@@ -753,13 +779,6 @@ protected:
    * recompute them unnecessarily.
    */
   bool output_dual_innerprods_computed;
-
-  /**
-   * A boolean flag to indicate whether or not the Fq representor norms
-   * have already been computed --- used to make sure that we don't
-   * recompute them unnecessarily.
-   */
-  bool Fq_representor_innerprods_computed;
 
   /**
    * A boolean flag to indicate whether to check for proper convergence

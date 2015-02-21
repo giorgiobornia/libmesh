@@ -39,30 +39,27 @@ namespace libMesh
 /**
  * The \p InfPrism12 is an infinite element in 3D composed of 12 nodes.
  * It is numbered like this:
- \verbatim
- INFPRISM12:
- 5
- o
- :
- :
- :
- 11 o   :   o 10
- :  2:   :
- :   o   :        closer to infinity
- :  . .  :
- 3o   : . o9. :   o4
- |   :.  |  .:   |
- |   o   |   o   |
- |  . 8  |  7 .  |
- | .     |     . |
- |.      |      .|     base face
- o-------o-------o
- 0       6       1
- \endverbatim
-*/
-
-// ------------------------------------------------------------
-// InfPrism12 class definition
+ * \verbatim
+ * INFPRISM12:
+ *          5
+ *          o
+ *          :
+ *          :
+ *          :
+ *   11 o   :   o 10
+ *      :  2:   :
+ *      :   o   :        closer to infinity
+ *      :  . .  :
+ * 3o   : . o9. :   o4
+ *  |   :.  |  .:   |
+ *  |   o   |   o   |
+ *  |  . 8  |  7 .  |
+ *  | .     |     . |
+ *  |.      |      .|     base face
+ *  o-------o-------o
+ *  0       6       1
+ * \endverbatim
+ */
 class InfPrism12 : public InfPrism
 {
 public:
@@ -140,16 +137,6 @@ public:
   virtual void connectivity(const unsigned int sc,
                             const IOPackage iop,
                             std::vector<dof_id_type>& conn) const;
-
-  //   void tecplot_connectivity(const unsigned int sc,
-  //     std::vector<unsigned int>& conn) const;
-
-  //   void vtk_connectivity(const unsigned int,
-  // std::vector<unsigned int>*) const
-  //   { libmesh_error(); }
-
-  //   unsigned int vtk_element_type (const unsigned int) const
-  //   { return 13; }
 
   /**
    * @returns 2 for all \p n

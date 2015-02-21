@@ -30,9 +30,8 @@ namespace libMesh
 {
 
 template <class Base>
-DerivedRBEvaluation<Base>::DerivedRBEvaluation(const Parallel::Communicator &comm)
-  :
-  Base(comm),
+DerivedRBEvaluation<Base>::DerivedRBEvaluation (const Parallel::Communicator &comm_in) :
+  Base(comm_in),
   residual_type_flag(RESIDUAL_WRT_UBER)
 {}
 
@@ -48,7 +47,7 @@ void DerivedRBEvaluation<Base>::clear()
 template <class Base>
 unsigned int DerivedRBEvaluation<Base>::get_n_basis_functions() const
 {
-  return libmesh_cast_int<unsigned int>
+  return cast_int<unsigned int>
     (derived_basis_functions.size());
 }
 
@@ -78,10 +77,7 @@ void DerivedRBEvaluation<Base>::write_out_basis_functions(System& ,
           std::ofstream derived_bf_out(file_name.str().c_str());
 
           if ( !derived_bf_out.good() )
-            {
-              libMesh::err << "Error opening derived_bf" << i << ".dat" << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("Error opening derived_bf" << i << ".dat");
 
           derived_bf_out.precision(precision_level);
           for(unsigned int j=0; j<derived_basis_functions[i].size(); j++)
@@ -100,10 +96,8 @@ void DerivedRBEvaluation<Base>::write_out_basis_functions(System& ,
           derived_bf_size_out.open(bf_file_name.str().c_str());
         }
         if ( !derived_bf_size_out.good() )
-          {
-            libMesh::err << "Error opening derived_bf_size.dat" << std::endl;
-            libmesh_error();
-          }
+          libmesh_error_msg("Error opening derived_bf_size.dat");
+
         derived_bf_size_out << derived_basis_functions[0].size();
         derived_bf_size_out.close();
       }
@@ -125,10 +119,7 @@ void DerivedRBEvaluation<Base>::read_in_basis_functions(System& ,
     std::ifstream derived_bf_size_in(file_name.str().c_str());
 
     if ( !derived_bf_size_in.good() )
-      {
-        libMesh::err << "Error opening derived_bf_size.dat" << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("Error opening derived_bf_size.dat");
 
     derived_bf_size_in >> derived_bf_size;
     derived_bf_size_in.close();
@@ -148,10 +139,7 @@ void DerivedRBEvaluation<Base>::read_in_basis_functions(System& ,
           int stat_result = stat(file_name.str().c_str(), &stat_info);
 
           if (stat_result != 0)
-            {
-              libMesh::out << "File does not exist: " << file_name.str() << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("File does not exist: " << file_name.str());
         }
 
       derived_basis_functions[i].resize(derived_bf_size);

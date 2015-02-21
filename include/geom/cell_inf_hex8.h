@@ -39,25 +39,22 @@ namespace libMesh
 /**
  * The \p InfHex8 is an infinite element in 3D composed of 8 nodes.
  * It is numbered like this:
- \verbatim
- INFHEX8: 7        6                             z^  / y
- o        o    closer to infinity        | /
- :        |                              |/
- :        |                              +----> x
- 4    :   5    |
- o   :    o   |
- |   o....|...o 2
- |  .3    |  /
- | .      | /
- |.       |/       base face
- o--------o
- 0        1
-
- \endverbatim
-*/
-
-// ------------------------------------------------------------
-// InfHex8 class definition
+ * \verbatim
+ * INFHEX8: 7        6                             z^  / y
+ *          o        o    closer to infinity        | /
+ *          :        |                              |/
+ *          :        |                              +----> x
+ *     4    :   5    |
+ *      o   :    o   |
+ *      |   o....|...o 2
+ *      |  .3    |  /
+ *      | .      | /
+ *      |.       |/       base face
+ *      o--------o
+ *      0        1
+ *
+ * \endverbatim
+ */
 class InfHex8 : public InfHex
 {
 public:
@@ -127,7 +124,7 @@ public:
   /*   {  */
   /*     // side() returns an AutoPtr to a DofObject, hence need to cast to Elem* */
   /*     AutoPtr<DofObject> ap_dof_object(this->side(i)); */
-  /*     Elem* side = libmesh_cast_ptr<Elem*>(ap_dof_object.release()); */
+  /*     Elem* side = cast_ptr<Elem*>(ap_dof_object.release()); */
   /*     libmesh_assert(side); // libmesh_assert that the cast was successful */
 
   /*     AutoPtr<Elem> ap(side); */
@@ -144,13 +141,6 @@ public:
   virtual void connectivity(const unsigned int sc,
                             const IOPackage iop,
                             std::vector<dof_id_type>& conn) const;
-
-  //   void tecplot_connectivity(const unsigned int sc,
-  //     std::vector<unsigned int>& conn) const;
-
-  //   void vtk_connectivity(const unsigned int,
-  // std::vector<unsigned int>*) const
-  //   { libmesh_error(); }
 
   unsigned int vtk_element_type (const unsigned int) const
   { return 12; }

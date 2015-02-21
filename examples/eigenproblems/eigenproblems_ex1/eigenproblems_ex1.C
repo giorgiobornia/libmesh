@@ -63,25 +63,19 @@ int main (int argc, char** argv)
 
   // Skip SLEPc examples on a non-SLEPc libMesh build
 #ifndef LIBMESH_HAVE_SLEPC
-  libmesh_example_assert(false, "--enable-slepc");
+  libmesh_example_requires(false, "--enable-slepc");
 }
 
 #else
 
 #ifdef LIBMESH_DEFAULT_SINGLE_PRECISION
 // SLEPc currently gives us a nasty crash with Real==float
-libmesh_example_assert(false, "--disable-singleprecision");
+libmesh_example_requires(false, "--disable-singleprecision");
 #endif
 
 // Check for proper usage.
 if (argc < 3)
-  {
-    if (init.comm().rank() == 0)
-      std::cerr << "\nUsage: " << argv[0]
-                << " -n <number of eigen values>"
-                << std::endl;
-    libmesh_error();
-  }
+  libmesh_error_msg("\nUsage: " << argv[0] << " -n <number of eigen values>");
 
 // Tell the user what we are doing.
  else
@@ -98,7 +92,7 @@ if (argc < 3)
 const unsigned int nev = std::atoi(argv[2]);
 
 // Skip this 2D example if libMesh was compiled as 1D-only.
-libmesh_example_assert(2 <= LIBMESH_DIM, "2D support");
+libmesh_example_requires(2 <= LIBMESH_DIM, "2D support");
 
 // Create a mesh, with dimension to be overridden later, on the
 // default MPI communicator.
@@ -319,6 +313,9 @@ void assemble_mass(EquationSystems& es,
 
     } // end of element loop
 
+#else
+  // Avoid compiler warnings
+  libmesh_ignore(es);
 #endif // LIBMESH_HAVE_SLEPC
 
   /**

@@ -61,6 +61,7 @@ ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ac_cxx_rtti.m4 \
 	$(top_srcdir)/m4/all_static.m4 \
 	$(top_srcdir)/m4/ax_boost_base.m4 \
+	$(top_srcdir)/m4/ax_cxx_compile_stdcxx_11.m4 \
 	$(top_srcdir)/m4/ax_openmp.m4 $(top_srcdir)/m4/ax_pthread.m4 \
 	$(top_srcdir)/m4/ax_split_version.m4 \
 	$(top_srcdir)/m4/ax_tls.m4 $(top_srcdir)/m4/backtrace.m4 \
@@ -68,12 +69,12 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ac_cxx_rtti.m4 \
 	$(top_srcdir)/m4/config_environment.m4 \
 	$(top_srcdir)/m4/config_summary.m4 \
 	$(top_srcdir)/m4/coverage.m4 $(top_srcdir)/m4/cppunit.m4 \
-	$(top_srcdir)/m4/demangle.m4 $(top_srcdir)/m4/eigen.m4 \
-	$(top_srcdir)/m4/exodus.m4 $(top_srcdir)/m4/feexcept.m4 \
-	$(top_srcdir)/m4/fparser.m4 $(top_srcdir)/m4/glpk.m4 \
-	$(top_srcdir)/m4/gmv.m4 $(top_srcdir)/m4/gz.m4 \
-	$(top_srcdir)/m4/hdf5.m4 $(top_srcdir)/m4/laspack.m4 \
-	$(top_srcdir)/m4/libhilbert.m4 \
+	$(top_srcdir)/m4/cxx11.m4 $(top_srcdir)/m4/demangle.m4 \
+	$(top_srcdir)/m4/eigen.m4 $(top_srcdir)/m4/exodus.m4 \
+	$(top_srcdir)/m4/feexcept.m4 $(top_srcdir)/m4/fparser.m4 \
+	$(top_srcdir)/m4/glpk.m4 $(top_srcdir)/m4/gmv.m4 \
+	$(top_srcdir)/m4/gz.m4 $(top_srcdir)/m4/hdf5.m4 \
+	$(top_srcdir)/m4/laspack.m4 $(top_srcdir)/m4/libhilbert.m4 \
 	$(top_srcdir)/m4/libmesh_compiler_features.m4 \
 	$(top_srcdir)/m4/libmesh_core_features.m4 \
 	$(top_srcdir)/m4/libmesh_method.m4 \
@@ -86,7 +87,8 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ac_cxx_rtti.m4 \
 	$(top_srcdir)/m4/nemesis.m4 $(top_srcdir)/m4/netcdf.m4 \
 	$(top_srcdir)/m4/parmetis.m4 $(top_srcdir)/m4/petsc.m4 \
 	$(top_srcdir)/m4/precision.m4 \
-	$(top_srcdir)/m4/prefix_config.m4 $(top_srcdir)/m4/sfc.m4 \
+	$(top_srcdir)/m4/prefix_config.m4 $(top_srcdir)/m4/qhull.m4 \
+	$(top_srcdir)/m4/sanitize.m4 $(top_srcdir)/m4/sfc.m4 \
 	$(top_srcdir)/m4/slepc.m4 $(top_srcdir)/m4/sstream.m4 \
 	$(top_srcdir)/m4/strstream.m4 $(top_srcdir)/m4/tbb.m4 \
 	$(top_srcdir)/m4/tecio.m4 $(top_srcdir)/m4/tecplot.m4 \
@@ -275,6 +277,7 @@ GREP = @GREP@
 GXX_VERSION = @GXX_VERSION@
 GZSTREAM_INCLUDE = @GZSTREAM_INCLUDE@
 GZSTREAM_LIB = @GZSTREAM_LIB@
+HAVE_CXX11 = @HAVE_CXX11@
 HAVE_DOT = @HAVE_DOT@
 HAVE_GCOV_TOOLS = @HAVE_GCOV_TOOLS@
 HDF5_CFLAGS = @HDF5_CFLAGS@
@@ -361,6 +364,7 @@ PTHREAD_CC = @PTHREAD_CC@
 PTHREAD_CFLAGS = @PTHREAD_CFLAGS@
 PTHREAD_LIBS = @PTHREAD_LIBS@
 PWD = @PWD@
+QHULL_LIBS = @QHULL_LIBS@
 RANLIB = @RANLIB@
 RPATHFLAG = @RPATHFLAG@
 SED = @SED@
@@ -505,7 +509,7 @@ noinst_HEADERS = \
 # to a user.  Consider these the public interface of libMesh.
 # will get installed into '$(prefix)/include/libmesh'
 include_HEADERS = \
-        libmesh/libmesh_config.h \
+        libmesh_config.h \
         base/auto_ptr.h \
         base/dirichlet_boundaries.h \
         base/dof_map.h \
@@ -612,6 +616,7 @@ include_HEADERS = \
         geom/edge_edge4.h \
         geom/edge_inf_edge2.h \
         geom/elem.h \
+        geom/elem_cutter.h \
         geom/elem_quality.h \
         geom/elem_range.h \
         geom/elem_type.h \
@@ -625,6 +630,7 @@ include_HEADERS = \
         geom/face_quad9.h \
         geom/face_tri.h \
         geom/face_tri3.h \
+        geom/face_tri3_subdivision.h \
         geom/face_tri6.h \
         geom/node.h \
         geom/node_elem.h \
@@ -667,12 +673,14 @@ include_HEADERS = \
         mesh/mesh_smoother.h \
         mesh/mesh_smoother_laplace.h \
         mesh/mesh_smoother_vsmoother.h \
+        mesh/mesh_subdivision_support.h \
         mesh/mesh_tetgen_interface.h \
         mesh/mesh_tetgen_wrapper.h \
         mesh/mesh_tools.h \
         mesh/mesh_triangle_holes.h \
         mesh/mesh_triangle_interface.h \
         mesh/mesh_triangle_wrapper.h \
+        mesh/namebased_io.h \
         mesh/nemesis_io.h \
         mesh/off_io.h \
         mesh/parallel_mesh.h \
@@ -693,6 +701,8 @@ include_HEADERS = \
         mesh/xdr_shead.h \
         mesh/xdr_soln.h \
         numerics/analytic_function.h \
+        numerics/composite_fem_function.h \
+        numerics/composite_function.h \
         numerics/const_fem_function.h \
         numerics/const_function.h \
         numerics/coupling_matrix.h \
@@ -710,6 +720,7 @@ include_HEADERS = \
         numerics/fem_function_base.h \
         numerics/function_base.h \
         numerics/numeric_vector.h \
+        numerics/parsed_fem_function.h \
         numerics/parsed_function.h \
         numerics/petsc_macro.h \
         numerics/petsc_matrix.h \
@@ -761,8 +772,10 @@ include_HEADERS = \
         physics/fem_physics.h \
         quadrature/quadrature.h \
         quadrature/quadrature_clough.h \
+        quadrature/quadrature_composite.h \
         quadrature/quadrature_conical.h \
         quadrature/quadrature_gauss.h \
+        quadrature/quadrature_gauss_lobatto.h \
         quadrature/quadrature_gm.h \
         quadrature/quadrature_grid.h \
         quadrature/quadrature_jacobi.h \
@@ -817,7 +830,6 @@ include_HEADERS = \
         solvers/nonlinear_solver.h \
         solvers/petsc_auto_fieldsplit.h \
         solvers/petsc_diff_solver.h \
-        solvers/petsc_dm_nonlinear_solver.h \
         solvers/petsc_linear_solver.h \
         solvers/petsc_nonlinear_solver.h \
         solvers/petscdmlibmesh.h \
@@ -847,6 +859,8 @@ include_HEADERS = \
         systems/linear_implicit_system.h \
         systems/newmark_system.h \
         systems/nonlinear_implicit_system.h \
+        systems/parameter_accessor.h \
+        systems/parameter_pointer.h \
         systems/parameter_vector.h \
         systems/qoi_set.h \
         systems/sensitivity_data.h \
@@ -1292,13 +1306,27 @@ uninstall-am: uninstall-includeHEADERS
 dist-hook:
 	rm -rf $(distdir)/libmesh_config.h
 
+# In order for the standalone header tests to be consistent, you must
+# pass *both* CPPFLAGS_xxx and CXXFLAGS_xxx to the script, otherwise
+# you miss the very important -DDEBUG/-DNDEBUG conditional compilation
+# flags!
+#
+# Note that for "make test_headers" this DEFAULT_HEADERS_TO_TEST business allows us
+# to selectively choose individual HEADERS_TO_TEST in the test_installed_headers.sh script,
+# e.g.
+# $ make HEADERS_TO_TEST="numerics/parsed_function.h  base/auto_ptr.h" test_headers
 test_headers:
 	@echo " "
-	@echo "Checking for standalone headers in source tree $(top_builddir)/include ..."
+	@echo "Checking for standalone headers in source tree $(top_builddir)/include in OPT mode ..."
 	@echo " "
-	@CXX="$(CXX)" \
-	  HEADERS_TO_TEST="$(headers_to_test)" \
-	  test_CXXFLAGS="$(libmesh_contrib_INCLUDES) $(libmesh_optional_INCLUDES) $(CXXFLAGS_DEVEL) -I$(top_builddir)/include" \
+	@CXX="$(CXX)" DEFAULT_HEADERS_TO_TEST="$(headers_to_test)" \
+          test_CXXFLAGS="$(libmesh_contrib_INCLUDES) $(libmesh_optional_INCLUDES) $(CPPFLAGS_OPT) $(CXXFLAGS_OPT) -I$(top_builddir)/include" \
+	  $(top_srcdir)/contrib/bin/test_installed_headers.sh
+	@echo " "
+	@echo "Checking for standalone headers in source tree $(top_builddir)/include in DBG mode ..."
+	@echo " "
+	@CXX="$(CXX)" DEFAULT_HEADERS_TO_TEST="$(headers_to_test)" \
+	  test_CXXFLAGS="$(libmesh_contrib_INCLUDES) $(libmesh_optional_INCLUDES) $(CPPFLAGS_DBG) $(CXXFLAGS_DBG) -I$(top_builddir)/include" \
 	  $(top_srcdir)/contrib/bin/test_installed_headers.sh
 
 installcheck-local:

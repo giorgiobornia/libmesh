@@ -23,9 +23,14 @@
 // Local includes
 #include "libmesh/quadrature_clough.h"
 #include "libmesh/quadrature_gauss.h"
+#include "libmesh/quadrature_gm.h"
+#include "libmesh/quadrature_grid.h"
 #include "libmesh/quadrature_jacobi.h"
+#include "libmesh/quadrature_monomial.h"
 #include "libmesh/quadrature_simpson.h"
 #include "libmesh/quadrature_trap.h"
+#include "libmesh/quadrature_gauss_lobatto.h"
+#include "libmesh/quadrature_conical.h"
 #include "libmesh/string_to_enum.h"
 
 namespace libMesh
@@ -85,10 +90,10 @@ AutoPtr<QBase> QBase::build(const QuadratureType _qt,
       {
 
 #ifdef DEBUG
-        if (_order > TWENTYTHIRD)
+        if (_order > FORTYTHIRD)
           {
             libMesh::out << "WARNING: Jacobi(1,0) quadrature implemented" << std::endl
-                         << " up to TWENTYTHIRD order." << std::endl;
+                         << " up to FORTYTHIRD order." << std::endl;
           }
 
         if (_dim > 1)
@@ -106,10 +111,10 @@ AutoPtr<QBase> QBase::build(const QuadratureType _qt,
       {
 
 #ifdef DEBUG
-        if (_order > TWENTYTHIRD)
+        if (_order > FORTYTHIRD)
           {
             libMesh::out << "WARNING: Jacobi(2,0) quadrature implemented" << std::endl
-                         << " up to TWENTYTHIRD order." << std::endl;
+                         << " up to FORTYTHIRD order." << std::endl;
           }
 
         if (_dim > 1)
@@ -153,16 +158,42 @@ AutoPtr<QBase> QBase::build(const QuadratureType _qt,
         return ap;
       }
 
+    case QGRID:
+      {
+        AutoPtr<QBase> ap(new QGrid(_dim, _order));
+        return ap;
+      }
+
+    case QGRUNDMANN_MOLLER:
+      {
+        AutoPtr<QBase> ap(new QGrundmann_Moller(_dim, _order));
+        return ap;
+      }
+
+    case QMONOMIAL:
+      {
+        AutoPtr<QBase> ap(new QMonomial(_dim, _order));
+        return ap;
+      }
+
+    case QGAUSS_LOBATTO:
+      {
+        AutoPtr<QBase> ap(new QGaussLobatto(_dim, _order));
+        return ap;
+      }
+
+    case QCONICAL:
+      {
+        AutoPtr<QBase> ap(new QConical(_dim, _order));
+        return ap;
+      }
 
     default:
-      {
-        libMesh::err << "ERROR: Bad qt=" << _qt << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR: Bad qt=" << _qt);
     }
 
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   AutoPtr<QBase> ap(NULL);
   return ap;
 }

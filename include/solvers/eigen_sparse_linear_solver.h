@@ -52,7 +52,7 @@ public:
   /**
    *  Constructor. Initializes Eigen data structures
    */
-  EigenSparseLinearSolver (const libMesh::Parallel::Communicator &comm
+  EigenSparseLinearSolver (const libMesh::Parallel::Communicator &comm_in
                            LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
 
   /**
@@ -149,9 +149,11 @@ private:
 /*----------------------- functions ----------------------------------*/
 template <typename T>
 inline
-EigenSparseLinearSolver<T>::EigenSparseLinearSolver (const libMesh::Parallel::Communicator &comm) :
-  LinearSolver<T>(comm)
+EigenSparseLinearSolver<T>::EigenSparseLinearSolver(const libMesh::Parallel::Communicator &comm_in) :
+  LinearSolver<T>(comm_in)
 {
+  // The GMRES iterative solver isn't supported by Eigen, so use BICGSTAB instead
+  this->_solver_type = BICGSTAB;
 }
 
 
@@ -175,9 +177,7 @@ EigenSparseLinearSolver<T>::solve (SparseMatrix<T>&,
                                    const double,
                                    const unsigned int)
 {
-  libMesh::err << "ERROR: Eigen does not support a user-supplied preconditioner!"
-               << std::endl;
-  libmesh_error();
+  libmesh_error_msg("ERROR: Eigen does not support a user-supplied preconditioner!");
 
   std::pair<unsigned int, Real> p;
   return p;

@@ -24,6 +24,7 @@
 #include "libmesh/point_locator_base.h"
 #include "libmesh/point_locator_tree.h"
 #include "libmesh/point_locator_list.h"
+#include "libmesh/mesh_base.h"
 
 namespace libMesh
 {
@@ -35,9 +36,12 @@ namespace libMesh
 // PointLocatorBase methods
 PointLocatorBase::PointLocatorBase (const MeshBase& mesh,
                                     const PointLocatorBase* master) :
+  _verbose                 (false),
   _master                  (master),
   _mesh                    (mesh),
-  _initialized             (false)
+  _initialized             (false),
+  _use_close_to_point_tol  (false),
+  _close_to_point_tol      (TOLERANCE)
 {
 }
 
@@ -51,9 +55,14 @@ PointLocatorBase::~PointLocatorBase ()
 
 
 
+bool PointLocatorBase::initialized () const
+{
+  return this->_initialized;
+}
 
 
-AutoPtr<PointLocatorBase> PointLocatorBase::build (const PointLocatorType t,
+
+AutoPtr<PointLocatorBase> PointLocatorBase::build (PointLocatorType t,
                                                    const MeshBase& mesh,
                                                    const PointLocatorBase* master)
 {
@@ -61,28 +70,53 @@ AutoPtr<PointLocatorBase> PointLocatorBase::build (const PointLocatorType t,
     {
     case TREE:
       {
-        AutoPtr<PointLocatorBase> ap(new PointLocatorTree(mesh,
-                                                          master));
+        AutoPtr<PointLocatorBase> ap(new PointLocatorTree(mesh, /*Trees::NODES,*/ master));
+        return ap;
+      }
+
+    case TREE_ELEMENTS:
+      {
+        AutoPtr<PointLocatorBase> ap(new PointLocatorTree(mesh, Trees::ELEMENTS, master));
+        return ap;
+      }
+
+    case TREE_LOCAL_ELEMENTS:
+      {
+        AutoPtr<PointLocatorBase> ap(new PointLocatorTree(mesh, Trees::LOCAL_ELEMENTS, master));
         return ap;
       }
 
     case LIST:
       {
-        AutoPtr<PointLocatorBase> ap(new PointLocatorList(mesh,
-                                                          master));
+        AutoPtr<PointLocatorBase> ap(new PointLocatorList(mesh, master));
         return ap;
       }
 
     default:
-      {
-        libMesh::err << "ERROR: Bad PointLocatorType = " << t << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR: Bad PointLocatorType = " << t);
     }
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   AutoPtr<PointLocatorBase> ap(NULL);
   return ap;
+}
+
+const Elem* PointLocatorBase:: operator() (const Point& p, const std::set<subdomain_id_type> *allowed_subdomains) const
+{
+  return (*this)(p, _mesh.mesh_dimension(), allowed_subdomains);
+}
+
+void PointLocatorBase::set_close_to_point_tol (Real close_to_point_tol)
+{
+  _use_close_to_point_tol = true;
+  _close_to_point_tol = close_to_point_tol;
+}
+
+
+void PointLocatorBase::unset_close_to_point_tol ()
+{
+  _use_close_to_point_tol = false;
+  _close_to_point_tol = TOLERANCE;
 }
 
 } // namespace libMesh

@@ -36,8 +36,9 @@
 namespace libMesh
 {
 
-TransientRBEvaluation::TransientRBEvaluation (const Parallel::Communicator &comm) :
-  RBEvaluation(comm)
+TransientRBEvaluation::TransientRBEvaluation(const Parallel::Communicator &comm_in) :
+  RBEvaluation(comm_in),
+  _rb_solve_data_cached(false)
 {
   // Indicate that we need to compute the RB
   // inner product matrix in this case
@@ -83,9 +84,12 @@ void TransientRBEvaluation::resize_data_structures(const unsigned int Nmax,
   Parent::resize_data_structures(Nmax, resize_error_bound_data);
 
   RB_L2_matrix.resize(Nmax,Nmax);
+  RB_LHS_matrix.resize(Nmax,Nmax);
+  RB_RHS_matrix.resize(Nmax,Nmax);
+  RB_RHS_save.resize(Nmax);
 
   TransientRBThetaExpansion& trans_theta_expansion =
-    libmesh_cast_ref<TransientRBThetaExpansion&>(get_rb_theta_expansion());
+    cast_ref<TransientRBThetaExpansion&>(get_rb_theta_expansion());
   const unsigned int Q_m = trans_theta_expansion.get_n_M_terms();
   const unsigned int Q_a = trans_theta_expansion.get_n_A_terms();
   const unsigned int Q_f = trans_theta_expansion.get_n_F_terms();
@@ -165,16 +169,12 @@ Real TransientRBEvaluation::rb_solve(unsigned int N)
   START_LOG("rb_solve()", "TransientRBEvaluation");
 
   if(N > get_n_basis_functions())
-    {
-      libMesh::err << "ERROR: N cannot be larger than the number "
-                   << "of basis functions in rb_solve" << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: N cannot be larger than the number of basis functions in rb_solve");
 
   const RBParameters& mu = get_parameters();
 
   TransientRBThetaExpansion& trans_theta_expansion =
-    libmesh_cast_ref<TransientRBThetaExpansion&>(get_rb_theta_expansion());
+    cast_ref<TransientRBThetaExpansion&>(get_rb_theta_expansion());
   const unsigned int Q_m = trans_theta_expansion.get_n_M_terms();
   const unsigned int Q_a = trans_theta_expansion.get_n_A_terms();
   const unsigned int Q_f = trans_theta_expansion.get_n_F_terms();
@@ -203,10 +203,10 @@ Real TransientRBEvaluation::rb_solve(unsigned int N)
       RB_mass_matrix_N.add(trans_theta_expansion.eval_M_theta(q_m, mu), RB_M_q_m);
     }
 
-  DenseMatrix<Number> RB_LHS_matrix(N,N);
+  RB_LHS_matrix.resize(N,N);
   RB_LHS_matrix.zero();
 
-  DenseMatrix<Number> RB_RHS_matrix(N,N);
+  RB_RHS_matrix.resize(N,N);
   RB_RHS_matrix.zero();
 
   RB_LHS_matrix.add(1./dt, RB_mass_matrix_N);
@@ -219,6 +219,16 @@ Real TransientRBEvaluation::rb_solve(unsigned int N)
 
       RB_LHS_matrix.add(       euler_theta*trans_theta_expansion.eval_A_theta(q_a,mu), RB_Aq_a);
       RB_RHS_matrix.add( -(1.-euler_theta)*trans_theta_expansion.eval_A_theta(q_a,mu), RB_Aq_a);
+    }
+
+  // Add forcing terms
+  DenseVector<Number> RB_Fq_f;
+  RB_RHS_save.resize(N);
+  RB_RHS_save.zero();
+  for(unsigned int q_f=0; q_f<Q_f; q_f++)
+    {
+      RB_Fq_vector[q_f].get_principal_subvector(N, RB_Fq_f);
+      RB_RHS_save.add(trans_theta_expansion.eval_F_theta(q_f,mu), RB_Fq_f);
     }
 
   // Set system time level to 0
@@ -305,12 +315,7 @@ Real TransientRBEvaluation::rb_solve(unsigned int N)
       RB_RHS_matrix.vector_mult(RB_rhs, old_RB_solution);
 
       // Add forcing terms
-      DenseVector<Number> RB_Fq_f;
-      for(unsigned int q_f=0; q_f<Q_f; q_f++)
-        {
-          RB_Fq_vector[q_f].get_principal_subvector(N, RB_Fq_f);
-          RB_rhs.add(trans_theta_expansion.eval_F_theta(q_f,mu), RB_Fq_f);
-        }
+      RB_rhs.add(get_control(time_level), RB_RHS_save);
 
       if(N > 0)
         {
@@ -356,6 +361,8 @@ Real TransientRBEvaluation::rb_solve(unsigned int N)
 
   STOP_LOG("rb_solve()", "TransientRBEvaluation");
 
+  _rb_solve_data_cached = true ;
+
   if(evaluate_RB_error_bound) // Calculate the error bounds
     {
       return error_bound_all_k[n_time_steps];
@@ -365,6 +372,50 @@ Real TransientRBEvaluation::rb_solve(unsigned int N)
       // Just return -1. if we did not compute the error bound
       return -1.;
     }
+}
+
+Real TransientRBEvaluation::rb_solve_again()
+{
+  libmesh_assert(_rb_solve_data_cached);
+
+  const unsigned int n_time_steps = get_n_time_steps();
+  // Set system time level to 0
+  set_time_step(0);
+
+  // Resize/clear the solution vector
+  const unsigned int N = RB_RHS_save.size();
+  RB_solution.resize(N);
+
+  // Load the initial condition into RB_solution
+  if(N > 0)
+    RB_solution = RB_initial_condition_all_N[N-1];
+
+  // Resize/clear the old solution vector
+  old_RB_solution.resize(N);
+
+  // Initialize the RB rhs
+  DenseVector<Number> RB_rhs(N);
+  RB_rhs.zero();
+
+  for (unsigned int time_level=1; time_level<=n_time_steps; time_level++)
+    {
+      set_time_step(time_level);
+      old_RB_solution = RB_solution;
+
+      // Compute RB_rhs, as *RB_lhs_matrix x old_RB_solution
+      RB_RHS_matrix.vector_mult(RB_rhs, old_RB_solution);
+
+      // Add forcing terms
+      RB_rhs.add(get_control(time_level), RB_RHS_save);
+
+      if (N > 0)
+        RB_LHS_matrix.lu_solve(RB_rhs, RB_solution);
+    }
+
+  {
+    // Just return -1. We did not compute the error bound
+    return -1.;
+  }
 }
 
 Real TransientRBEvaluation::get_rb_solution_norm()
@@ -394,7 +445,7 @@ void TransientRBEvaluation::cache_online_residual_terms(const unsigned int N)
   const RBParameters mu = get_parameters();
 
   TransientRBThetaExpansion& trans_theta_expansion =
-    libmesh_cast_ref<TransientRBThetaExpansion&>(get_rb_theta_expansion());
+    cast_ref<TransientRBThetaExpansion&>(get_rb_theta_expansion());
   const unsigned int Q_m = trans_theta_expansion.get_n_M_terms();
   const unsigned int Q_a = trans_theta_expansion.get_n_A_terms();
   const unsigned int Q_f = trans_theta_expansion.get_n_F_terms();
@@ -520,6 +571,7 @@ Real TransientRBEvaluation::compute_residual_dual_norm(const unsigned int N)
 
   const Real dt          = get_delta_t();
   const Real euler_theta = get_euler_theta();
+  const Real current_control = get_control(get_time_step());
 
   DenseVector<Number> RB_u_euler_theta(N);
   DenseVector<Number> mass_coeffs(N);
@@ -530,10 +582,10 @@ Real TransientRBEvaluation::compute_residual_dual_norm(const unsigned int N)
       mass_coeffs(i) = -(RB_solution(i) - old_RB_solution(i))/dt;
     }
 
-  Number residual_norm_sq = cached_Fq_term;
+  Number residual_norm_sq = current_control*current_control*cached_Fq_term;
 
-  residual_norm_sq += RB_u_euler_theta.dot(cached_Fq_Aq_vector);
-  residual_norm_sq += mass_coeffs.dot(cached_Fq_Mq_vector);
+  residual_norm_sq += current_control*RB_u_euler_theta.dot(cached_Fq_Aq_vector);
+  residual_norm_sq += current_control*mass_coeffs.dot(cached_Fq_Mq_vector);
 
   for(unsigned int i=0; i<N; i++)
     for(unsigned int j=0; j<N; j++)
@@ -552,7 +604,6 @@ Real TransientRBEvaluation::compute_residual_dual_norm(const unsigned int N)
       // Sometimes this is negative due to rounding error,
       // but error is on the order of 1.e-10, so shouldn't
       // affect result
-      //    libmesh_error();
       residual_norm_sq = std::abs(residual_norm_sq);
     }
 
@@ -571,7 +622,7 @@ Real TransientRBEvaluation::uncached_compute_residual_dual_norm(const unsigned i
   const RBParameters& mu = get_parameters();
 
   TransientRBThetaExpansion& trans_theta_expansion =
-    libmesh_cast_ref<TransientRBThetaExpansion&>(get_rb_theta_expansion());
+    cast_ref<TransientRBThetaExpansion&>(get_rb_theta_expansion());
   const unsigned int Q_m = trans_theta_expansion.get_n_M_terms();
   const unsigned int Q_a = trans_theta_expansion.get_n_A_terms();
   const unsigned int Q_f = trans_theta_expansion.get_n_F_terms();
@@ -703,7 +754,6 @@ Real TransientRBEvaluation::uncached_compute_residual_dual_norm(const unsigned i
       // Sometimes this is negative due to rounding error,
       // but error is on the order of 1.e-10, so shouldn't
       // affect result
-      //    libmesh_error();
       residual_norm_sq = std::abs(residual_norm_sq);
     }
 
@@ -723,7 +773,7 @@ void TransientRBEvaluation::write_offline_data_to_files(const std::string& direc
   Parent::write_offline_data_to_files(directory_name);
 
   TransientRBThetaExpansion& trans_theta_expansion =
-    libmesh_cast_ref<TransientRBThetaExpansion&>(get_rb_theta_expansion());
+    cast_ref<TransientRBThetaExpansion&>(get_rb_theta_expansion());
   const unsigned int Q_m = trans_theta_expansion.get_n_M_terms();
   const unsigned int Q_a = trans_theta_expansion.get_n_A_terms();
   const unsigned int Q_f = trans_theta_expansion.get_n_F_terms();
@@ -878,7 +928,7 @@ void TransientRBEvaluation::read_offline_data_from_files(const std::string& dire
   Parent::read_offline_data_from_files(directory_name);
 
   TransientRBThetaExpansion& trans_theta_expansion =
-    libmesh_cast_ref<TransientRBThetaExpansion&>(get_rb_theta_expansion());
+    cast_ref<TransientRBThetaExpansion&>(get_rb_theta_expansion());
   const unsigned int Q_m = trans_theta_expansion.get_n_M_terms();
   const unsigned int Q_a = trans_theta_expansion.get_n_A_terms();
   const unsigned int Q_f = trans_theta_expansion.get_n_F_terms();

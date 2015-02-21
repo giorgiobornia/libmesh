@@ -21,6 +21,7 @@
 #include "libmesh/elem.h"
 #include "libmesh/fe.h"
 #include "libmesh/fe_interface.h"
+#include "libmesh/string_to_enum.h"
 
 namespace libMesh
 {
@@ -75,7 +76,11 @@ void hermite_nodal_soln(const Elem* elem,
 
 unsigned int hermite_n_dofs(const ElemType t, const Order o)
 {
-  libmesh_assert_greater (o, 2);
+#ifdef DEBUG
+  if (o < 3)
+    libmesh_error_msg("Error: Hermite elements require order>=3, but you asked for order=" << o);
+#endif
+
   // Piecewise (bi/tri)cubic C1 Hermite splines
   switch (t)
     {
@@ -98,18 +103,14 @@ unsigned int hermite_n_dofs(const ElemType t, const Order o)
     case HEX27:
       return ((o+1)*(o+1)*(o+1));
 
+    case INVALID_ELEM:
+      return 0;
+
     default:
-      {
-#ifdef DEBUG
-        libMesh::err << "ERROR: Bad ElemType = " << t
-                     << " for " << o << "th order approximation!"
-                     << std::endl;
-#endif
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
     }
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0;
 } // hermite_n_dofs()
 
@@ -140,7 +141,7 @@ unsigned int hermite_n_dofs_at_node(const ElemType t,
             return 0;
 
           default:
-            libmesh_error();
+            libmesh_error_msg("ERROR: Invalid node ID " << n << " selected for EDGE2/3!");
           }
       }
 
@@ -169,7 +170,7 @@ unsigned int hermite_n_dofs_at_node(const ElemType t,
             return 0;
 
           default:
-            libmesh_error();
+            libmesh_error_msg("ERROR: Invalid node ID " << n << " selected for QUAD4/8/9!");
           }
       }
 
@@ -218,24 +219,18 @@ unsigned int hermite_n_dofs_at_node(const ElemType t,
             return 0;
 
           default:
-            libmesh_error();
+            libmesh_error_msg("ERROR: Invalid node ID " << n << " selected for HEX8/20/27!");
           }
       }
 
-    default:
-      {
-#ifdef DEBUG
-        libMesh::err << "ERROR: Bad ElemType = " << t
-                     << " for " << o << "th order approximation!"
-                     << std::endl;
-#endif
-        libmesh_error();
-      }
+    case INVALID_ELEM:
+      return 0;
 
+    default:
+      libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
     }
 
-  libmesh_error();
-
+  libmesh_error_msg("We'll never get here!");
   return 0;
 } // hermite_n_dofs_at_node()
 
@@ -264,19 +259,14 @@ unsigned int hermite_n_dofs_per_elem(const ElemType t,
     case HEX27:
       return ((o-3)*(o-3)*(o-3));
 
+    case INVALID_ELEM:
+      return 0;
+
     default:
-      {
-#ifdef DEBUG
-        libMesh::err << "ERROR: Bad ElemType = " << t
-                     << " for " << o << "th order approximation!"
-                     << std::endl;
-#endif
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
     }
 
-  // Will never get here...
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0;
 } // hermite_n_dofs_per_elem()
 

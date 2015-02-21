@@ -50,7 +50,7 @@ int main(int argc, char** argv)
 
   GetPot cl(argc, argv);
 
-  int dim = -1;
+  unsigned char dim = -1;
   if (!cl.search("--dim"))
     {
       libMesh::err << "No --dim argument found!" << std::endl;
@@ -146,7 +146,7 @@ int main(int argc, char** argv)
     {
       Elem *elem = *el;
       unsigned int n_sides = elem->n_sides();
-      for (unsigned int s=0; s != n_sides; ++s)
+      for (unsigned short s=0; s != n_sides; ++s)
         {
           if (elem->neighbor(s))
             continue;
@@ -168,10 +168,10 @@ int main(int argc, char** argv)
               n(2) > minnormal(2) && n(2) < maxnormal(2))
             {
               if (matcholdbcid &&
-                  mesh.boundary_info->boundary_id(elem, s) != oldbcid)
+                  mesh.get_boundary_info().boundary_id(elem, s) != oldbcid)
                 continue;
-              mesh.boundary_info->remove_side(elem, s);
-              mesh.boundary_info->add_side(elem, s, bcid);
+              mesh.get_boundary_info().remove_side(elem, s);
+              mesh.get_boundary_info().add_side(elem, s, bcid);
               //libMesh::out << "Set element " << elem->id() << " side " << s <<
               //                " to boundary " << bcid << std::endl;
             }

@@ -124,7 +124,7 @@ AutoPtr<Elem> InfPrism6::build_side (const unsigned int i,
             return ap;
           }
         default:
-          libmesh_error();
+          libmesh_error_msg("Invalid side i = " << i);
         }
     }
 
@@ -184,19 +184,16 @@ AutoPtr<Elem> InfPrism6::build_side (const unsigned int i,
           }
 
         default:
-          {
-            libmesh_error();
-          }
+          libmesh_error_msg("Invalid side i = " << i);
         }
 
       face->subdomain_id() = this->subdomain_id();
       return face;
     }
 
-
-  // We will never get here...  Look at the code above.
-  libmesh_error();
-  AutoPtr<Elem> ap(NULL);  return ap;
+  libmesh_error_msg("We'll never get here!");
+  AutoPtr<Elem> ap(NULL);
+  return ap;
 }
 
 
@@ -226,22 +223,22 @@ bool InfPrism6::contains_point (const Point& p, Real tol) const
    * this infinite element.  Therefore if this fails,
    * fall back to the FEInterface::inverse_map()
    */
-  const Point origin (this->origin());
+  const Point my_origin (this->origin());
 
   /*
    * determine the minimal distance of the base from the origin
    * use size_sq(), it is faster than size() and produces
    * the same behavior
    */
-  const Real min_distance_sq = std::min((Point(this->point(0)-origin)).size_sq(),
-                                        std::min((Point(this->point(1)-origin)).size_sq(),
-                                                 (Point(this->point(2)-origin)).size_sq()));
+  const Real min_distance_sq = std::min((Point(this->point(0)-my_origin)).size_sq(),
+                                        std::min((Point(this->point(1)-my_origin)).size_sq(),
+                                                 (Point(this->point(2)-my_origin)).size_sq()));
 
   /*
    * work with 1% allowable deviation.  We can still fall
    * back to the InfFE::inverse_map()
    */
-  const Real conservative_p_dist_sq = 1.01 * (Point(p-origin).size_sq());
+  const Real conservative_p_dist_sq = 1.01 * (Point(p-my_origin).size_sq());
 
 
   if (conservative_p_dist_sq < min_distance_sq)
@@ -298,10 +295,8 @@ void InfPrism6::connectivity(const unsigned int libmesh_dbg_var(sc),
       }
 
     default:
-      libmesh_error();
+      libmesh_error_msg("Unsupported IO package " << iop);
     }
-
-  libmesh_error();
 }
 
 

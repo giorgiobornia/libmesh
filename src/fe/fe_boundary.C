@@ -44,9 +44,7 @@ namespace libMesh
                              const std::vector<Point>* const,           \
                              const std::vector<Real>* const)            \
   {                                                                     \
-    libMesh::err << "ERROR: This method makes no sense for low-D elements!" \
-                 << std::endl;                                          \
-    libmesh_error();                                                    \
+    libmesh_error_msg("ERROR: This method makes no sense for low-D elements!"); \
   }
 
 #define SIDEMAP_ERROR(_dim, _type, _func)                               \
@@ -57,9 +55,7 @@ namespace libMesh
                              const std::vector<Point>&,                 \
                              std::vector<Point>&)                       \
   {                                                                     \
-    libMesh::err << "ERROR: This method makes no sense for low-D elements!" \
-                 << std::endl;                                          \
-    libmesh_error();                                                    \
+    libmesh_error_msg("ERROR: This method makes no sense for low-D elements!"); \
   }
 
 #define FACE_EDGE_SHAPE_ERROR(_dim, _func)                              \
@@ -67,9 +63,7 @@ namespace libMesh
   void FEMap::_func<_dim>(const std::vector<Point>&,                    \
                           const Elem* )                                 \
   {                                                                     \
-    libMesh::err << "ERROR: This method makes no sense for low-D elements!" \
-                 << std::endl;                                          \
-    libmesh_error();                                                    \
+    libmesh_error_msg("ERROR: This method makes no sense for low-D elements!"); \
   }
 
 
@@ -358,7 +352,7 @@ void FE<Dim,T>::side_map (const Elem* elem,
     }
 
   const unsigned int n_points =
-    libmesh_cast_int<unsigned int>(reference_side_points.size());
+    cast_int<unsigned int>(reference_side_points.size());
   reference_points.resize(n_points);
   for (unsigned int i = 0; i < n_points; i++)
     reference_points[i].zero();
@@ -399,7 +393,7 @@ void FEMap::init_face_shape_functions(const std::vector<Point>& qp,
   const ElemType mapping_elem_type (side->type());
 
   // The number of quadrature points.
-  const unsigned int n_qp = libmesh_cast_int<unsigned int>(qp.size());
+  const unsigned int n_qp = cast_int<unsigned int>(qp.size());
 
   const unsigned int n_mapping_shape_functions =
     FE<Dim,LAGRANGE>::n_shape_functions (mapping_elem_type,
@@ -488,7 +482,7 @@ void FEMap::init_edge_shape_functions(const std::vector<Point>& qp,
   const ElemType mapping_elem_type (edge->type());
 
   // The number of quadrature points.
-  const unsigned int n_qp = libmesh_cast_int<unsigned int>(qp.size());
+  const unsigned int n_qp = cast_int<unsigned int>(qp.size());
 
   const unsigned int n_mapping_shape_functions =
     FE<Dim,LAGRANGE>::n_shape_functions (mapping_elem_type,
@@ -535,7 +529,7 @@ void FEMap::compute_face_map(int dim, const std::vector<Real>& qw,
   START_LOG("compute_face_map()", "FEMap");
 
   // The number of quadrature points.
-  const unsigned int n_qp = libmesh_cast_int<unsigned int>(qw.size());
+  const unsigned int n_qp = cast_int<unsigned int>(qw.size());
 
   switch (dim)
     {
@@ -795,8 +789,7 @@ void FEMap::compute_face_map(int dim, const std::vector<Real>& qw,
 
 
     default:
-      libmesh_error();
-
+      libmesh_error_msg("Invalid dimension dim = " << dim);
     }
   STOP_LOG("compute_face_map()", "FEMap");
 }
@@ -824,7 +817,7 @@ void FEMap::compute_edge_map(int dim,
   START_LOG("compute_edge_map()", "FEMap");
 
   // The number of quadrature points.
-  const unsigned int n_qp = libmesh_cast_int<unsigned int>(qw.size());
+  const unsigned int n_qp = cast_int<unsigned int>(qw.size());
 
   // Resize the vectors to hold data at the quadrature points
   this->xyz.resize(n_qp);
@@ -960,6 +953,7 @@ template void FE<2,SZABAB>::reinit(Elem const*, unsigned int, Real, const std::v
 template void FE<2,SZABAB>::side_map(Elem const*, Elem const*, const unsigned int, const std::vector<Point>&, std::vector<Point>&);
 template void FE<2,SZABAB>::edge_reinit(Elem const*, unsigned int, Real, const std::vector<Point>* const, const std::vector<Real>* const);
 #endif
+template void FE<2,SUBDIVISION>::reinit(Elem const*, unsigned int, Real, const std::vector<Point>* const, const std::vector<Real>* const);
 template void FE<2,XYZ>::reinit(Elem const*, unsigned int, Real, const std::vector<Point>* const, const std::vector<Real>* const);
 template void FE<2,XYZ>::side_map(Elem const*, Elem const*, const unsigned int, const std::vector<Point>&, std::vector<Point>&);
 template void FE<2,XYZ>::edge_reinit(Elem const*, unsigned int, Real, const std::vector<Point>* const, const std::vector<Real>* const);

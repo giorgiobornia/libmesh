@@ -39,39 +39,36 @@ namespace libMesh
 /**
  * The \p InfHex16 is an infinite element in 3D composed of 16 nodes.
  * It is numbered like this:
- \verbatim
- INFHEX16:   7              14             6
- o              o              o      closer to infinity
- :              :              |
- :              :              |
- :              :              |
- 15    :              :        13    |
- o    :              :         o    |
- :    :              :         |    |
- :    :              :         |    |
- :    :              :         |    |
- 4    :    :    12        :    5    |    |
- o    :    :    o         :    o    |    |
- |    :    :    |         :    |    |    |
- |    :    :    |         :    |    |    |
- |    :    :    |         :10  |    |    |
- |    :   3o....|.........o....|....|....o
- |    :   .     |              |    |   / 2
- |    :  .      |              |    |  /
- |    : .       |              |    | /
- |    :.        |              |    |/
- |  11o         |              |    o           base face
- |   .          |              |   / 9
- |  .           |              |  /
- | .            |              | /
- |.             |              |/
- o--------------o--------------o
- 0              8              1
- \endverbatim
-*/
-
-// ------------------------------------------------------------
-// InfHex16 class definition
+ * \verbatim
+ * INFHEX16:   7              14             6
+ *             o              o              o      closer to infinity
+ *             :              :              |
+ *             :              :              |
+ *             :              :              |
+ *       15    :              :        13    |
+ *        o    :              :         o    |
+ *        :    :              :         |    |
+ *        :    :              :         |    |
+ *        :    :              :         |    |
+ *   4    :    :    12        :    5    |    |
+ *   o    :    :    o         :    o    |    |
+ *   |    :    :    |         :    |    |    |
+ *   |    :    :    |         :    |    |    |
+ *   |    :    :    |         :10  |    |    |
+ *   |    :   3o....|.........o....|....|....o
+ *   |    :   .     |              |    |   / 2
+ *   |    :  .      |              |    |  /
+ *   |    : .       |              |    | /
+ *   |    :.        |              |    |/
+ *   |  11o         |              |    o           base face
+ *   |   .          |              |   / 9
+ *   |  .           |              |  /
+ *   | .            |              | /
+ *   |.             |              |/
+ *   o--------------o--------------o
+ *   0              8              1
+ * \endverbatim
+ */
 class InfHex16 : public InfHex
 {
 public:
@@ -149,13 +146,6 @@ public:
   virtual void connectivity(const unsigned int sc,
                             const IOPackage iop,
                             std::vector<dof_id_type>& conn) const;
-
-  //   void tecplot_connectivity(const unsigned int sc,
-  //     std::vector<unsigned int>& conn) const;
-
-  //   void vtk_connectivity(const unsigned int,
-  // std::vector<unsigned int>*) const
-  //   { libmesh_error(); }
 
   unsigned int vtk_element_type (const unsigned int) const
   { return 12; }

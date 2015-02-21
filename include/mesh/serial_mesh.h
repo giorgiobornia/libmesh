@@ -54,8 +54,8 @@ public:
    * changed by mesh generation/loading) later.
    */
   explicit
-  SerialMesh (const Parallel::Communicator &comm,
-              unsigned int dim=1);
+  SerialMesh (const Parallel::Communicator &comm_in,
+              unsigned char dim=1);
 
 #ifndef LIBMESH_DISABLE_COMMWORLD
   /**
@@ -64,7 +64,7 @@ public:
    * changed by mesh generation/loading) later.
    */
   explicit
-  SerialMesh (unsigned int dim=1);
+  SerialMesh (unsigned char dim=1);
 #endif
 
 
@@ -102,27 +102,27 @@ public:
   virtual void renumber_nodes_and_elements ();
 
   virtual dof_id_type n_nodes () const
-  { return libmesh_cast_int<dof_id_type>(_nodes.size()); }
+  { return cast_int<dof_id_type>(_nodes.size()); }
 
   virtual dof_id_type parallel_n_nodes () const
-  { return libmesh_cast_int<dof_id_type>(_nodes.size()); }
+  { return cast_int<dof_id_type>(_nodes.size()); }
 
   virtual dof_id_type max_node_id () const
-  { return libmesh_cast_int<dof_id_type>(_nodes.size()); }
+  { return cast_int<dof_id_type>(_nodes.size()); }
 
   virtual void reserve_nodes (const dof_id_type nn)
   { _nodes.reserve (nn); }
 
   virtual dof_id_type n_elem () const
-  { return libmesh_cast_int<dof_id_type>(_elements.size()); }
+  { return cast_int<dof_id_type>(_elements.size()); }
 
   virtual dof_id_type parallel_n_elem () const
-  { return libmesh_cast_int<dof_id_type>(_elements.size()); }
+  { return cast_int<dof_id_type>(_elements.size()); }
 
   virtual dof_id_type n_active_elem () const;
 
   virtual dof_id_type max_elem_id ()  const
-  { return libmesh_cast_int<dof_id_type>(_elements.size()); }
+  { return cast_int<dof_id_type>(_elements.size()); }
 
   virtual void reserve_elem (const dof_id_type ne) { _elements.reserve (ne); }
 
@@ -245,6 +245,12 @@ public:
   element_iterator local_elements_begin ();
   element_iterator local_elements_end   ();
 
+  element_iterator semilocal_elements_begin ();
+  element_iterator semilocal_elements_end   ();
+
+  element_iterator facelocal_elements_begin ();
+  element_iterator facelocal_elements_end   ();
+
   element_iterator not_local_elements_begin ();
   element_iterator not_local_elements_end   ();
 
@@ -313,6 +319,12 @@ public:
 
   const_element_iterator local_elements_begin () const;
   const_element_iterator local_elements_end   () const;
+
+  const_element_iterator semilocal_elements_begin () const;
+  const_element_iterator semilocal_elements_end   () const;
+
+  const_element_iterator facelocal_elements_begin () const;
+  const_element_iterator facelocal_elements_end   () const;
 
   const_element_iterator not_local_elements_begin () const;
   const_element_iterator not_local_elements_end   () const;

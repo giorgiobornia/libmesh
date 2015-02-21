@@ -15,7 +15,7 @@
 /* License along with this library; if not, write to the Free Software */
 /* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  U$ */
 
-// <h1>Adjoints Example 1 - Laplace Equation in the L-Shaped Domain with Adjoint based mesh refinement</h1>
+// <h1>Adjoints Example 1 - Laplace Equation in the L-Shaped Domain with Adjoint based error estimation</h1>
 //
 // This example solves the Laplace equation on the classic "L-shaped"
 // domain with adaptive mesh refinement. The exact
@@ -206,7 +206,7 @@ int main (int argc, char** argv)
 
   // Skip adaptive examples on a non-adaptive libMesh build
 #ifndef LIBMESH_ENABLE_AMR
-  libmesh_example_assert(false, "--enable-amr");
+  libmesh_example_requires(false, "--enable-amr");
 #else
 
   std::cout << "Started " << argv[0] << std::endl;
@@ -215,12 +215,7 @@ int main (int argc, char** argv)
   {
     std::ifstream i("general.in");
     if (!i)
-      {
-        std::cerr << '[' << init.comm().rank()
-                  << "] Can't find general.in; exiting early."
-                  << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg('[' << init.comm().rank() << "] Can't find general.in; exiting early.");
   }
   GetPot infile("general.in");
 
@@ -229,7 +224,7 @@ int main (int argc, char** argv)
   param.read(infile);
 
   // Skip this default-2D example if libMesh was compiled as 1D-only.
-  libmesh_example_assert(2 <= LIBMESH_DIM, "2D support");
+  libmesh_example_requires(2 <= LIBMESH_DIM, "2D support");
 
   // Create a mesh, with dimension to be overridden later, distributed
   // across the default MPI communicator.

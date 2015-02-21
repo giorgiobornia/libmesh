@@ -51,12 +51,10 @@ PointLocatorList::PointLocatorList (const MeshBase& mesh,
 
 
 
-
 PointLocatorList::~PointLocatorList ()
 {
   this->clear ();
 }
-
 
 
 
@@ -79,22 +77,15 @@ void PointLocatorList::clear ()
 
 
 
-
-
 void PointLocatorList::init ()
 {
   libmesh_assert (!this->_list);
 
   if (this->_initialized)
-    {
-      libMesh::err << "ERROR: Already initialized!  Will ignore this call..."
-                   << std::endl;
-    }
+    libMesh::err << "ERROR: Already initialized!  Will ignore this call..." << std::endl;
 
   else
-
     {
-
       if (this->_master == NULL)
         {
           START_LOG("init(no master)", "PointLocatorList");
@@ -111,9 +102,6 @@ void PointLocatorList::init ()
           // fill our list with the centroids and element
           // pointers of the mesh.  For this use the handy
           // element iterators.
-          //   const_active_elem_iterator       el (this->_mesh.elements_begin());
-          //   const const_active_elem_iterator end(this->_mesh.elements_end());
-
           MeshBase::const_element_iterator       el  = _mesh.active_elements_begin();
           const MeshBase::const_element_iterator end = _mesh.active_elements_end();
 
@@ -124,7 +112,6 @@ void PointLocatorList::init ()
         }
 
       else
-
         {
           // We are _not_ the master.  Let our _list point to
           // the master's list.  But for this we first transform
@@ -132,20 +119,14 @@ void PointLocatorList::init ()
           // (this should also beware of a bad master pointer?).
           // And make sure the master @e has a list!
           const PointLocatorList* my_master =
-            libmesh_cast_ptr<const PointLocatorList*>(this->_master);
+            cast_ptr<const PointLocatorList*>(this->_master);
 
           if (my_master->initialized())
             this->_list = my_master->_list;
           else
-            {
-              libMesh::err << "ERROR: Initialize master first, then servants!"
-                           << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Initialize master first, then servants!");
         }
-
     }
-
 
   // ready for take-off
   this->_initialized = true;
@@ -153,9 +134,8 @@ void PointLocatorList::init ()
 
 
 
-
-
-const Elem* PointLocatorList::operator() (const Point& p) const
+const Elem* PointLocatorList::operator() (const Point& p, const unsigned int elem_dim,
+                                          const std::set<subdomain_id_type> *allowed_subdomains) const
 {
   libmesh_assert (this->_initialized);
 
@@ -180,44 +160,77 @@ const Elem* PointLocatorList::operator() (const Point& p) const
   // here to avoid repeated calls to std::sqrt(), which is
   // pretty expensive.
   {
+    // Make sure the mesh has elements of dimension elem_dim
+    if( _mesh.elem_dimensions().find(elem_dim) == _mesh.elem_dimensions().end() )
+      {
+        libMesh::err << "ERROR: There are no elements of dimension " << elem_dim
+                     << " in the mesh to find!" << std::endl;
+        libmesh_error();
+      }
+
     std::vector<std::pair<Point, const Elem *> >& my_list = *(this->_list);
 
-    Real              last_distance_sq = Point(my_list[0].first -p).size_sq();
+    Real              last_distance_sq = std::numeric_limits<Real>::max();
     const Elem *      last_elem        = NULL;
     const std::size_t max_index        = my_list.size();
 
-
-    for (std::size_t n=1; n<max_index; n++)
+    for (std::size_t n=0; n<max_index; n++)
       {
-        const Real current_distance_sq = Point(my_list[n].first -p).size_sq();
-
-        if (current_distance_sq < last_distance_sq)
+        // Only consider elements in the allowed_subdomains list, if it exists
+        if ( (!allowed_subdomains ||
+              allowed_subdomains->count(my_list[n].second->subdomain_id())) &&
+             my_list[n].second->dim() == elem_dim )
           {
-            last_distance_sq = current_distance_sq;
-            last_elem        = my_list[n].second;
+            const Real current_distance_sq = Point(my_list[n].first -p).size_sq();
+
+            if (current_distance_sq < last_distance_sq)
+              {
+                last_distance_sq = current_distance_sq;
+                last_elem        = my_list[n].second;
+              }
           }
       }
 
     // If we found an element, it should be active
     libmesh_assert (!last_elem || last_elem->active());
 
+    // If we found an element and have a restriction list, they better match
+    libmesh_assert (!last_elem || !allowed_subdomains || allowed_subdomains->count(last_elem->subdomain_id()));
+
     STOP_LOG("operator()", "PointLocatorList");
 
     // return the element
-    return (last_elem);
+    return last_elem;
   }
-
 }
 
-void PointLocatorList::enable_out_of_mesh_mode (void)
+
+
+void PointLocatorList::enable_out_of_mesh_mode ()
 {
-  /* This functionality is not yet implemented for PointLocatorList.  */
+  // This functionality is not yet implemented for PointLocatorList.
   libmesh_not_implemented();
 }
 
-void PointLocatorList::disable_out_of_mesh_mode (void)
+
+
+void PointLocatorList::disable_out_of_mesh_mode ()
 {
-  /* This functionality is not yet implemented for PointLocatorList.  */
+  // This functionality is not yet implemented for PointLocatorList.
+  libmesh_not_implemented();
+}
+
+
+void PointLocatorList::set_close_to_point_tol (Real /*close_to_point_tol*/)
+{
+  // This functionality is not yet implemented for PointLocatorList.
+  libmesh_not_implemented();
+}
+
+
+void PointLocatorList::unset_close_to_point_tol ()
+{
+  // This functionality is not yet implemented for PointLocatorList.
   libmesh_not_implemented();
 }
 

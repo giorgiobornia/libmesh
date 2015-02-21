@@ -25,31 +25,40 @@
 
 // Local includes
 #include "libmesh/dense_vector.h"
+#include "libmesh/vector_value.h"
 #include "libmesh/point.h"
 
 // FParser includes
-#include "fparser.hh"
+#include "libmesh/fparser_ad.hh"
 
 // C++ includes
 #include <algorithm> // std::find
 #include <cmath>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <string>
 
 namespace libMesh {
 
-template <typename Output=Number>
+template <typename Output=Number, typename OutputGradient=Gradient>
 class ParsedFunction : public FunctionBase<Output>
 {
 public:
   explicit
   ParsedFunction (const std::string& expression, const std::vector<std::string>* additional_vars=NULL,
-                  const std::vector<Output>* initial_vals=NULL)
-    : _expression(expression)
-      // Size the spacetime vector to account for space, time, and any additional
-      // variables passed
-      //_spacetime(LIBMESH_DIM+1 + (additional_vars ? additional_vars->size() : 0)),
+                  const std::vector<Output>* initial_vals=NULL) :
+    _expression (expression),
+    _spacetime (LIBMESH_DIM+1 + (additional_vars ?
+                                 additional_vars->size() : 0)),
+    _valid_derivatives (true),
+    _additional_vars (additional_vars ? *additional_vars :
+                      std::vector<std::string>()),
+    _initial_vals (initial_vals ? *initial_vals :
+                   std::vector<Output>())
+    // Size the spacetime vector to account for space, time, and any additional
+    // variables passed
+    //_spacetime(LIBMESH_DIM+1 + (additional_vars ? additional_vars->size() : 0)),
   {
     std::string variables = "x";
 #if LIBMESH_DIM > 1
@@ -60,18 +69,11 @@ public:
 #endif
     variables += ",t";
 
-    _spacetime.resize(LIBMESH_DIM+1 + (additional_vars ? additional_vars->size() : 0));
-
     // If additional vars were passed, append them to the string
     // that we send to the function parser. Also add them to the
     // end of our spacetime vector
     if (additional_vars)
       {
-        if (initial_vals)
-          std::copy(initial_vals->begin(), initial_vals->end(), std::back_inserter(_initial_vals));
-
-        std::copy(additional_vars->begin(), additional_vars->end(), std::back_inserter(_additional_vars));
-
         for (unsigned int i=0; i < additional_vars->size(); ++i)
           {
             variables += "," + (*additional_vars)[i];
@@ -108,14 +110,49 @@ public:
                             std::string::npos : end - nextstart);
 
         // fparser can crash on empty expressions
-        libmesh_assert(!subexpression.empty());
+        if (subexpression.empty())
+          libmesh_error_msg("ERROR: FunctionParser is unable to parse empty expression.\n");
 
         // Parse (and optimize if possible) the subexpression.
         // Add some basic constants, to Real precision.
-        FunctionParserBase<Output> fp;
+        FunctionParserADBase<Output> fp;
+        fp.AddConstant("NaN", std::numeric_limits<Real>::quiet_NaN());
         fp.AddConstant("pi", std::acos(Real(-1)));
         fp.AddConstant("e", std::exp(Real(1)));
-        fp.Parse(subexpression, variables);
+        if (fp.Parse(subexpression, variables) != -1) // -1 for success
+          libmesh_error_msg("ERROR: FunctionParser is unable to parse expression: " << subexpression << '\n' << fp.ErrorMsg());
+
+        // use of derivatives is optional. suppress error output on the console
+        // use the has_derivatives() method to check if AutoDiff was successful.
+        fp.silenceAutoDiffErrors();
+
+        // generate derivatives through automatic differentiation
+        FunctionParserADBase<Output> dx_fp(fp);
+        if (dx_fp.AutoDiff("x") != -1) // -1 for success
+          _valid_derivatives = false;
+        dx_fp.Optimize();
+        dx_parsers.push_back(dx_fp);
+#if LIBMESH_DIM > 1
+        FunctionParserADBase<Output> dy_fp(fp);
+        if (dy_fp.AutoDiff("y") != -1) // -1 for success
+          _valid_derivatives = false;
+        dy_fp.Optimize();
+        dy_parsers.push_back(dy_fp);
+#endif
+#if LIBMESH_DIM > 2
+        FunctionParserADBase<Output> dz_fp(fp);
+        if (dz_fp.AutoDiff("z") != -1) // -1 for success
+          _valid_derivatives = false;
+        dz_fp.Optimize();
+        dz_parsers.push_back(dz_fp);
+#endif
+        FunctionParserADBase<Output> dt_fp(fp);
+        if (dt_fp.AutoDiff("t") != -1) // -1 for success
+          _valid_derivatives = false;
+        dt_fp.Optimize();
+        dt_parsers.push_back(dt_fp);
+
+        // now optimise original function (after derivatives are taken)
         fp.Optimize();
         parsers.push_back(fp);
 
@@ -131,32 +168,42 @@ public:
   virtual Output operator() (const Point& p,
                              const Real time = 0)
   {
-    _spacetime[0] = p(0);
+    set_spacetime(p, time);
+    return eval(parsers[0], "f", 0);
+  }
+
+  // Query if the automatic derivative generation was successful
+  virtual bool has_derivatives() { return _valid_derivatives; }
+
+  virtual Output dot(const Point& p,
+                     const Real time = 0)
+  {
+    set_spacetime(p, time);
+    return eval(dt_parsers[0], "df/dt", 0);
+  }
+
+  virtual OutputGradient gradient(const Point& p,
+                                  const Real time = 0)
+  {
+    OutputGradient grad;
+    set_spacetime(p, time);
+
+    grad(0) = eval(dx_parsers[0], "df/dx", 0);
 #if LIBMESH_DIM > 1
-    _spacetime[1] = p(1);
+    grad(1) = eval(dy_parsers[0], "df/dy", 0);
 #endif
 #if LIBMESH_DIM > 2
-    _spacetime[2] = p(2);
+    grad(2) = eval(dz_parsers[0], "df/dz", 0);
 #endif
-    _spacetime[LIBMESH_DIM] = time;
 
-    // The remaining locations in _spacetime are currently fixed at construction
-    // but could potentially be made dynamic
-    return parsers[0].Eval(&_spacetime[0]);
+    return grad;
   }
 
   virtual void operator() (const Point& p,
                            const Real time,
                            DenseVector<Output>& output)
   {
-    _spacetime[0] = p(0);
-#if LIBMESH_DIM > 1
-    _spacetime[1] = p(1);
-#endif
-#if LIBMESH_DIM > 2
-    _spacetime[2] = p(2);
-#endif
-    _spacetime[LIBMESH_DIM] = time;
+    set_spacetime(p, time);
 
     unsigned int size = output.size();
 
@@ -165,7 +212,7 @@ public:
     // The remaining locations in _spacetime are currently fixed at construction
     // but could potentially be made dynamic
     for (unsigned int i=0; i != size; ++i)
-      output(i) = parsers[i].Eval(&_spacetime[0]);
+      output(i) = eval(parsers[i], "f", i);
   }
 
   /**
@@ -176,20 +223,13 @@ public:
                             const Point& p,
                             Real time)
   {
-    _spacetime[0] = p(0);
-#if LIBMESH_DIM > 1
-    _spacetime[1] = p(1);
-#endif
-#if LIBMESH_DIM > 2
-    _spacetime[2] = p(2);
-#endif
-    _spacetime[LIBMESH_DIM] = time;
-
+    set_spacetime(p, time);
     libmesh_assert_less (i, parsers.size());
 
     // The remaining locations in _spacetime are currently fixed at construction
     // but could potentially be made dynamic
-    return parsers[i].Eval(&_spacetime[0]);
+    libmesh_assert_less(i, parsers.size());
+    return eval(parsers[i], "f", i);
   }
 
   /**
@@ -201,10 +241,7 @@ public:
       std::find(_additional_vars.begin(), _additional_vars.end(), variable_name);
 
     if (it == _additional_vars.end())
-      {
-        libMesh::err << "ERROR: Requested variable not found in parsed function\n" << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR: Requested variable not found in parsed function");
 
     // Iterator Arithmetic (How far from the end of the array is our target address?)
     return _spacetime[_spacetime.size() - (_additional_vars.end() - it)];
@@ -217,9 +254,89 @@ public:
   }
 
 private:
+  // Set the _spacetime argument vector
+  void set_spacetime(const Point& p,
+                     const Real time = 0)
+  {
+    _spacetime[0] = p(0);
+#if LIBMESH_DIM > 1
+    _spacetime[1] = p(1);
+#endif
+#if LIBMESH_DIM > 2
+    _spacetime[2] = p(2);
+#endif
+    _spacetime[LIBMESH_DIM] = time;
+
+    // The remaining locations in _spacetime are currently fixed at construction
+    // but could potentially be made dynamic
+  }
+
+  // Evaluate the ith FunctionParser and check the result
+  inline Output eval(FunctionParserADBase<Output> & parser,
+                     const std::string & libmesh_dbg_var(function_name),
+                     unsigned int libmesh_dbg_var(component_idx))
+  {
+#ifndef NDEBUG
+    Output result = parser.Eval(&_spacetime[0]);
+    int error_code = parser.EvalError();
+    if (error_code)
+      {
+        libMesh::err << "ERROR: FunctionParser is unable to evaluate component "
+                     << component_idx
+                     << " of expression '"
+                     << function_name
+                     << "' with arguments:\n";
+        for (unsigned int j=0; j<_spacetime.size(); ++j)
+          libMesh::err << '\t' << _spacetime[j] << '\n';
+        libMesh::err << '\n';
+
+        // Currently no API to report error messages, we'll do it manually
+        std::string error_message = "Reason: ";
+
+        switch (error_code)
+          {
+          case 1:
+            error_message += "Division by zero";
+            break;
+          case 2:
+            error_message += "Square Root error (negative value)";
+            break;
+          case 3:
+            error_message += "Log error (negative value)";
+            break;
+          case 4:
+            error_message += "Trigonometric error (asin or acos of illegal value)";
+            break;
+          case 5:
+            error_message += "Maximum recursion level reached";
+            break;
+          default:
+            error_message += "Unknown";
+            break;
+          }
+        libmesh_error_msg(error_message);
+      }
+
+    return result;
+#else
+    return parser.Eval(&_spacetime[0]);
+#endif
+  }
+
   std::string _expression;
-  std::vector<FunctionParserBase<Output> > parsers;
+  std::vector<FunctionParserADBase<Output> > parsers;
   std::vector<Output> _spacetime;
+
+  // derivative functions
+  std::vector<FunctionParserADBase<Output> > dx_parsers;
+#if LIBMESH_DIM > 1
+  std::vector<FunctionParserADBase<Output> > dy_parsers;
+#endif
+#if LIBMESH_DIM > 2
+  std::vector<FunctionParserADBase<Output> > dz_parsers;
+#endif
+  std::vector<FunctionParserADBase<Output> > dt_parsers;
+  bool _valid_derivatives;
 
   // Additional variables/values that can be parsed and handled by the function parser
   std::vector<std::string> _additional_vars;
@@ -236,7 +353,7 @@ private:
 namespace libMesh {
 
 
-template <typename Output>
+template <typename Output=Number>
 class ParsedFunction : public FunctionBase<Output>
 {
 public:

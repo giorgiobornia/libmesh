@@ -68,14 +68,14 @@ public:
    *  Dummy-Constructor. Dimension=0
    */
   explicit
-  PetscVector (const Parallel::Communicator &comm,
+  PetscVector (const Parallel::Communicator &comm_in,
                const ParallelType type = AUTOMATIC);
 
   /**
    * Constructor. Set dimension to \p n and initialize all elements with zero.
    */
   explicit
-  PetscVector (const Parallel::Communicator &comm,
+  PetscVector (const Parallel::Communicator &comm_in,
                const numeric_index_type n,
                const ParallelType type = AUTOMATIC);
 
@@ -83,7 +83,7 @@ public:
    * Constructor. Set local dimension to \p n_local, the global dimension
    * to \p n, and initialize all elements with zero.
    */
-  PetscVector (const Parallel::Communicator &comm,
+  PetscVector (const Parallel::Communicator &comm_in,
                const numeric_index_type n,
                const numeric_index_type n_local,
                const ParallelType type = AUTOMATIC);
@@ -93,7 +93,7 @@ public:
    * dimension to \p n, but additionally reserve memory for the
    * indices specified by the \p ghost argument.
    */
-  PetscVector (const Parallel::Communicator &comm,
+  PetscVector (const Parallel::Communicator &comm_in,
                const numeric_index_type N,
                const numeric_index_type n_local,
                const std::vector<numeric_index_type>& ghost,
@@ -107,7 +107,7 @@ public:
    * and to simply provide additional functionality with the PetscVector.
    */
   PetscVector(Vec v,
-              const Parallel::Communicator &comm
+              const Parallel::Communicator &comm_in
               LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
 
   /**
@@ -298,11 +298,12 @@ public:
   T operator() (const numeric_index_type i) const;
 
   /**
-   * Access multiple components at once.  Overloaded method that
-   * should be faster (probably much faster) than calling \p
-   * operator() individually for each index.
+   * Access multiple components at once.  \p values will *not* be
+   * reallocated; it should already have enough space.  Overloaded
+   * method that should be faster (probably much faster) than calling
+   * \p operator() individually for each index.
    */
-  virtual void get(const std::vector<numeric_index_type>& index, std::vector<T>& values) const;
+  virtual void get(const std::vector<numeric_index_type>& index, T* values) const;
 
   /**
    * Addition operator.
@@ -359,22 +360,17 @@ public:
   void add (const T a, const NumericVector<T>& v);
 
   /**
-   * \f$ U+=v \f$ where \p v is a std::vector<T>
-   * and you
-   * want to specify WHERE to add it
+   * We override two NumericVector<T>::add_vector() methods but don't
+   * want to hide the other defaults.
    */
-  void add_vector (const std::vector<T>& v,
-                   const std::vector<numeric_index_type>& dof_indices);
+  using NumericVector<T>::add_vector;
 
   /**
-   * \f$ U+=V \f$ where U and V are type
-   * \p NumericVector<T> and you
-   * want to specify WHERE to add
-   * the \p NumericVector<T> V
+   * \f$ U+=v \f$ where v is a pointer and each \p dof_indices[i]
+   * specifies where to add value \p v[i]
    */
-  void add_vector (const NumericVector<T>& V,
+  void add_vector (const T* v,
                    const std::vector<numeric_index_type>& dof_indices);
-
 
   /**
    * \f$U+=A*V\f$, add the product of a \p SparseMatrix \p A
@@ -382,15 +378,6 @@ public:
    */
   void add_vector (const NumericVector<T> &V,
                    const SparseMatrix<T> &A);
-
-  /**
-   * \f$U+=V \f$ where U and V are type
-   * DenseVector<T> and you
-   * want to specify WHERE to add
-   * the DenseVector<T> V
-   */
-  void add_vector (const DenseVector<T>& V,
-                   const std::vector<numeric_index_type>& dof_indices);
 
   /**
    * \f$U+=A^T*V\f$, add the product of the transpose
@@ -409,37 +396,17 @@ public:
                                        const SparseMatrix<T> &A_trans);
 
   /**
-   * \f$ U=v \f$ where v is a std::vector<T>
+   * We override one NumericVector<T>::insert() method but don't want
+   * to hide the other defaults
+   */
+  using NumericVector<T>::insert;
+
+  /**
+   * \f$ U=v \f$ where v is a \p T[] or T*
    * and you want to specify WHERE to insert it
    */
-  virtual void insert (const std::vector<T>& v,
+  virtual void insert (const T* v,
                        const std::vector<numeric_index_type>& dof_indices);
-
-  /**
-   * \f$U=V\f$, where U and V are type
-   * NumericVector<T> and you
-   * want to specify WHERE to insert
-   * the NumericVector<T> V
-   */
-  virtual void insert (const NumericVector<T>& V,
-                       const std::vector<numeric_index_type>& dof_indices);
-
-  /**
-   * \f$ U=V \f$ where V is type
-   * DenseVector<T> and you
-   * want to specify WHERE to insert it
-   */
-  virtual void insert (const DenseVector<T>& V,
-                       const std::vector<numeric_index_type>& dof_indices);
-
-  /**
-   * \f$ U=V \f$ where V is type
-   * DenseSubVector<T> and you
-   * want to specify WHERE to insert it
-   */
-  virtual void insert (const DenseSubVector<T>& V,
-                       const std::vector<numeric_index_type>& dof_indices);
-
 
   /**
    * Scale each element of the
@@ -631,8 +598,8 @@ private:
 
 template <typename T>
 inline
-PetscVector<T>::PetscVector (const Parallel::Communicator &comm, const ParallelType ptype)
-  : NumericVector<T>(comm, ptype),
+PetscVector<T>::PetscVector (const Parallel::Communicator &comm_in, const ParallelType ptype)
+  : NumericVector<T>(comm_in, ptype),
     _array_is_present(false),
     _first(0),
     _last(0),
@@ -648,10 +615,10 @@ PetscVector<T>::PetscVector (const Parallel::Communicator &comm, const ParallelT
 
 template <typename T>
 inline
-PetscVector<T>::PetscVector (const Parallel::Communicator &comm,
+PetscVector<T>::PetscVector (const Parallel::Communicator &comm_in,
                              const numeric_index_type n,
                              const ParallelType ptype)
-  : NumericVector<T>(comm, ptype),
+  : NumericVector<T>(comm_in, ptype),
     _array_is_present(false),
     _local_form(NULL),
     _values(NULL),
@@ -665,11 +632,11 @@ PetscVector<T>::PetscVector (const Parallel::Communicator &comm,
 
 template <typename T>
 inline
-PetscVector<T>::PetscVector (const Parallel::Communicator &comm,
+PetscVector<T>::PetscVector (const Parallel::Communicator &comm_in,
                              const numeric_index_type n,
                              const numeric_index_type n_local,
                              const ParallelType ptype)
-  : NumericVector<T>(comm, ptype),
+  : NumericVector<T>(comm_in, ptype),
     _array_is_present(false),
     _local_form(NULL),
     _values(NULL),
@@ -683,12 +650,12 @@ PetscVector<T>::PetscVector (const Parallel::Communicator &comm,
 
 template <typename T>
 inline
-PetscVector<T>::PetscVector (const Parallel::Communicator &comm,
+PetscVector<T>::PetscVector (const Parallel::Communicator &comm_in,
                              const numeric_index_type n,
                              const numeric_index_type n_local,
                              const std::vector<numeric_index_type>& ghost,
                              const ParallelType ptype)
-  : NumericVector<T>(comm, ptype),
+  : NumericVector<T>(comm_in, ptype),
     _array_is_present(false),
     _local_form(NULL),
     _values(NULL),
@@ -705,8 +672,8 @@ PetscVector<T>::PetscVector (const Parallel::Communicator &comm,
 template <typename T>
 inline
 PetscVector<T>::PetscVector (Vec v,
-                             const Parallel::Communicator &comm)
-  : NumericVector<T>(comm, AUTOMATIC),
+                             const Parallel::Communicator &comm_in)
+  : NumericVector<T>(comm_in, AUTOMATIC),
     _array_is_present(false),
     _local_form(NULL),
     _values(NULL),
@@ -851,7 +818,7 @@ void PetscVector<T>::init (const numeric_index_type n,
       LIBMESH_CHKERRABORT(ierr);
     }
   else
-    libmesh_error();
+    libmesh_error_msg("Unsupported type " << this->_type);
 
   this->_is_initialized = true;
   this->_is_closed = true;
@@ -943,7 +910,7 @@ void PetscVector<T>::init (const NumericVector<T>& other,
   if (this->initialized())
     this->clear();
 
-  const PetscVector<T>& v = libmesh_cast_ref<const PetscVector<T>&>(other);
+  const PetscVector<T>& v = cast_ref<const PetscVector<T>&>(other);
 
   // Other vector should restore array.
   if(v.initialized())
@@ -1236,9 +1203,7 @@ numeric_index_type PetscVector<T>::map_global_to_local_index (const numeric_inde
           error_message << "}\n";
         }
 
-      libMesh::err << error_message.str();
-
-      libmesh_error();
+      libmesh_error_msg(error_message.str());
     }
   libmesh_assert (it != _global_to_local_map.end());
 #endif
@@ -1269,12 +1234,11 @@ T PetscVector<T>::operator() (const numeric_index_type i) const
 
 template <typename T>
 inline
-void PetscVector<T>::get(const std::vector<numeric_index_type>& index, std::vector<T>& values) const
+void PetscVector<T>::get(const std::vector<numeric_index_type>& index, T* values) const
 {
   this->_get_array();
 
   const std::size_t num = index.size();
-  values.resize(num);
 
   for(std::size_t i=0; i<num; i++)
     {
@@ -1335,7 +1299,7 @@ void PetscVector<T>::swap (NumericVector<T> &other)
 {
   NumericVector<T>::swap(other);
 
-  PetscVector<T>& v = libmesh_cast_ref<PetscVector<T>&>(other);
+  PetscVector<T>& v = cast_ref<PetscVector<T>&>(other);
 
   std::swap(_vec, v._vec);
   std::swap(_destroy_vec_on_exit, v._destroy_vec_on_exit);
@@ -1375,7 +1339,6 @@ void PetscVector<T>::_get_array(void) const
         }
 
       { // cache ownership range
-        PetscErrorCode ierr=0;
         PetscInt petsc_first=0, petsc_last=0;
         ierr = VecGetOwnershipRange (_vec, &petsc_first, &petsc_last);
         LIBMESH_CHKERRABORT(ierr);
@@ -1417,6 +1380,19 @@ void PetscVector<T>::_restore_array(void) const
         }
       _array_is_present = false;
     }
+}
+
+
+#ifdef LIBMESH_HAVE_CXX11
+static_assert(sizeof(PetscInt) == sizeof(numeric_index_type),
+              "PETSc and libMesh integer sizes must match!");
+#endif
+
+
+inline
+PetscInt* numeric_petsc_cast(const numeric_index_type* p)
+{
+  return reinterpret_cast<PetscInt*>(const_cast<numeric_index_type*>(p));
 }
 
 } // namespace libMesh

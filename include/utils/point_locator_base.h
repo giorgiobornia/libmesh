@@ -51,13 +51,9 @@ class Elem;
  *
  * @author Daniel Dreyer, 2003
  */
-
-// ------------------------------------------------------------
-// PointLocatorBase class definition
 class PointLocatorBase : public ReferenceCountedObject<PointLocatorBase>
 {
 protected:
-
   /**
    * Constructor.  Protected so that this base class
    * cannot be explicitly instantiated.  Takes a master
@@ -66,9 +62,7 @@ protected:
   PointLocatorBase (const MeshBase& mesh,
                     const PointLocatorBase* master);
 
-
 public:
-
   /**
    * Destructor.
    */
@@ -80,7 +74,7 @@ public:
    * An \p AutoPtr<PointLocatorBase> is returned to prevent memory leak.
    * This way the user need not remember to delete the object.
    */
-  static AutoPtr<PointLocatorBase> build (const PointLocatorType t,
+  static AutoPtr<PointLocatorBase> build (PointLocatorType t,
                                           const MeshBase& mesh,
                                           const PointLocatorBase* master = NULL);
 
@@ -97,9 +91,23 @@ public:
 
   /**
    * Locates the element in which the point with global coordinates
-   * \p p is located.  Pure virtual.
+   * \p p is located. Optionally allows the user to restrict
+   * the subdomains searched. To restrict the search to element dimension other
+   * than _mesh.mesh_dimension(), use the more general form of this function
+   * (for mixed dimension meshes).
    */
-  virtual const Elem* operator() (const Point& p) const = 0;
+  const Elem* operator() (const Point& p, const std::set<subdomain_id_type> *allowed_subdomains = NULL ) const;
+
+  /**
+   * Locates the element in which the point with global coordinates
+   * \p p is located.  Pure virtual. Restricts the search to elements
+   * with dimension elem_dim. Optionally allows the user to restrict
+   * the subdomains searched. For the default elem_dim = _mesh.mesh_dimension(),
+   * use operator()(const Point& p, const std::set<subdomain_id_type> *allowed_subdomains)
+   * version of this function.
+   */
+  virtual const Elem* operator() (const Point& p, const unsigned int elem_dim,
+                                  const std::set<subdomain_id_type> *allowed_subdomains = NULL ) const = 0;
 
   /**
    * @returns \p true when this object is properly initialized
@@ -113,17 +121,33 @@ public:
    * return a NULL pointer instead of crashing.  Per default, this
    * mode is off.
    */
-  virtual void enable_out_of_mesh_mode (void) = 0;
+  virtual void enable_out_of_mesh_mode () = 0;
 
   /**
    * Disables out-of-mesh mode (default).  If asked to find a point
    * that is contained in no mesh at all, the point locator will now
    * crash.
    */
-  virtual void disable_out_of_mesh_mode (void) = 0;
+  virtual void disable_out_of_mesh_mode () = 0;
+
+  /**
+   * Set a tolerance to use when determining
+   * if a point is contained within the mesh.
+   */
+  virtual void set_close_to_point_tol(Real close_to_point_tol);
+
+  /**
+   * Specify that we do not want to use a user-specified tolerance to
+   * determine if a point is contained within the mesh.
+   */
+  virtual void unset_close_to_point_tol();
+
+  /**
+   * Boolean flag to indicate whether to print out extra info.
+   */
+  bool _verbose;
 
 protected:
-
   /**
    * Const pointer to our master, initialized to \p NULL if none
    * given.  When using multiple PointLocators, one can be assigned
@@ -141,16 +165,17 @@ protected:
    */
   bool _initialized;
 
+  /**
+   * \p true if we will use a user-specified tolerance for locating
+   * the element.
+   */
+  bool _use_close_to_point_tol;
+
+  /**
+   * The tolerance to use.
+   */
+  Real _close_to_point_tol;
 };
-
-
-// ------------------------------------------------------------
-// PointLocatorBase inline methods
-inline
-bool PointLocatorBase::initialized () const
-{
-  return (this->_initialized);
-}
 
 } // namespace libMesh
 

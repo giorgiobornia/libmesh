@@ -44,8 +44,8 @@ template <typename KeyType, typename IdxType>
 Sort<KeyType,IdxType>::Sort(const Parallel::Communicator &comm_in,
                             std::vector<KeyType>& d) :
   ParallelObject(comm_in),
-  _n_procs(comm_in.size()),
-  _proc_id(comm_in.rank()),
+  _n_procs(cast_int<processor_id_type>(comm_in.size())),
+  _proc_id(cast_int<processor_id_type>(comm_in.rank())),
   _bin_is_sorted(false),
   _data(d)
 {
@@ -63,7 +63,7 @@ void Sort<KeyType,IdxType>::sort()
   // Find the global data size.  The sorting
   // algorithms assume they have a range to
   // work with, so catch the degenerate cases here
-  IdxType global_data_size = libmesh_cast_int<IdxType>(_data.size());
+  IdxType global_data_size = cast_int<IdxType>(_data.size());
 
   this->comm().sum (global_data_size);
 

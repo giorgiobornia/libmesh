@@ -16,7 +16,6 @@
 /* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
 
 
-#include "libmesh/boundary_info.h"
 #include "libmesh/dirichlet_boundaries.h"
 #include "libmesh/dof_map.h"
 #include "libmesh/fe_base.h"
@@ -108,8 +107,6 @@ void CoupledSystem::init_data ()
 
   // Useful debugging options
   this->verify_analytic_jacobians = infile("verify_analytic_jacobians", 0.);
-  this->print_jacobians = infile("print_jacobians", false);
-  this->print_element_jacobians = infile("print_element_jacobians", false);
 
   // Set Dirichlet boundary conditions
   const boundary_id_type left_inlet_id = 0;
@@ -172,7 +169,7 @@ void CoupledSystem::init_data ()
 
 void CoupledSystem::init_context(DiffContext &context)
 {
-  FEMContext &c = libmesh_cast_ref<FEMContext&>(context);
+  FEMContext &c = cast_ref<FEMContext&>(context);
 
   // We should prerequest all the data
   // we will need to build the linear system.
@@ -194,14 +191,14 @@ void CoupledSystem::init_context(DiffContext &context)
 
   side_fe->get_JxW();
   side_fe->get_phi();
-  side_fe->get_dphi();
+  side_fe->get_xyz();
 }
 
 
 bool CoupledSystem::element_time_derivative (bool request_jacobian,
                                              DiffContext &context)
 {
-  FEMContext &c = libmesh_cast_ref<FEMContext&>(context);
+  FEMContext &c = cast_ref<FEMContext&>(context);
 
   // First we get some references to cell-specific data that
   // will be used to assemble the linear system.
@@ -328,12 +325,15 @@ bool CoupledSystem::element_time_derivative (bool request_jacobian,
 bool CoupledSystem::element_constraint (bool request_jacobian,
                                         DiffContext &context)
 {
-  FEMContext &c = libmesh_cast_ref<FEMContext&>(context);
+  FEMContext &c = cast_ref<FEMContext&>(context);
 
   // Here we define some references to cell-specific data that
   // will be used to assemble the linear system.
   FEBase* u_elem_fe = NULL;
   c.get_element_fe( u_var, u_elem_fe );
+
+  FEBase* p_elem_fe = NULL;
+  c.get_element_fe( p_var, p_elem_fe );
 
   // Element Jacobian * quadrature weight for interior integration
   const std::vector<Real> &JxW = u_elem_fe->get_JxW();
@@ -344,7 +344,7 @@ bool CoupledSystem::element_constraint (bool request_jacobian,
 
   // The pressure shape functions at interior
   // quadrature points.
-  const std::vector<std::vector<Real> >& psi = u_elem_fe->get_phi();
+  const std::vector<std::vector<Real> >& psi = p_elem_fe->get_phi();
 
   // The number of local degrees of freedom in each variable
   const unsigned int n_u_dofs = c.get_dof_indices(u_var).size();
@@ -427,11 +427,9 @@ Number CoupledFEMFunctionsx::operator()(const FEMContext& c, const Point& p,
       break;
 
     default:
-      {
-        std::cout<<"Wrong variable number"<<var<<" passed to CoupledFEMFunctionsx object ! Quitting !"<<std::endl;
-        libmesh_error();
-      }
-
+      libmesh_error_msg("Wrong variable number "                        \
+                        << var                                          \
+                        << " passed to CoupledFEMFunctionsx object! Quitting!");
     }
 
   return weight;
@@ -461,10 +459,9 @@ Number CoupledFEMFunctionsy::operator()(const FEMContext& c, const Point& p,
       break;
 
     default:
-      {
-        std::cout<<"Wrong variable number "<<var<<" passed to CoupledFEMFunctionsy object ! Quitting !"<<std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("Wrong variable number "                        \
+                        << var                                          \
+                        << " passed to CoupledFEMFunctionsy object! Quitting!");
     }
 
   return weight;

@@ -15,6 +15,7 @@ if LIBMESH_INSTALL_INTERNAL_BOOST
         boost/config/select_stdlib_config.hpp \
         boost/config/no_tr1/utility.hpp \
         boost/config/stdlib/libstdcpp3.hpp \
+        boost/config/stdlib/libcpp.hpp \
         boost/config/select_platform_config.hpp \
         boost/config/platform/macos.hpp \
         boost/config/platform/linux.hpp \
@@ -25,6 +26,7 @@ if LIBMESH_INSTALL_INTERNAL_BOOST
         boost/memory_order.hpp \
         boost/shared_ptr.hpp \
         boost/smart_ptr/shared_ptr.hpp \
+        boost/utility/addressof.hpp \
         boost/config/no_tr1/memory.hpp \
         boost/throw_exception.hpp \
         boost/exception/detail/attribute_noreturn.hpp \

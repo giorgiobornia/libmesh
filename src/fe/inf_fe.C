@@ -385,11 +385,11 @@ void InfFE<Dim,T_radial,T_map>::init_shape_functions(const Elem* inf_elem)
   // -----------------------------------------------------------------
   // fast access to some const int's for the radial data
   const unsigned int n_radial_mapping_sf =
-    libmesh_cast_int<unsigned int>(radial_map.size());
+    cast_int<unsigned int>(radial_map.size());
   const unsigned int n_radial_approx_sf  =
-    libmesh_cast_int<unsigned int>(mode.size());
+    cast_int<unsigned int>(mode.size());
   const unsigned int n_radial_qp         =
-    libmesh_cast_int<unsigned int>(som.size());
+    cast_int<unsigned int>(som.size());
 
 
   // -----------------------------------------------------------------
@@ -746,7 +746,7 @@ void InfFE<Dim,T_radial,T_map>::combine_base_radial(const Elem* inf_elem)
 
 
   const unsigned int n_base_mapping_sf =
-    libmesh_cast_int<unsigned int>(dist.size());
+    cast_int<unsigned int>(dist.size());
   const Point origin = inf_elem->origin();
 
   // for each new infinite element, compute the radial distances
@@ -793,7 +793,7 @@ void InfFE<Dim,T_radial,T_map>::combine_base_radial(const Elem* inf_elem)
         const unsigned int n_base_qp           = base_qrule->  n_points();
 
         const unsigned int n_total_mapping_sf  =
-          libmesh_cast_int<unsigned int>(radial_map.size()) * n_base_mapping_sf;
+          cast_int<unsigned int>(radial_map.size()) * n_base_mapping_sf;
 
         const unsigned int n_total_approx_sf   = Radial::n_dofs(fe_type.radial_order) *  base_fe->n_shape_functions();
 
@@ -870,9 +870,8 @@ void InfFE<Dim,T_radial,T_map>::combine_base_radial(const Elem* inf_elem)
         break;
       }
 
-
     default:
-      libmesh_error();
+      libmesh_error_msg("Unsupported Dim = " << Dim);
     }
 
 
@@ -880,7 +879,6 @@ void InfFE<Dim,T_radial,T_map>::combine_base_radial(const Elem* inf_elem)
    * Start logging the combination of radial and base parts
    */
   STOP_LOG("combine_base_radial()", "InfFE");
-
 }
 
 
@@ -892,8 +890,6 @@ template <unsigned int Dim, FEFamily T_radial, InfMapType T_map>
 void InfFE<Dim,T_radial,T_map>::compute_shape_functions(const Elem*, const std::vector<Point>&)
 {
   libmesh_assert(radial_qrule);
-
-
 
   // Start logging the overall computation of shape functions
   START_LOG("compute_shape_functions()", "InfFE");
@@ -990,19 +986,12 @@ void InfFE<Dim,T_radial,T_map>::compute_shape_functions(const Elem*, const std::
         break;
       }
 
-
-
     default:
-      {
-        libmesh_error();
-      }
+      libmesh_error_msg("Unsupported dim = " << dim);
     }
-
-
 
   // Stop logging the overall computation of shape functions
   STOP_LOG("compute_shape_functions()", "InfFE");
-
 }
 
 

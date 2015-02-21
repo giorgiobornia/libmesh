@@ -61,7 +61,7 @@ void FroIO::write (const std::string& fname)
       out_stream << the_mesh.n_elem()  << " "
                  << the_mesh.n_nodes() << " "
                  << "0 0 "
-                 << the_mesh.boundary_info->n_boundary_ids()  << " 1\n";
+                 << the_mesh.get_boundary_info().n_boundary_ids()  << " 1\n";
 
       // Write the nodes -- 1-based!
       for (unsigned int n=0; n<the_mesh.n_nodes(); n++)
@@ -80,12 +80,8 @@ void FroIO::write (const std::string& fname)
         {
           // .fro likes TRI3's
           if ((*it)->type() != TRI3)
-            {
-              libMesh::err << "ERROR:  .fro format only valid for triangles!\n"
-                           << "  writing of " << fname << " aborted.\n"
-                           << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR:  .fro format only valid for triangles!\n" \
+                              << "  writing of " << fname << " aborted.");
 
           out_stream << ++e << " \t";
 
@@ -103,13 +99,13 @@ void FroIO::write (const std::string& fname)
       // Write BCs.
       {
         const std::set<boundary_id_type>& bc_ids =
-          the_mesh.boundary_info->get_boundary_ids();
+          the_mesh.get_boundary_info().get_boundary_ids();
 
         std::vector<dof_id_type>        el;
         std::vector<unsigned short int> sl;
         std::vector<boundary_id_type>   il;
 
-        the_mesh.boundary_info->build_side_list (el, sl, il);
+        the_mesh.get_boundary_info().build_side_list (el, sl, il);
 
 
         // Map the boundary ids into [1,n_bc_ids],

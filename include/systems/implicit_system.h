@@ -146,8 +146,11 @@ public:
    * This is undefined in ImplicitSystem; subclasses each have their
    * own way of handling assembly.
    */
-  virtual void assembly(bool /* get_residual */ , bool /* get_jacobian */)
-  { libmesh_error(); }
+  virtual void assembly
+    (bool /* get_residual */,
+     bool /* get_jacobian */,
+     bool /* apply_heterogeneous_constraints */ = false)
+  { libmesh_not_implemented(); }
 
   /**
    * Residual parameter derivative function.
@@ -384,7 +387,7 @@ bool ImplicitSystem::have_matrix (const std::string& mat_name) const
 inline
 unsigned int ImplicitSystem::n_matrices () const
 {
-  return libmesh_cast_int<unsigned int>(_matrices.size());
+  return cast_int<unsigned int>(_matrices.size());
 }
 
 } // namespace libMesh

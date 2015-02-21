@@ -28,13 +28,14 @@
 #include "libmesh/enum_subset_solve_mode.h"
 #include "libmesh/enum_parallel_type.h"
 #include "libmesh/fe_type.h"
+#include "libmesh/fem_function_base.h"
 #include "libmesh/libmesh_common.h"
-#include "libmesh/tensor_value.h" // For point_hessian
+#include "libmesh/parallel_object.h"
 #include "libmesh/qoi_set.h"
 #include "libmesh/reference_counted_object.h"
+#include "libmesh/system_norm.h" // for implicit conversion
+#include "libmesh/tensor_value.h" // For point_hessian
 #include "libmesh/variable.h"
-#include "libmesh/fem_function_base.h"
-#include "libmesh/parallel_object.h"
 
 // C++ includes
 #include <cstddef>
@@ -46,7 +47,6 @@ namespace libMesh
 
 // Forward Declarations
 class System;
-class SystemNorm;
 class EquationSystems;
 class MeshBase;
 class Xdr;
@@ -204,7 +204,9 @@ public:
      * be called to compute derivatived of quantities of interest and
      * must be provided by the user in a derived class.
      */
-    virtual void qoi_derivative (const QoISet& qoi_indices) = 0;
+    virtual void qoi_derivative (const QoISet& qoi_indices,
+                                 bool include_liftfunc,
+                                 bool apply_constraints) = 0;
   };
 
 
@@ -245,6 +247,11 @@ public:
   virtual void reinit ();
 
   /**
+   * Reinitializes the constraints for this system.
+   */
+  virtual void reinit_constraints ();
+
+  /**
    * Update the local values to reflect the solution
    * on neighboring processors.
    */
@@ -270,7 +277,9 @@ public:
    * @e Can be overloaded in derived classes.
    */
   virtual void assemble_qoi_derivative
-  (const QoISet &qoi_indices = QoISet());
+  (const QoISet &qoi_indices = QoISet(),
+   bool include_liftfunc = true,
+   bool apply_constraints = true);
 
   /**
    * Calls residual parameter derivative function.
@@ -509,10 +518,14 @@ public:
    * element spaces with continuous derivatives.
    * If non-default \p Parameters are to be used, they can be provided
    * in the \p parameters argument.
+   *
+   * Constrain the new vector using the requested adjoint rather than
+   * primal constraints if is_adjoint is non-negative.
    */
   void project_vector (NumericVector<Number>& new_vector,
                        FunctionBase<Number> *f,
-                       FunctionBase<Gradient> *g = NULL) const;
+                       FunctionBase<Gradient> *g = NULL,
+                       int is_adjoint = -1) const;
 
   /**
    * Projects arbitrary functions onto a vector of degree of freedom
@@ -523,10 +536,14 @@ public:
    * element spaces with continuous derivatives.
    * If non-default \p Parameters are to be used, they can be provided
    * in the \p parameters argument.
+   *
+   * Constrain the new vector using the requested adjoint rather than
+   * primal constraints if is_adjoint is non-negative.
    */
   void project_vector (NumericVector<Number>& new_vector,
                        FEMFunctionBase<Number> *f,
-                       FEMFunctionBase<Gradient> *g = NULL) const;
+                       FEMFunctionBase<Gradient> *g = NULL,
+                       int is_adjoint = -1) const;
 
   /**
    * Projects arbitrary functions onto a vector of degree of freedom
@@ -535,6 +552,9 @@ public:
    * represented by function pointers.
    * A gradient \p gptr is only required/used for projecting onto
    * finite element spaces with continuous derivatives.
+   *
+   * Constrain the new vector using the requested adjoint rather than
+   * primal constraints if is_adjoint is non-negative.
    */
   void project_vector (Number fptr(const Point& p,
                                    const Parameters& parameters,
@@ -545,7 +565,8 @@ public:
                                      const std::string& sys_name,
                                      const std::string& unknown_name),
                        const Parameters& parameters,
-                       NumericVector<Number>& new_vector) const;
+                       NumericVector<Number>& new_vector,
+                       int is_adjoint = -1) const;
 
   /**
    * Projects arbitrary boundary functions onto a vector of degree of
@@ -603,12 +624,16 @@ public:
    * element spaces with continuous derivatives.
    * If non-default \p Parameters are to be used, they can be provided
    * in the \p parameters argument.
+   *
+   * Constrain the new vector using the requested adjoint rather than
+   * primal constraints if is_adjoint is non-negative.
    */
   void boundary_project_vector (const std::set<boundary_id_type> &b,
                                 const std::vector<unsigned int> &variables,
                                 NumericVector<Number>& new_vector,
                                 FunctionBase<Number> *f,
-                                FunctionBase<Gradient> *g = NULL) const;
+                                FunctionBase<Gradient> *g = NULL,
+                                int is_adjoint = -1) const;
 
   /**
    * Projects arbitrary boundary functions onto a vector of degree of
@@ -621,6 +646,9 @@ public:
    * represented by function pointers.
    * A gradient \p gptr is only required/used for projecting onto
    * finite element spaces with continuous derivatives.
+   *
+   * Constrain the new vector using the requested adjoint rather than
+   * primal constraints if is_adjoint is non-negative.
    */
   void boundary_project_vector (const std::set<boundary_id_type> &b,
                                 const std::vector<unsigned int> &variables,
@@ -633,7 +661,8 @@ public:
                                               const std::string& sys_name,
                                               const std::string& unknown_name),
                                 const Parameters& parameters,
-                                NumericVector<Number>& new_vector) const;
+                                NumericVector<Number>& new_vector,
+                                int is_adjoint = -1) const;
 
   /**
    * @returns the system number.
@@ -653,7 +682,7 @@ public:
    * Requires communication with all other processors.
    */
   void update_global_solution (std::vector<Number>& global_soln,
-                               const unsigned int dest_proc) const;
+                               const processor_id_type dest_proc) const;
 
   /**
    * @returns a constant reference to this systems's \p _mesh.
@@ -833,6 +862,25 @@ public:
    * @returns the name of a system vector, given a reference to that vector
    */
   const std::string & vector_name (const NumericVector<Number> & vec_reference) const;
+
+  /**
+   * Allows one to set the QoI index controlling whether the vector
+   * identified by vec_name represents a solution from the adjoint
+   * (qoi_num >= 0) or primal (qoi_num == -1) space.  This becomes
+   * significant if those spaces have differing heterogeneous
+   * Dirichlet constraints.
+   *
+   * qoi_num == -2 can be used to indicate a vector which should not
+   * be affected by constraints during projection operations.
+   */
+  void set_vector_as_adjoint (const std::string &vec_name, int qoi_num);
+
+  /**
+   * @returns the int describing whether the vector identified by
+   * vec_name represents a solution from an adjoint (non-negative) or
+   * the primal (-1) space.
+   */
+  int vector_is_adjoint (const std::string &vec_name) const;
 
   /**
    * Allows one to set the boolean controlling whether the vector
@@ -1154,8 +1202,8 @@ public:
    * norm (e.g. L2, L_INF, H1)
    */
   Real calculate_norm(const NumericVector<Number>& v,
-                      unsigned int var = 0,
-                      FEMNormType norm_type = L2) const;
+                      unsigned int var,
+                      FEMNormType norm_type) const;
 
   /**
    * @returns a norm of the vector \p v, using \p component_norm and \p
@@ -1257,7 +1305,7 @@ public:
    * allows for optimization for the multiple vector case by only communicating
    * the metadata once.
    */
-  dof_id_type write_serialized_vectors (Xdr &io,
+  std::size_t write_serialized_vectors (Xdr &io,
                                         const std::vector<const NumericVector<Number>*> &vectors) const;
 
   /**
@@ -1332,7 +1380,9 @@ public:
    */
   void attach_QOI_derivative (void fptr(EquationSystems& es,
                                         const std::string& name,
-                                        const QoISet& qoi_indices));
+                                        const QoISet& qoi_indices,
+                                        bool include_liftfunc,
+                                        bool apply_constraints));
 
   /**
    * Register a user object for evaluating derivatives of a quantity
@@ -1369,7 +1419,10 @@ public:
    * Calls user's attached quantity of interest derivative function,
    * or is overloaded by the user in derived classes.
    */
-  virtual void user_QOI_derivative (const QoISet& qoi_indices);
+  virtual void user_QOI_derivative
+  (const QoISet &qoi_indices = QoISet(),
+   bool include_liftfunc = true,
+   bool apply_constraints = true);
 
   /**
    * Re-update the local values when the mesh has changed.
@@ -1571,16 +1624,24 @@ protected:
   /**
    * Projects the vector defined on the old mesh onto the
    * new mesh.
+   *
+   * Constrain the new vector using the requested adjoint rather than
+   * primal constraints if is_adjoint is non-negative.
    */
-  void project_vector (NumericVector<Number>&) const;
+  void project_vector (NumericVector<Number>&,
+                       int is_adjoint = -1) const;
 
   /**
    * Projects the vector defined on the old mesh onto the
    * new mesh. The original vector is unchanged and the new vector
    * is passed through the second argument.
+   *
+   * Constrain the new vector using the requested adjoint rather than
+   * primal constraints if is_adjoint is non-negative.
    */
   void project_vector (const NumericVector<Number>&,
-                       NumericVector<Number>&) const;
+                       NumericVector<Number>&,
+                       int is_adjoint = -1) const;
 
 private:
   /**
@@ -1661,7 +1722,7 @@ private:
    * Returns the number of values written
    */
   template <typename iterator_type>
-  dof_id_type write_serialized_blocked_dof_objects (const std::vector<const NumericVector<Number>*> &vecs,
+  std::size_t write_serialized_blocked_dof_objects (const std::vector<const NumericVector<Number>*> &vecs,
                                                     const dof_id_type n_objects,
                                                     const iterator_type begin,
                                                     const iterator_type end,
@@ -1736,7 +1797,9 @@ private:
    */
   void (* _qoi_evaluate_derivative_function) (EquationSystems& es,
                                               const std::string& name,
-                                              const QoISet& qoi_indices);
+                                              const QoISet& qoi_indices,
+                                              bool include_liftfunc,
+                                              bool apply_constraints);
 
   /**
    * Object to compute derivatives of quantities of interest.
@@ -1805,6 +1868,12 @@ private:
    * onto a changed grid, false if it should be zeroed.
    */
   std::map<std::string, bool> _vector_projections;
+
+  /**
+   * Holds non-negative if a vector by that name should be projected
+   * using adjoint constraints/BCs, -1 if primal
+   */
+  std::map<std::string, int> _vector_is_adjoint;
 
   /**
    * Holds the type of a vector
@@ -1950,7 +2019,7 @@ void System::set_basic_system_only ()
 inline
 unsigned int System::n_vars() const
 {
-  return libmesh_cast_int<unsigned int>(_variables.size());
+  return cast_int<unsigned int>(_variables.size());
 }
 
 
@@ -1958,7 +2027,7 @@ unsigned int System::n_vars() const
 inline
 unsigned int System::n_variable_groups() const
 {
-  return libmesh_cast_int<unsigned int>(_variable_groups.size());
+  return cast_int<unsigned int>(_variable_groups.size());
 }
 
 
@@ -2078,7 +2147,7 @@ bool System::have_vector (const std::string& vec_name) const
 inline
 unsigned int System::n_vectors () const
 {
-  return libmesh_cast_int<unsigned int>(_vectors.size());
+  return cast_int<unsigned int>(_vectors.size());
 }
 
 inline

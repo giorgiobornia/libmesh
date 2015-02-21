@@ -101,7 +101,7 @@ public:
   /**
    *  Constructor. Initializes Petsc data structures
    */
-  PetscLinearSolver (const libMesh::Parallel::Communicator &comm
+  PetscLinearSolver (const libMesh::Parallel::Communicator &comm_in
                      LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
 
   /**
@@ -312,7 +312,7 @@ private:
    * Internal method that returns the local size of \p
    * _restrict_solve_to_is.
    */
-  size_t _restrict_solve_to_is_local_size(void)const;
+  PetscInt _restrict_solve_to_is_local_size(void)const;
 
   /**
    * Creates \p _restrict_solve_to_is_complement to contain all
@@ -333,8 +333,8 @@ private:
 /*----------------------- functions ----------------------------------*/
 template <typename T>
 inline
-PetscLinearSolver<T>::PetscLinearSolver (const libMesh::Parallel::Communicator &comm):
-  LinearSolver<T>(comm),
+PetscLinearSolver<T>::PetscLinearSolver(const libMesh::Parallel::Communicator &comm_in) :
+  LinearSolver<T>(comm_in),
   _restrict_solve_to_is(NULL),
   _restrict_solve_to_is_complement(NULL),
   _subset_solve_mode(SUBSET_ZERO)
@@ -357,7 +357,7 @@ PetscLinearSolver<T>::~PetscLinearSolver ()
 
 
 template <typename T>
-inline size_t
+inline PetscInt
 PetscLinearSolver<T>::
 _restrict_solve_to_is_local_size(void)const
 {
@@ -367,7 +367,7 @@ _restrict_solve_to_is_local_size(void)const
   int ierr = ISGetLocalSize(_restrict_solve_to_is,&s);
   LIBMESH_CHKERRABORT(ierr);
 
-  return static_cast<size_t>(s);
+  return s;
 }
 
 

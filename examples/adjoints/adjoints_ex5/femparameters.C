@@ -86,6 +86,7 @@ FEMParameters::FEMParameters() :
   print_residual_norms(false), print_residuals(false),
   print_jacobian_norms(false), print_jacobians(false),
   print_element_jacobians(false),
+  print_element_residuals(false),
 
   use_petsc_snes(false),
   time_solver_quiet(true), solver_quiet(true), solver_verbose(false),
@@ -274,10 +275,8 @@ void FEMParameters::read(GetPot &input)
           domaintype != "cylinder" &&
           domaintype != "file" &&
           domaintype != "od2")
-        {
-          libMesh::out << "Periodic boundaries need rectilinear domains" << std::endl;;
-          libmesh_error();
-        }
+        libmesh_error_msg("Periodic boundaries need rectilinear domains");
+
       for (unsigned int i=0; i != n_periodic_bcs; ++i)
         {
           unsigned int myboundary =
@@ -296,9 +295,7 @@ void FEMParameters::read(GetPot &input)
                 translation_vector = RealVectorValue(-domain_edge_width, 0);
                 break;
               default:
-                libMesh::out << "Unrecognized periodic boundary id " <<
-                  myboundary << std::endl;;
-                libmesh_error();
+                libmesh_error_msg("Unrecognized periodic boundary id " << myboundary);
               }
           else if (dimension == 3)
             switch (myboundary)
@@ -316,9 +313,7 @@ void FEMParameters::read(GetPot &input)
                 translation_vector = RealVectorValue(-domain_edge_width, (Real) 0., (Real) 0.);
                 break;
               default:
-                libMesh::out << "Unrecognized periodic boundary id " <<
-                  myboundary << std::endl;;
-                libmesh_error();
+                libmesh_error_msg("Unrecognized periodic boundary id " << myboundary);
               }
           //periodic_boundaries.push_back(PeriodicBoundary(translation_vector));
           //periodic_boundaries[i].myboundary = myboundary;
@@ -341,36 +336,24 @@ void FEMParameters::read(GetPot &input)
 
   if (n_dirichlet_conditions !=
       input.vector_variable_size("dirichlet_condition_values"))
-    {
-      libMesh::out << "Error: " << n_dirichlet_conditions
-                   << " Dirichlet condition types does not match "
-                   << input.vector_variable_size("dirichlet_condition_values")
-                   << " Dirichlet condition values." << std::endl;
-
-      libmesh_error();
-    }
+    libmesh_error_msg("Error: " << n_dirichlet_conditions               \
+                      << " Dirichlet condition types does not match "   \
+                      << input.vector_variable_size("dirichlet_condition_values") \
+                      << " Dirichlet condition values.");
 
   if (n_dirichlet_conditions !=
       input.vector_variable_size("dirichlet_condition_boundaries"))
-    {
-      libMesh::out << "Error: " << n_dirichlet_conditions
-                   << " Dirichlet condition types does not match "
-                   << input.vector_variable_size("dirichlet_condition_boundaries")
-                   << " Dirichlet condition boundaries." << std::endl;
-
-      libmesh_error();
-    }
+    libmesh_error_msg("Error: " << n_dirichlet_conditions \
+                      << " Dirichlet condition types does not match " \
+                      << input.vector_variable_size("dirichlet_condition_boundaries") \
+                      << " Dirichlet condition boundaries.");
 
   if (n_dirichlet_conditions !=
       input.vector_variable_size("dirichlet_condition_variables"))
-    {
-      libMesh::out << "Error: " << n_dirichlet_conditions
-                   << " Dirichlet condition types does not match "
-                   << input.vector_variable_size("dirichlet_condition_variables")
-                   << " Dirichlet condition variables sets." << std::endl;
-
-      libmesh_error();
-    }
+    libmesh_error_msg("Error: " << n_dirichlet_conditions          \
+                      << " Dirichlet condition types does not match "   \
+                      << input.vector_variable_size("dirichlet_condition_variables") \
+                      << " Dirichlet condition variables sets.");
 
   for (unsigned int i=0; i != n_dirichlet_conditions; ++i)
     {
@@ -394,11 +377,7 @@ void FEMParameters::read(GetPot &input)
           if (variable_set[j] == '1')
             dirichlet_condition_variables[func_boundary].push_back(j);
           else if (variable_set[j] != '0')
-            {
-              libMesh::out << "Unable to understand Dirichlet variable set"
-                           << variable_set << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("Unable to understand Dirichlet variable set" << variable_set);
         }
     }
 
@@ -412,36 +391,24 @@ void FEMParameters::read(GetPot &input)
 
   if (n_neumann_conditions !=
       input.vector_variable_size("neumann_condition_values"))
-    {
-      libMesh::out << "Error: " << n_neumann_conditions
-                   << " Neumann condition types does not match "
-                   << input.vector_variable_size("neumann_condition_values")
-                   << " Neumann condition values." << std::endl;
-
-      libmesh_error();
-    }
+    libmesh_error_msg("Error: " << n_neumann_conditions \
+                      << " Neumann condition types does not match " \
+                      << input.vector_variable_size("neumann_condition_values") \
+                      << " Neumann condition values.");
 
   if (n_neumann_conditions !=
       input.vector_variable_size("neumann_condition_boundaries"))
-    {
-      libMesh::out << "Error: " << n_neumann_conditions
-                   << " Neumann condition types does not match "
-                   << input.vector_variable_size("neumann_condition_boundaries")
-                   << " Neumann condition boundaries." << std::endl;
-
-      libmesh_error();
-    }
+    libmesh_error_msg("Error: " << n_neumann_conditions          \
+                      << " Neumann condition types does not match "     \
+                      << input.vector_variable_size("neumann_condition_boundaries") \
+                      << " Neumann condition boundaries.");
 
   if (n_neumann_conditions !=
       input.vector_variable_size("neumann_condition_variables"))
-    {
-      libMesh::out << "Error: " << n_neumann_conditions
-                   << " Neumann condition types does not match "
-                   << input.vector_variable_size("neumann_condition_variables")
-                   << " Neumann condition variables sets." << std::endl;
-
-      libmesh_error();
-    }
+    libmesh_error_msg("Error: " << n_neumann_conditions \
+                      << " Neumann condition types does not match " \
+                      << input.vector_variable_size("neumann_condition_variables") \
+                      << " Neumann condition variables sets.");
 
   for (unsigned int i=0; i != n_neumann_conditions; ++i)
     {
@@ -465,11 +432,7 @@ void FEMParameters::read(GetPot &input)
           if (variable_set[j] == '1')
             neumann_condition_variables[func_boundary].push_back(j);
           else if (variable_set[j] != '0')
-            {
-              libMesh::out << "Unable to understand Neumann variable set"
-                           << variable_set << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("Unable to understand Neumann variable set" << variable_set);
         }
     }
 
@@ -482,25 +445,17 @@ void FEMParameters::read(GetPot &input)
 
   if (n_initial_conditions !=
       input.vector_variable_size("initial_condition_values"))
-    {
-      libMesh::out << "Error: " << n_initial_conditions
-                   << " initial condition types does not match "
-                   << input.vector_variable_size("initial_condition_values")
-                   << " initial condition values." << std::endl;
-
-      libmesh_error();
-    }
+    libmesh_error_msg("Error: " << n_initial_conditions \
+                      << " initial condition types does not match "   \
+                      << input.vector_variable_size("initial_condition_values") \
+                      << " initial condition values.");
 
   if (n_initial_conditions !=
       input.vector_variable_size("initial_condition_subdomains"))
-    {
-      libMesh::out << "Error: " << n_initial_conditions
-                   << " initial condition types does not match "
-                   << input.vector_variable_size("initial_condition_subdomains")
-                   << " initial condition subdomains." << std::endl;
-
-      libmesh_error();
-    }
+    libmesh_error_msg("Error: " << n_initial_conditions          \
+                      << " initial condition types does not match "     \
+                      << input.vector_variable_size("initial_condition_subdomains") \
+                      << " initial condition subdomains.");
 
   for (unsigned int i=0; i != n_initial_conditions; ++i)
     {
@@ -527,36 +482,24 @@ void FEMParameters::read(GetPot &input)
 
   if (n_other_interior_functions !=
       input.vector_variable_size("other_interior_function_values"))
-    {
-      libMesh::out << "Error: " << n_other_interior_functions
-                   << " other interior function types does not match "
-                   << input.vector_variable_size("other_interior_function_values")
-                   << " other interior function values." << std::endl;
-
-      libmesh_error();
-    }
+    libmesh_error_msg("Error: " << n_other_interior_functions \
+                      << " other interior function types does not match " \
+                      << input.vector_variable_size("other_interior_function_values") \
+                      << " other interior function values.");
 
   if (n_other_interior_functions !=
       input.vector_variable_size("other_interior_function_subdomains"))
-    {
-      libMesh::out << "Error: " << n_other_interior_functions
-                   << " other interior function types does not match "
-                   << input.vector_variable_size("other_interior_function_subdomains")
-                   << " other interior function subdomains." << std::endl;
-
-      libmesh_error();
-    }
+    libmesh_error_msg("Error: " << n_other_interior_functions          \
+                      << " other interior function types does not match " \
+                      << input.vector_variable_size("other_interior_function_subdomains") \
+                      << " other interior function subdomains.");
 
   if (n_other_interior_functions !=
       input.vector_variable_size("other_interior_function_ids"))
-    {
-      libMesh::out << "Error: " << n_other_interior_functions
-                   << " other interior function types does not match "
-                   << input.vector_variable_size("other_interior_function_ids")
-                   << " other interior function ids." << std::endl;
-
-      libmesh_error();
-    }
+    libmesh_error_msg("Error: " << n_other_interior_functions           \
+                      << " other interior function types does not match " \
+                      << input.vector_variable_size("other_interior_function_ids") \
+                      << " other interior function ids.");
 
   for (unsigned int i=0; i != n_other_interior_functions; ++i)
     {
@@ -586,36 +529,24 @@ void FEMParameters::read(GetPot &input)
 
   if (n_other_boundary_functions !=
       input.vector_variable_size("other_boundary_function_values"))
-    {
-      libMesh::out << "Error: " << n_other_boundary_functions
-                   << " other boundary function types does not match "
-                   << input.vector_variable_size("other_boundary_function_values")
-                   << " other boundary function values." << std::endl;
-
-      libmesh_error();
-    }
+    libmesh_error_msg("Error: " << n_other_boundary_functions           \
+                      << " other boundary function types does not match " \
+                      << input.vector_variable_size("other_boundary_function_values") \
+                      << " other boundary function values.");
 
   if (n_other_boundary_functions !=
       input.vector_variable_size("other_boundary_function_boundaries"))
-    {
-      libMesh::out << "Error: " << n_other_boundary_functions
-                   << " other boundary function types does not match "
-                   << input.vector_variable_size("other_boundary_function_boundaries")
-                   << " other boundary function boundaries." << std::endl;
-
-      libmesh_error();
-    }
+    libmesh_error_msg("Error: " << n_other_boundary_functions \
+                      << " other boundary function types does not match " \
+                      << input.vector_variable_size("other_boundary_function_boundaries") \
+                      << " other boundary function boundaries.");
 
   if (n_other_boundary_functions !=
       input.vector_variable_size("other_boundary_function_ids"))
-    {
-      libMesh::out << "Error: " << n_other_boundary_functions
-                   << " other boundary function types does not match "
-                   << input.vector_variable_size("other_boundary_function_ids")
-                   << " other boundary function ids." << std::endl;
-
-      libmesh_error();
-    }
+    libmesh_error_msg("Error: " << n_other_boundary_functions \
+                      << " other boundary function types does not match " \
+                      << input.vector_variable_size("other_boundary_function_ids") \
+                      << " other boundary function ids.");
 
   for (unsigned int i=0; i != n_other_boundary_functions; ++i)
     {
@@ -664,6 +595,7 @@ void FEMParameters::read(GetPot &input)
   GETPOT_INPUT(print_jacobian_norms);
   GETPOT_INPUT(print_jacobians);
   GETPOT_INPUT(print_element_jacobians);
+  GETPOT_INPUT(print_element_residuals);
 
 
   GETPOT_INPUT(use_petsc_snes);
@@ -693,12 +625,12 @@ void FEMParameters::read(GetPot &input)
 
   if (libMesh::global_processor_id() == 0 && !bad_variables.empty())
     {
-      std::cerr << "ERROR: Unrecognized variables:" << std::endl;
+      libMesh::err << "ERROR: Unrecognized variable(s):" << std::endl;
       for (unsigned int i = 0; i != bad_variables.size(); ++i)
-        std::cerr << bad_variables[i] << std::endl;
-      std::cerr << "Not found among recognized variables:" << std::endl;
+        libMesh::err << bad_variables[i] << std::endl;
+      libMesh::err << "\nRecognized variables are:" << std::endl;
       for (unsigned int i = 0; i != variable_names.size(); ++i)
-        std::cerr << variable_names[i] << std::endl;
-      libmesh_error();
+        libMesh::err << variable_names[i] << std::endl;
+      libmesh_error_msg("Fix/remove the unrecognized variables and try again.");
     }
 }

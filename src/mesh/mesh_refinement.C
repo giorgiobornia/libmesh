@@ -65,7 +65,8 @@ MeshRefinement::MeshRefinement (MeshBase& m) :
   _absolute_global_tolerance(0.0),
   _face_level_mismatch_limit(1),
   _edge_level_mismatch_limit(0),
-  _node_level_mismatch_limit(0)
+  _node_level_mismatch_limit(0),
+  _enforce_mismatch_limit_prior_to_refinement(false)
 #ifdef LIBMESH_ENABLE_PERIODIC
   , _periodic_boundaries(NULL)
 #endif
@@ -98,7 +99,7 @@ void MeshRefinement::clear ()
 
 
 Node* MeshRefinement::add_point (const Point& p,
-                                 const processor_id_type processor_id,
+                                 const processor_id_type proc_id,
                                  const Real tol)
 {
   START_LOG("add_point()", "MeshRefinement");
@@ -113,7 +114,7 @@ Node* MeshRefinement::add_point (const Point& p,
 
   // Add the node, with a default id and the requested
   // processor_id
-  node = _mesh.add_point (p, DofObject::invalid_id, processor_id);
+  node = _mesh.add_point (p, DofObject::invalid_id, proc_id);
 
   libmesh_assert(node);
 
@@ -1405,25 +1406,11 @@ bool MeshRefinement::make_refinement_compatible(const bool maintain_level_one)
                                 }
                             }
 #ifdef DEBUG
-
-                          // Sanity check. We should never get into a
-                          // case when our neighbot is more than one
-                          // level away.
-                          /* // We libmesh_error() in the next case anyway
-                             else if ((neighbor->level()+1) < my_level)
-                             {
-                             libmesh_error();
-                             }
-                          */
-
-
                           // Note that the only other possibility is that the
                           // neighbor is already refined, in which case it isn't
                           // active and we should never get here.
                           else
-                            {
-                              libmesh_error();
-                            }
+                            libmesh_error_msg("ERROR: Neighbor level must be equal or 1 higher than mine.");
 #endif
                         }
                     }
@@ -1552,7 +1539,7 @@ bool MeshRefinement::_coarsen_elements ()
 
           // Remove any boundary information associated
           // with this element
-          _mesh.boundary_info->remove (elem);
+          _mesh.get_boundary_info().remove (elem);
 
           // Add this iterator to the _unused_elements
           // data structure so we might fill it.

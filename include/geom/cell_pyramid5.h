@@ -35,24 +35,21 @@ namespace libMesh
 /**
  * The \p Pyramid5 is an element in 3D composed of 5 nodes.
  * It is numbered with a counter-clockwise base like this:
- \verbatim
- PYRAMID5:
- o 4
- //|\
- // | \
- //  |  \
- 3 o/...|...o 2
- ./    |  /
- ./     | /
- ./      |/
- o--------o
- 0        1
-
- \endverbatim
-*/
-
-// ------------------------------------------------------------
-// Pyramid class definition
+ * \verbatim
+ * PYRAMID5:
+ *           o 4
+ *         //|\
+ *        // | \
+ *       //  |  \
+ *    3 o/...|...o 2
+ *     ./    |  /
+ *    ./     | /
+ *   ./      |/
+ *  o--------o
+ *  0        1
+ *
+ * \endverbatim
+ */
 class Pyramid5 : public Pyramid
 {
 public:
@@ -165,7 +162,7 @@ protected:
   float embedding_matrix (const unsigned int,
                           const unsigned int,
                           const unsigned int) const
-  { libmesh_error(); return 0.; }
+  { libmesh_not_implemented(); return 0.; }
 
 #endif
 };

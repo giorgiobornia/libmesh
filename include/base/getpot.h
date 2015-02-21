@@ -75,7 +75,7 @@ extern "C" {
 #define getpot_cerr libMesh::err
 #define getpot_error() libmesh_error()
 #define getpot_file_error(filename) libmesh_file_error(filename)
-#define getpot_cast_int libMesh::libmesh_cast_int
+#define getpot_cast_int libMesh::cast_int
 
 #else // USE_LIBMESH
 
@@ -89,7 +89,26 @@ extern "C" {
 
 #endif
 
+// Clang provides the __has_builtin macro, we define it for compilers
+// that don't...
+#ifndef __has_builtin
+#define __has_builtin(x) 0
+#endif
 
+// Fine-grained ifdefs for all three inverse hyperbolic trig
+// functions.  This works for the two clang compilers I tried it
+// on... a hand-built one and one from Apple.
+#if __cplusplus > 199711L && (!defined(__clang__) || __has_builtin(asinh))
+#define HAVE_INVERSE_HYPERBOLIC_SINE
+#endif
+
+#if __cplusplus > 199711L && (!defined(__clang__) || __has_builtin(acosh))
+#define HAVE_INVERSE_HYPERBOLIC_COSINE
+#endif
+
+#if __cplusplus > 199711L && (!defined(__clang__) || __has_builtin(atanh))
+#define HAVE_INVERSE_HYPERBOLIC_TANGENT
+#endif
 
 typedef  std::vector<std::string>  STRING_VECTOR;
 
@@ -839,9 +858,9 @@ GetPot::GetPot(const GetPot& Other) :
   _comment_start(Other._comment_start),
   _comment_end(Other._comment_end),
   _field_separator(Other._field_separator),
-#if !defined(GETPOT_DISABLE_MUTEX)
-  _getpot_mtx(Other._getpot_mtx),
-#endif
+  // #if !defined(GETPOT_DISABLE_MUTEX)
+  //   _getpot_mtx(Other._getpot_mtx),
+  // #endif
   _internal_string_container(),
   _requested_arguments(Other._requested_arguments),
   _requested_variables(Other._requested_variables),
@@ -897,9 +916,9 @@ GetPot::operator=(const GetPot& Other)
   _comment_start       = Other._comment_start;
   _comment_end         = Other._comment_end;
   _field_separator     = Other._field_separator;
-#if !defined(GETPOT_DISABLE_MUTEX)
-  _getpot_mtx          = Other._getpot_mtx;
-#endif
+  // #if !defined(GETPOT_DISABLE_MUTEX)
+  //   _getpot_mtx          = Other._getpot_mtx;
+  // #endif
   _requested_arguments = Other._requested_arguments;
   _requested_variables = Other._requested_variables;
   _requested_sections  = Other._requested_sections;
@@ -1407,7 +1426,7 @@ GetPot::_process_section_label(const std::string& Section,
           if (sname[i] == '/')
             {
               section_stack.push_back(sname.substr(0,i));
-              if (i+1 < sname.length()-1)
+              if (i+1 < sname.length())
                 sname = sname.substr(i+1);
               i = 0;
             }
@@ -2770,6 +2789,13 @@ GetPot::_DBE_expand(const std::string& expr)
               double arg = _convert_to_type(A[0], 0.0);
               return _convert_from_type(std::log10(arg));
             }
+          else if (funcname == "exp")
+            {
+              STRING_VECTOR A =
+                _DBE_get_expr_list(expr.substr(funcnameend), 1);
+              double arg = _convert_to_type(A[0], 0.0);
+              return _convert_from_type(std::exp(arg));
+            }
           else if (funcname == "sin")
             {
               STRING_VECTOR A =
@@ -2841,6 +2867,33 @@ GetPot::_DBE_expand(const std::string& expr)
               double arg = _convert_to_type(A[0], 0.0);
               return _convert_from_type(std::tanh(arg));
             }
+#ifdef HAVE_INVERSE_HYPERBOLIC_SINE
+          else if (funcname == "asinh")
+            {
+              STRING_VECTOR A =
+                _DBE_get_expr_list(expr.substr(funcnameend), 1);
+              double arg = _convert_to_type(A[0], 0.0);
+              return _convert_from_type(std::asinh(arg));
+            }
+#endif
+#ifdef HAVE_INVERSE_HYPERBOLIC_COSINE
+          else if (funcname == "acosh")
+            {
+              STRING_VECTOR A =
+                _DBE_get_expr_list(expr.substr(funcnameend), 1);
+              double arg = _convert_to_type(A[0], 0.0);
+              return _convert_from_type(std::acosh(arg));
+            }
+#endif
+#ifdef HAVE_INVERSE_HYPERBOLIC_TANGENT
+          else if (funcname == "atanh")
+            {
+              STRING_VECTOR A =
+                _DBE_get_expr_list(expr.substr(funcnameend), 1);
+              double arg = _convert_to_type(A[0], 0.0);
+              return _convert_from_type(std::atanh(arg));
+            }
+#endif
           else if (funcname == "sqrt")
             {
               STRING_VECTOR A =
@@ -2926,9 +2979,14 @@ GetPot::_DBE_expand(const std::string& expr)
                 } while (returnval >= y);
               return _convert_from_type(returnval / x);
             }
-
           else if (funcname == "time")
             return _convert_from_type(std::time(NULL));
+          else
+            {
+              getpot_cerr << "ERROR: unrecognized function "
+                          << funcname << std::endl;
+              getpot_error();
+            }
         }
     }
 

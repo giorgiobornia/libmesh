@@ -33,9 +33,7 @@ namespace libMesh
 {
 
 // Forward Declarations
-class DiffSolver;
 class ImplicitSystem;
-class ParameterVector;
 template <typename T> class NumericVector;
 
 /**
@@ -172,7 +170,7 @@ public:
   bool continue_after_max_iterations;
 
   /**
-   * Defaults to false, telling the DiffSolver to throw a libmesh_error() when
+   * Defaults to false, telling the DiffSolver to throw an error when
    * the backtracking scheme fails to find a descent direction.
    */
   bool continue_after_backtrack_failure;
@@ -271,7 +269,13 @@ public:
      * The DiffSolver failed to find a descent direction
      * by backtracking (See newton_solver.C)
      */
-    DIVERGED_BACKTRACKING_FAILURE = 128
+    DIVERGED_BACKTRACKING_FAILURE = 128,
+
+    /**
+     * The linear solver used by the DiffSolver failed to
+     * find a solution.
+     */
+    DIVERGED_LINEAR_SOLVER_FAILURE = 256
   };
 
   /**

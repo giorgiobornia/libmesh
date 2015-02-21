@@ -123,17 +123,17 @@ public:
   void set_auto_parallel ();
 
   /**
-   * Get/Set the version string.  Vailid version strings:
-   \verbatim
-
-   "libMesh-0.7.0+"
-   "libMesh-0.7.0+ parallel"
-
-   \endverbatim
-   If "libMesh" is not detected in the version string the
-   \p LegacyXdrIO class will be used to read older
-   (pre version 0.7.0) mesh files.
-  */
+   * Get/Set the version string.  Valid version strings:
+   *
+   * \verbatim
+   * "libMesh-0.7.0+"
+   * "libMesh-0.7.0+ parallel"
+   * \endverbatim
+   *
+   * If "libMesh" is not detected in the version string the
+   * \p LegacyXdrIO class will be used to read older
+   * (pre version 0.7.0) mesh files.
+   */
   const std::string & version () const { return _version; }
   std::string &       version ()       { return _version; }
 
@@ -185,12 +185,12 @@ private:
   /**
    * Write the boundary conditions for a parallel, distributed mesh
    */
-  void write_serialized_bcs (Xdr &io, const std::size_t n_bcs) const;
+  void write_serialized_bcs (Xdr &io, const header_id_type n_bcs) const;
 
   /**
    * Write the boundary conditions for a parallel, distributed mesh
    */
-  void write_serialized_nodesets (Xdr &io, const std::size_t n_nodesets) const;
+  void write_serialized_nodesets (Xdr &io, const header_id_type n_nodesets) const;
 
   /**
    * Write boundary names information (sideset and nodeset) - NEW in 0.9.2 format

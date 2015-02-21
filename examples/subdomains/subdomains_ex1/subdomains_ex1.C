@@ -98,11 +98,11 @@ int main (int argc, char** argv)
 
   // Only our PETSc interface currently supports solves restricted to
   // subdomains
-  libmesh_example_assert(libMesh::default_solver_package() == PETSC_SOLVERS, "--enable-petsc");
+  libmesh_example_requires(libMesh::default_solver_package() == PETSC_SOLVERS, "--enable-petsc");
 
   // Skip adaptive examples on a non-adaptive libMesh build
 #ifndef LIBMESH_ENABLE_AMR
-  libmesh_example_assert(false, "--enable-amr");
+  libmesh_example_requires(false, "--enable-amr");
 #else
 
   // Declare a performance log for the main program
@@ -114,15 +114,9 @@ int main (int argc, char** argv)
   // Check for proper calling arguments.
   if (argc < 3)
     {
-      if (init.comm().rank() == 0)
-        std::cerr << "Usage:\n"
-                  <<"\t " << argv[0] << " -d 2(3)" << " -n 15"
-                  << std::endl;
-
       // This handy function will print the file name, line number,
-      // and then abort.  Currrently the library does not use C++
-      // exception handling.
-      libmesh_error();
+      // specified message, and then throw an exception.
+      libmesh_error_msg("Usage:\n" << "\t " << argv[0] << " -d 2(3)" << " -n 15");
     }
 
   // Brief message to the user regarding the program name
@@ -146,7 +140,7 @@ int main (int argc, char** argv)
     dim = command_line.next(dim);
 
   // Skip higher-dimensional examples on a lower-dimensional libMesh build
-  libmesh_example_assert(dim <= LIBMESH_DIM, "2D/3D support");
+  libmesh_example_requires(dim <= LIBMESH_DIM, "2D/3D support");
 
   // Create a mesh with user-defined dimension.
   // Read number of elements from command line
@@ -166,11 +160,7 @@ int main (int argc, char** argv)
 
   // Cannot use discontinuous basis.
   if ((family == "MONOMIAL") || (family == "XYZ"))
-    {
-      if (init.comm().rank() == 0)
-        std::cerr << "ex4 currently requires a C^0 (or higher) FE basis." << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("This example requires a C^0 (or higher) FE basis.");
 
   // Create a mesh, with dimension to be overridden later, on the
   // default MPI communicator.

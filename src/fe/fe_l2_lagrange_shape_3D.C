@@ -93,7 +93,7 @@ Real FE<3,L2_LAGRANGE>::shape(const ElemType type,
                   return zeta3;
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid i = " << i);
                 }
             }
 
@@ -146,17 +146,13 @@ Real FE<3,L2_LAGRANGE>::shape(const ElemType type,
                   return zeta;
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid i = " << i);
                 }
             }
 
 
           default:
-            {
-              libMesh::err << "ERROR: Unsupported 3D element type!: " << type
-                           << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Unsupported 3D element type!: " << type);
           }
       }
 
@@ -245,7 +241,7 @@ Real FE<3,L2_LAGRANGE>::shape(const ElemType type,
                   return 4.*(1. - x)*y*(1. - y)*z;
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid i = " << i);
                 }
             }
 
@@ -316,7 +312,7 @@ Real FE<3,L2_LAGRANGE>::shape(const ElemType type,
                   return 4.*zeta2*zeta3;
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid i = " << i);
                 }
             }
 
@@ -341,27 +337,19 @@ Real FE<3,L2_LAGRANGE>::shape(const ElemType type,
 
 
           default:
-            {
-              libMesh::err << "ERROR: Unsupported 3D element type!: " << type
-                           << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Unsupported 3D element type!: " << type);
           }
       }
 
 
       // unsupported order
     default:
-      {
-        libMesh::err << "ERROR: Unsupported 3D FE order!: " << order
-                     << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR: Unsupported 3D FE order!: " << order);
     }
 
 #endif
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0.;
 }
 
@@ -434,9 +422,7 @@ Real FE<3,L2_LAGRANGE>::shape_deriv(const ElemType type,
                           FE<1,L2_LAGRANGE>::shape_deriv(EDGE2, FIRST, i2[i], 0, zeta));
 
                 default:
-                  {
-                    libmesh_error();
-                  }
+                  libmesh_error_msg("Invalid j = " << j);
                 }
             }
 
@@ -482,7 +468,7 @@ Real FE<3,L2_LAGRANGE>::shape_deriv(const ElemType type,
                         return dzeta3dxi;
 
                       default:
-                        libmesh_error();
+                        libmesh_error_msg("Invalid i = " << i);
                       }
                   }
 
@@ -504,7 +490,7 @@ Real FE<3,L2_LAGRANGE>::shape_deriv(const ElemType type,
                         return dzeta3deta;
 
                       default:
-                        libmesh_error();
+                        libmesh_error_msg("Invalid i = " << i);
                       }
                   }
 
@@ -526,9 +512,12 @@ Real FE<3,L2_LAGRANGE>::shape_deriv(const ElemType type,
                         return dzeta3dzeta;
 
                       default:
-                        libmesh_error();
+                        libmesh_error_msg("Invalid i = " << i);
                       }
                   }
+
+                default:
+                  libmesh_error_msg("Invalid shape function derivative j = " << j);
                 }
             }
 
@@ -565,6 +554,9 @@ Real FE<3,L2_LAGRANGE>::shape_deriv(const ElemType type,
                 case 2:
                   return (FE<2,L2_LAGRANGE>::shape(TRI3,  FIRST, i1[i], p2d)*
                           FE<1,L2_LAGRANGE>::shape_deriv(EDGE2, FIRST, i0[i], 0, p1d));
+
+                default:
+                  libmesh_error_msg("Invalid shape function derivative j = " << j);
                 }
             }
 
@@ -600,7 +592,7 @@ Real FE<3,L2_LAGRANGE>::shape_deriv(const ElemType type,
                       return 0;
 
                     default:
-                      libmesh_error();
+                      libmesh_error_msg("Invalid i = " << i);
                     }
 
 
@@ -624,7 +616,7 @@ Real FE<3,L2_LAGRANGE>::shape_deriv(const ElemType type,
                       return 0;
 
                     default:
-                      libmesh_error();
+                      libmesh_error_msg("Invalid i = " << i);
                     }
 
 
@@ -676,22 +668,18 @@ Real FE<3,L2_LAGRANGE>::shape_deriv(const ElemType type,
                       return 1.;
 
                     default:
-                      libmesh_error();
+                      libmesh_error_msg("Invalid i = " << i);
                     }
 
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid j = " << j);
                 }
             }
 
 
           default:
-            {
-              libMesh::err << "ERROR: Unsupported 3D element type!: " << type
-                           << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Unsupported 3D element type!: " << type);
           }
       }
 
@@ -795,7 +783,7 @@ Real FE<3,L2_LAGRANGE>::shape_deriv(const ElemType type,
                       return 2.*y*(1. - y)*z*(-1.);
 
                     default:
-                      libmesh_error();
+                      libmesh_error_msg("Invalid i = " << i);
                     }
 
 
@@ -872,7 +860,7 @@ Real FE<3,L2_LAGRANGE>::shape_deriv(const ElemType type,
                       return 2.*(1. - x)*z*(1. - 2.*y);
 
                     default:
-                      libmesh_error();
+                      libmesh_error_msg("Invalid i = " << i);
                     }
 
 
@@ -949,8 +937,11 @@ Real FE<3,L2_LAGRANGE>::shape_deriv(const ElemType type,
                       return 2.*(1. - x)*y*(1. - y);
 
                     default:
-                      libmesh_error();
+                      libmesh_error_msg("Invalid i = " << i);
                     }
+
+                default:
+                  libmesh_error_msg("Invalid shape function derivative j = " << j);
                 }
             }
 
@@ -990,9 +981,7 @@ Real FE<3,L2_LAGRANGE>::shape_deriv(const ElemType type,
                           FE<1,L2_LAGRANGE>::shape_deriv(EDGE3, SECOND, i2[i], 0, zeta));
 
                 default:
-                  {
-                    libmesh_error();
-                  }
+                  libmesh_error_msg("Invalid j = " << j);
                 }
             }
 
@@ -1060,7 +1049,7 @@ Real FE<3,L2_LAGRANGE>::shape_deriv(const ElemType type,
                         return 4.*(zeta2*dzeta3dxi + dzeta2dxi*zeta3);
 
                       default:
-                        libmesh_error();
+                        libmesh_error_msg("Invalid i = " << i);
                       }
                   }
 
@@ -1100,7 +1089,7 @@ Real FE<3,L2_LAGRANGE>::shape_deriv(const ElemType type,
                         return 4.*(zeta2*dzeta3deta + dzeta2deta*zeta3);
 
                       default:
-                        libmesh_error();
+                        libmesh_error_msg("Invalid i = " << i);
                       }
                   }
 
@@ -1140,12 +1129,12 @@ Real FE<3,L2_LAGRANGE>::shape_deriv(const ElemType type,
                         return 4.*(zeta2*dzeta3dzeta + dzeta2dzeta*zeta3);
 
                       default:
-                        libmesh_error();
+                        libmesh_error_msg("Invalid i = " << i);
                       }
                   }
 
                 default:
-                  libmesh_error();
+                  libmesh_error_msg("Invalid j = " << j);
                 }
             }
 
@@ -1182,33 +1171,27 @@ Real FE<3,L2_LAGRANGE>::shape_deriv(const ElemType type,
                 case 2:
                   return (FE<2,L2_LAGRANGE>::shape(TRI6,  SECOND, i1[i], p2d)*
                           FE<1,L2_LAGRANGE>::shape_deriv(EDGE3, SECOND, i0[i], 0, p1d));
+
+                default:
+                  libmesh_error_msg("Invalid shape function derivative j = " << j);
                 }
             }
 
 
-
           default:
-            {
-              libMesh::err << "ERROR: Unsupported 3D element type!: " << type
-                           << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Unsupported 3D element type!: " << type);
           }
       }
 
 
       // unsupported order
     default:
-      {
-        libMesh::err << "ERROR: Unsupported 3D FE order!: " << order
-                     << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR: Unsupported 3D FE order!: " << order);
     }
 
 #endif
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0.;
 }
 
@@ -1323,9 +1306,7 @@ Real FE<3,L2_LAGRANGE>::shape_second_deriv(const ElemType type,
                           FE<1,L2_LAGRANGE>::shape_second_deriv(EDGE3, SECOND, i2[i], 0, zeta));
 
                 default:
-                  {
-                    libmesh_error();
-                  }
+                  libmesh_error_msg("Invalid j = " << j);
                 }
             }
 
@@ -1394,10 +1375,7 @@ Real FE<3,L2_LAGRANGE>::shape_second_deriv(const ElemType type,
                              dzetadxi[my_m][my_j]*dzetadxi[my_n][my_k] );
                 }
               else
-                {
-                  libMesh::err << "Invalid shape function index " << i << std::endl;
-                  libmesh_error();
-                }
+                libmesh_error_msg("Invalid shape function index " << i);
             }
 
 
@@ -1447,33 +1425,28 @@ Real FE<3,L2_LAGRANGE>::shape_second_deriv(const ElemType type,
                 case 5:
                   return (FE<2,L2_LAGRANGE>::shape(TRI6,  SECOND, i1[i], p2d)*
                           FE<1,L2_LAGRANGE>::shape_second_deriv(EDGE3, SECOND, i0[i], 0, p1d));
+
+                default:
+                  libmesh_error_msg("Invalid shape function derivative j = " << j);
                 }
             }
 
 
 
           default:
-            {
-              libMesh::err << "ERROR: Unsupported 3D element type!: " << type
-                           << std::endl;
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Unsupported 3D element type!: " << type);
           }
       }
 
 
       // unsupported order
     default:
-      {
-        libMesh::err << "ERROR: Unsupported 3D FE order!: " << order
-                     << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR: Unsupported 3D FE order!: " << order);
     }
 
 #endif
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0.;
 }
 

@@ -142,6 +142,7 @@ void set_system_parameters(HeatSystem &system, FEMParameters &param)
   system.print_jacobian_norms    = param.print_jacobian_norms;
   system.print_jacobians         = param.print_jacobians;
   system.print_element_jacobians = param.print_element_jacobians;
+  system.print_element_residuals = param.print_element_residuals;
 
   // Solve this as a time-dependent or steady system
   if (param.transient)
@@ -156,11 +157,8 @@ void set_system_parameters(HeatSystem &system, FEMParameters &param)
           innersolver = eulersolver;
         }
       else
-        {
-          std::cerr << "This example (and unsteady adjoints in libMesh) only support Backward Euler and explicit methods."
-                    <<  std::endl;
-          libmesh_error();
-        }
+        libmesh_error_msg("This example (and unsteady adjoints in libMesh) only support Backward Euler and explicit methods.");
+
       system.time_solver =
         AutoPtr<TimeSolver>(innersolver);
     }
@@ -210,7 +208,7 @@ void set_system_parameters(HeatSystem &system, FEMParameters &param)
       PetscDiffSolver *solver = new PetscDiffSolver(system);
       system.time_solver->diff_solver() = AutoPtr<DiffSolver>(solver);
 #else
-      libmesh_error();
+      libmesh_error_msg("This example requires libMesh to be compiled with PETSc support.");
 #endif
     }
   else
@@ -244,10 +242,10 @@ int main (int argc, char** argv)
 {
   // Skip adaptive examples on a non-adaptive libMesh build
 #ifndef LIBMESH_ENABLE_AMR
-  libmesh_example_assert(false, "--enable-amr");
+  libmesh_example_requires(false, "--enable-amr");
 #else
   // Skip this 2D example if libMesh was compiled as 1D-only.
-  libmesh_example_assert(2 <= LIBMESH_DIM, "2D support");
+  libmesh_example_requires(2 <= LIBMESH_DIM, "2D support");
 
   // Initialize libMesh.
   LibMeshInit init (argc, argv);
@@ -258,12 +256,7 @@ int main (int argc, char** argv)
   {
     std::ifstream i("general.in");
     if (!i)
-      {
-        std::cerr << '[' << init.comm().rank()
-                  << "] Can't find general.in; exiting early."
-                  << std::endl;
-        libmesh_error();
-      }
+      libmesh_error_msg('[' << init.comm().rank() << "] Can't find general.in; exiting early.");
   }
   GetPot infile("general.in");
 

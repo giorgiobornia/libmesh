@@ -91,7 +91,8 @@ public:
    * Users may reimplement this to add pre- or post-assembly
    * code before or after calling FEMSystem::assembly()
    */
-  virtual void assembly (bool get_residual, bool get_jacobian);
+  virtual void assembly (bool get_residual, bool get_jacobian,
+                         bool apply_heterogeneous_constraints = false);
 
   /**
    * Invokes the solver associated with the system.  For steady state
@@ -158,7 +159,9 @@ public:
    * interest that are not expressible as a sum of element qois.
    */
   virtual void assemble_qoi_derivative
-  (const QoISet& indices = QoISet());
+  (const QoISet &qoi_indices = QoISet(),
+   bool include_liftfunc = true,
+   bool apply_constraints = true);
 
   /**
    * If fe_reinit_during_postprocess is true (it is true by default), FE
@@ -215,6 +218,13 @@ public:
    * on an element's side.
    */
   void numerical_side_jacobian (FEMContext &context) const;
+
+  /**
+   * Uses the results of multiple side_residual() calls
+   * to numerically differentiate the corresponding jacobian
+   * on nonlocal DoFs.
+   */
+  void numerical_nonlocal_jacobian (FEMContext &context) const;
 
 protected:
   /**

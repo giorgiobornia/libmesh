@@ -270,7 +270,9 @@ void ExactErrorEstimator::estimate_error (const System& system,
           // used even when a different vector is used for the coarse
           // system
           fine_system.update_global_solution(global_soln);
-          fine_soln->init (global_soln.size(), true, SERIAL);
+          fine_soln->init
+            (cast_int<numeric_index_type>(global_soln.size()), true,
+             SERIAL);
           (*fine_soln) = global_soln;
 
           fine_values = AutoPtr<MeshFunction>
@@ -368,7 +370,7 @@ void ExactErrorEstimator::estimate_error (const System& system,
           std::vector<dof_id_type> dof_indices;
           dof_map.dof_indices (elem, dof_indices, var);
           const unsigned int n_dofs =
-            libmesh_cast_int<unsigned int>(dof_indices.size());
+            cast_int<unsigned int>(dof_indices.size());
           DenseVector<Number> Uelem(n_dofs);
           for (unsigned int i=0; i != n_dofs; ++i)
             Uelem(i) = system.current_solution(dof_indices[i]);
@@ -456,11 +458,11 @@ Real ExactErrorEstimator::find_squared_element_error(const System& system,
 
   // The number of shape functions
   const unsigned int n_sf =
-    libmesh_cast_int<unsigned int>(Uelem.size());
+    cast_int<unsigned int>(Uelem.size());
 
   // The number of quadrature points
   const unsigned int n_qp =
-    libmesh_cast_int<unsigned int>(JxW.size());
+    cast_int<unsigned int>(JxW.size());
 
   Real error_val = 0;
 

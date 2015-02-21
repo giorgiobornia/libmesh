@@ -347,22 +347,17 @@ public:
   void add (const T a, const NumericVector<T>& v);
 
   /**
-   * \f$ U+=v \f$ where \p v is a \p std::vector<T>
-   * and you
-   * want to specify WHERE to add it
+   * We override two NumericVector<T>::add_vector() methods but don't
+   * want to hide the other defaults.
    */
-  void add_vector (const std::vector<T>& v,
-                   const std::vector<numeric_index_type>& dof_indices);
+  using NumericVector<T>::add_vector;
 
   /**
-   * \f$ U+=V \f$ where U and V are type
-   * \p NumericVector<T> and you
-   * want to specify WHERE to add
-   * the \p NumericVector<T> V
+   * \f$ U+=v \f$ where v is a pointer and each \p dof_indices[i]
+   * specifies where to add value \p v[i]
    */
-  void add_vector (const NumericVector<T>& V,
+  void add_vector (const T* v,
                    const std::vector<numeric_index_type>& dof_indices);
-
 
   /**
    * \f$U+=A*V\f$, add the product of a \p SparseMatrix \p A
@@ -372,15 +367,6 @@ public:
                    const SparseMatrix<T> &A);
 
   /**
-   * \f$U+=V \f$ where U and V are type
-   * DenseVector<T> and you
-   * want to specify WHERE to add
-   * the DenseVector<T> V
-   */
-  void add_vector (const DenseVector<T>& V,
-                   const std::vector<numeric_index_type>& dof_indices);
-
-  /**
    * \f$U+=A*V\f$, add the product of the transpose of a \p SparseMatrix \p A_trans
    * and a \p NumericVector \p V to \p this, where \p this=U.
    */
@@ -388,35 +374,16 @@ public:
                              const SparseMatrix<T> &A_trans);
 
   /**
-   * \f$ U=v \f$ where v is a \p std::vector<T>
+   * We override one NumericVector<T>::insert() method but don't want
+   * to hide the other defaults
+   */
+  using NumericVector<T>::insert;
+
+  /**
+   * \f$ U=v \f$ where v is a \p T[] or T*
    * and you want to specify WHERE to insert it
    */
-  virtual void insert (const std::vector<T>& v,
-                       const std::vector<numeric_index_type>& dof_indices);
-
-  /**
-   * \f$U=V\f$, where U and V are type
-   * NumericVector<T> and you
-   * want to specify WHERE to insert
-   * the NumericVector<T> V
-   */
-  virtual void insert (const NumericVector<T>& V,
-                       const std::vector<numeric_index_type>& dof_indices);
-
-  /**
-   * \f$ U=V \f$ where V is type
-   * DenseVector<T> and you
-   * want to specify WHERE to insert it
-   */
-  virtual void insert (const DenseVector<T>& V,
-                       const std::vector<numeric_index_type>& dof_indices);
-
-  /**
-   * \f$ U=V \f$ where V is type
-   * DenseSubVector<T> and you
-   * want to specify WHERE to insert it
-   */
-  virtual void insert (const DenseSubVector<T>& V,
+  virtual void insert (const T* v,
                        const std::vector<numeric_index_type>& dof_indices);
 
   /**
@@ -1043,7 +1010,7 @@ void EpetraVector<T>::swap (NumericVector<T> &other)
 {
   NumericVector<T>::swap(other);
 
-  EpetraVector<T>& v = libmesh_cast_ref<EpetraVector<T>&>(other);
+  EpetraVector<T>& v = cast_ref<EpetraVector<T>&>(other);
 
   std::swap(_vec, v._vec);
   std::swap(_map, v._map);

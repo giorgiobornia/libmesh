@@ -21,6 +21,7 @@
 #include "libmesh/elem.h"
 #include "libmesh/fe.h"
 #include "libmesh/fe_interface.h"
+#include "libmesh/string_to_enum.h"
 
 namespace libMesh
 {
@@ -122,11 +123,13 @@ unsigned int hierarchic_n_dofs(const ElemType t, const Order o)
       return ((o+1)*(o+1)*(o+1));
     case TRI6:
       return ((o+1)*(o+2)/2);
+    case INVALID_ELEM:
+      return 0;
     default:
-      libmesh_error();
+      libmesh_error_msg("ERROR: Invalid ElemType " << Utility::enum_to_string(t) << " selected for HIERARCHIC FE family!");
     }
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0;
 } // hierarchic_n_dofs()
 
@@ -153,7 +156,7 @@ unsigned int hierarchic_n_dofs_at_node(const ElemType t,
         case 2:
           return 0;
         default:
-          libmesh_error();
+          libmesh_error_msg("ERROR: Invalid node ID " << n << " selected for EDGE2/3!");
         }
     case TRI6:
       switch (n)
@@ -170,7 +173,7 @@ unsigned int hierarchic_n_dofs_at_node(const ElemType t,
 
           // Internal DoFs are associated with the elem, not its nodes
         default:
-          libmesh_error();
+          libmesh_error_msg("ERROR: Invalid node ID " << n << " selected for TRI6!");
         }
     case QUAD4:
       libmesh_assert_less (n, 4);
@@ -196,7 +199,7 @@ unsigned int hierarchic_n_dofs_at_node(const ElemType t,
           return 0;
 
         default:
-          libmesh_error();
+          libmesh_error_msg("ERROR: Invalid node ID " << n << " selected for QUAD4/8/9!");
         }
     case HEX8:
       libmesh_assert_less (n, 8);
@@ -243,18 +246,17 @@ unsigned int hierarchic_n_dofs_at_node(const ElemType t,
         case 26:
           return 0;
         default:
-          libmesh_error();
+          libmesh_error_msg("ERROR: Invalid node ID " << n << " selected for HEX8/20/27!");
         }
+
+    case INVALID_ELEM:
+      return 0;
+
     default:
-#ifdef DEBUG
-      libMesh::err << "ERROR: Bad ElemType = " << t
-                   << std::endl;
-#endif
-      libmesh_error();
+      libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
     }
 
-  libmesh_error();
-
+  libmesh_error_msg("We'll never get here!");
   return 0;
 } // hierarchic_n_dofs_at_node()
 
@@ -286,16 +288,13 @@ unsigned int hierarchic_n_dofs_per_elem(const ElemType t,
       return 0;
     case HEX27:
       return ((o-1)*(o-1)*(o-1));
+    case INVALID_ELEM:
+      return 0;
     default:
-#ifdef DEBUG
-      libMesh::err << "ERROR: Bad ElemType = " << t
-                   << std::endl;
-#endif
-      libmesh_error();
+      libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
     }
 
-  // Will never get here...
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0;
 } // hierarchic_n_dofs_per_elem()
 

@@ -4,8 +4,8 @@ dnl -------------------------------------------------------------
 AC_DEFUN([CONFIGURE_TBB],
 [
   AC_ARG_ENABLE(tbb,
-                AC_HELP_STRING([--enable-tbb],
-                               [build with threading support via Threading Building Blocks]),
+                AS_HELP_STRING([--disable-tbb],
+                               [build without threading support via Threading Building Blocks]),
 		[case "${enableval}" in
 		  yes)  enabletbb=yes ;;
 		   no)  enabletbb=no ;;
@@ -17,12 +17,12 @@ AC_DEFUN([CONFIGURE_TBB],
   if (test $enabletbb = yes); then
 
     AC_ARG_WITH(tbb,
-                AC_HELP_STRING([--with-tbb=PATH],[Specify the path where Threading Building Blocks is installed]),
+                AS_HELP_STRING([--with-tbb=PATH],[Specify the path where Threading Building Blocks is installed]),
                 withtbb=$withval,
                 withtbb=$TBB_DIR)
 
     AC_ARG_WITH(tbb-lib,
-                AC_HELP_STRING([--with-tbb-lib=PATH],[Specify the path to Threading Building Blocks libraries]),
+                AS_HELP_STRING([--with-tbb-lib=PATH],[Specify the path to Threading Building Blocks libraries]),
                 withtbblib=$withval,
                 withtbblib=$TBB_LIB_PATH)
 

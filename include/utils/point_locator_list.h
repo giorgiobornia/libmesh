@@ -62,9 +62,6 @@ class Elem;
  *
  * @author Daniel Dreyer, 2003
  */
-
-// ------------------------------------------------------------
-// PointLocatorList class definition
 class PointLocatorList : public PointLocatorBase
 {
 public:
@@ -80,9 +77,6 @@ public:
    */
   PointLocatorList (const MeshBase& mesh,
                     const PointLocatorBase* master = NULL);
-
-
-public:
 
   /**
    * Destructor.
@@ -103,10 +97,12 @@ public:
   virtual void init();
 
   /**
-   * Locates the element in which the point with global coordinates
-   * \p p is located.  Overloaded from base class.
+   * Locates the element, with dimension elem_dim, in which the point with global
+   * coordinates \p p is located, optionally restricted to a set of allowed subdomains.
+   * Overloaded from base class.
    */
-  virtual const Elem* operator() (const Point& p) const;
+  virtual const Elem* operator() (const Point& p, const unsigned int elem_dim,
+                                  const std::set<subdomain_id_type> *allowed_subdomains = NULL) const;
 
   /**
    * Enables out-of-mesh mode.  In this mode, if asked to find a point
@@ -114,17 +110,28 @@ public:
    * return a NULL pointer instead of crashing.  Per default, this
    * mode is off.
    */
-  virtual void enable_out_of_mesh_mode (void);
+  virtual void enable_out_of_mesh_mode ();
 
   /**
    * Disables out-of-mesh mode (default).  If asked to find a point
    * that is contained in no mesh at all, the point locator will now
    * crash.
    */
-  virtual void disable_out_of_mesh_mode (void);
+  virtual void disable_out_of_mesh_mode ();
+
+  /**
+   * Set a tolerance to use when determining
+   * if a point is contained within the mesh.
+   */
+  virtual void set_close_to_point_tol(Real close_to_point_tol);
+
+  /**
+   * Specify that we do not want to use a user-specified tolerance to
+   * determine if a point is contained within the mesh.
+   */
+  virtual void unset_close_to_point_tol();
 
 protected:
-
   /**
    * Pointer to the list of element centroids.  Only the
    * master @e has such a list.  For servants, this
@@ -132,12 +139,7 @@ protected:
    * it's not a std::list as the name might suggest, but a std::vector.
    */
   std::vector<std::pair<Point, const Elem *> >* _list;
-
 };
-
-
-// ------------------------------------------------------------
-// PointLocatorList inline methods
 
 
 } // namespace libMesh

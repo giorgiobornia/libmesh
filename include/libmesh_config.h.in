@@ -121,6 +121,10 @@
    support */
 #undef ENABLE_NODE_CONSTRAINTS
 
+/* Flag indicating if the library should compute and store node valence values
+   */
+#undef ENABLE_NODE_VALENCE
+
 /* Flag indicating if the library should use the experimental ParallelMesh as
    its default Mesh type */
 #undef ENABLE_PARMESH
@@ -140,6 +144,10 @@
 /* Flag indicating if the library should be built with second derivatives */
 #undef ENABLE_SECOND_DERIVATIVES
 
+/* Flag indicating if the library should be built with compile time and date
+   timestamps */
+#undef ENABLE_TIMESTAMPS
+
 /* Flag indicating if the library should be built to write stack trace files
    on unexpected errors */
 #undef ENABLE_TRACEFILES
@@ -154,6 +162,12 @@
 /* Flag indicating if the library should have warnings enabled */
 #undef ENABLE_WARNINGS
 
+/* Enable fparser debugging functions */
+#undef FPARSER_SUPPORT_DEBUGGING
+
+/* command to invoke gdb */
+#undef GDB_COMMAND
+
 /* Flag indicating whether the library shall be compiled to use the Trilinos
    solver collection */
 #undef HAVE_AZTECOO
@@ -167,6 +181,36 @@
 
 /* Define to 1 if you have the <csignal> header file. */
 #undef HAVE_CSIGNAL
+
+/* define if the compiler supports basic C++11 syntax */
+#undef HAVE_CXX11
+
+/* Flag indicating whether compiler supports initializer lists */
+#undef HAVE_CXX11_INITIALIZER_LIST
+
+/* Flag indicating whether compiler supports std::move */
+#undef HAVE_CXX11_MOVE
+
+/* Flag indicating whether compiler supports the override keyword */
+#undef HAVE_CXX11_OVERRIDE
+
+/* Flag indicating whether compiler supports std::regex */
+#undef HAVE_CXX11_REGEX
+
+/* Flag indicating whether compiler supports std::shared_ptr */
+#undef HAVE_CXX11_SHARED_PTR
+
+/* Flag indicating whether compiler supports std::thread */
+#undef HAVE_CXX11_THREAD
+
+/* Flag indicating whether compiler supports std::thread */
+#undef HAVE_CXX11_TYPE_TRAITS
+
+/* Flag indicating whether compiler supports std::unique_ptr */
+#undef HAVE_CXX11_UNIQUE_PTR
+
+/* Flag indicating whether compiler supports variadic templates */
+#undef HAVE_CXX11_VARIADIC_TEMPLATES
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
@@ -211,6 +255,10 @@
 
 /* Flag indicating whether FPARSER will build the full development version */
 #undef HAVE_FPARSER_DEVEL
+
+/* Flag indicating whether FPARSER will be built with JIT compilation enabled
+   */
+#undef HAVE_FPARSER_JIT
 
 /* define if the compiler supports GCC C++ ABI name demangling */
 #undef HAVE_GCC_ABI_DEMANGLE
@@ -308,6 +356,9 @@
 
 /* Have PTHREAD_PRIO_INHERIT. */
 #undef HAVE_PTHREAD_PRIO_INHERIT
+
+/* Flag indicating whether the library will be compiled with Qhull support */
+#undef HAVE_QHULL_API
 
 /* Define to 1 if you have the <rpc/rpc.h> header file. */
 #undef HAVE_RPC_RPC_H
@@ -452,6 +503,9 @@
 
 /* libMesh minor version number */
 #undef MINOR_VERSION
+
+/* Define to 1 if your C compiler doesn't accept -c and -o together. */
+#undef NO_MINUS_C_MINUS_O
 
 /* Name of package */
 #undef PACKAGE

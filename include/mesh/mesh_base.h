@@ -47,6 +47,8 @@ class Node;
 class Point;
 class MeshData;
 
+template <class MT>
+class MeshInput;
 
 
 /**
@@ -75,8 +77,8 @@ public:
    * The mesh dimension can be changed (and may automatically be
    * changed by mesh generation/loading) later.
    */
-  MeshBase (const Parallel::Communicator &comm,
-            unsigned int dim=1);
+  MeshBase (const Parallel::Communicator &comm_in,
+            unsigned char dim=1);
 
 #ifndef LIBMESH_DISABLE_COMMWORLD
   /**
@@ -84,7 +86,7 @@ public:
    * The mesh dimension can be changed (and may automatically be
    * changed by mesh generation/loading) later.
    */
-  MeshBase (unsigned int dim=1);
+  MeshBase (unsigned char dim=1);
 #endif
 
   /**
@@ -103,16 +105,19 @@ public:
   virtual ~MeshBase ();
 
   /**
-   * This class holds the boundary information.  It can store nodes, edges,
-   * and faces with a corresponding id that facilitates setting boundary
-   * conditions.
-   */
-  AutoPtr<BoundaryInfo> boundary_info;
-
-  /**
    * A partitioner to use at each prepare_for_use()
    */
   virtual AutoPtr<Partitioner> &partitioner() { return _partitioner; }
+
+  /**
+   * The information about boundary ids on the mesh
+   */
+  const BoundaryInfo& get_boundary_info() const { return *boundary_info; }
+
+  /**
+   * Writeable information about boundary ids on the mesh
+   */
+  BoundaryInfo& get_boundary_info() { return *boundary_info; }
 
   /**
    * Deletes all the data that are currently stored.
@@ -152,21 +157,30 @@ public:
    * multi-dimensional meshes (e.g. hexes and quads in the same mesh)
    * then this will return the largest such dimension.
    */
-  unsigned int mesh_dimension () const
-  { return static_cast<unsigned int>(_dim); }
+  unsigned int mesh_dimension () const;
 
   /**
-   * Resets the logical dimension of the mesh.
+   * Resets the logical dimension of the mesh. If the mesh has
+   * elements of multiple dimensions, this should be set to the largest
+   * dimension. E.g. if the mesh has 1D and 2D elements, this should
+   * be set to 2. If the mesh has 2D and 3D elements, this should be
+   * set to 3.
    */
-  void set_mesh_dimension (unsigned int d)
-  { _dim = d; }
+  void set_mesh_dimension (unsigned char d)
+  { _elem_dims.clear(); _elem_dims.insert(d); }
+
+  /**
+   * @returns set of dimensions of elements present in the mesh.
+   */
+  const std::set<unsigned char>& elem_dimensions() const
+  { return _elem_dims; }
 
   /**
    * Returns the spatial dimension of the mesh.  Note that this is
    * defined at compile time in the header \p libmesh_common.h.
    */
   unsigned int spatial_dimension () const
-  { return static_cast<unsigned int>(LIBMESH_DIM); }
+  { return cast_int<unsigned int>(LIBMESH_DIM); }
 
   /**
    * Returns the number of nodes in the mesh. This function and others must
@@ -496,10 +510,11 @@ public:
 
   /**
    * Prepare a newly created (or read) mesh for use.
-   * This involves 3 steps:
+   * This involves 4 steps:
    *  1.) call \p find_neighbors()
    *  2.) call \p partition()
    *  3.) call \p renumber_nodes_and_elements()
+   *  4.) call \p cache_elem_dims()
    *
    * The argument to skip renumbering is now deprecated - to prevent a
    * mesh from being renumbered, set allow_renumbering(false).
@@ -699,14 +714,10 @@ public:
   const std::string& subdomain_name(subdomain_id_type id) const;
 
   /**
-   * Returns a the id of the requested block by name.  Throws an error
-   * if a block by name is not found
+   * Returns the id of the named subdomain if it exists,
+   * Elem::invalid_subdomain_id otherwise.
    */
   subdomain_id_type get_id_by_name(const std::string& name) const;
-
-public:
-
-
 
   /**
    * Elem iterator accessor functions.  These must be defined in
@@ -728,6 +739,10 @@ public:
   virtual element_iterator not_subactive_elements_end       () = 0;
   virtual element_iterator local_elements_begin             () = 0;
   virtual element_iterator local_elements_end               () = 0;
+  virtual element_iterator semilocal_elements_begin         () = 0;
+  virtual element_iterator semilocal_elements_end           () = 0;
+  virtual element_iterator facelocal_elements_begin         () = 0;
+  virtual element_iterator facelocal_elements_end           () = 0;
   virtual element_iterator not_local_elements_begin         () = 0;
   virtual element_iterator not_local_elements_end           () = 0;
   virtual element_iterator active_local_elements_begin      () = 0;
@@ -779,6 +794,10 @@ public:
   virtual const_element_iterator not_subactive_elements_end       () const = 0;
   virtual const_element_iterator local_elements_begin             () const = 0;
   virtual const_element_iterator local_elements_end               () const = 0;
+  virtual const_element_iterator semilocal_elements_begin         () const = 0;
+  virtual const_element_iterator semilocal_elements_end           () const = 0;
+  virtual const_element_iterator facelocal_elements_begin         () const = 0;
+  virtual const_element_iterator facelocal_elements_end           () const = 0;
   virtual const_element_iterator not_local_elements_begin         () const = 0;
   virtual const_element_iterator not_local_elements_end           () const = 0;
   virtual const_element_iterator active_local_elements_begin      () const = 0;
@@ -843,6 +862,19 @@ public:
   const std::map<subdomain_id_type, std::string>& get_subdomain_name_map () const
   { return _block_id_to_name; }
 
+
+
+  /**
+   * This class holds the boundary information.  It can store nodes, edges,
+   * and faces with a corresponding id that facilitates setting boundary
+   * conditions.
+   *
+   * Direct access to this class will be removed in future libMesh
+   * versions.  Use the \p get_boundary_info() accessor instead.
+   */
+  AutoPtr<BoundaryInfo> boundary_info;
+
+
 protected:
 
   /**
@@ -860,6 +892,12 @@ protected:
   { return _n_parts; }
 
   /**
+   * Search the mesh and cache the different dimenions of the elements
+   * present in the mesh.
+   */
+  void cache_elem_dims();
+
+  /**
    * The number of partitions the mesh has.  This is set by
    * the partitioners, and may not be changed directly by
    * the user.
@@ -869,11 +907,6 @@ protected:
    * processor and view the result in GMV.
    */
   unsigned int _n_parts;
-
-  /**
-   * The logical dimension of the mesh.
-   */
-  unsigned int _dim;
 
   /**
    * Flag indicating if the mesh has been prepared for use.
@@ -924,10 +957,23 @@ protected:
   std::map<subdomain_id_type, std::string> _block_id_to_name;
 
   /**
+   * We cache the dimension of the elements present in the mesh.
+   * So, if we have a mesh with 1D and 2D elements, this structure
+   * will contain 1 and 2.
+   */
+  std::set<unsigned char> _elem_dims;
+
+  /**
    * The partitioner class is a friend so that it can set
    * the number of partitions.
    */
   friend class Partitioner;
+
+  /**
+   * The MeshInput classes are friends so that they can set the number
+   * of partitions.
+   */
+  friend class MeshInput<MeshBase>;
 
   /**
    * Make the \p BoundaryInfo class a friend so that

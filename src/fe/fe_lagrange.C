@@ -23,6 +23,7 @@
 #include "libmesh/fe_interface.h"
 #include "libmesh/elem.h"
 #include "libmesh/threads.h"
+#include "libmesh/string_to_enum.h"
 
 namespace libMesh
 {
@@ -348,6 +349,7 @@ unsigned int lagrange_n_dofs(const ElemType t, const Order o)
             return 2;
 
           case TRI3:
+          case TRI3SUBDIVISION:
           case TRI6:
             return 3;
 
@@ -375,15 +377,11 @@ unsigned int lagrange_n_dofs(const ElemType t, const Order o)
           case PYRAMID14:
             return 5;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for FIRST order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
@@ -429,15 +427,11 @@ unsigned int lagrange_n_dofs(const ElemType t, const Order o)
           case PYRAMID14:
             return 14;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for SECOND order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
@@ -451,23 +445,19 @@ unsigned int lagrange_n_dofs(const ElemType t, const Order o)
           case EDGE4:
             return 4;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for THIRD order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
     default:
-      libmesh_error();
+      libmesh_error_msg("ERROR: Invalid Order " << Utility::enum_to_string(o) << " selected for LAGRANGE FE family!");
     }
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0;
 }
 
@@ -505,6 +495,7 @@ unsigned int lagrange_n_dofs_at_node(const ElemType t,
             }
 
           case TRI3:
+          case TRI3SUBDIVISION:
           case TRI6:
             {
               switch (n)
@@ -611,15 +602,11 @@ unsigned int lagrange_n_dofs_at_node(const ElemType t,
                 }
             }
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for FIRST order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
@@ -643,15 +630,11 @@ unsigned int lagrange_n_dofs_at_node(const ElemType t,
           case PYRAMID14:
             return 1;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for SECOND order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
@@ -663,15 +646,11 @@ unsigned int lagrange_n_dofs_at_node(const ElemType t,
           case EDGE4:
             return 1;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for THIRD order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
@@ -679,7 +658,7 @@ unsigned int lagrange_n_dofs_at_node(const ElemType t,
       libmesh_error_msg("Unsupported order: " << o );
     }
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0;
 
 }

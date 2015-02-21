@@ -22,8 +22,8 @@
 AC_DEFUN([CONFIGURE_EIGEN],
 [
   AC_ARG_ENABLE(eigen,
-                AC_HELP_STRING([--enable-eigen],
-                               [build with Eigen linear algebra support]),
+                AS_HELP_STRING([--disable-eigen],
+                               [build without Eigen linear algebra support]),
 		[case "${enableval}" in
 		  yes)  enableeigen=yes ;;
 		   no)  enableeigen=no ;;
@@ -41,7 +41,7 @@ AC_DEFUN([CONFIGURE_EIGEN],
 
     # User-specific include path
     AC_ARG_WITH(eigen-include,
-                AC_HELP_STRING([--with-eigen-include=PATH],[Specify the path for EIGEN header files]),
+                AS_HELP_STRING([--with-eigen-include=PATH],[Specify the path for EIGEN header files]),
                 witheigeninc=$withval,
                 witheigeninc=no)
 
@@ -77,6 +77,22 @@ AC_DEFUN([CONFIGURE_EIGEN],
 
     externaleigenincFound=no;
     AC_CHECK_HEADERS($EIGEN_INC/Eigen/Eigen, externaleigenincFound=yes)
+
+    # Check to make sure the external header files are sufficiently up
+    # to date - this fixes our Eigen detection on Scientific Linux 6
+    if (test x$externaleigenincFound = xyes); then
+        ac_eigen_save_CPPFLAGS="$CPPFLAGS"
+	CPPFLAGS="-I${EIGEN_INC} ${CPPFLAGS}"
+
+	AC_CHECK_HEADERS([Eigen/Dense],[],[enableeigenincFound=no])
+
+        if (test x$enableeigensparse = xyes); then
+	    AC_CHECK_HEADERS([Eigen/Sparse],[],[enableeigenincFound=no])
+        fi
+
+	CPPFLAGS="${ac_eigen_save_CPPFLAGS}"
+    fi
+
 
     if (test x$externaleigenincFound = xyes); then
         EIGEN_INCLUDE="-I$EIGEN_INC"

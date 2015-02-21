@@ -1,5 +1,5 @@
 /***************************************************************************\
-|* Function Parser for C++ v4.5                                            *|
+|* Function Parser for C++ v4.5.1                                          *|
 |*-------------------------------------------------------------------------*|
 |* Copyright: Juha Nieminen, Joel Yliluoma                                 *|
 |*                                                                         *|
@@ -7,7 +7,6 @@
 |* GNU Lesser General Public License version 3.                            *|
 |* (See lgpl.txt and gpl.txt for the license text.)                        *|
 \***************************************************************************/
-
 
 #include "libmesh_config.h"
 // Communicate to fparser that threads are being utilized
@@ -463,7 +462,7 @@ namespace
         return std::strtod(str, endptr);
     }
 
-#if defined(FP_USE_STRTOLD) || __cplusplus > 201100
+#if defined(FP_USE_STRTOLD) || defined(FP_SUPPORT_CPLUSPLUS11_MATH_FUNCS)
     template<>
     inline long double fp_parseLiteral<long double>(const char* str,
                                                     char** endptr)
@@ -923,39 +922,16 @@ void FunctionParserBase<Value_t>::ForceDeepCopy()
 //=========================================================================
 // Epsilon
 //=========================================================================
-template<> double FunctionParserBase<double>::sEpsilon = 1E-12;
-template<> float FunctionParserBase<float>::sEpsilon = 1E-5F;
-template<> long double FunctionParserBase<long double>::sEpsilon = 1E-14L;
-template<> long FunctionParserBase<long>::sEpsilon = 0;
-
-template<> std::complex<double>
-FunctionParserBase<std::complex<double> >::sEpsilon = 1E-12;
-
-template<> std::complex<float>
-FunctionParserBase<std::complex<float> >::sEpsilon = 1E-5F;
-
-template<> std::complex<long double>
-FunctionParserBase<std::complex<long double> >::sEpsilon = 1E-14L;
-
-#ifdef FP_SUPPORT_MPFR_FLOAT_TYPE
-template<> MpfrFloat
-FunctionParserBase<MpfrFloat>::sEpsilon(MpfrFloat::someEpsilon());
-#endif
-
-#ifdef FP_SUPPORT_GMP_INT_TYPE
-template<> GmpInt FunctionParserBase<GmpInt>::sEpsilon = 0;
-#endif
-
 template<typename Value_t>
 Value_t FunctionParserBase<Value_t>::epsilon()
 {
-    return sEpsilon;
+    return Epsilon<Value_t>::value;
 }
 
 template<typename Value_t>
 void FunctionParserBase<Value_t>::setEpsilon(Value_t value)
 {
-    sEpsilon = value;
+    Epsilon<Value_t>::value = value;
 }
 
 
@@ -1672,7 +1648,18 @@ inline void FunctionParserBase<Value_t>::AddFunctionOpcode(unsigned opcode)
 {
 #define FP_FLOAT_VERSION 1
 #define FP_COMPLEX_VERSION 0
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc99-extensions"
+#endif
+
 #include "extrasrc/fp_opcode_add.inc"
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
 #undef FP_COMPLEX_VERSION
 #undef FP_FLOAT_VERSION
 }
@@ -1684,7 +1671,18 @@ inline void FunctionParserBase<long>::AddFunctionOpcode(unsigned opcode)
     typedef long Value_t;
 #define FP_FLOAT_VERSION 0
 #define FP_COMPLEX_VERSION 0
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc99-extensions"
+#endif
+
 #include "extrasrc/fp_opcode_add.inc"
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
 #undef FP_COMPLEX_VERSION
 #undef FP_FLOAT_VERSION
 }
@@ -1697,7 +1695,18 @@ inline void FunctionParserBase<GmpInt>::AddFunctionOpcode(unsigned opcode)
     typedef GmpInt Value_t;
 #define FP_FLOAT_VERSION 0
 #define FP_COMPLEX_VERSION 0
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc99-extensions"
+#endif
+
 #include "extrasrc/fp_opcode_add.inc"
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
 #undef FP_COMPLEX_VERSION
 #undef FP_FLOAT_VERSION
 }
@@ -1710,7 +1719,18 @@ inline void FunctionParserBase<std::complex<double> >::AddFunctionOpcode(unsigne
     typedef std::complex<double> Value_t;
 #define FP_FLOAT_VERSION 1
 #define FP_COMPLEX_VERSION 1
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc99-extensions"
+#endif
+
 #include "extrasrc/fp_opcode_add.inc"
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
 #undef FP_COMPLEX_VERSION
 #undef FP_FLOAT_VERSION
 }
@@ -1723,7 +1743,18 @@ inline void FunctionParserBase<std::complex<float> >::AddFunctionOpcode(unsigned
     typedef std::complex<float> Value_t;
 #define FP_FLOAT_VERSION 1
 #define FP_COMPLEX_VERSION 1
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc99-extensions"
+#endif
+
 #include "extrasrc/fp_opcode_add.inc"
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
 #undef FP_COMPLEX_VERSION
 #undef FP_FLOAT_VERSION
 }
@@ -1736,7 +1767,18 @@ inline void FunctionParserBase<std::complex<long double> >::AddFunctionOpcode(un
     typedef std::complex<long double> Value_t;
 #define FP_FLOAT_VERSION 1
 #define FP_COMPLEX_VERSION 1
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc99-extensions"
+#endif
+
 #include "extrasrc/fp_opcode_add.inc"
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
 #undef FP_COMPLEX_VERSION
 #undef FP_FLOAT_VERSION
 }
@@ -3781,7 +3823,8 @@ void FunctionParserBase<Value_t>::PrintByteCode(std::ostream& dest,
 #endif
 
 
-#ifndef FP_SUPPORT_OPTIMIZER
+//#ifndef FP_SUPPORT_OPTIMIZER
+#ifdef FP_DUMMY_OPTIMIZER
 template<typename Value_t>
 void FunctionParserBase<Value_t>::Optimize()
 {
@@ -3789,4 +3832,42 @@ void FunctionParserBase<Value_t>::Optimize()
 }
 #endif
 
-FUNCTIONPARSER_INSTANTIATE_TYPES
+
+#define FUNCTIONPARSER_INSTANTIATE_CLASS(type) \
+    template class FunctionParserBase< type >;
+
+#ifndef FP_DISABLE_DOUBLE_TYPE
+FUNCTIONPARSER_INSTANTIATE_CLASS(double)
+#endif
+
+#ifdef FP_SUPPORT_FLOAT_TYPE
+FUNCTIONPARSER_INSTANTIATE_CLASS(float)
+#endif
+
+#ifdef FP_SUPPORT_LONG_DOUBLE_TYPE
+FUNCTIONPARSER_INSTANTIATE_CLASS(long double)
+#endif
+
+#ifdef FP_SUPPORT_LONG_INT_TYPE
+FUNCTIONPARSER_INSTANTIATE_CLASS(long)
+#endif
+
+#ifdef FP_SUPPORT_MPFR_FLOAT_TYPE
+FUNCTIONPARSER_INSTANTIATE_CLASS(MpfrFloat)
+#endif
+
+#ifdef FP_SUPPORT_GMP_INT_TYPE
+FUNCTIONPARSER_INSTANTIATE_CLASS(GmpInt)
+#endif
+
+#ifdef FP_SUPPORT_COMPLEX_DOUBLE_TYPE
+FUNCTIONPARSER_INSTANTIATE_CLASS(std::complex<double>)
+#endif
+
+#ifdef FP_SUPPORT_COMPLEX_FLOAT_TYPE
+FUNCTIONPARSER_INSTANTIATE_CLASS(std::complex<float>)
+#endif
+
+#ifdef FP_SUPPORT_COMPLEX_LONG_DOUBLE_TYPE
+FUNCTIONPARSER_INSTANTIATE_CLASS(std::complex<long double>)
+#endif

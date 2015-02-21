@@ -152,7 +152,6 @@ void WeightedPatchRecoveryErrorEstimator::EstimateError::operator()(const ConstE
       // Process each variable in the system using the current patch
       for (unsigned int var=0; var<n_vars; var++)
         {
-#ifndef DEBUG
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
           libmesh_assert (error_estimator.error_norm.type(var) == L2 ||
                           error_estimator.error_norm.type(var) == H1_SEMINORM ||
@@ -192,7 +191,6 @@ void WeightedPatchRecoveryErrorEstimator::EstimateError::operator()(const ConstE
                              (error_estimator.error_norm.type(var-1) == L_INF ||
                               error_estimator.error_norm.type(var-1) == W1_INF_SEMINORM ||
                               error_estimator.error_norm.type(var-1) == W2_INF_SEMINORM)));
-#endif
 
           // Possibly skip this variable
           if (error_estimator.error_norm.weight(var) == 0.0) continue;
@@ -331,7 +329,7 @@ void WeightedPatchRecoveryErrorEstimator::EstimateError::operator()(const ConstE
               libmesh_assert (dof_indices.size() == phi->size());
 
               const unsigned int n_dofs =
-                libmesh_cast_int<unsigned int>(dof_indices.size());
+                cast_int<unsigned int>(dof_indices.size());
               const unsigned int n_qp   = qrule->n_points();
 
               // Compute the weighted projection components from this cell.
@@ -469,13 +467,11 @@ void WeightedPatchRecoveryErrorEstimator::EstimateError::operator()(const ConstE
 #endif
                         }
 #else
-                      libMesh::err << "ERROR:  --enable-second-derivatives is required\n"
-                                   << "        for _sobolev_order == 2!\n";
-                      libmesh_error();
+                      libmesh_error_msg("ERROR:  --enable-second-derivatives is required \nfor _sobolev_order == 2!");
 #endif
                     }
                   else
-                    libmesh_error();
+                    libmesh_error_msg("Unsupported error norm type!");
                 } // end quadrature loop
             } // end patch loop
 
@@ -603,7 +599,7 @@ void WeightedPatchRecoveryErrorEstimator::EstimateError::operator()(const ConstE
 
               // The number of dofs for this variable on this element
               const unsigned int n_dofs =
-                libmesh_cast_int<unsigned int>(dof_indices.size());
+                cast_int<unsigned int>(dof_indices.size());
 
               // Variable to hold the error on the current element
               Real element_error = 0;
@@ -620,7 +616,7 @@ void WeightedPatchRecoveryErrorEstimator::EstimateError::operator()(const ConstE
 
               // The number of points we will sample over
               const unsigned int n_sp =
-                libmesh_cast_int<unsigned int>(JxW.size());
+                cast_int<unsigned int>(JxW.size());
 
               // Loop over every sample point for the current element
               for (unsigned int sp=0; sp<n_sp; sp++)
@@ -770,9 +766,7 @@ void WeightedPatchRecoveryErrorEstimator::EstimateError::operator()(const ConstE
                       temperr[5] -= hess_u_h(1,2);
 #endif
 #else
-                      libMesh::err << "ERROR:  --enable-second-derivatives is required\n"
-                                   << "        for _sobolev_order == 2!\n";
-                      libmesh_error();
+                      libmesh_error_msg("ERROR:  --enable-second-derivatives is required \nfor _sobolev_order == 2!");
 #endif
                     }
 
@@ -825,7 +819,7 @@ void WeightedPatchRecoveryErrorEstimator::EstimateError::operator()(const ConstE
                        error_estimator.error_norm.type(var) == H2_SEMINORM)
                 new_error_per_cell[e] += error_estimator.error_norm.weight_sq(var) * element_error;
               else
-                libmesh_error();
+                libmesh_error_msg("Unsupported error norm type!");
             }  // End (re) loop over patch elements
 
         } // end variables loop

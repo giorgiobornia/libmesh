@@ -21,6 +21,8 @@
 #include "libmesh/fem_system.h"
 #include "libmesh/parameter_vector.h"
 
+using namespace libMesh;
+
 // FEMSystem, TimeSolver and  NewtonSolver will handle most tasks,
 // but we must specify element residuals
 class HeatSystem : public FEMSystem
@@ -41,7 +43,7 @@ public:
   bool & analytic_jacobians() { return _analytic_jacobians; }
 
   // A function to compute and accumulate residuals
-  void perturb_accumulate_residuals(const ParameterVector& parameters);
+  void perturb_accumulate_residuals(ParameterVector& parameters);
 
   // Sensitivity Calculation
   Number & compute_final_sensitivity()

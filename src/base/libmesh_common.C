@@ -17,6 +17,7 @@
 
 
 // libmesh includes
+#include "libmesh/libmesh.h"
 #include "libmesh/libmesh_common.h"
 #include "libmesh/print_trace.h"
 
@@ -62,7 +63,10 @@ void stop(const char* file, int line, const char* date, const char* time)
 
 void report_error(const char* file, int line, const char* date, const char* time)
 {
-  if (libMesh::global_n_processors() == 1)
+  if (libMesh::global_n_processors() == 1 ||
+      // Note: support both 'underscore' and 'dash' flavors of the option
+      libMesh::on_command_line("--print_trace") ||
+      libMesh::on_command_line("--print-trace"))
     libMesh::print_trace();
   else
     libMesh::write_traceout();

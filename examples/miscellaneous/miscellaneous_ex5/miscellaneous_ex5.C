@@ -455,7 +455,7 @@ int main (int argc, char** argv)
 
   // Skip adaptive examples on a non-adaptive libMesh build
 #ifndef LIBMESH_ENABLE_AMR
-  libmesh_example_assert(false, "--enable-amr");
+  libmesh_example_requires(false, "--enable-amr");
 #else
 
   //Parse the input file
@@ -475,7 +475,7 @@ int main (int argc, char** argv)
   const unsigned int dim                       = input_file("dimension", 3);
 
   // Skip higher-dimensional examples on a lower-dimensional libMesh build
-  libmesh_example_assert(dim <= LIBMESH_DIM, "2D/3D support");
+  libmesh_example_requires(dim <= LIBMESH_DIM, "2D/3D support");
 
 
   // Create a mesh, with dimension to be overridden later, distributed
@@ -522,11 +522,9 @@ int main (int argc, char** argv)
     {
       std::string fe_str = command_line_value( std::string("element_type"),
                                                std::string("MONOMIAL") );
-      if( fe_str != "MONOMIAL" || fe_str != "XYZ" )
-        {
-          std::cerr << "Error: This example must be run with MONOMIAL or XYZ element types." << std::endl;
-          libmesh_error();
-        }
+      if (fe_str != "MONOMIAL" || fe_str != "XYZ")
+        libmesh_error_msg("Error: This example must be run with MONOMIAL or XYZ element types.");
+
       ellipticdg_system.add_variable ("u", p_order, Utility::string_to_enum<FEFamily>(fe_str) );
     }
   else

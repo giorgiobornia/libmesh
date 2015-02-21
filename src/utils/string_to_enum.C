@@ -104,57 +104,60 @@ void init_elem_type_to_enum ()
 {
   if (elem_type_to_enum.empty())
     {
-      elem_type_to_enum["EDGE"      ]=EDGE2;
-      elem_type_to_enum["EDGE2"     ]=EDGE2;
-      elem_type_to_enum["EDGE3"     ]=EDGE3;
-      elem_type_to_enum["EDGE4"     ]=EDGE4;
+      elem_type_to_enum["EDGE"           ]=EDGE2;
+      elem_type_to_enum["EDGE2"          ]=EDGE2;
+      elem_type_to_enum["EDGE3"          ]=EDGE3;
+      elem_type_to_enum["EDGE4"          ]=EDGE4;
 
-      elem_type_to_enum["TRI"       ]=TRI3;
-      elem_type_to_enum["TRI3"      ]=TRI3;
-      elem_type_to_enum["TRI6"      ]=TRI6;
+      elem_type_to_enum["TRI"            ]=TRI3;
+      elem_type_to_enum["TRI3"           ]=TRI3;
+      elem_type_to_enum["TRI3SUBDIVISION"]=TRI3SUBDIVISION;
+      elem_type_to_enum["TRI6"           ]=TRI6;
 
-      elem_type_to_enum["QUAD"      ]=QUAD4;
-      elem_type_to_enum["QUAD4"     ]=QUAD4;
-      elem_type_to_enum["QUAD8"     ]=QUAD8;
-      elem_type_to_enum["QUAD9"     ]=QUAD9;
+      elem_type_to_enum["QUAD"           ]=QUAD4;
+      elem_type_to_enum["QUAD4"          ]=QUAD4;
+      elem_type_to_enum["QUAD8"          ]=QUAD8;
+      elem_type_to_enum["QUAD9"          ]=QUAD9;
 
-      elem_type_to_enum["TET"       ]=TET4;
-      elem_type_to_enum["TET4"      ]=TET4;
-      elem_type_to_enum["TET10"     ]=TET10;
+      elem_type_to_enum["TET"            ]=TET4;
+      elem_type_to_enum["TET4"           ]=TET4;
+      elem_type_to_enum["TET10"          ]=TET10;
 
-      elem_type_to_enum["HEX"       ]=HEX8;
-      elem_type_to_enum["HEX8"      ]=HEX8;
-      elem_type_to_enum["HEX20"     ]=HEX20;
-      elem_type_to_enum["HEX27"     ]=HEX27;
+      elem_type_to_enum["HEX"            ]=HEX8;
+      elem_type_to_enum["HEX8"           ]=HEX8;
+      elem_type_to_enum["HEX20"          ]=HEX20;
+      elem_type_to_enum["HEX27"          ]=HEX27;
 
-      elem_type_to_enum["PRISM"     ]=PRISM6;
-      elem_type_to_enum["PRISM6"    ]=PRISM6;
-      elem_type_to_enum["PRISM15"   ]=PRISM15;
-      elem_type_to_enum["PRISM18"   ]=PRISM18;
+      elem_type_to_enum["PRISM"          ]=PRISM6;
+      elem_type_to_enum["PRISM6"         ]=PRISM6;
+      elem_type_to_enum["PRISM15"        ]=PRISM15;
+      elem_type_to_enum["PRISM18"        ]=PRISM18;
 
-      elem_type_to_enum["PYRAMID"   ]=PYRAMID5;
-      elem_type_to_enum["PYRAMID5"  ]=PYRAMID5;
-      elem_type_to_enum["PYRAMID13" ]=PYRAMID13;
-      elem_type_to_enum["PYRAMID14" ]=PYRAMID14;
+      elem_type_to_enum["PYRAMID"        ]=PYRAMID5;
+      elem_type_to_enum["PYRAMID5"       ]=PYRAMID5;
+      elem_type_to_enum["PYRAMID13"      ]=PYRAMID13;
+      elem_type_to_enum["PYRAMID14"      ]=PYRAMID14;
 
-      elem_type_to_enum["INFEDGE"   ]=INFEDGE2;
-      elem_type_to_enum["INFEDGE2"  ]=INFEDGE2;
+      elem_type_to_enum["INFEDGE"        ]=INFEDGE2;
+      elem_type_to_enum["INFEDGE2"       ]=INFEDGE2;
 
-      elem_type_to_enum["INFQUAD"   ]=INFQUAD4;
-      elem_type_to_enum["INFQUAD4"  ]=INFQUAD4;
-      elem_type_to_enum["INFQUAD6"  ]=INFQUAD6;
+      elem_type_to_enum["INFQUAD"        ]=INFQUAD4;
+      elem_type_to_enum["INFQUAD4"       ]=INFQUAD4;
+      elem_type_to_enum["INFQUAD6"       ]=INFQUAD6;
 
-      elem_type_to_enum["INFHEX"    ]=INFHEX8;
-      elem_type_to_enum["INFHEX8"   ]=INFHEX8;
-      elem_type_to_enum["INFHEX16"  ]=INFHEX16;
-      elem_type_to_enum["INFHEX18"  ]=INFHEX18;
+      elem_type_to_enum["INFHEX"         ]=INFHEX8;
+      elem_type_to_enum["INFHEX8"        ]=INFHEX8;
+      elem_type_to_enum["INFHEX16"       ]=INFHEX16;
+      elem_type_to_enum["INFHEX18"       ]=INFHEX18;
 
-      elem_type_to_enum["INFPRISM"  ]=INFPRISM6;
-      elem_type_to_enum["INFPRISM6" ]=INFPRISM6;
-      elem_type_to_enum["INFPRISM12"]=INFPRISM12;
+      elem_type_to_enum["INFPRISM"       ]=INFPRISM6;
+      elem_type_to_enum["INFPRISM6"      ]=INFPRISM6;
+      elem_type_to_enum["INFPRISM12"     ]=INFPRISM12;
 
-      elem_type_to_enum["NODE"      ]=NODEELEM;
-      elem_type_to_enum["NODEELEM"  ]=NODEELEM;
+      elem_type_to_enum["NODE"           ]=NODEELEM;
+      elem_type_to_enum["NODEELEM"       ]=NODEELEM;
+
+      elem_type_to_enum["INVALID_ELEM"   ]=INVALID_ELEM;
     }
 }
 
@@ -186,7 +189,8 @@ void init_order_to_enum ()
       order_to_enum["SIXTEENTH"    ]=SIXTEENTH;
       order_to_enum["SEVENTEENTH"  ]=SEVENTEENTH;
       order_to_enum["EIGHTTEENTH"  ]=EIGHTTEENTH;
-      order_to_enum["NINTEENTH"    ]=NINTEENTH;
+      order_to_enum["NINTEENTH"    ]=NINTEENTH; // deprecated
+      order_to_enum["NINETEENTH"   ]=NINETEENTH;
       order_to_enum["TWENTIETH"    ]=TWENTIETH;
 
       order_to_enum["TWENTYFIRST"  ]=TWENTYFIRST;
@@ -242,6 +246,7 @@ void init_fefamily_to_enum ()
       fefamily_to_enum["LEGENDRE"     ]=LEGENDRE;
       fefamily_to_enum["CLOUGH"       ]=CLOUGH;
       fefamily_to_enum["HERMITE"      ]=HERMITE;
+      fefamily_to_enum["SUBDIVISION"  ]=SUBDIVISION;
       fefamily_to_enum["NEDELEC_ONE"  ]=NEDELEC_ONE;
     }
 
@@ -277,6 +282,7 @@ void init_quadrature_type_to_enum ()
       quadrature_type_to_enum["QTRAP"      ]=QTRAP;
       quadrature_type_to_enum["QGRID"      ]=QGRID;
       quadrature_type_to_enum["QCLOUGH"    ]=QCLOUGH;
+      quadrature_type_to_enum["QGAUSS_LOBATTO"    ]=QGAUSS_LOBATTO;
     }
 }
 
@@ -618,7 +624,7 @@ namespace Utility {
     init_enum_to_##VAR_NAME ();                                         \
                                                                         \
     if (!enum_to_##VAR_NAME .count(e))                                  \
-      libmesh_error();                                                  \
+      libmesh_error_msg("No " #ENUM_NAME " with enumeration " << e << " found."); \
                                                                         \
     return enum_to_##VAR_NAME [e];                                      \
   }

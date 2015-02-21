@@ -72,16 +72,13 @@ int main (int argc, char** argv)
   LibMeshInit init (argc, argv);
 
   // Skip this 2D example if libMesh was compiled as 1D-only.
-  libmesh_example_assert(2 <= LIBMESH_DIM, "2D support");
+  libmesh_example_requires(2 <= LIBMESH_DIM, "2D support");
 
-  // Trilinos solver NaNs by default on the zero pressure block.
-  // We'll skip this example for now.
-  if (libMesh::default_solver_package() == TRILINOS_SOLVERS)
-    {
-      std::cout << "We skip example 13 when using the Trilinos solvers.\n"
-                << std::endl;
-      return 0;
-    }
+  // This example NaNs with the Eigen sparse linear solvers and
+  // Trilinos solvers, but should work OK with either PETSc or
+  // Laspack.
+  libmesh_example_requires(libMesh::default_solver_package() != EIGEN_SOLVERS, "--enable-petsc or --enable-laspack");
+  libmesh_example_requires(libMesh::default_solver_package() != TRILINOS_SOLVERS, "--enable-petsc or --enable-laspack");
 
   // Create a mesh, with dimension to be overridden later, distributed
   // across the default MPI communicator.
@@ -615,7 +612,9 @@ void assemble_stokes (EquationSystems& es,
                   // 3=left
 
                   // Set u = 1 on the top boundary, 0 everywhere else
-                  const Real u_value = (mesh.boundary_info->has_boundary_id(elem,s,2)) ? 1. : 0.;
+                  const Real u_value =
+                    (mesh.get_boundary_info().has_boundary_id(elem,s,2))
+                      ? 1. : 0.;
 
                   // Set v = 0 everywhere
                   const Real v_value = 0.;

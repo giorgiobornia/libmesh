@@ -100,15 +100,9 @@ int main (int argc, char** argv)
   // Check for proper calling arguments.
   if (argc < 3)
     {
-      if (init.comm().rank() == 0)
-        std::cerr << "Usage:\n"
-                  <<"\t " << argv[0] << " -d 2(3)" << " -n 15"
-                  << std::endl;
-
       // This handy function will print the file name, line number,
-      // and then abort.  Currrently the library does not use C++
-      // exception handling.
-      libmesh_error();
+      // specified message, and then throw an exception.
+      libmesh_error_msg("Usage:\n" << "\t " << argv[0] << " -d 2(3)" << " -n 15");
     }
 
   // Brief message to the user regarding the program name
@@ -132,7 +126,7 @@ int main (int argc, char** argv)
     dim = command_line.next(dim);
 
   // Skip higher-dimensional examples on a lower-dimensional libMesh build
-  libmesh_example_assert(dim <= LIBMESH_DIM, "2D/3D support");
+  libmesh_example_requires(dim <= LIBMESH_DIM, "2D/3D support");
 
   // Create a mesh with user-defined dimension on the default MPI
   // communicator.
@@ -157,8 +151,7 @@ int main (int argc, char** argv)
   if ((family == "MONOMIAL") || (family == "XYZ"))
     {
       if (mesh.processor_id() == 0)
-        std::cerr << "ex28 currently requires a C^0 (or higher) FE basis." << std::endl;
-      libmesh_error();
+        libmesh_error_msg("This example requires a C^0 (or higher) FE basis.");
     }
 
   // Use the MeshTools::Generation mesh generator to create a uniform

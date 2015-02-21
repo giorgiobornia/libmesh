@@ -1,5 +1,5 @@
 /***************************************************************************\
-|* Function Parser for C++ v4.5                                            *|
+|* Function Parser for C++ v4.5.1                                          *|
 |*-------------------------------------------------------------------------*|
 |* Copyright: Juha Nieminen, Joel Yliluoma                                 *|
 |*                                                                         *|
@@ -13,6 +13,14 @@
 
 #include <string>
 #include <vector>
+
+#include "libmesh_config.h"
+// Debugging support was enabled at compile time
+#ifdef LIBMESH_FPARSER_SUPPORT_DEBUGGING
+#  ifndef FUNCTIONPARSER_SUPPORT_DEBUGGING
+#    define FUNCTIONPARSER_SUPPORT_DEBUGGING
+#  endif
+#endif
 
 #ifdef FUNCTIONPARSER_SUPPORT_DEBUGGING
 #include <iostream>
@@ -94,7 +102,7 @@ class FunctionParserBase
 
 
     FunctionParserBase();
-    ~FunctionParserBase();
+    virtual ~FunctionParserBase();
 
     // Copy constructor and assignment operator (implemented using the
     // copy-on-write technique for efficiency):
@@ -138,7 +146,6 @@ class FunctionParserBase
 // ------------
     Data* mData;
     unsigned mStackPtr;
-    static Value_t sEpsilon;
 
 
 // Private methods:

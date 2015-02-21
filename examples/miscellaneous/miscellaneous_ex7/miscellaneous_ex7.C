@@ -42,18 +42,18 @@ int main(int argc, char** argv)
   else
     {
 #if !defined(LIBMESH_ENABLE_SECOND_DERIVATIVES)
-      libmesh_example_assert(false, "--enable-second");
+      libmesh_example_requires(false, "--enable-second");
 #elif !defined(LIBMESH_ENABLE_PERIODIC)
-      libmesh_example_assert(false, "--enable-periodic");
+      libmesh_example_requires(false, "--enable-periodic");
 #endif
 
       // This is a PETSc-specific solver
-      libmesh_example_assert(libMesh::default_solver_package() == PETSC_SOLVERS, "--enable-petsc");
+      libmesh_example_requires(libMesh::default_solver_package() == PETSC_SOLVERS, "--enable-petsc");
 
       const int dim = command_line_value("dim",1);
 
       // Skip higher-dimensional examples on a lower-dimensional libMesh build
-      libmesh_example_assert(dim <= LIBMESH_DIM, "2D/3D support");
+      libmesh_example_requires(dim <= LIBMESH_DIM, "2D/3D support");
 
       Biharmonic* biharmonic;
       Biharmonic::Create(&biharmonic,init.comm());
@@ -114,7 +114,7 @@ void print_help(int, char** argv)
                << "\n-----------\n"
                << "RUNNING:     "
                << "\n-----------\n"
-               << "Run in serial with build METHOD <method> as follows:\n"
+               << "Run in serial with PETSc-3.4 and above as follows:\n"
                << "\n"
                << argv[0] << "\n"
                << "               [--verbose] dim=<1|2|3> N=<number_of_linear_elements> \n"
@@ -123,8 +123,8 @@ void print_help(int, char** argv)
                << "               theta=<theta_value> theta_c=<theta_c_value>                                                                        \n"
                << "               initial_state=<ball|rod|strip> initial_center='x [y [z]]' initial_width=<width>                                    \n"
                << "               min_time=<initial_time> max_time=<final_time> dt=<timestep_size> crank_nicholson_weight=<between_0_and_1>          \n"
-               << "               output_base=<base_filename> output_dt=<output_timestep_size> [--use-petsc-dm -snes_type virs]                      \n"
-               << "\n"
+               << "               output_base=<base_filename> output_dt=<output_timestep_size> [-snes_type vinewtonrsls | vinewtonssls]              \n"
+               << "(with PETSc-3.3 use -snes_type virs | viss).\n"
                << argv[0] << " --verbose \n"
                << "is a pretty good start.\n"
                << "\nModeling a 1D system with 2D or 3D (for a strip the second and third components of the center are immaterial):\n"
@@ -139,6 +139,8 @@ void print_help(int, char** argv)
                << "A 3D system with an initial ball in the center\n"
                << argv[0] << " --verbose dim=3 N=32   initial_state=ball initial_center='0.5 0.5 0.5' initial_width=0.1 dt=1e-10 max_time=1e-6 \n"
                << "\n"
-               << "Add --use-petsc-dm -snes_type virs to run the variational inequality version that ensures the solution is between -1.0 and 1.0 at all times.\n\n"
+               << "Add -snes_type vinewtonrsls to run the variational inequality version that ensures the solution is between -1.0 and 1.0 at all times.\n"
+               << "If using PETSc-3.3, run with -snes_type virs.\n"
+               << "\n"
                << std::endl;
 }

@@ -65,8 +65,8 @@ AC_C_RESTRICT
 # --disable-getpwuid.
 # --------------------------------------------------------------
 AC_ARG_ENABLE(getpwuid,
-              AC_HELP_STRING([--enable-getpwuid],
-                             [allow calls to getpwuid]),
+              AS_HELP_STRING([--disable-getpwuid],
+                             [do not make calls to getpwuid]),
               enablegetpwuid=$enableval,
               enablegetpwuid=yes)
 
@@ -83,8 +83,8 @@ fi
 # C++ exceptions - enabled by default
 # --------------------------------------------------------------
 AC_ARG_ENABLE(exceptions,
-              AC_HELP_STRING([--enable-exceptions],
-                             [throw exceptions on unexpected errors]),
+              AS_HELP_STRING([--disable-exceptions],
+                             [exit rather than throw exceptions on unexpected errors]),
               enableexceptions=$enableval,
               enableexceptions=yes)
 
@@ -92,6 +92,26 @@ if test "$enableexceptions" != no ; then
   AC_DEFINE(ENABLE_EXCEPTIONS, 1,
            [Flag indicating if the library should be built to throw C++ exceptions on unexpected errors])
   AC_MSG_RESULT(<<< Configuring library with exception throwing support >>>)
+fi
+# --------------------------------------------------------------
+
+
+
+# --------------------------------------------------------------
+# __TIME__ __DATE__ stamps - enabled by default
+# disabling preprocessor timestamps helps compiler caches such
+# as ccache to work more effectively.
+# --------------------------------------------------------------
+AC_ARG_ENABLE(timestamps,
+              AS_HELP_STRING([--disable-timestamps],
+                             [do not add preprocessor timestamps to the library (helps ccache)]),
+              enabletimestamps=$enableval,
+              enabletimestamps=yes)
+
+if test "$enabletimestamps" != no ; then
+  AC_DEFINE(ENABLE_TIMESTAMPS, 1,
+           [Flag indicating if the library should be built with compile time and date timestamps])
+  AC_MSG_RESULT(<<< Configuring library with compile timestamps >>>)
 fi
 # --------------------------------------------------------------
 
@@ -139,10 +159,25 @@ AC_CHECK_HEADERS(xmmintrin.h)
 AC_HAVE_FEEXCEPT
 
 AC_ARG_ENABLE(unordered-containers,
-              AC_HELP_STRING([--enable-unordered-containers],
-                             [Use unordered_map/unordered_set if available]),
+              AS_HELP_STRING([--disable-unordered-containers],
+                             [Use map/set instead of unordered_map/unordered_set]),
               enableunorderedcontainers=$enableval,
               enableunorderedcontainers=yes)
+
+  # After a lengthy investigation in Jan. 2015, it was determined that
+  # there is a quality of implementation issue with clang's
+  # unordered container types on OSX, which does not appear to affect
+  # Linux.  Until this gets resolved, we will fall back to the "ordered"
+  # containers (map/set/multimap) for this compiler/architecture combination.
+  # https://github.com/idaholab/moose/issues/4624#issuecomment-72278831
+  if test "x$is_clang" != "x" ; then
+    case "${host_os}" in
+      *darwin*)
+        AC_MSG_RESULT(<<< Disabling unordered containers to work around Clang/OSX QOI issues >>>)
+        enableunorderedcontainers=no
+        ;;
+    esac
+  fi
 
   if test "$enableunorderedcontainers" != no ; then
     # The following routines, defined in unordered.m4, check to see if the compiler can compile programs using
@@ -166,8 +201,8 @@ AX_CXX_GLIBC_BACKTRACE
 # OpenMP Support  -- enabled by default
 # -------------------------------------------------------------
 AC_ARG_ENABLE(openmp,
-             AC_HELP_STRING([--enable-openmp],
-                            [Build with OpenMP Support]),
+             AS_HELP_STRING([--disable-openmp],
+                            [Build without OpenMP Support]),
              enableopenmp=$enableval,
              enableopenmp=yes)
 if (test "$enableopenmp" != no) ; then

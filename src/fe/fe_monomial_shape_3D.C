@@ -177,7 +177,7 @@ Real FE<3,MONOMIAL>::shape(const ElemType,
 
 #endif
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0.;
 }
 
@@ -623,11 +623,14 @@ Real FE<3,MONOMIAL>::shape_deriv(const ElemType,
             return val;
           }
       }
+
+    default:
+      libmesh_error_msg("Invalid shape function derivative j = " << j);
     }
 
 #endif
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0.;
 }
 
@@ -1285,14 +1288,13 @@ Real FE<3,MONOMIAL>::shape_second_deriv(const ElemType,
           }
       }
 
-
     default:
-      libmesh_error();
+      libmesh_error_msg("Invalid j = " << j);
     }
 
 #endif
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0.;
 }
 

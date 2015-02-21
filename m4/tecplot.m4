@@ -4,7 +4,7 @@
 AC_DEFUN([CONFIGURE_TECPLOT],
 [
   AC_ARG_ENABLE(tecplot,
-                AC_HELP_STRING([--enable-tecplot],
+                AS_HELP_STRING([--enable-tecplot],
                                [build with Tecplot binary file I/O support (using distributed libraries)]),
 		[case "${enableval}" in
 		  yes)  enabletecplot=yes ;;
@@ -66,7 +66,7 @@ AC_DEFUN([CONFIGURE_TECPLOT],
 
       AC_LINK_IFELSE(
                   [
-                     AC_LANG_PROGRAM([#include <TECIO.h>],
+                     AC_LANG_PROGRAM([@%:@include <TECIO.h>],
                                      [int ierr = TECEND112 ();])
                   ],
                   [
@@ -79,7 +79,7 @@ AC_DEFUN([CONFIGURE_TECPLOT],
 		  [
                      AC_LINK_IFELSE(
                                  [
-                                    AC_LANG_PROGRAM([#include <TECIO.h>],
+                                    AC_LANG_PROGRAM([@%:@include <TECIO.h>],
                                                     [int ierr = TECEND ();])
                                  ],
                                  [

@@ -8,6 +8,19 @@ using namespace FPoptimizer_CodeTree;
 
 //#define DEBUG_SUBSTITUTIONS_extra_verbose
 
+// Intel 11.1 has problems with std::isnan().  In libMesh we have some
+// workarounds, but don't need to include all that infrastructure here.
+// So, this little hack will do.
+namespace
+{
+  template <typename T>
+  inline
+  int isnan_workaround(T t)
+  {
+    return (t != t);
+  }
+}
+
 namespace FPoptimizer_CodeTree
 {
     template<typename Value_t>
@@ -26,7 +39,7 @@ namespace FPoptimizer_CodeTree
         return tmp;
     }
     template<typename Value_t>
-    range<Value_t> CodeTree<Value_t>::CalculateResultBoundaries_do(const CodeTree<Value_t>& tree)
+    range<Value_t> CalculateResultBoundaries_do(const CodeTree<Value_t>& tree)
 #endif
     {
         static const range<Value_t> pihalf_limits
@@ -312,8 +325,18 @@ namespace FPoptimizer_CodeTree
                 // No guess which branch is chosen. Produce a spanning min & max.
                 range<Value_t> res1 = CalculateResultBoundaries( tree.GetParam(1) );
                 range<Value_t> res2 = CalculateResultBoundaries( tree.GetParam(2) );
-                if(!res2.min.known) res1.min.known = false; else if(res1.min.known && (res2.min.val) < res1.min.val) res1.min.val = res2.min.val;
-                if(!res2.max.known) res1.max.known = false; else if(res1.max.known && (res2.max.val) > res1.max.val) res1.max.val = res2.max.val;
+                if(!res2.min.known)
+                  res1.min.known = false;
+                else if(res1.min.known && (res2.min.val) < res1.min.val)
+                  res1.min.val = res2.min.val;
+                else if (isnan_workaround(res2.min.val))
+                  res1.min.val = res2.min.val;
+                if(!res2.max.known)
+                  res1.max.known = false;
+                else if(res1.max.known && (res2.max.val) > res1.max.val)
+                  res1.max.val = res2.max.val;
+                else if (isnan_workaround(res2.max.val))
+                  res1.max.val = res2.max.val;
                 return res1;
             }
 
@@ -622,6 +645,10 @@ namespace FPoptimizer_CodeTree
                         {
                             min = fp_pow(p0.min.val, p1.min.val);
                             if(p0.min.val < Value_t(0) && (!p1.max.known || p1.max.val >= Value_t(0)) && min >= Value_t(0))
+                                min = Value_t(0);
+
+                            // we've already determined the result to be positive, but these boundaries would result in a min = inf
+                            if(p0.min.val == Value_t(0) || p1.min.val < Value_t(0))
                                 min = Value_t(0);
                         }
                         if(p0.min.known && p0.min.val >= Value_t(0) && p0.max.known && p1.max.known)

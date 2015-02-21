@@ -33,6 +33,8 @@ using libMesh::RBTheta;
 using libMesh::RBThetaExpansion;
 using libMesh::Real;
 using libMesh::RealGradient;
+using libMesh::Elem;
+using libMesh::FEBase;
 
 struct ShiftedGaussian : public RBParametrizedFunction
 {
@@ -128,8 +130,6 @@ struct EIM_F : RBEIMAssembly
     const std::vector<Real> &JxW = elem_fe->get_JxW();
 
     const std::vector<std::vector<Real> >& phi = elem_fe->get_phi();
-
-    const std::vector<Point>& qpoints = elem_fe->get_xyz();
 
     // The number of local degrees of freedom in each variable
     const unsigned int n_u_dofs = c.get_dof_indices(u_var).size();

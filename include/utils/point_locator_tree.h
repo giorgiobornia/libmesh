@@ -46,14 +46,9 @@ class Elem;
  *
  * @author Daniel Dreyer, 2003
  */
-
-// ------------------------------------------------------------
-// PointLocatorTree class definition
 class PointLocatorTree : public PointLocatorBase
 {
 public:
-
-
   /**
    * Constructor.  Needs the \p mesh in which the points
    * should be located.  Optionally takes a master
@@ -81,10 +76,6 @@ public:
                     const Trees::BuildType build_type,
                     const PointLocatorBase* master = NULL);
 
-
-
-public:
-
   /**
    * Destructor.
    */
@@ -99,21 +90,52 @@ public:
    * Initializes the locator, so that the \p operator() methods can
    * be used.  This function allocates dynamic memory with "new".
    */
-  void init(const Trees::BuildType build_type);
+  void init(Trees::BuildType build_type);
 
   /**
    * Initializes the locator, so that the \p operator() methods can
    * be used.  This function allocates dynamic memory with "new".
    */
-  virtual void init() { this->init(Trees::NODES); }
+  virtual void init();
 
   /**
-   * Locates the element in which the point with global coordinates
-   * \p p is located.  The mutable _element member is used to cache
+   * Locates the element, with dimension elem_dim, in which the point with
+   * global coordinates \p p is located, optionally restricted to a set of
+   * allowed subdomains. The mutable _element member is used to cache
    * the result and allow it to be used during the next call to
    * operator().
    */
-  virtual const Elem* operator() (const Point& p) const;
+  virtual const Elem* operator() (const Point& p, const unsigned int elem_dim,
+                                  const std::set<subdomain_id_type> *allowed_subdomains = NULL) const;
+
+  /**
+   * As a fallback option, it's helpful to be able to do a linear
+   * search over the entire mesh. This can be used if operator()
+   * fails to find an element that contains \p p, for example.
+   * Optionally specify a "close to point" tolerance to use in
+   * the linear search. This only looks for elements with
+   * dimension mesh.mesh_dimension().
+   * Return NULL if no element is found.
+   */
+  const Elem* perform_linear_search(const Point& p,
+                                    const std::set<subdomain_id_type> *allowed_subdomains,
+                                    bool use_close_to_point,
+                                    Real close_to_point_tolerance=TOLERANCE) const;
+
+  /**
+   * As a fallback option, it's helpful to be able to do a linear
+   * search over the entire mesh. This can be used if operator()
+   * fails to find an element that contains \p p, for example.
+   * Optionally specify a "close to point" tolerance to use in
+   * the linear search. This only looks for elements with
+   * dimension elem_dim.
+   * Return NULL if no element is found.
+   */
+  const Elem* perform_linear_search(const Point& p,
+                                    unsigned int elem_dim,
+                                    const std::set<subdomain_id_type> *allowed_subdomains,
+                                    bool use_close_to_point,
+                                    Real close_to_point_tolerance=TOLERANCE) const;
 
   /**
    * Enables out-of-mesh mode.  In this mode, if asked to find a point
@@ -121,17 +143,16 @@ public:
    * return a NULL pointer instead of crashing.  Per default, this
    * mode is off.
    */
-  virtual void enable_out_of_mesh_mode (void);
+  virtual void enable_out_of_mesh_mode ();
 
   /**
    * Disables out-of-mesh mode (default).  If asked to find a point
    * that is contained in no mesh at all, the point locator will now
    * crash.
    */
-  virtual void disable_out_of_mesh_mode (void);
+  virtual void disable_out_of_mesh_mode ();
 
 protected:
-
   /**
    * Pointer to our tree.  The tree is built at run-time
    * through \p init().  For servant PointLocators (not master),
@@ -152,11 +173,11 @@ protected:
    */
   bool _out_of_mesh_mode;
 
+  /**
+   * How the underlying tree is built.
+   */
+  Trees::BuildType _build_type;
 };
-
-
-// ------------------------------------------------------------
-// PointLocatorTree inline methods
 
 
 } // namespace libMesh

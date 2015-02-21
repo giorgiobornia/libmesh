@@ -22,6 +22,7 @@
 #include "libmesh/fe.h"
 #include "libmesh/elem.h"
 #include "libmesh/fe_interface.h"
+#include "libmesh/string_to_enum.h"
 
 namespace libMesh
 {
@@ -104,7 +105,7 @@ unsigned int xyz_n_dofs(const ElemType t, const Order o)
       // constant shape functions
       // no matter what shape there is only one DOF.
     case CONSTANT:
-      return 1;
+      return (t != INVALID_ELEM) ? 1 : 0;
 
 
       // Discontinuous linear shape functions
@@ -141,15 +142,11 @@ unsigned int xyz_n_dofs(const ElemType t, const Order o)
           case PYRAMID14:
             return 4;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for " << o << "th order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
@@ -188,15 +185,11 @@ unsigned int xyz_n_dofs(const ElemType t, const Order o)
           case PYRAMID14:
             return 10;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for " << o << "th order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
@@ -235,15 +228,11 @@ unsigned int xyz_n_dofs(const ElemType t, const Order o)
           case PYRAMID14:
             return 20;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for " << o << "th order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
@@ -281,15 +270,11 @@ unsigned int xyz_n_dofs(const ElemType t, const Order o)
           case PYRAMID14:
             return 35;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for " << o << "th order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
@@ -326,21 +311,16 @@ unsigned int xyz_n_dofs(const ElemType t, const Order o)
           case PYRAMID14:
             return (order+1)*(order+2)*(order+3)/6;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for " << o << "th order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
     }
 
-  libmesh_error();
-
+  libmesh_error_msg("We'll never get here!");
   return 0;
 }
 
@@ -354,7 +334,7 @@ unsigned int xyz_n_dofs_per_elem(const ElemType t,
     {
       // constant shape functions always have 1 DOF per element
     case CONSTANT:
-      return 1;
+      return (t != INVALID_ELEM) ? 1 : 0;
 
 
       // Discontinuous linear shape functions
@@ -394,15 +374,11 @@ unsigned int xyz_n_dofs_per_elem(const ElemType t,
           case PYRAMID14:
             return 4;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for " << o << "th order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
@@ -444,15 +420,11 @@ unsigned int xyz_n_dofs_per_elem(const ElemType t,
           case PYRAMID14:
             return 10;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for " << o << "th order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
@@ -491,15 +463,11 @@ unsigned int xyz_n_dofs_per_elem(const ElemType t,
           case PYRAMID14:
             return 20;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for " << o << "th order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
@@ -538,15 +506,11 @@ unsigned int xyz_n_dofs_per_elem(const ElemType t,
           case PYRAMID14:
             return 35;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for " << o << "th order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
@@ -582,15 +546,11 @@ unsigned int xyz_n_dofs_per_elem(const ElemType t,
           case PYRAMID14:
             return (order+1)*(order+2)*(order+3)/6;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for " << o << "th order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
       return 0;
@@ -608,7 +568,7 @@ unsigned int xyz_n_dofs_per_elem(const ElemType t,
 
 template <unsigned int Dim>
 void FEXYZ<Dim>::init_shape_functions(const std::vector<Point>& qp,
-                                      const Elem* elem)
+                                      const Elem* libmesh_dbg_var(elem))
 {
   libmesh_assert(elem);
   this->calculations_started = true;
@@ -875,9 +835,7 @@ void FEXYZ<Dim>::compute_shape_functions (const Elem* elem, const std::vector<Po
       }
 
     default:
-      {
-        libmesh_error();
-      }
+      libmesh_error_msg("ERROR: Invalid dimension " << this->dim);
     }
 
   // Stop logging the shape function computation

@@ -23,7 +23,7 @@ Biharmonic::JR::JR(EquationSystems& eqSys,
 {
   // Check that we can actually compute second derivatives
 #ifndef LIBMESH_ENABLE_SECOND_DERIVATIVES
-  ERROR("Must have second derivatives enabled");
+  libmesh_error_msg("Must have second derivatives enabled");
 #endif
 
 #ifdef LIBMESH_ENABLE_PERIODIC
@@ -68,13 +68,13 @@ Biharmonic::JR::JR(EquationSystems& eqSys,
       break;
 #endif
     default:
-      libmesh_error();
+      libmesh_error_msg("Invalid dimension = " << _biharmonic._dim);
     }
 #endif // LIBMESH_ENABLE_PERIODIC
 
   // Adaptivity stuff is commented out for now...
   // #ifndef   LIBMESH_ENABLE_AMR
-  //   libmesh_example_assert(false, "--enable-amr");
+  //   libmesh_example_requires(false, "--enable-amr");
   // #else
   //   // In case we ever get around to doing mesh refinement.
   //   _biharmonic._meshRefinement = new MeshRefinement(_mesh);

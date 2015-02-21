@@ -39,15 +39,6 @@ namespace libMesh
 //-----------------------------------------------------------------------
 // PetscVector members
 
-// void PetscVector<T>::init (const NumericVector<T>& v, const bool fast)
-// {
-//   libmesh_error();
-
-//   init (v.local_size(), v.size(), fast);
-
-//   vec = libmesh_cast_ref<const PetscVector<T>&>(v).vec;
-// }
-
 template <typename T>
 T PetscVector<T>::sum () const
 {
@@ -206,36 +197,24 @@ void PetscVector<T>::add (const numeric_index_type i, const T value)
 
 
 template <typename T>
-void PetscVector<T>::add_vector (const std::vector<T>& v,
+void PetscVector<T>::add_vector (const T* v,
                                  const std::vector<numeric_index_type>& dof_indices)
 {
   // If we aren't adding anything just return
-  if(v.empty() || dof_indices.empty())
+  if(dof_indices.empty())
     return;
 
   this->_restore_array();
-  libmesh_assert_equal_to (v.size(), dof_indices.size());
 
   PetscErrorCode ierr=0;
   const PetscInt * i_val = reinterpret_cast<const PetscInt*>(&dof_indices[0]);
-  const PetscScalar * petsc_value = static_cast<const PetscScalar*>(&v[0]);
+  const PetscScalar * petsc_value = static_cast<const PetscScalar*>(v);
 
-  ierr = VecSetValues (_vec, v.size(), i_val, petsc_value, ADD_VALUES);
+  ierr = VecSetValues (_vec, cast_int<PetscInt>(dof_indices.size()),
+                       i_val, petsc_value, ADD_VALUES);
   LIBMESH_CHKERRABORT(ierr);
 
   this->_is_closed = false;
-}
-
-
-
-template <typename T>
-void PetscVector<T>::add_vector (const NumericVector<T>& V,
-                                 const std::vector<numeric_index_type>& dof_indices)
-{
-  libmesh_assert_equal_to (V.size(), dof_indices.size());
-
-  for (unsigned int i=0; i<V.size(); i++)
-    this->add (dof_indices[i], V(i));
 }
 
 
@@ -246,8 +225,8 @@ void PetscVector<T>::add_vector (const NumericVector<T>& V_in,
 {
   this->_restore_array();
   // Make sure the data passed in are really of Petsc types
-  const PetscVector<T>* V = libmesh_cast_ptr<const PetscVector<T>*>(&V_in);
-  const PetscMatrix<T>* A = libmesh_cast_ptr<const PetscMatrix<T>*>(&A_in);
+  const PetscVector<T>* V = cast_ptr<const PetscVector<T>*>(&V_in);
+  const PetscMatrix<T>* A = cast_ptr<const PetscMatrix<T>*>(&A_in);
 
   PetscErrorCode ierr=0;
 
@@ -262,24 +241,13 @@ void PetscVector<T>::add_vector (const NumericVector<T>& V_in,
 
 
 template <typename T>
-void PetscVector<T>::add_vector (const DenseVector<T>& V,
-                                 const std::vector<numeric_index_type>& dof_indices)
-{
-  libmesh_assert_equal_to (V.size(), dof_indices.size());
-
-  for (unsigned int i=0; i<V.size(); i++)
-    this->add (dof_indices[i], V(i));
-}
-
-
-template <typename T>
 void PetscVector<T>::add_vector_transpose (const NumericVector<T>& V_in,
                                            const SparseMatrix<T>& A_in)
 {
   this->_restore_array();
   // Make sure the data passed in are really of Petsc types
-  const PetscVector<T>* V = libmesh_cast_ptr<const PetscVector<T>*>(&V_in);
-  const PetscMatrix<T>* A = libmesh_cast_ptr<const PetscMatrix<T>*>(&A_in);
+  const PetscVector<T>* V = cast_ptr<const PetscVector<T>*>(&V_in);
+  const PetscMatrix<T>* A = cast_ptr<const PetscMatrix<T>*>(&A_in);
 
   PetscErrorCode ierr=0;
 
@@ -297,11 +265,9 @@ template <typename T>
 void PetscVector<T>::add_vector_conjugate_transpose (const NumericVector<T>&,
                                                      const SparseMatrix<T>&)
 {
-
-  libMesh::out << "MatMultHermitianTranspose was introduced in PETSc 3.1.0,"
-               << "No one has made it backwards compatible with older "
-               << "versions of PETSc so far." << std::endl;
-  libmesh_error();
+  libmesh_error_msg("MatMultHermitianTranspose was introduced in PETSc 3.1.0," \
+                    << "No one has made it backwards compatible with older " \
+                    << "versions of PETSc so far.");
 }
 
 #else
@@ -312,8 +278,8 @@ void PetscVector<T>::add_vector_conjugate_transpose (const NumericVector<T>& V_i
 {
   this->_restore_array();
   // Make sure the data passed in are really of Petsc types
-  const PetscVector<T>* V = libmesh_cast_ptr<const PetscVector<T>*>(&V_in);
-  const PetscMatrix<T>* A = libmesh_cast_ptr<const PetscMatrix<T>*>(&A_in);
+  const PetscVector<T>* V = cast_ptr<const PetscVector<T>*>(&V_in);
+  const PetscMatrix<T>* A = cast_ptr<const PetscMatrix<T>*>(&A_in);
 
   A->close();
 
@@ -414,7 +380,7 @@ void PetscVector<T>::add (const T a_in, const NumericVector<T>& v_in)
   PetscScalar a = static_cast<PetscScalar>(a_in);
 
   // Make sure the NumericVector passed in is really a PetscVector
-  const PetscVector<T>* v = libmesh_cast_ptr<const PetscVector<T>*>(&v_in);
+  const PetscVector<T>* v = cast_ptr<const PetscVector<T>*>(&v_in);
   v->_restore_array();
 
   libmesh_assert_equal_to (this->size(), v->size());
@@ -460,49 +426,20 @@ void PetscVector<T>::add (const T a_in, const NumericVector<T>& v_in)
 
 
 template <typename T>
-void PetscVector<T>::insert (const std::vector<T>& v,
+void PetscVector<T>::insert (const T* v,
                              const std::vector<numeric_index_type>& dof_indices)
 {
-  libmesh_assert_equal_to (v.size(), dof_indices.size());
+  if (dof_indices.empty())
+    return;
 
-  for (unsigned int i=0; i<v.size(); i++)
-    this->set (dof_indices[i], v[i]);
-}
+  this->_restore_array();
 
+  PetscErrorCode ierr=0;
+  PetscInt *idx_values = numeric_petsc_cast(&dof_indices[0]);
+  ierr = VecSetValues (_vec, dof_indices.size(), idx_values, v, INSERT_VALUES);
+  LIBMESH_CHKERRABORT(ierr);
 
-
-template <typename T>
-void PetscVector<T>::insert (const NumericVector<T>& V,
-                             const std::vector<numeric_index_type>& dof_indices)
-{
-  libmesh_assert_equal_to (V.size(), dof_indices.size());
-
-  for (unsigned int i=0; i<V.size(); i++)
-    this->set (dof_indices[i], V(i));
-}
-
-
-
-template <typename T>
-void PetscVector<T>::insert (const DenseVector<T>& V,
-                             const std::vector<numeric_index_type>& dof_indices)
-{
-  libmesh_assert_equal_to (V.size(), dof_indices.size());
-
-  for (unsigned int i=0; i<V.size(); i++)
-    this->set (dof_indices[i], V(i));
-}
-
-
-
-template <typename T>
-void PetscVector<T>::insert (const DenseSubVector<T>& V,
-                             const std::vector<numeric_index_type>& dof_indices)
-{
-  libmesh_assert_equal_to (V.size(), dof_indices.size());
-
-  for (unsigned int i=0; i<V.size(); i++)
-    this->set (dof_indices[i], V(i));
+  this->_is_closed = false;
 }
 
 
@@ -553,7 +490,7 @@ NumericVector<T> & PetscVector<T>::operator /= (NumericVector<T> & v)
 {
   PetscErrorCode ierr = 0;
 
-  const PetscVector<T>* v_vec = libmesh_cast_ptr<const PetscVector<T>*>(&v);
+  const PetscVector<T>* v_vec = cast_ptr<const PetscVector<T>*>(&v);
 
   ierr = VecPointwiseDivide(_vec, _vec, v_vec->_vec);
   LIBMESH_CHKERRABORT(ierr);
@@ -599,7 +536,7 @@ T PetscVector<T>::dot (const NumericVector<T>& V) const
   PetscScalar value=0.;
 
   // Make sure the NumericVector passed in is really a PetscVector
-  const PetscVector<T>* v = libmesh_cast_ptr<const PetscVector<T>*>(&V);
+  const PetscVector<T>* v = cast_ptr<const PetscVector<T>*>(&V);
 
   // 2.3.x (at least) style.  Untested for previous versions.
   ierr = VecDot(this->_vec, v->_vec, &value);
@@ -620,7 +557,7 @@ T PetscVector<T>::indefinite_dot (const NumericVector<T>& V) const
   PetscScalar value=0.;
 
   // Make sure the NumericVector passed in is really a PetscVector
-  const PetscVector<T>* v = libmesh_cast_ptr<const PetscVector<T>*>(&V);
+  const PetscVector<T>* v = cast_ptr<const PetscVector<T>*>(&V);
 
   // 2.3.x (at least) style.  Untested for previous versions.
   ierr = VecTDot(this->_vec, v->_vec, &value);
@@ -685,7 +622,7 @@ NumericVector<T>&
 PetscVector<T>::operator = (const NumericVector<T>& v_in)
 {
   // Make sure the NumericVector passed in is really a PetscVector
-  const PetscVector<T>* v = libmesh_cast_ptr<const PetscVector<T>*>(&v_in);
+  const PetscVector<T>* v = cast_ptr<const PetscVector<T>*>(&v_in);
 
   *this = *v;
 
@@ -818,7 +755,7 @@ void PetscVector<T>::localize (NumericVector<T>& v_local_in) const
   this->_restore_array();
 
   // Make sure the NumericVector passed in is really a PetscVector
-  PetscVector<T>* v_local = libmesh_cast_ptr<PetscVector<T>*>(&v_local_in);
+  PetscVector<T>* v_local = cast_ptr<PetscVector<T>*>(&v_local_in);
 
   libmesh_assert(v_local);
   libmesh_assert_equal_to (v_local->size(), this->size());
@@ -895,14 +832,15 @@ void PetscVector<T>::localize (NumericVector<T>& v_local_in,
   this->_restore_array();
 
   // Make sure the NumericVector passed in is really a PetscVector
-  PetscVector<T>* v_local = libmesh_cast_ptr<PetscVector<T>*>(&v_local_in);
+  PetscVector<T>* v_local = cast_ptr<PetscVector<T>*>(&v_local_in);
 
   libmesh_assert(v_local);
   libmesh_assert_equal_to (v_local->size(), this->size());
   libmesh_assert_less_equal (send_list.size(), v_local->size());
 
   PetscErrorCode ierr=0;
-  const numeric_index_type n_sl = send_list.size();
+  const numeric_index_type n_sl =
+    cast_int<numeric_index_type>(send_list.size());
 
   IS is;
   VecScatter scatter;
@@ -1277,18 +1215,17 @@ void PetscVector<T>::pointwise_mult (const NumericVector<T>& vec1,
   PetscErrorCode ierr = 0;
 
   // Convert arguments to PetscVector*.
-  const PetscVector<T>* vec1_petsc = libmesh_cast_ptr<const PetscVector<T>*>(&vec1);
-  const PetscVector<T>* vec2_petsc = libmesh_cast_ptr<const PetscVector<T>*>(&vec2);
+  const PetscVector<T>* vec1_petsc = cast_ptr<const PetscVector<T>*>(&vec1);
+  const PetscVector<T>* vec2_petsc = cast_ptr<const PetscVector<T>*>(&vec2);
 
   // Call PETSc function.
 
 #if PETSC_VERSION_LESS_THAN(2,3,1)
 
-  libMesh::out << "This method has been developed with PETSc 2.3.1.  "
-               << "No one has made it backwards compatible with older "
-               << "versions of PETSc so far; however, it might work "
-               << "without any change with some older version." << std::endl;
-  libmesh_error();
+  libmesh_error_msg("This method has been developed with PETSc 2.3.1.  " \
+                    << "No one has made it backwards compatible with older " \
+                    << "versions of PETSc so far; however, it might work " \
+                    << "without any change with some older version.");
 
 #else
 
@@ -1398,7 +1335,7 @@ void PetscVector<T>::create_subvector(NumericVector<T>& subvector,
   PetscErrorCode ierr = 0;
 
   // Make sure the passed in subvector is really a PetscVector
-  PetscVector<T>* petsc_subvector = libmesh_cast_ptr<PetscVector<T>*>(&subvector);
+  PetscVector<T>* petsc_subvector = cast_ptr<PetscVector<T>*>(&subvector);
 
   // If the petsc_subvector is already initialized, we assume that the
   // user has already allocated the *correct* amount of space for it.
@@ -1412,11 +1349,13 @@ void PetscVector<T>::create_subvector(NumericVector<T>& subvector,
       // class.  Should we differentiate here between sequential and
       // parallel vector creation based on this->n_processors() ?
       ierr = VecCreateMPI(this->comm().get(),
-                          PETSC_DECIDE,          // n_local
-                          rows.size(),           // n_global
-                          &(petsc_subvector->_vec)); LIBMESH_CHKERRABORT(ierr);
+                          PETSC_DECIDE,                    // n_local
+                          cast_int<PetscInt>(rows.size()), // n_global
+                          &(petsc_subvector->_vec));
+      LIBMESH_CHKERRABORT(ierr);
 
-      ierr = VecSetFromOptions (petsc_subvector->_vec); LIBMESH_CHKERRABORT(ierr);
+      ierr = VecSetFromOptions (petsc_subvector->_vec);
+      LIBMESH_CHKERRABORT(ierr);
 
       // Mark the subvector as initialized
       petsc_subvector->_is_initialized = true;
@@ -1433,15 +1372,17 @@ void PetscVector<T>::create_subvector(NumericVector<T>& subvector,
   // Construct index sets
   ierr = ISCreateLibMesh(this->comm().get(),
                          rows.size(),
-                         (PetscInt*) &rows[0],
+                         numeric_petsc_cast(&rows[0]),
                          PETSC_USE_POINTER,
-                         &parent_is); LIBMESH_CHKERRABORT(ierr);
+                         &parent_is);
+  LIBMESH_CHKERRABORT(ierr);
 
   ierr = ISCreateLibMesh(this->comm().get(),
                          rows.size(),
-                         (PetscInt*) &idx[0],
+                         &idx[0],
                          PETSC_USE_POINTER,
-                         &subvector_is); LIBMESH_CHKERRABORT(ierr);
+                         &subvector_is);
+  LIBMESH_CHKERRABORT(ierr);
 
   // Construct the scatter object
   ierr = VecScatterCreate(this->_vec,

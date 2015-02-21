@@ -35,6 +35,7 @@
 #include <map>
 #include <string>
 #include <typeinfo>
+#include <sstream>
 
 namespace libMesh
 {
@@ -419,7 +420,7 @@ bool Parameters::have_parameter (const std::string& name) const
 #ifdef LIBMESH_HAVE_RTTI
     if (dynamic_cast<const Parameter<T>*>(it->second) != NULL)
 #else // LIBMESH_HAVE_RTTI
-      if (libmesh_cast_ptr<const Parameter<T>*>(it->second) != NULL)
+      if (cast_ptr<const Parameter<T>*>(it->second) != NULL)
 #endif // LIBMESH_HAVE_RTTI
         return true;
 
@@ -434,15 +435,17 @@ const T& Parameters::get (const std::string& name) const
 {
   if (!this->have_parameter<T>(name))
     {
-      libMesh::err << "ERROR: no"
-#ifdef LIBMESH_HAVE_RTTI
-                   << ' ' << demangle(typeid(T).name())
-#endif // LIBMESH_HAVE_RTTI
-                   << " parameter named \""
-                   << name << "\":" << std::endl
-                   << *this;
+      std::ostringstream oss;
 
-      libmesh_error();
+      oss << "ERROR: no";
+#ifdef LIBMESH_HAVE_RTTI
+      oss << ' ' << demangle(typeid(T).name());
+#endif
+      oss << " parameter named \""
+          << name << "\":\n"
+          << *this;
+
+      libmesh_error_msg(oss.str());
     }
 
   Parameters::const_iterator it = _values.find(name);
@@ -450,7 +453,7 @@ const T& Parameters::get (const std::string& name) const
   libmesh_assert(it != _values.end());
   libmesh_assert(it->second);
 
-  return libmesh_cast_ptr<Parameter<T>*>(it->second)->get();
+  return cast_ptr<Parameter<T>*>(it->second)->get();
 }
 
 template <typename T>
@@ -473,7 +476,7 @@ T& Parameters::set (const std::string& name)
 
   set_attributes(name, false);
 
-  return libmesh_cast_ptr<Parameter<T>*>(_values[name])->set();
+  return cast_ptr<Parameter<T>*>(_values[name])->set();
 }
 
 inline

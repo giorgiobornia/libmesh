@@ -138,10 +138,7 @@ void LaspackMatrix<T>::init (const numeric_index_type libmesh_dbg_var(m_in),
   libmesh_assert_equal_to (m_in, n_in);
   libmesh_assert_greater (nnz, 0);
 
-
-  libMesh::err << "ERROR: Only the init() member that uses the" << std::endl
-               << "DofMap is implemented for Laspack matrices!" << std::endl;
-  libmesh_error();
+  libmesh_error_msg("ERROR: Only the init() member that uses the DofMap is implemented for Laspack matrices!");
 
   this->_is_initialized = true;
 }
@@ -206,8 +203,8 @@ void LaspackMatrix<T>::add_matrix(const DenseMatrix<T>& dm,
 
 {
   libmesh_assert (this->initialized());
-  unsigned int n_rows = libmesh_cast_int<unsigned int>(rows.size());
-  unsigned int n_cols = libmesh_cast_int<unsigned int>(cols.size());
+  unsigned int n_rows = cast_int<unsigned int>(rows.size());
+  unsigned int n_cols = cast_int<unsigned int>(cols.size());
   libmesh_assert_equal_to (dm.m(), n_rows);
   libmesh_assert_equal_to (dm.n(), n_cols);
 
@@ -388,7 +385,7 @@ void LaspackMatrix<T>::add (const T a_in, SparseMatrix<T> &X_in)
   libmesh_assert_equal_to (this->m(), X_in.m());
   libmesh_assert_equal_to (this->n(), X_in.n());
 
-  LaspackMatrix<T>* X = libmesh_cast_ptr<LaspackMatrix<T>*> (&X_in);
+  LaspackMatrix<T>* X = cast_ptr<LaspackMatrix<T>*> (&X_in);
   _LPNumber         a = static_cast<_LPNumber>          (a_in);
 
   libmesh_assert(X);

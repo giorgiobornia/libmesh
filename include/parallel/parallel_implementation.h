@@ -26,12 +26,11 @@
 // C++ includes
 #include <iterator> // iterator_traits
 
+namespace libMesh {
+namespace Parallel {
 
 // First declare StandardType specializations so we can use them in anonymous
 // helper functions later
-
-namespace libMesh {
-namespace Parallel {
 
 #ifdef LIBMESH_HAVE_MPI
 
@@ -173,10 +172,6 @@ public:
 // Anonymous namespace for helper functions
 namespace {
 
-// Safe to use this here since it won't "infect" anything outside the
-// anonymous namespace
-using namespace libMesh;
-
 // Internal helper function to create vector<something_useable> from
 // vector<bool> for compatibility with MPI bitwise operations
 template <typename T>
@@ -226,9 +221,9 @@ inline void send_receive_vec_of_vec
  std::vector<std::vector<T1> > &send,
  const unsigned int source_processor_id,
  std::vector<std::vector<T2> > &recv,
- const Parallel::MessageTag &send_tag,
- const Parallel::MessageTag &recv_tag,
- const Parallel::Communicator &comm)
+ const libMesh::Parallel::MessageTag &send_tag,
+ const libMesh::Parallel::MessageTag &recv_tag,
+ const libMesh::Parallel::Communicator &comm)
 {
   START_LOG("send_receive()", "Parallel");
 
@@ -249,7 +244,7 @@ inline void send_receive_vec_of_vec
 
   // The outer buffer size
   MPI_Pack_size (1,
-                 Parallel::StandardType<unsigned int>(),
+                 libMesh::Parallel::StandardType<unsigned int>(),
                  comm.get(),
                  &packedsize);
   sendsize += packedsize;
@@ -258,14 +253,14 @@ inline void send_receive_vec_of_vec
     {
       // The size of the ith inner buffer
       MPI_Pack_size (1,
-                     Parallel::StandardType<unsigned int>(),
+                     libMesh::Parallel::StandardType<unsigned int>(),
                      comm.get(),
                      &packedsize);
       sendsize += packedsize;
 
       // The data for each inner buffer
-      MPI_Pack_size (libmesh_cast_int<int>(send[i].size()),
-                     Parallel::StandardType<T1>
+      MPI_Pack_size (libMesh::cast_int<int>(send[i].size()),
+                     libMesh::Parallel::StandardType<T1>
                      (send[i].empty() ? NULL : &send[i][0]),
                      comm.get(),
                      &packedsize);
@@ -279,30 +274,30 @@ inline void send_receive_vec_of_vec
   int pos=0;
 
   // ... the size of the outer buffer
-  sendsize = libmesh_cast_int<int>(send.size());
-  MPI_Pack (&sendsize, 1, Parallel::StandardType<unsigned int>(),
-            &sendbuf[0], libmesh_cast_int<int>(sendbuf.size()), &pos,
+  sendsize = libMesh::cast_int<int>(send.size());
+  MPI_Pack (&sendsize, 1, libMesh::Parallel::StandardType<unsigned int>(),
+            &sendbuf[0], libMesh::cast_int<int>(sendbuf.size()), &pos,
             comm.get());
 
   for (std::size_t i=0; i<send.size(); i++)
     {
       // ... the size of the ith inner buffer
-      sendsize = libmesh_cast_int<int>(send[i].size());
-      MPI_Pack (&sendsize, 1, Parallel::StandardType<unsigned int>(),
-                &sendbuf[0], libmesh_cast_int<int>(sendbuf.size()), &pos,
+      sendsize = libMesh::cast_int<int>(send[i].size());
+      MPI_Pack (&sendsize, 1, libMesh::Parallel::StandardType<unsigned int>(),
+                &sendbuf[0], libMesh::cast_int<int>(sendbuf.size()), &pos,
                 comm.get());
 
       // ... the contents of the ith inner buffer
       if (!send[i].empty())
-        MPI_Pack (&send[i][0], libmesh_cast_int<int>(send[i].size()),
-                  Parallel::StandardType<T1>(&send[i][0]),
-                  &sendbuf[0], libmesh_cast_int<int>(sendbuf.size()), &pos,
+        MPI_Pack (&send[i][0], libMesh::cast_int<int>(send[i].size()),
+                  libMesh::Parallel::StandardType<T1>(&send[i][0]),
+                  &sendbuf[0], libMesh::cast_int<int>(sendbuf.size()), &pos,
                   comm.get());
     }
 
   libmesh_assert_equal_to (static_cast<unsigned int>(pos), sendbuf.size());
 
-  Parallel::Request request;
+  libMesh::Parallel::Request request;
 
   comm.send (dest_processor_id, sendbuf, MPI_PACKED, request, send_tag);
 
@@ -311,8 +306,8 @@ inline void send_receive_vec_of_vec
   // Unpack the received buffer
   libmesh_assert (!recvbuf.empty());
   pos=0;
-  MPI_Unpack (&recvbuf[0], libmesh_cast_int<int>(recvbuf.size()), &pos,
-              &sendsize, 1, Parallel::StandardType<unsigned int>(),
+  MPI_Unpack (&recvbuf[0], libMesh::cast_int<int>(recvbuf.size()), &pos,
+              &sendsize, 1, libMesh::Parallel::StandardType<unsigned int>(),
               comm.get());
 
   // ... size the outer buffer
@@ -320,8 +315,8 @@ inline void send_receive_vec_of_vec
 
   for (std::size_t i=0; i<recv.size(); i++)
     {
-      MPI_Unpack (&recvbuf[0], libmesh_cast_int<int>(recvbuf.size()), &pos,
-                  &sendsize, 1, Parallel::StandardType<unsigned int>(),
+      MPI_Unpack (&recvbuf[0], libMesh::cast_int<int>(recvbuf.size()), &pos,
+                  &sendsize, 1, libMesh::Parallel::StandardType<unsigned int>(),
                   comm.get());
 
       // ... size the inner buffer
@@ -329,9 +324,9 @@ inline void send_receive_vec_of_vec
 
       // ... unpack the inner buffer if it is not empty
       if (!recv[i].empty())
-        MPI_Unpack (&recvbuf[0], libmesh_cast_int<int>(recvbuf.size()), &pos,
-                    &recv[i][0], libmesh_cast_int<int>(recv[i].size()),
-                    Parallel::StandardType<T2>(&recv[i][0]),
+        MPI_Unpack (&recvbuf[0], libMesh::cast_int<int>(recvbuf.size()), &pos,
+                    &recv[i][0], libMesh::cast_int<int>(recv[i].size()),
+                    libMesh::Parallel::StandardType<T2>(&recv[i][0]),
                     comm.get());
     }
 
@@ -367,13 +362,11 @@ extern Communicator& Communicator_World;
 /**
  * Helper function for range packing
  */
-template <typename Context, typename buffertype, typename Iter>
-inline void pack_range (const Context *context,
-                        Iter range_begin,
-                        const Iter range_end,
-                        std::vector<buffertype>& buffer)
+template <typename Context, typename Iter>
+inline std::size_t packed_range_size (const Context *context,
+                                      Iter range_begin,
+                                      const Iter range_end)
 {
-  // Count the total size of and preallocate buffer for efficiency
   std::size_t buffer_size = 0;
   for (Iter range_count = range_begin;
        range_count != range_end;
@@ -381,10 +374,44 @@ inline void pack_range (const Context *context,
     {
       buffer_size += Parallel::packable_size(*range_count, context);
     }
+  return buffer_size;
+}
+
+
+/**
+ * Helper function for range packing
+ */
+template <typename Context, typename buffertype, typename Iter>
+inline Iter pack_range (const Context *context,
+                        Iter range_begin,
+                        const Iter range_end,
+                        std::vector<buffertype>& buffer)
+{
+  // When we serialize into buffers, we need to use large buffers to optimize MPI
+  // bandwidth, but not so large as to risk allocation failures.  max_buffer_size
+  // is measured in number of buffer type entries; number of bytes may be 4 or 8
+  // times larger depending on configuration.
+
+  static const std::size_t max_buffer_size = 1000000;
+  // static const std::size_t max_buffer_size = std::size_t(-1);
+
+  // Count the total size of and preallocate buffer for efficiency.
+  // Prepare to stop early if the buffer would be too large.
+  std::size_t buffer_size = 0;
+  Iter range_stop = range_begin;
+  for (; range_stop != range_end; ++range_stop)
+    {
+      std::size_t next_buffer_size =
+        Parallel::packable_size(*range_stop, context);
+      if (buffer_size + next_buffer_size >= max_buffer_size)
+        break;
+      else
+        buffer_size += next_buffer_size;
+    }
   buffer.reserve(buffer.size() + buffer_size);
 
   // Pack the objects into the buffer
-  for (; range_begin != range_end; ++range_begin)
+  for (; range_begin != range_stop; ++range_begin)
     {
 #ifndef NDEBUG
       std::size_t old_size = buffer.size();
@@ -402,6 +429,8 @@ inline void pack_range (const Context *context,
       libmesh_assert_equal_to (buffer.size(), old_size + my_packable_size);
 #endif
     }
+
+  return range_stop;
 }
 
 
@@ -465,12 +494,15 @@ inline Communicator::~Communicator () {
 }
 
 #ifdef LIBMESH_HAVE_MPI
-inline void Communicator::split(int color, int key, Communicator &target) {
-  MPI_Comm_split(this->get(), color, key, &target.get());
+inline void Communicator::split(int color, int key, Communicator &target) const {
+  target.clear();
+  MPI_Comm newcomm;
+  MPI_Comm_split(this->get(), color, key, &newcomm);
+  target.assign(newcomm);
   target.send_mode(this->send_mode());
 }
 #else
-inline void Communicator::split(int, int, Communicator &target) {
+inline void Communicator::split(int, int, Communicator &target) const {
   target.assign(this->get());
 }
 #endif
@@ -522,7 +554,7 @@ inline Communicator::Communicator (const Communicator &) :
   used_tag_values(),
   _I_duped_it(false)
 {
-  libmesh_error();
+  libmesh_not_implemented();
 }
 
 inline void Communicator::assign(const communicator &comm)
@@ -597,7 +629,7 @@ inline int Status::tag () const
 #ifdef LIBMESH_HAVE_MPI
   return _status.MPI_TAG;
 #else
-  libmesh_error();
+  libmesh_not_implemented();
   return 0;
 #endif
 }
@@ -613,7 +645,7 @@ inline unsigned int Status::size (const data_type &type) const
 #else
 inline unsigned int Status::size (const data_type &) const
 {
-  libmesh_error();
+  libmesh_not_implemented();
   return 0;
 }
 #endif
@@ -641,6 +673,10 @@ inline Request::Request (const Request &other) :
   _request(other._request),
   post_wait_work(other.post_wait_work)
 {
+  if (other._prior_request.get())
+    _prior_request = AutoPtr<Request>
+      (new Request(*other._prior_request.get()));
+
   // operator= should behave like a shared pointer
   if (post_wait_work)
     post_wait_work->second++;
@@ -675,6 +711,10 @@ inline Request& Request::operator = (const Request &other)
   _request = other._request;
   post_wait_work = other.post_wait_work;
 
+  if (other._prior_request.get())
+    _prior_request = AutoPtr<Request>
+      (new Request(*other._prior_request.get()));
+
   // operator= should behave like a shared pointer
   if (post_wait_work)
     post_wait_work->second++;
@@ -697,6 +737,9 @@ inline Request::~Request () {
 inline Status Request::wait ()
 {
   START_LOG("wait()", "Parallel::Request");
+
+  if (_prior_request.get())
+    _prior_request->wait();
 
   Status stat;
 #ifdef LIBMESH_HAVE_MPI
@@ -756,6 +799,16 @@ inline bool Request::test (status &)
   return true;
 }
 #endif
+
+inline void Request::add_prior_request(const Request& req)
+{
+  // We're making a chain of prior requests, not a tree
+  libmesh_assert(!req._prior_request.get());
+
+  Request *new_prior_req = new Request(req);
+  new_prior_req->_prior_request = this->_prior_request;
+  this->_prior_request = AutoPtr<Request>(new_prior_req);
+}
 
 inline void Request::add_post_wait_work(PostWaitWork* work)
 {
@@ -954,14 +1007,14 @@ inline void receive_packed_range (const unsigned int src_processor_id,
                                   const Communicator &comm = Communicator_World)
 { comm.receive_packed_range (src_processor_id, context, out, tag); }
 
-template <typename Context, typename OutputIter>
-inline void receive_packed_range (const unsigned int src_processor_id,
-                                  Context *context,
-                                  OutputIter out,
-                                  Request &req,
-                                  const MessageTag &tag=any_tag,
-                                  const Communicator &comm = Communicator_World)
-{ comm.receive_packed_range (src_processor_id, context, out, req, tag); }
+// template <typename Context, typename OutputIter>
+// inline void receive_packed_range (const unsigned int src_processor_id,
+//                                   Context *context,
+//                                   OutputIter out,
+//                                   Request &req,
+//                                   const MessageTag &tag=any_tag,
+//                                   const Communicator &comm = Communicator_World)
+// { comm.receive_packed_range (src_processor_id, context, out, req, tag); }
 
 template <typename T>
 inline void nonblocking_receive (const unsigned int src_processor_id,
@@ -1349,7 +1402,7 @@ inline void Communicator::min(std::vector<T> &r) const
       std::vector<T> temp(r);
       MPI_Allreduce (&temp[0],
                      &r[0],
-                     libmesh_cast_int<int>(r.size()),
+                     cast_int<int>(r.size()),
                      StandardType<T>(&temp[0]),
                      MPI_MIN,
                      this->get());
@@ -1372,7 +1425,7 @@ inline void Communicator::min(std::vector<bool> &r) const
       std::vector<unsigned int> temp(ruint.size());
       MPI_Allreduce (&ruint[0],
                      &temp[0],
-                     libmesh_cast_int<int>(ruint.size()),
+                     cast_int<int>(ruint.size()),
                      StandardType<unsigned int>(),
                      MPI_BAND,
                      this->get());
@@ -1457,7 +1510,7 @@ inline void Communicator::minloc(std::vector<T> &r,
       std::vector<DataPlusInt<T> > out(r.size());
       MPI_Allreduce (&in[0],
                      &out[0],
-                     libmesh_cast_int<int>(r.size()),
+                     cast_int<int>(r.size()),
                      dataplusint_type<T>(),
                      MPI_MINLOC,
                      this->get());
@@ -1495,7 +1548,7 @@ inline void Communicator::minloc(std::vector<bool> &r,
       std::vector<DataPlusInt<int> > out(r.size());
       MPI_Allreduce (&in[0],
                      &out[0],
-                     libmesh_cast_int<int>(r.size()),
+                     cast_int<int>(r.size()),
                      StandardType<int>(),
                      MPI_MINLOC,
                      this->get());
@@ -1569,7 +1622,7 @@ inline void Communicator::max(std::vector<T> &r) const
       std::vector<T> temp(r);
       MPI_Allreduce (&temp[0],
                      &r[0],
-                     libmesh_cast_int<int>(r.size()),
+                     cast_int<int>(r.size()),
                      StandardType<T>(&temp[0]),
                      MPI_MAX,
                      this->get());
@@ -1592,7 +1645,7 @@ inline void Communicator::max(std::vector<bool> &r) const
       std::vector<unsigned int> temp(ruint.size());
       MPI_Allreduce (&ruint[0],
                      &temp[0],
-                     libmesh_cast_int<int>(ruint.size()),
+                     cast_int<int>(ruint.size()),
                      StandardType<unsigned int>(),
                      MPI_BOR,
                      this->get());
@@ -1677,7 +1730,7 @@ inline void Communicator::maxloc(std::vector<T> &r,
       std::vector<DataPlusInt<T> > out(r.size());
       MPI_Allreduce (&in[0],
                      &out[0],
-                     libmesh_cast_int<int>(r.size()),
+                     cast_int<int>(r.size()),
                      dataplusint_type<T>(),
                      MPI_MAXLOC,
                      this->get());
@@ -1715,7 +1768,7 @@ inline void Communicator::maxloc(std::vector<bool> &r,
       std::vector<DataPlusInt<int> > out(r.size());
       MPI_Allreduce (&in[0],
                      &out[0],
-                     libmesh_cast_int<int>(r.size()),
+                     cast_int<int>(r.size()),
                      StandardType<int>(),
                      MPI_MAXLOC,
                      this->get());
@@ -1767,7 +1820,7 @@ inline void Communicator::sum(std::vector<T> &r) const
       std::vector<T> temp(r);
       MPI_Allreduce (&temp[0],
                      &r[0],
-                     libmesh_cast_int<int>(r.size()),
+                     cast_int<int>(r.size()),
                      StandardType<T>(&temp[0]),
                      MPI_SUM,
                      this->get());
@@ -1811,7 +1864,7 @@ inline void Communicator::sum(std::vector<std::complex<T> > &r) const
       std::vector<std::complex<T> > temp(r);
       MPI_Allreduce (&temp[0],
                      &r[0],
-                     libmesh_cast_int<int>(r.size() * 2),
+                     cast_int<int>(r.size() * 2),
                      StandardType<T>(NULL),
                      MPI_SUM,
                      this->get());
@@ -1899,7 +1952,7 @@ inline void Communicator::send (const unsigned int dest_processor_id,
 #endif
     ((this->send_mode() == SYNCHRONOUS) ?
      MPI_Ssend : MPI_Send) (dataptr,
-                            libmesh_cast_int<int>(buf.size()),
+                            cast_int<int>(buf.size()),
                             StandardType<T>(dataptr),
                             dest_processor_id,
                             tag.value(),
@@ -1928,7 +1981,7 @@ inline void Communicator::send (const unsigned int dest_processor_id,
 #endif
     ((this->send_mode() == SYNCHRONOUS) ?
      MPI_Issend : MPI_Isend) (dataptr,
-                              libmesh_cast_int<int>(buf.size()),
+                              cast_int<int>(buf.size()),
                               StandardType<T>(dataptr),
                               dest_processor_id,
                               tag.value(),
@@ -2101,7 +2154,7 @@ inline void Communicator::send (const unsigned int dest_processor_id,
 #endif
     ((this->send_mode() == SYNCHRONOUS) ?
      MPI_Ssend : MPI_Send) (buf.empty() ? NULL : &buf[0],
-                            libmesh_cast_int<int>(buf.size()),
+                            cast_int<int>(buf.size()),
                             type,
                             dest_processor_id,
                             tag.value(),
@@ -2129,7 +2182,7 @@ inline void Communicator::send (const unsigned int dest_processor_id,
 #endif
     ((this->send_mode() == SYNCHRONOUS) ?
      MPI_Issend : MPI_Isend) (buf.empty() ? NULL : &buf[0],
-                              libmesh_cast_int<int>(buf.size()),
+                              cast_int<int>(buf.size()),
                               type,
                               dest_processor_id,
                               tag.value(),
@@ -2152,12 +2205,33 @@ inline void Communicator::send_packed_range (const unsigned int dest_processor_i
   // We will serialize variable size objects from *range_begin to
   // *range_end as a sequence of plain data (e.g. ints) in this buffer
   typedef typename std::iterator_traits<Iter>::value_type T;
-  std::vector<typename Parallel::BufferType<T>::type> buffer;
 
-  Parallel::pack_range(context, range_begin, range_end, buffer);
+  std::size_t total_buffer_size =
+    Parallel::packed_range_size(context, range_begin, range_end);
 
-  // Blocking send of the buffer
-  this->send(dest_processor_id, buffer, tag);
+  this->send(dest_processor_id, total_buffer_size, tag);
+
+#ifdef DEBUG
+  std::size_t used_buffer_size = 0;
+#endif
+
+  while (range_begin != range_end)
+    {
+      std::vector<typename Parallel::BufferType<T>::type> buffer;
+
+      range_begin = Parallel::pack_range(context, range_begin, range_end, buffer);
+
+#ifdef DEBUG
+      used_buffer_size += buffer.size();
+#endif
+
+      // Blocking send of the buffer
+      this->send(dest_processor_id, buffer, tag);
+    }
+
+#ifdef DEBUG
+  libmesh_assert_equal_to(used_buffer_size, total_buffer_size);
+#endif
 }
 
 
@@ -2173,17 +2247,44 @@ inline void Communicator::send_packed_range (const unsigned int dest_processor_i
   // after the Request::wait()
   typedef typename std::iterator_traits<Iter>::value_type T;
   typedef typename Parallel::BufferType<T>::type buffer_t;
-  std::vector<buffer_t> *buffer = new std::vector<buffer_t>();
 
-  Parallel::pack_range(context, range_begin, range_end, *buffer);
+  std::size_t total_buffer_size =
+    Parallel::packed_range_size(context, range_begin, range_end);
 
-  // Make the Request::wait() handle deleting the buffer
-  req.add_post_wait_work
-    (new Parallel::PostWaitDeleteBuffer<std::vector<buffer_t> >
-     (buffer));
+  Request intermediate_req = request();
+  this->send(dest_processor_id, total_buffer_size, intermediate_req, tag);
 
-  // Non-blocking send of the buffer
-  this->send(dest_processor_id, *buffer, req, tag);
+  req.add_prior_request(intermediate_req);
+
+#ifdef DEBUG
+  std::size_t used_buffer_size = 0;
+#endif
+
+  while (range_begin != range_end)
+    {
+      std::vector<buffer_t> *buffer = new std::vector<buffer_t>();
+
+      range_begin = Parallel::pack_range(context, range_begin, range_end, *buffer);
+
+#ifdef DEBUG
+      used_buffer_size += buffer->size();
+#endif
+
+      Request next_intermediate_req;
+
+      Request *my_req = (range_begin == range_end) ? &req : &next_intermediate_req;
+
+      // Make the Request::wait() handle deleting the buffer
+      my_req->add_post_wait_work
+        (new Parallel::PostWaitDeleteBuffer<std::vector<buffer_t> >
+         (buffer));
+
+      // Non-blocking send of the buffer
+      this->send(dest_processor_id, *buffer, *my_req, tag);
+
+      if (range_begin != range_end)
+        req.add_prior_request(*my_req);
+    }
 }
 
 
@@ -2409,7 +2510,7 @@ inline Status Communicator::receive (const unsigned int src_processor_id,
   const int ierr =
 #endif
     MPI_Recv (buf.empty() ? NULL : &buf[0],
-              libmesh_cast_int<int>(buf.size()),
+              cast_int<int>(buf.size()),
               type,
               src_processor_id,
               tag.value(),
@@ -2438,7 +2539,7 @@ inline void Communicator::receive (const unsigned int src_processor_id,
   const int ierr =
 #endif
     MPI_Irecv (buf.empty() ? NULL : &buf[0],
-               libmesh_cast_int<int>(buf.size()),
+               cast_int<int>(buf.size()),
                type,
                src_processor_id,
                tag.value(),
@@ -2459,40 +2560,48 @@ inline void Communicator::receive_packed_range (const unsigned int src_processor
   typedef typename std::iterator_traits<OutputIter>::value_type T;
   typedef typename Parallel::BufferType<T>::type buffer_t;
 
-  // Receive serialized variable size objects as a sequence of ints
-  std::vector<buffer_t> buffer;
-  this->receive(src_processor_id, buffer, tag);
-  Parallel::unpack_range(buffer, context, out);
+  // Receive serialized variable size objects as sequences of buffer_t
+  std::size_t total_buffer_size = 0;
+  this->receive(src_processor_id, total_buffer_size, tag);
+
+  std::size_t received_buffer_size = 0;
+  while (received_buffer_size < total_buffer_size)
+    {
+      std::vector<buffer_t> buffer;
+      this->receive(src_processor_id, buffer, tag);
+      received_buffer_size += buffer.size();
+      Parallel::unpack_range(buffer, context, out);
+    }
 }
 
 
 
-template <typename Context, typename OutputIter>
-inline void Communicator::receive_packed_range (const unsigned int src_processor_id,
-                                                Context *context,
-                                                OutputIter out,
-                                                Request &req,
-                                                const MessageTag &tag) const
-{
-  typedef typename std::iterator_traits<OutputIter>::value_type T;
-  typedef typename Parallel::BufferType<T>::type buffer_t;
-
-  // Receive serialized variable size objects as a sequence of
-  // buffer_t.
-  // Allocate a buffer on the heap so we don't have to free it until
-  // after the Request::wait()
-  std::vector<buffer_t> *buffer = new std::vector<buffer_t>();
-  this->receive(src_processor_id, *buffer, req, tag);
-
-  // Make the Request::wait() handle unpacking the buffer
-  req.add_post_wait_work
-    (new Parallel::PostWaitUnpackBuffer<std::vector<buffer_t>, Context, OutputIter>
-     (buffer, context, out));
-
-  // Make the Request::wait() then handle deleting the buffer
-  req.add_post_wait_work
-    (new Parallel::PostWaitDeleteBuffer<std::vector<buffer_t> >(buffer));
-}
+// template <typename Context, typename OutputIter>
+// inline void Communicator::receive_packed_range (const unsigned int src_processor_id,
+//                                                 Context *context,
+//                                                 OutputIter out,
+//                                                 Request &req,
+//                                                 const MessageTag &tag) const
+// {
+//   typedef typename std::iterator_traits<OutputIter>::value_type T;
+//   typedef typename Parallel::BufferType<T>::type buffer_t;
+//
+//   // Receive serialized variable size objects as a sequence of
+//   // buffer_t.
+//   // Allocate a buffer on the heap so we don't have to free it until
+//   // after the Request::wait()
+//   std::vector<buffer_t> *buffer = new std::vector<buffer_t>();
+//   this->receive(src_processor_id, *buffer, req, tag);
+//
+//   // Make the Request::wait() handle unpacking the buffer
+//   req.add_post_wait_work
+//     (new Parallel::PostWaitUnpackBuffer<std::vector<buffer_t>, Context, OutputIter>
+//      (buffer, context, out));
+//
+//   // Make the Request::wait() then handle deleting the buffer
+//   req.add_post_wait_work
+//     (new Parallel::PostWaitDeleteBuffer<std::vector<buffer_t> >(buffer));
+// }
 
 
 
@@ -2827,10 +2936,10 @@ inline void Communicator::allgather
       StandardType<T> send_type(&r_src[0]);
 
       MPI_Allgather (&r_src[0],
-                     libmesh_cast_int<int>(r_src.size()),
+                     cast_int<int>(r_src.size()),
                      send_type,
                      &r[0],
-                     libmesh_cast_int<int>(r_src.size()),
+                     cast_int<int>(r_src.size()),
                      send_type,
                      this->get());
       libmesh_assert(this->verify(r));
@@ -2894,15 +3003,24 @@ inline void Communicator::gather_packed_range
   typedef typename std::iterator_traits<Iter>::value_type T;
   typedef typename Parallel::BufferType<T>::type buffer_t;
 
-  // We will serialize variable size objects from *range_begin to
-  // *range_end as a sequence of ints in this buffer
-  std::vector<buffer_t> buffer;
+  bool nonempty_range = (range_begin != range_end);
+  this->max(nonempty_range);
 
-  Parallel::pack_range(context, range_begin, range_end, buffer);
+  while (nonempty_range)
+    {
+      // We will serialize variable size objects from *range_begin to
+      // *range_end as a sequence of ints in this buffer
+      std::vector<buffer_t> buffer;
 
-  this->gather(root_id, buffer);
+      range_begin = Parallel::pack_range(context, range_begin, range_end, buffer);
 
-  Parallel::unpack_range(buffer, context, out);
+      this->gather(root_id, buffer);
+
+      Parallel::unpack_range(buffer, context, out);
+
+      nonempty_range = (range_begin != range_end);
+      this->max(nonempty_range);
+    }
 }
 
 
@@ -2916,15 +3034,26 @@ inline void Communicator::allgather_packed_range
   typedef typename std::iterator_traits<Iter>::value_type T;
   typedef typename Parallel::BufferType<T>::type buffer_t;
 
-  // We will serialize variable size objects from *range_begin to
-  // *range_end as a sequence of ints in this buffer
-  std::vector<buffer_t> buffer;
+  bool nonempty_range = (range_begin != range_end);
+  this->max(nonempty_range);
 
-  Parallel::pack_range(context, range_begin, range_end, buffer);
+  while (nonempty_range)
+    {
+      // We will serialize variable size objects from *range_begin to
+      // *range_end as a sequence of ints in this buffer
+      std::vector<buffer_t> buffer;
 
-  this->allgather(buffer, false);
+      range_begin = Parallel::pack_range(context, range_begin, range_end, buffer);
 
-  Parallel::unpack_range(buffer, context, out);
+      this->allgather(buffer, false);
+
+      libmesh_assert(buffer.size());
+
+      Parallel::unpack_range(buffer, context, out);
+
+      nonempty_range = (range_begin != range_end);
+      this->max(nonempty_range);
+    }
 }
 
 
@@ -2940,7 +3069,7 @@ inline void Communicator::alltoall(std::vector<T> &buf) const
   // processors using MPI_Alltoall, could be variable
   // using MPI_Alltoallv
   const int size_per_proc =
-    libmesh_cast_int<int>(buf.size()/this->size());
+    cast_int<int>(buf.size()/this->size());
 
   libmesh_assert_equal_to (buf.size()%this->size(), 0);
 
@@ -3059,7 +3188,7 @@ inline void Communicator::broadcast (std::vector<T> &data,
   // Only catch the return value when asserts are active.
   const int ierr =
 #endif
-    MPI_Bcast (data_ptr, libmesh_cast_int<int>(data.size()),
+    MPI_Bcast (data_ptr, cast_int<int>(data.size()),
                StandardType<T>(data_ptr), root_id, this->get());
 
   libmesh_assert (ierr == MPI_SUCCESS);
@@ -3098,7 +3227,7 @@ inline void Communicator::broadcast (std::vector<std::basic_string<T> > &data,
     {
       for (unsigned int i=0; i<data.size(); ++i)
         {
-          temp.push_back(data[i].size());
+          temp.push_back(cast_int<unsigned int>(data[i].size()));
           for (std::size_t j=0; j != data[i].size(); ++j)
             /**
              * The strings will be packed in one long array with the size of each
@@ -3233,24 +3362,32 @@ inline void Communicator::broadcast_packed_range
   typedef typename std::iterator_traits<Iter>::value_type T;
   typedef typename Parallel::BufferType<T>::type buffer_t;
 
-  // We will serialize variable size objects from *range_begin to
-  // *range_end as a sequence of ints in this buffer
-  std::vector<buffer_t> buffer;
+  do
+    {
+      // We will serialize variable size objects from *range_begin to
+      // *range_end as a sequence of ints in this buffer
+      std::vector<buffer_t> buffer;
 
-  if (this->rank() == root_id)
-    Parallel::pack_range(context1, range_begin, range_end, buffer);
+      if (this->rank() == root_id)
+        range_begin = Parallel::pack_range(context1, range_begin, range_end, buffer);
 
-  // this->broadcast(vector) requires the receiving vectors to
-  // already be the appropriate size
-  std::size_t buffer_size = buffer.size();
-  this->broadcast (buffer_size);
-  buffer.resize(buffer_size);
+      // this->broadcast(vector) requires the receiving vectors to
+      // already be the appropriate size
+      std::size_t buffer_size = buffer.size();
+      this->broadcast (buffer_size, root_id);
 
-  // Broadcast the packed data
-  this->broadcast (buffer, root_id);
+      // We continue until there's nothing left to broadcast
+      if (!buffer_size)
+        break;
 
-  if (this->rank() != root_id)
-    Parallel::unpack_range(buffer, context2, out);
+      buffer.resize(buffer_size);
+
+      // Broadcast the packed data
+      this->broadcast (buffer, root_id);
+
+      if (this->rank() != root_id)
+        Parallel::unpack_range(buffer, context2, out);
+    } while (true);  // break above when we reach buffer_size==0
 }
 
 
@@ -3299,87 +3436,87 @@ inline void Communicator::set_union(T&, const unsigned int root_id) const
  */
 inline status Communicator::probe (const unsigned int,
                                    const MessageTag&) const
-{ libmesh_error(); status s; return s; }
+{ libmesh_not_implemented(); status s; return s; }
 
 /**
  * We do not currently support sends on one processor without MPI.
  */
 template <typename T>
 inline void Communicator::send (const unsigned int, T&, const MessageTag &) const
-{ libmesh_error(); }
+{ libmesh_not_implemented(); }
 
 template <typename T>
 inline void Communicator::send (const unsigned int, T&, Request&,
                                 const MessageTag&) const
-{ libmesh_error(); }
+{ libmesh_not_implemented(); }
 
 template <typename T>
 inline void Communicator::send (const unsigned int, T&, const DataType&,
                                 const MessageTag &) const
-{ libmesh_error(); }
+{ libmesh_not_implemented(); }
 
 template <typename T>
 inline void Communicator::send (const unsigned int, T&, const DataType&, Request&,
                                 const MessageTag &) const
-{ libmesh_error(); }
+{ libmesh_not_implemented(); }
 
 template <typename Context, typename Iter>
 inline void Communicator::send_packed_range
 (const unsigned int, const Context*, Iter, const Iter, const MessageTag&) const
-{ libmesh_error(); }
+{ libmesh_not_implemented(); }
 
 template <typename Context, typename Iter>
 inline void Communicator::send_packed_range
 (const unsigned int, const Context*, Iter, const Iter, Request&,
  const MessageTag&) const
-{ libmesh_error(); }
+{ libmesh_not_implemented(); }
 
 /**
  * We do not currently support receives on one processor without MPI.
  */
 template <typename T>
 inline Status Communicator::receive (const unsigned int, T&, const MessageTag&) const
-{ libmesh_error(); return Status(); }
+{ libmesh_not_implemented(); return Status(); }
 
 template <typename T>
 inline void Communicator::receive
 (const unsigned int, T&, Request&, const MessageTag&) const
-{ libmesh_error(); }
+{ libmesh_not_implemented(); }
 
 template <typename T>
 inline Status Communicator::receive
 (const unsigned int, T&, const DataType&, const MessageTag&) const
-{ libmesh_error(); return Status(); }
+{ libmesh_not_implemented(); return Status(); }
 
 template <typename T>
 inline void Communicator::receive
 (const unsigned int, T&, const DataType&, Request&, const MessageTag&) const
-{ libmesh_error(); }
+{ libmesh_not_implemented(); }
 
 template <typename Context, typename OutputIter>
 inline void Communicator::receive_packed_range
 (const unsigned int, Context*, OutputIter, const MessageTag&) const
-{ libmesh_error(); }
+{ libmesh_not_implemented(); }
 
-template <typename Context, typename OutputIter>
-inline void Communicator::receive_packed_range
-(const unsigned int, Context*, OutputIter, Request&, const MessageTag&) const
-{ libmesh_error(); }
+// template <typename Context, typename OutputIter>
+// inline void Communicator::receive_packed_range
+// (const unsigned int, Context*, OutputIter, Request&, const MessageTag&) const
+// { libmesh_not_implemented(); }
 
 /**
  * Send-receive data from one processor.
  */
 template <typename T1, typename T2>
 inline void Communicator::send_receive (const unsigned int send_tgt,
-                                        T1 &send,
+                                        T1 &send_val,
                                         const unsigned int recv_source,
-                                        T2 &recv,
+                                        T2 &recv_val,
                                         const MessageTag &,
                                         const MessageTag &) const
 {
   libmesh_assert_equal_to (send_tgt, 0);
   libmesh_assert_equal_to (recv_source, 0);
-  recv = send;
+  recv_val = send_val;
 }
 
 /**
@@ -3394,19 +3531,19 @@ inline void Communicator::send_receive_packed_range
  RangeIter /* send_begin */, const RangeIter /* send_end */,
  const unsigned int /* source_processor_id */, Context2*,
  OutputIter /* out */, const MessageTag &, const MessageTag &) const
-{ libmesh_error(); }
+{ libmesh_not_implemented(); }
 
 /**
  * Gather-to-root on one processor.
  */
 template <typename T>
 inline void Communicator::gather(const unsigned int root_id,
-                                 T send,
-                                 std::vector<T> &recv) const
+                                 T send_val,
+                                 std::vector<T> &recv_val) const
 {
   libmesh_assert_equal_to (root_id, 0);
-  recv.resize(1);
-  recv[0] = send;
+  recv_val.resize(1);
+  recv_val[0] = send_val;
 }
 
 template <typename T>
@@ -3414,10 +3551,10 @@ inline void Communicator::gather(const unsigned int root_id, std::vector<T>&) co
 { libmesh_assert_equal_to(root_id, 0); }
 
 template <typename T>
-inline void Communicator::allgather(T send, std::vector<T> &recv) const
+inline void Communicator::allgather(T send_val, std::vector<T> &recv_val) const
 {
-  recv.resize(1);
-  recv[0] = send;
+  recv_val.resize(1);
+  recv_val[0] = send_val;
 }
 
 template <typename T>

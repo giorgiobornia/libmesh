@@ -23,6 +23,7 @@
 #include "libmesh/fe_interface.h"
 #include "libmesh/elem.h"
 #include "libmesh/threads.h"
+#include "libmesh/string_to_enum.h"
 
 namespace libMesh
 {
@@ -333,15 +334,11 @@ unsigned int l2_lagrange_n_dofs(const ElemType t, const Order o)
           case PYRAMID14:
             return 5;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for FIRST order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
@@ -381,15 +378,11 @@ unsigned int l2_lagrange_n_dofs(const ElemType t, const Order o)
           case PRISM18:
             return 18;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for SECOND order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
@@ -403,23 +396,19 @@ unsigned int l2_lagrange_n_dofs(const ElemType t, const Order o)
           case EDGE4:
             return 4;
 
+          case INVALID_ELEM:
+            return 0;
+
           default:
-            {
-#ifdef DEBUG
-              libMesh::err << "ERROR: Bad ElemType = " << t
-                           << " for THIRD order approximation!"
-                           << std::endl;
-#endif
-              libmesh_error();
-            }
+            libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
           }
       }
 
     default:
-      libmesh_error();
+      libmesh_error_msg("ERROR: Invalid Order " << Utility::enum_to_string(o) << " selected for L2_LAGRANGE FE family!");
     }
 
-  libmesh_error();
+  libmesh_error_msg("We'll never get here!");
   return 0;
 }
 

@@ -123,18 +123,21 @@ int main (int argc, char** argv)
   // Initialize libMesh.
   LibMeshInit init (argc, argv);
 
+  // Skip this 2D example if libMesh was compiled as 1D-only.
+  libmesh_example_requires(2 <= LIBMESH_DIM, "2D support");
+
 #if !defined(LIBMESH_ENABLE_AMR)
-  libmesh_example_assert(false, "--enable-amr");
+  libmesh_example_requires(false, "--enable-amr");
 #elif !defined(LIBMESH_HAVE_XDR)
   // We use XDR support in our output here
-  libmesh_example_assert(false, "--enable-xdr");
+  libmesh_example_requires(false, "--enable-xdr");
 #elif !defined(LIBMESH_ENABLE_PERIODIC)
-  libmesh_example_assert(false, "--enable-periodic");
+  libmesh_example_requires(false, "--enable-periodic");
 #else
 
   // Our Trilinos interface does not yet support adaptive transient
   // problems
-  libmesh_example_assert(libMesh::default_solver_package() != TRILINOS_SOLVERS, "--enable-petsc");
+  libmesh_example_requires(libMesh::default_solver_package() != TRILINOS_SOLVERS, "--enable-petsc");
 
   // Brief message to the user regarding the program name
   // and command line arguments.
@@ -179,13 +182,9 @@ int main (int argc, char** argv)
     init_timestep = command_line.next(0);
   else
     {
-      if (init.comm().rank() == 0)
-        std::cerr << "ERROR: Initial timestep not specified\n" << std::endl;
-
       // This handy function will print the file name, line number,
-      // and then abort.  Currrently the library does not use C++
-      // exception handling.
-      libmesh_error();
+      // specified message, and then throw an exception.
+      libmesh_error_msg("ERROR: Initial timestep not specified!");
     }
 
   // This value is also obtained from the command line, and specifies
@@ -196,10 +195,7 @@ int main (int argc, char** argv)
   if(command_line.search("-n_timesteps"))
     n_timesteps = command_line.next(0);
   else
-    {
-      std::cout << "ERROR: Number of timesteps not specified\n" << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: Number of timesteps not specified");
 
   // The user can specify a different exact solution on the command
   // line, if we have an expression parser compiled in
@@ -212,7 +208,7 @@ int main (int argc, char** argv)
     parsed_solution = new ParsedFunction<Number>(command_line.next(std::string()));
 
   // Skip this 2D example if libMesh was compiled as 1D-only.
-  libmesh_example_assert(2 <= LIBMESH_DIM, "2D support");
+  libmesh_example_requires(2 <= LIBMESH_DIM, "2D support");
 
   // Create a new mesh on the default MPI communicator.
   // ParallelMesh doesn't yet understand periodic BCs, plus

@@ -64,11 +64,7 @@ void MeshData::read_unv (const std::string& file_name)
       igzstream in_stream(file_name.c_str());
       this->read_unv_implementation (in_stream);
 #else
-      libMesh::err << "ERROR:  You must have the zlib.h header "
-                   << "files and libraries to read and write "
-                   << "compressed streams."
-                   << std::endl;
-      libmesh_error();
+      libmesh_error_msg("ERROR:  You must have the zlib.h header files and libraries to read and write compressed streams.");
 #endif
       return;
     }
@@ -96,11 +92,7 @@ void MeshData::read_unv_implementation (std::istream& in_file)
    * allows to read .gz'ed files.
    */
   if ( !in_file.good() )
-    {
-      libMesh::err << "ERROR: Input file not good."
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: Input file not good.");
 
   const std::string _label_dataset_mesh_data = "2414";
 
@@ -267,11 +259,7 @@ void MeshData::read_unv_implementation (std::istream& in_file)
              * Check the location of the dataset.
              */
             if (dataset_location != 1)
-              {
-                libMesh::err << "ERROR: Currently only Data at nodes is supported."
-                             << std::endl;
-                libmesh_error();
-              }
+              libmesh_error_msg("ERROR: Currently only Data at nodes is supported.");
 
 
             /*
@@ -346,19 +334,12 @@ void MeshData::read_unv_implementation (std::istream& in_file)
                         values[data_cnt] = Complex(re_val,im_val);
 #else
 
-                        libMesh::err << "ERROR: Complex data only supported" << std::endl
-                                     << "when libMesh is configured with --enable-complex!"
-                                     << std::endl;
-                        libmesh_error();
+                        libmesh_error_msg("ERROR: Complex data only supported when libMesh is configured with --enable-complex!");
 #endif
                       }
 
                     else
-                      {
-                        libMesh::err << "ERROR: Data type not supported."
-                                     << std::endl;
-                        libmesh_error();
-                      }
+                      libmesh_error_msg("ERROR: Data type not supported.");
 
                   } // end loop data_cnt
 
@@ -421,11 +402,7 @@ void MeshData::write_unv (const std::string& file_name)
       ogzstream out_stream(file_name.c_str());
       this->write_unv_implementation (out_stream);
 #else
-      libMesh::err << "ERROR:  You must have the zlib.h header "
-                   << "files and libraries to read and write "
-                   << "compressed streams."
-                   << std::endl;
-      libmesh_error();
+      libmesh_error_msg("ERROR:  You must have the zlib.h header files and libraries to read and write compressed streams.");
 #endif
       return;
 
@@ -451,11 +428,7 @@ void MeshData::write_unv_implementation (std::ostream& out_file)
    * unv files, either as .unv or as .unv.gz file
    */
   if ( !out_file.good() )
-    {
-      libMesh::err << "ERROR: Output file not good."
-                   << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("ERROR: Output file not good.");
 
 
   /*
@@ -816,14 +789,6 @@ bool MeshDataUnvHeader::need_D_to_e (std::string& number)
 {
   // find "D" in string, start looking at 6th element, to improve speed.
   // We dont expect a "D" earlier
-
-  // #ifdef __HP_aCC
-  //   // Use an "int" instead of unsigned int,
-  //   // otherwise HP aCC may crash!
-  //   const int position = number.find("D",6);
-  // #else
-  //   const unsigned int position = number.find("D",6);
-  // #endif
   std::string::size_type position = number.find("D",6);
 
   if(position!=std::string::npos)     // npos means no position

@@ -19,7 +19,6 @@
 
 #include "curl_curl_system.h"
 
-#include "libmesh/boundary_info.h"
 #include "libmesh/dof_map.h"
 #include "libmesh/fe_base.h"
 #include "libmesh/fe_interface.h"
@@ -82,7 +81,7 @@ void CurlCurlSystem::init_dirichlet_bcs()
 
 void CurlCurlSystem::init_context(DiffContext &context)
 {
-  FEMContext &c = libmesh_cast_ref<FEMContext&>(context);
+  FEMContext &c = cast_ref<FEMContext&>(context);
 
   // Get finite element object
   FEGenericBase<RealGradient>* fe;
@@ -109,7 +108,7 @@ void CurlCurlSystem::init_context(DiffContext &context)
 bool CurlCurlSystem::element_time_derivative (bool request_jacobian,
                                               DiffContext &context)
 {
-  FEMContext &c = libmesh_cast_ref<FEMContext&>(context);
+  FEMContext &c = cast_ref<FEMContext&>(context);
 
   // Get finite element object
   FEGenericBase<RealGradient>* fe = NULL;
@@ -184,7 +183,7 @@ bool CurlCurlSystem::element_time_derivative (bool request_jacobian,
 bool CurlCurlSystem::side_time_derivative (bool request_jacobian,
                                            DiffContext &context)
 {
-  FEMContext &c = libmesh_cast_ref<FEMContext&>(context);
+  FEMContext &c = cast_ref<FEMContext&>(context);
 
   // Get finite element object
   FEGenericBase<RealGradient>* side_fe = NULL;

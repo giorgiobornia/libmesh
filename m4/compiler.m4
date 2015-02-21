@@ -11,8 +11,8 @@ AC_DEFUN([LIBMESH_SET_COMPILERS],
      #                             smart about which compilers to look for
      # -------------------------------------------------------------------
      AC_ARG_ENABLE(mpi,
-                   AC_HELP_STRING([--enable-mpi],
-                                  [build with MPI message passing support]),
+                   AS_HELP_STRING([--disable-mpi],
+                                  [build without MPI message passing support]),
    		   [case "${enableval}" in
    		     yes)  enablempi=yes ;;
    		      no)  enablempi=no ;;
@@ -27,7 +27,7 @@ AC_DEFUN([LIBMESH_SET_COMPILERS],
   fi
 
   AC_ARG_WITH([cxx],
-  	    AC_HELP_STRING([--with-cxx=CXX],
+  	    AS_HELP_STRING([--with-cxx=CXX],
                              [C++ compiler to use]),
   	    [CXX="$withval"],
   	    [])
@@ -42,7 +42,7 @@ AC_DEFUN([LIBMESH_SET_COMPILERS],
 
 
   # --------------------------------------------------------------
-  # See aclocal.m4 for the definition of this function.  It can
+  # See below for the definition of this function.  It can
   # figure out which version of a particular compiler, e.g. GCC 4.0,
   # you are using.
   # --------------------------------------------------------------
@@ -57,7 +57,7 @@ AC_DEFUN([LIBMESH_SET_COMPILERS],
     CC_TRY_LIST="mpicc $CC_TRY_LIST"
   fi
   AC_ARG_WITH([cc],
-  	    AC_HELP_STRING([--with-cc=CC],
+  	    AS_HELP_STRING([--with-cc=CC],
                              [C compiler to use]),
   	    [CC="$withval"],
   	    [])
@@ -83,8 +83,8 @@ AC_DEFUN([LIBMESH_SET_COMPILERS],
   # --disable-fortran
   # --------------------------------------------------------------
   AC_ARG_ENABLE(fortran,
-                AC_HELP_STRING([--enable-fortran],
-                               [build with Fortran language support]),
+                AS_HELP_STRING([--disable-fortran],
+                               [build without Fortran language support]),
 		[case "${enableval}" in
 		  yes)  enablefortran=yes ;;
 		   no)  enablefortran=no ;;
@@ -101,7 +101,7 @@ AC_DEFUN([LIBMESH_SET_COMPILERS],
       FC_TRY_LIST="mpif90 $FC_TRY_LIST"
     fi
     AC_ARG_WITH([fc],
-    	    AC_HELP_STRING([--with-fc=FC],
+    	    AS_HELP_STRING([--with-fc=FC],
                                [Fortran compiler to use]),
     	    [FC="$withval"],
     	    [])
@@ -127,7 +127,7 @@ AC_DEFUN([LIBMESH_SET_COMPILERS],
       F77_TRY_LIST="mpif77 $F77_TRY_LIST"
     fi
     AC_ARG_WITH([f77],
-    	    AC_HELP_STRING([--with-f77=F77],
+    	    AS_HELP_STRING([--with-f77=F77],
                                [Fortran compiler to use]),
     	    [F77="$withval"],
     	    [])
@@ -181,6 +181,10 @@ AC_DEFUN([DETERMINE_CXX_BRAND],
     # find out the right version
     GXX_VERSION_STRING=`($CXX -v 2>&1) | grep "gcc version"`
     case "$GXX_VERSION_STRING" in
+      *4.9.*)
+        AC_MSG_RESULT(<<< C++ compiler is gcc-4.9 >>>)
+        GXX_VERSION=gcc4.9
+        ;;
       *4.8.*)
   	AC_MSG_RESULT(<<< C++ compiler is gcc-4.8 >>>)
   	GXX_VERSION=gcc4.8
@@ -450,22 +454,44 @@ AC_DEFUN([DETERMINE_CXX_BRAND],
     	                GXX_VERSION=hpux_acc
   	              else
 
-		        # Clang LLVM C++?
-			is_clang="`($CXX --version 2>&1) | grep 'clang'`"
-  	                if test "x$is_clang" != "x" ; then
-                          AC_MSG_RESULT(<<< C++ compiler is LLVM Clang C++ >>>)
-	                  GXX_VERSION=clang
-			else
+                      # Clang/LLVM C++?
+                      clang_version="`($CXX --version 2>&1)`"
+                      is_clang="`echo $clang_version | grep 'clang'`"
+
+                        if test "x$is_clang" != "x" ; then
+                          # Detect if clang is the version built by
+                          # Apple, because then the version number means
+                          # something different...
+                          is_apple_clang="`echo $clang_version | grep 'Apple'`"
+                          clang_vendor="clang"
+                          if test "x$is_apple_clang" != "x" ; then
+                            clang_vendor="Apple clang"
+                          fi
+
+                          # If we have perl, we can also pull out the clang version number using regexes.
+                          # Note that @S|@ is a quadrigraph for the dollar sign.
+                          clang_major_minor=unknown
+
+                          if test "x$PERL" != "x" ; then
+                             clang_major_minor=`echo $clang_version | $PERL -ne 'print @S|@1 if /version\s(\d+\.\d+)/'`
+                             if test "x$clang_major_minor" = "x" ; then
+                               clang_major_minor=unknown
+                             fi
+                          fi
+
+                          AC_MSG_RESULT([<<< C++ compiler is ${clang_vendor}, version ${clang_major_minor} >>>])
+                          GXX_VERSION=clang
+                        else
 
                           # No recognized compiler found...
-			  # warn the user and continue
-			  AC_MSG_RESULT( WARNING:)
+                          # warn the user and continue
+                          AC_MSG_RESULT( WARNING:)
                           AC_MSG_RESULT( >>> Unrecognized compiler: "$CXX" <<<)
-			  AC_MSG_RESULT( You will likely need to modify)
-			  AC_MSG_RESULT( Make.common directly to specify)
-			  AC_MSG_RESULT( proper compiler flags)
-			  GXX_VERSION=unknown
-			fi
+                          AC_MSG_RESULT( You will likely need to modify)
+                          AC_MSG_RESULT( Make.common directly to specify)
+                          AC_MSG_RESULT( proper compiler flags)
+                          GXX_VERSION=unknown
+                        fi
                       fi
                     fi
                   fi
@@ -524,13 +550,93 @@ AC_DEFUN([LIBMESH_SET_CXX_FLAGS],
   # interferes with OProfile callgraphs
   OPROFILE_FLAGS="-g -fno-omit-frame-pointer"
 
+  # For compilers that support it (clang >= 3.5.0 and GCC >= 4.8) the
+  # user can selectively enable "sanitize" flags for different METHODs
+  # with e.g.
+  #
+  # --enable-sanitize="dbg opt"
+  #
+  # These flags generally slow down code execution, so you don't
+  # necessarily want to turn them on all the time or in all METHODs.
 
+  # Declaring something AC_ARG_VAR does several things, see
+  # http://www.gnu.org/software/autoconf/manual/autoconf-2.60/html_node/Setting-Output-Variables.html
+  # for more information... not sure we need it in this case.
+  # AC_ARG_VAR([SANITIZE_METHODS], [methods we apply sanitizer flags to, e.g. "opt dbg devel"])
+
+  AC_ARG_ENABLE([sanitize],
+              AS_HELP_STRING([--enable-sanitize="opt dbg devel prof oprof"],
+                             [turn on sanitizer flags for the given methods]),
+              [for method in ${enableval} ; do
+                 # make sure each method specified makes sense
+                 case "${method}" in
+                     optimized|opt)      ;;
+                     debug|dbg)          ;;
+                     devel)              ;;
+                     profiling|pro|prof) ;;
+                     oprofile|oprof)     ;;
+                     *)
+                         AC_MSG_ERROR(bad value ${method} for --enable-sanitize)
+                         ;;
+                 esac
+               done
+               # If we made it here, the case statement didn't detect any errors
+               SANITIZE_METHODS=${enableval}],
+               [])
+
+  if test "x$SANITIZE_METHODS" != x; then
+    AC_MSG_RESULT([<<< Testing sanitizer flags for method(s) "$SANITIZE_METHODS" >>>])
+
+    # Both Clang and GCC docs suggest using "-fsanitize=address -fno-omit-frame-pointer".
+    # The Clang documentation further suggests using "-O1 -g -fno-optimize-sibling-calls".
+    # Since these flags also work in GCC, we'll use them there as well...
+    COMMON_SANITIZE_OPTIONS="-fsanitize=address -fno-omit-frame-pointer -O1 -g -fno-optimize-sibling-calls"
+
+    # Test the sanitizer flags.  Currently Clang and GCC are the only
+    # compilers that support the address sanitizer, and they use the
+    # same set of flags.  If the set of flags used by Clang and GCC ever
+    # diverges, we'll need to set up separate flags and test them in the
+    # case blocks below...  The LIBMESH_TEST_SANITIZE_FLAGS function sets
+    # the variable have_address_sanitizer to either "no" or "yes"
+    LIBMESH_TEST_SANITIZE_FLAGS([$COMMON_SANITIZE_OPTIONS])
+
+    # Enable the address sanitizer stuff if the test code compiled
+    if test "x$have_address_sanitizer" = xyes; then
+      for method in ${SANITIZE_METHODS}; do
+          case "${method}" in
+              optimized|opt)
+                SANITIZE_OPT_FLAGS=$COMMON_SANITIZE_OPTIONS
+                ;;
+
+              debug|dbg)
+                SANITIZE_DBG_FLAGS=$COMMON_SANITIZE_OPTIONS
+                ;;
+
+              devel)
+                SANITIZE_DEVEL_FLAGS=$COMMON_SANITIZE_OPTIONS
+                ;;
+
+              profiling|pro|prof)
+                SANITIZE_PROF_FLAGS=$COMMON_SANITIZE_OPTIONS
+                ;;
+
+              oprofile|oprof)
+                SANITIZE_OPROF_FLAGS=$COMMON_SANITIZE_OPTIONS
+                ;;
+
+              *)
+                AC_MSG_ERROR(bad value ${method} for --enable-sanitize)
+                ;;
+          esac
+      done
+    fi
+  fi
 
   # in the case blocks below we may add GLIBCXX-specific pedantic debugging preprocessor
   # definitions. however, allow the knowing user to preclude that if they need to.
   AC_ARG_ENABLE(glibcxx-debugging,
-	 [AC_HELP_STRING([--enable-glibcxx-debugging],
-	                 [add -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC to CXXFLAGS_DBG (yes by default)])],
+	 [AS_HELP_STRING([--disable-glibcxx-debugging],
+	                 [omit -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC even in dbg mode])],
 	 [case "${enableval}" in
 	   yes)  enableglibcxxdebugging=yes ;;
 	    no)  enableglibcxxdebugging=no ;;
@@ -540,7 +646,7 @@ AC_DEFUN([LIBMESH_SET_CXX_FLAGS],
 
   # GLIBCXX debugging causes untold woes on mac machines - so disable it
   if (test `uname` = "Darwin"); then
-    AC_MSG_RESULT(<< Disabling GLIBCXX debugging on Darwin >>>)
+    AC_MSG_RESULT(<<< Disabling GLIBCXX debugging on Darwin >>>)
     enableglibcxxdebugging=no
   fi
   AM_CONDITIONAL(LIBMESH_ENABLE_GLIBCXX_DEBUGGING, test x$enableglibcxxdebugging = xyes)
@@ -549,8 +655,8 @@ AC_DEFUN([LIBMESH_SET_CXX_FLAGS],
   # First the flags for gcc compilers
   if (test "$GXX" = yes -a "x$REAL_GXX" != "x" ) ; then
     CXXFLAGS_OPT="$CXXFLAGS_OPT -O2 -felide-constructors"
-    CXXFLAGS_DEVEL="$CXXFLAGS_DEVEL -O2 -felide-constructors -g -ansi -pedantic -W -Wall -Wextra -Wno-long-long -Wunused -Wpointer-arith -Wformat -Wparentheses -Wuninitialized"
-    CXXFLAGS_DBG="$CXXFLAGS_DBG -O0 -felide-constructors -g -ansi -pedantic -W -Wall -Wextra -Wno-long-long -Wunused -Wpointer-arith -Wformat -Wparentheses"
+    CXXFLAGS_DEVEL="$CXXFLAGS_DEVEL -O2 -felide-constructors -g -pedantic -W -Wall -Wextra -Wno-long-long -Wunused -Wpointer-arith -Wformat -Wparentheses -Wuninitialized"
+    CXXFLAGS_DBG="$CXXFLAGS_DBG -O0 -felide-constructors -g -pedantic -W -Wall -Wextra -Wno-long-long -Wunused -Wpointer-arith -Wformat -Wparentheses"
     NODEPRECATEDFLAG="-Wno-deprecated"
 
     CFLAGS_OPT="-O2"
@@ -594,9 +700,9 @@ AC_DEFUN([LIBMESH_SET_CXX_FLAGS],
       # Note:  do not use -Wold-style-cast...  creates a lot of unavoidable warnings
       #        when dealing with C APIs that take void* pointers.
       gcc4.4 | gcc4.5 | gcc4.6)
-	 CXXFLAGS_OPT="$CXXFLAGS_OPT -std=c++0x -Wdisabled-optimization"
-         CXXFLAGS_DEVEL="$CXXFLAGS_DEVEL -std=c++0x -Woverloaded-virtual -Wdisabled-optimization"
-	 CXXFLAGS_DBG="$CXXFLAGS_DBG -std=c++0x -Woverloaded-virtual"
+         CXXFLAGS_OPT="$CXXFLAGS_OPT -Wdisabled-optimization"
+         CXXFLAGS_DEVEL="$CXXFLAGS_DEVEL -Woverloaded-virtual -Wdisabled-optimization"
+         CXXFLAGS_DBG="$CXXFLAGS_DBG -Woverloaded-virtual"
 
          if (test "x$enableglibcxxdebugging" = "xyes"); then
            CPPFLAGS_DBG="$CPPFLAGS_DBG -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC"

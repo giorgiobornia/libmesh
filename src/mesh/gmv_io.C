@@ -36,6 +36,7 @@
 #include "libmesh/elem.h"
 #include "libmesh/equation_systems.h"
 #include "libmesh/numeric_vector.h"
+#include "libmesh/string_to_enum.h"
 
 // Wrap everything in a GMVLib namespace and
 // use extern "C" to avoid name mangling.
@@ -52,6 +53,8 @@ extern "C"
 // anonymous namespace to hold local data
 namespace
 {
+using namespace libMesh;
+
 /**
  * Defines mapping from libMesh element types to GMV element types.
  * Note: Not all of the GMV element types have an identity mapping
@@ -329,10 +332,8 @@ void GMVIO::write_ascii_new_impl (const std::string& fname,
   if (this->partitioning())
     {
       if (this->write_subdomain_id_as_material())
-        {
-          libMesh::out << "Not yet supported in GMVIO::write_ascii_new_impl" << std::endl;
-          libmesh_error();
-        }
+        libmesh_error_msg("Not yet supported in GMVIO::write_ascii_new_impl");
+
       else // write processor IDs as materials.  This is the default
         {
           out_stream << "material "
@@ -649,8 +650,7 @@ void GMVIO::write_ascii_old_impl (const std::string& fname,
                     (*it)->connectivity(0, TECPLOT, conn);
                   else
                     {
-                      AutoPtr<Elem> lo_elem = Elem::build(
-                                                          Elem::first_order_equivalent_type((*it)->type()));
+                      AutoPtr<Elem> lo_elem = Elem::build(Elem::first_order_equivalent_type((*it)->type()));
                       for (unsigned int i = 0; i != lo_elem->n_nodes(); ++i)
                         lo_elem->set_node(i) = (*it)->get_node(i);
                       lo_elem->connectivity(0, TECPLOT, conn);
@@ -705,7 +705,7 @@ void GMVIO::write_ascii_old_impl (const std::string& fname,
                           out_stream << conn[i] << " ";
                       }
                     else
-                      libmesh_error();
+                      libmesh_error_msg("Unsupported element type: " << Utility::enum_to_string((*it)->type()));
                   }
               else // !this->subdivide_second_order()
                 {
@@ -728,8 +728,7 @@ void GMVIO::write_ascii_old_impl (const std::string& fname,
 #endif
                            )
                     {
-                      AutoPtr<Elem> lo_elem = Elem::build(
-                                                          Elem::first_order_equivalent_type((*it)->type()));
+                      AutoPtr<Elem> lo_elem = Elem::build(Elem::first_order_equivalent_type((*it)->type()));
                       for (unsigned int i = 0; i != lo_elem->n_nodes(); ++i)
                         lo_elem->set_node(i) = (*it)->get_node(i);
                       lo_elem->connectivity(0, TECPLOT, conn);
@@ -746,8 +745,7 @@ void GMVIO::write_ascii_old_impl (const std::string& fname,
                     }
                   else if ((*it)->type() == TRI6)
                     {
-                      AutoPtr<Elem> lo_elem = Elem::build(
-                                                          Elem::first_order_equivalent_type((*it)->type()));
+                      AutoPtr<Elem> lo_elem = Elem::build(Elem::first_order_equivalent_type((*it)->type()));
                       for (unsigned int i = 0; i != lo_elem->n_nodes(); ++i)
                         lo_elem->set_node(i) = (*it)->get_node(i);
                       lo_elem->connectivity(0, TECPLOT, conn);
@@ -871,21 +869,16 @@ void GMVIO::write_ascii_old_impl (const std::string& fname,
                       }
 
                     else
-                      {
-                        libMesh::out << "Encountered an unrecognized element "
-                                     << "type: " << (*it)->type()
-                                     << "\nPossibly a dim-1 dimensional "
-                                     << "element?  Aborting..."
-                                     << std::endl;
-                        libmesh_error();
-                      }
+                      libmesh_error_msg("Encountered an unrecognized element " \
+                                        << "type: " << (*it)->type()  \
+                                        << "\nPossibly a dim-1 dimensional " \
+                                        << "element?  Aborting...");
 
                     out_stream << '\n';
                   }
               else // !this->subdivide_second_order()
                 {
-                  AutoPtr<Elem> lo_elem = Elem::build(
-                                                      Elem::first_order_equivalent_type((*it)->type()));
+                  AutoPtr<Elem> lo_elem = Elem::build(Elem::first_order_equivalent_type((*it)->type()));
                   for (unsigned int i = 0; i != lo_elem->n_nodes(); ++i)
                     lo_elem->set_node(i) = (*it)->get_node(i);
                   if ((lo_elem->type() == HEX8)
@@ -926,13 +919,9 @@ void GMVIO::write_ascii_old_impl (const std::string& fname,
                     }
 
                   else
-                    {
-                      libMesh::out << "Encountered an unrecognized element "
-                                   << "type.  Possibly a dim-1 dimensional "
-                                   << "element?  Aborting..."
-                                   << std::endl;
-                      libmesh_error();
-                    }
+                    libmesh_error_msg("Encountered an unrecognized element " \
+                                      << "type.  Possibly a dim-1 dimensional " \
+                                      << "element?  Aborting...");
 
                   out_stream << '\n';
                 }
@@ -942,7 +931,7 @@ void GMVIO::write_ascii_old_impl (const std::string& fname,
         }
 
       default:
-        libmesh_error();
+        libmesh_error_msg("Unsupported mesh dimension: " << mesh.mesh_dimension());
       }
 
     out_stream << '\n';
@@ -1121,7 +1110,7 @@ void GMVIO::write_ascii_old_impl (const std::string& fname,
       (v != NULL))
     {
       const unsigned int n_vars =
-        libmesh_cast_int<unsigned int>(solution_names->size());
+        cast_int<unsigned int>(solution_names->size());
 
       if (!(v->size() == mesh.n_nodes()*n_vars))
         libMesh::err << "ERROR: v->size()=" << v->size()
@@ -1344,7 +1333,7 @@ void GMVIO::write_binary (const std::string& fname,
           }
         break;
       default:
-        libmesh_error();
+        libmesh_error_msg("Unsupported mesh dimension: " << mesh.mesh_dimension());
 
       }
   }
@@ -1355,10 +1344,8 @@ void GMVIO::write_binary (const std::string& fname,
   if (this->partitioning())
     {
       if (this->write_subdomain_id_as_material())
-        {
-          libMesh::out << "Not yet supported in GMVIO::write_binary" << std::endl;
-          libmesh_error();
-        }
+        libmesh_error_msg("Not yet supported in GMVIO::write_binary");
+
       else
         {
           std::strcpy(buf, "material");
@@ -1510,7 +1497,8 @@ void GMVIO::write_binary (const std::string& fname,
     {
       float *temp = new float[mesh.n_nodes()];
 
-      const unsigned int n_vars = solution_names->size();
+      const unsigned int n_vars =
+        cast_int<unsigned int>(solution_names->size());
 
       for (unsigned int c=0; c<n_vars; c++)
         {
@@ -1733,9 +1721,7 @@ void GMVIO::write_discontinuous_gmv (const std::string& name,
 
                   }
                 else
-                  {
-                    libmesh_error();
-                  }
+                  libmesh_error_msg("Unsupported 1D element type: " << Utility::enum_to_string((*it)->type()));
 
                 out_stream << std::endl;
               }
@@ -1773,9 +1759,7 @@ void GMVIO::write_discontinuous_gmv (const std::string& name,
 
                   }
                 else
-                  {
-                    libmesh_error();
-                  }
+                  libmesh_error_msg("Unsupported 2D element type: " << Utility::enum_to_string((*it)->type()));
 
                 out_stream << std::endl;
               }
@@ -1824,9 +1808,7 @@ void GMVIO::write_discontinuous_gmv (const std::string& name,
                       out_stream << nn++ << " ";
                   }
                 else
-                  {
-                    libmesh_error();
-                  }
+                  libmesh_error_msg("Unsupported 3D element type: " << Utility::enum_to_string((*it)->type()));
 
                 out_stream << std::endl;
               }
@@ -1835,7 +1817,7 @@ void GMVIO::write_discontinuous_gmv (const std::string& name,
         }
 
       default:
-        libmesh_error();
+        libmesh_error_msg("Unsupported mesh dimension: " << mesh.mesh_dimension());
       }
 
     out_stream << std::endl;
@@ -1847,10 +1829,8 @@ void GMVIO::write_discontinuous_gmv (const std::string& name,
   if (write_partitioning)
     {
       if (_write_subdomain_id_as_material)
-        {
-          libMesh::out << "Not yet supported in GMVIO::write_discontinuous_gmv" << std::endl;
-          libmesh_error();
-        }
+        libmesh_error_msg("Not yet supported in GMVIO::write_discontinuous_gmv");
+
       else
         {
           out_stream << "material "
@@ -1881,7 +1861,8 @@ void GMVIO::write_discontinuous_gmv (const std::string& name,
 
   // write the data
   {
-    const unsigned int n_vars = solution_names.size();
+    const unsigned int n_vars =
+      cast_int<unsigned int>(solution_names.size());
 
     //    libmesh_assert_equal_to (v.size(), tw*n_vars);
 
@@ -1994,8 +1975,7 @@ void GMVIO::read (const std::string& name)
 
 #ifndef LIBMESH_HAVE_GMV
 
-  libMesh::err << "Cannot read GMV file " << name << " without the GMV API." << std::endl;
-  libmesh_error();
+  libmesh_error_msg("Cannot read GMV file " << name << " without the GMV API.");
 
 #else
   // We use the file-scope global variable eletypes for mapping nodes
@@ -2016,10 +1996,7 @@ void GMVIO::read (const std::string& name)
   // from any function usually means an error has occurred.
   int ierr = GMVLib::gmvread_open_fromfileskip(const_cast<char*>(name.c_str()));
   if (ierr != 0)
-    {
-      libMesh::err << "GMVLib::gmvread_open_fromfileskip failed!" << std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("GMVLib::gmvread_open_fromfileskip failed!");
 
 
   // Loop through file until GMVEND.
@@ -2038,10 +2015,7 @@ void GMVIO::read (const std::string& name)
 
       /*  Check for GMVERROR.  */
       if (GMVLib::gmv_data.keyword == GMVERROR)
-        {
-          libMesh::err << "Encountered GMVERROR while reading!" << std::endl;
-          libmesh_error();
-        }
+        libmesh_error_msg("Encountered GMVERROR while reading!");
 
       /*  Process the data.  */
       switch (GMVLib::gmv_data.keyword)
@@ -2054,10 +2028,8 @@ void GMVIO::read (const std::string& name)
               this->_read_nodes();
 
             else if (GMVLib::gmv_data.num2 == NODE_V)
-              {
-                libMesh::err << "Unsupported GMV data type NODE_V!" << std::endl;
-                libmesh_error();
-              }
+              libmesh_error_msg("Unsupported GMV data type NODE_V!");
+
             break;
           }
 
@@ -2112,30 +2084,23 @@ void GMVIO::read (const std::string& name)
           }
 
         default:
-          {
-            libMesh::err << "Encountered unknown GMV keyword "
-                         << GMVLib::gmv_data.keyword
-                         << std::endl;
-            libmesh_error();
-          }
+          libmesh_error_msg("Encountered unknown GMV keyword " << GMVLib::gmv_data.keyword);
+
         } // end switch
     } // end while
 
   // Set the mesh dimension to the largest encountered for an element
-  for (unsigned int i=0; i!=4; ++i)
+  for (unsigned char i=0; i!=4; ++i)
     if (elems_of_dimension[i])
       mesh.set_mesh_dimension(i);
 
 #if LIBMESH_DIM < 3
   if (mesh.mesh_dimension() > LIBMESH_DIM)
-    {
-      libMesh::err << "Cannot open dimension " <<
-        mesh.mesh_dimension() <<
-        " mesh file when configured without " <<
-        mesh.mesh_dimension() << "D support." <<
-        std::endl;
-      libmesh_error();
-    }
+    libmesh_error_msg("Cannot open dimension " \
+                      << mesh.mesh_dimension()            \
+                      << " mesh file when configured without "        \
+                      << mesh.mesh_dimension()                        \
+                      << "D support.");
 #endif
 
   // Done reading in the mesh, now call find_neighbors, etc.
@@ -2195,7 +2160,7 @@ void GMVIO::_read_materials()
       // << std::endl;
 
       MeshInput<MeshBase>::mesh().elem(i)->processor_id() =
-        GMVLib::gmv_data.longdata1[i]-1;
+        cast_int<processor_id_type>(GMVLib::gmv_data.longdata1[i]-1);
     }
 
 #endif
@@ -2297,7 +2262,8 @@ void GMVIO::_read_one_cell()
           unsigned mapped_i = eledef.node_map[i];
 
           // Note: Node numbers (as stored in libmesh) are 1-based
-          elem->set_node(i) = mesh.node_ptr(GMVLib::gmv_data.longdata1[mapped_i]-1);
+          elem->set_node(i) = mesh.node_ptr
+            (cast_int<dof_id_type>(GMVLib::gmv_data.longdata1[mapped_i]-1));
         }
 
       elems_of_dimension[elem->dim()] = true;
@@ -2378,11 +2344,7 @@ ElemType GMVIO::_gmv_elem_to_libmesh_elem(const char* elemname)
   // if (!std::strncmp(elemname,"ppyrmd13",8))
 
   // If we didn't return yet, then we didn't find the right cell!
-  libMesh::err << "Uknown/unsupported element: "
-               << elemname
-               << " was read."
-               << std::endl;
-  libmesh_error();
+  libmesh_error_msg("Uknown/unsupported element: " << elemname << " was read.");
 }
 
 
@@ -2449,7 +2411,6 @@ void GMVIO::copy_nodal_solution(EquationSystems& es)
                 {
                   libMesh::err << "Only FIRST-order LAGRANGE variables can be read from GMV files. "
                                << "Skipping variable " << var_name << std::endl;
-                  //libmesh_error();
                   break;
                 }
 

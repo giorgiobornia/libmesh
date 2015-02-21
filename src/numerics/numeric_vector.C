@@ -108,6 +108,29 @@ NumericVector<T>::build(const SolverPackage solver_package)
 #endif
 
 
+
+template <typename T>
+void NumericVector<T>::insert (const T* v,
+                               const std::vector<numeric_index_type>& dof_indices)
+{
+  for (numeric_index_type i=0; i<dof_indices.size(); i++)
+    this->set (dof_indices[i], v[i]);
+}
+
+
+
+template <typename T>
+void NumericVector<T>::insert (const NumericVector<T>& V,
+                               const std::vector<numeric_index_type>& dof_indices)
+{
+  libmesh_assert_equal_to (V.size(), dof_indices.size());
+
+  for (numeric_index_type i=0; i<dof_indices.size(); i++)
+    this->set (dof_indices[i], V(i));
+}
+
+
+
 template <typename T>
 int NumericVector<T>::compare (const NumericVector<T> &other_vector,
                                const Real threshold) const
@@ -372,6 +395,29 @@ Real NumericVector<T>::subset_linfty_norm (const std::set<numeric_index_type> & 
   this->comm().max(norm);
 
   return norm;
+}
+
+
+
+template <typename T>
+void NumericVector<T>::add_vector (const T* v,
+                                   const std::vector<numeric_index_type>& dof_indices)
+{
+  int n = dof_indices.size();
+  for (int i=0; i<n; i++)
+    this->add (dof_indices[i], v[i]);
+}
+
+
+
+template <typename T>
+void NumericVector<T>::add_vector (const NumericVector<T>& v,
+                                   const std::vector<numeric_index_type>& dof_indices)
+{
+  int n = dof_indices.size();
+  libmesh_assert_equal_to(v.size(), static_cast<unsigned>(n));
+  for (int i=0; i<n; i++)
+    this->add (dof_indices[i], v(i));
 }
 
 

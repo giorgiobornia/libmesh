@@ -97,7 +97,7 @@ public:
    * The number of field variables.
    */
   unsigned int n_field_variables () const
-  { return libmesh_cast_int<unsigned int>(_names.size()); }
+  { return cast_int<unsigned int>(_names.size()); }
 
   /**
    * Defines the field variable(s) we are responsible for,
@@ -241,8 +241,7 @@ protected:
           }
 
         default:
-          libMesh::err << "ERROR: unknown size " << size << std::endl;
-          libmesh_error();
+          libmesh_error_msg("ERROR: unknown size " << size);
         }
 
       return -1.;
@@ -320,10 +319,10 @@ public:
    * Constructor. Takes the inverse distance power,
    * which defaults to 2.
    */
-  InverseDistanceInterpolation (const libMesh::Parallel::Communicator &comm,
+  InverseDistanceInterpolation (const libMesh::Parallel::Communicator &comm_in,
                                 const unsigned int n_interp_pts = 8,
                                 const Real  power               = 2) :
-    MeshfreeInterpolation(comm),
+    MeshfreeInterpolation(comm_in),
 #if LIBMESH_HAVE_NANOFLANN
     _point_list_adaptor(_src_pts),
 #endif

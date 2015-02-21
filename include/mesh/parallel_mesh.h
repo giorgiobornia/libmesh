@@ -56,8 +56,8 @@ public:
    * changed by mesh generation/loading) later.
    */
   explicit
-  ParallelMesh (const Parallel::Communicator &comm,
-                unsigned int dim=1);
+  ParallelMesh (const Parallel::Communicator &comm_in,
+                unsigned char dim=1);
 
 #ifndef LIBMESH_DISABLE_COMMWORLD
   /**
@@ -66,7 +66,7 @@ public:
    * changed by mesh generation/loading) later.
    */
   explicit
-  ParallelMesh (unsigned int dim=1);
+  ParallelMesh (unsigned char dim=1);
 #endif
 
 
@@ -266,6 +266,12 @@ public:
   element_iterator local_elements_begin ();
   element_iterator local_elements_end   ();
 
+  element_iterator semilocal_elements_begin ();
+  element_iterator semilocal_elements_end   ();
+
+  element_iterator facelocal_elements_begin ();
+  element_iterator facelocal_elements_end   ();
+
   element_iterator not_local_elements_begin ();
   element_iterator not_local_elements_end   ();
 
@@ -335,6 +341,12 @@ public:
 
   const_element_iterator local_elements_begin () const;
   const_element_iterator local_elements_end   () const;
+
+  const_element_iterator semilocal_elements_begin () const;
+  const_element_iterator semilocal_elements_end   () const;
+
+  const_element_iterator facelocal_elements_begin () const;
+  const_element_iterator facelocal_elements_end   () const;
 
   const_element_iterator not_local_elements_begin () const;
   const_element_iterator not_local_elements_end   () const;
