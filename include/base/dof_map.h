@@ -723,6 +723,12 @@ public:
                                               const dof_id_type dof) const;
 
   /**
+   * @returns a reference to the set of right-hand-side values in
+   * primal constraint equations
+   */
+  DofConstraintValueMap & get_primal_constraint_values();
+
+  /**
    * @returns true if the Node is constrained,
    * false otherwise.
    */
@@ -1096,7 +1102,8 @@ private:
    */
   void _dof_indices (const Elem* const elem, std::vector<dof_id_type>& di,
                      const unsigned int v,
-                     const std::vector<Node*>& elem_nodes
+                     const Node * const * nodes,
+                     unsigned int       n_nodes
 #ifdef DEBUG
                      ,
                      std::size_t & tot_size
@@ -1261,6 +1268,12 @@ private:
   std::vector<dof_id_type> _end_df;
 
   /**
+   * First DOF index for SCALAR variable v, or garbage for non-SCALAR
+   * variable v
+   */
+  std::vector<dof_id_type> _first_scalar_df;
+
+  /**
    * A list containing all the global DOF indices that affect the
    * solution on my processor.
    */
@@ -1352,6 +1365,12 @@ private:
    */
   std::vector<dof_id_type> _end_old_df;
 
+  /**
+   * First old DOF index for SCALAR variable v, or garbage for
+   * non-SCALAR variable v
+   */
+  std::vector<dof_id_type> _first_old_scalar_df;
+
 #endif
 
 #ifdef LIBMESH_ENABLE_CONSTRAINTS
@@ -1359,8 +1378,7 @@ private:
    * Data structure containing DOF constraints.  The ith
    * entry is the constraint matrix row for DOF i.
    */
-  DofConstraints             _dof_constraints,
-                             _stashed_dof_constraints;
+  DofConstraints _dof_constraints, _stashed_dof_constraints;
 
   DofConstraintValueMap      _primal_constraint_values;
 
@@ -1537,6 +1555,15 @@ Number DofMap::has_heterogenous_adjoint_constraint (const unsigned int qoi_num,
 
   return 0;
 }
+
+
+
+inline
+DofConstraintValueMap & DofMap::get_primal_constraint_values()
+{
+  return _primal_constraint_values;
+}
+
 
 
 #else

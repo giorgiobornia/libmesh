@@ -665,10 +665,6 @@ FPARSER_SUPPORT_JIT_FALSE
 FPARSER_SUPPORT_JIT_TRUE
 FPARSER_SUPPORT_DEBUGGING_FALSE
 FPARSER_SUPPORT_DEBUGGING_TRUE
-FPARSER_SUPPORT_OPTIMIZER_FALSE
-FPARSER_SUPPORT_OPTIMIZER_TRUE
-FPARSER_NO_SUPPORT_OPTIMIZER_FALSE
-FPARSER_NO_SUPPORT_OPTIMIZER_TRUE
 FPARSER_DEVEL_FALSE
 FPARSER_DEVEL_TRUE
 FPARSER_RELEASE_FALSE
@@ -1080,8 +1076,10 @@ enable_tripleprecision
 enable_quadrupleprecision
 enable_getpwuid
 enable_exceptions
+enable_timestamps
 enable_unordered_containers
 enable_openmp
+with_gdb_command
 enable_warnings
 enable_blocked_storage
 enable_default_comm_world
@@ -1167,7 +1165,6 @@ enable_libHilbert
 enable_fparser
 with_fparser
 enable_fparser_debugging
-enable_fparser_optimizer
 enable_cppunit
 with_cppunit_prefix
 with_cppunit_exec_prefix
@@ -1855,6 +1852,8 @@ Optional Features:
   --disable-getpwuid      do not make calls to getpwuid
   --disable-exceptions    exit rather than throw exceptions on unexpected
                           errors
+  --disable-timestamps    do not add preprocessor timestamps to the library
+                          (helps ccache)
   --disable-unordered-containers
                           Use map/set instead of unordered_map/unordered_set
   --disable-openmp        Build without OpenMP Support
@@ -1935,8 +1934,6 @@ Optional Features:
   --disable-fparser       build without C++ function parser support
   --enable-fparser-debugging
                           Build fparser with bytecode debugging functions
-  --disable-fparser-optimizer
-                          do not optimize parsed functions
   --disable-cppunit       Build without cppunit C++ unit testing support
   --disable-nanoflann     build without nanoflann KD-tree suppport
 
@@ -1954,6 +1951,8 @@ Optional Packages:
   --with-gnu-ld           assume the C compiler uses GNU ld [default=no]
   --with-sysroot=DIR Search for dependent libraries within DIR
                         (or the compiler's sysroot if not specified).
+  --with-gdb-command=commandname
+                          command to invoke gdb
   --with-boundary-id-bytes=<1|2|4|8>
                           bytes used per boundary side per boundary_id [2]
   --with-dof-id-bytes=<1|2|4|8>
@@ -25496,6 +25495,30 @@ fi
 
 
 # --------------------------------------------------------------
+# __TIME__ __DATE__ stamps - enabled by default
+# disabling preprocessor timestamps helps compiler caches such
+# as ccache to work more effectively.
+# --------------------------------------------------------------
+# Check whether --enable-timestamps was given.
+if test "${enable_timestamps+set}" = set; then :
+  enableval=$enable_timestamps; enabletimestamps=$enableval
+else
+  enabletimestamps=yes
+fi
+
+
+if test "$enabletimestamps" != no ; then
+
+$as_echo "#define ENABLE_TIMESTAMPS 1" >>confdefs.h
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: <<< Configuring library with compile timestamps >>>" >&5
+$as_echo "<<< Configuring library with compile timestamps >>>" >&6; }
+fi
+# --------------------------------------------------------------
+
+
+
+# --------------------------------------------------------------
 # Check for important type sizes
 # --------------------------------------------------------------
 # The cast to long int works around a bug in the HP C Compiler
@@ -26133,6 +26156,22 @@ else
   enableunorderedcontainers=yes
 fi
 
+
+  # After a lengthy investigation in Jan. 2015, it was determined that
+  # there is a quality of implementation issue with clang's
+  # unordered container types on OSX, which does not appear to affect
+  # Linux.  Until this gets resolved, we will fall back to the "ordered"
+  # containers (map/set/multimap) for this compiler/architecture combination.
+  # https://github.com/idaholab/moose/issues/4624#issuecomment-72278831
+  if test "x$is_clang" != "x" ; then
+    case "${host_os}" in
+      *darwin*)
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: <<< Disabling unordered containers to work around Clang/OSX QOI issues >>>" >&5
+$as_echo "<<< Disabling unordered containers to work around Clang/OSX QOI issues >>>" >&6; }
+        enableunorderedcontainers=no
+        ;;
+    esac
+  fi
 
   if test "$enableunorderedcontainers" != no ; then
     # The following routines, defined in unordered.m4, check to see if the compiler can compile programs using
@@ -27451,32 +27490,37 @@ ax_cv_cxx_openmp=unknown
 # Flags to try:  -fopenmp (gcc), -openmp (icc), -mp (SGI & PGI),
 #                -xopenmp (Sun), -omp (Tru64), -qsmp=omp (AIX), none
 ax_openmp_flags="-fopenmp -openmp -mp -xopenmp -omp -qsmp=omp none"
+
 if test "x$OPENMP_CXXFLAGS" != x; then
   ax_openmp_flags="$OPENMP_CXXFLAGS $ax_openmp_flags"
 fi
+
 for ax_openmp_flag in $ax_openmp_flags; do
   case $ax_openmp_flag in
     none) CXXFLAGS=$saveCXX ;;
-    *) CXXFLAGS="$saveCXXFLAGS $ax_openmp_flag" ;;
+    *)    CXXFLAGS="$saveCXXFLAGS $ax_openmp_flag" ;;
   esac
+
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-void omp_set_num_threads(int);
+
+    #include <omp.h>
+
 int
 main ()
 {
-const int N = 100000;
-  int i, arr[N];
 
-  omp_set_num_threads(2);
+    const int N = 100000;
+    int i, arr[N];
 
-  #pragma omp parallel for
-  for (i = 0; i < N; i++) {
-    arr[i] = i;
-  }
+    omp_set_num_threads(2);
+
+    #pragma omp parallel for
+    for (i = 0; i < N; i++)
+    {
+      arr[i] = i;
+    }
+
   ;
   return 0;
 }
@@ -27487,11 +27531,13 @@ fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext conftest.$ac_ext
 done
+
 CXXFLAGS=$saveCXXFLAGS
 
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_cxx_openmp" >&5
 $as_echo "$ax_cv_cxx_openmp" >&6; }
+
 if test "x$ax_cv_cxx_openmp" = "xunknown"; then
   enableopenmp=no
 else
@@ -27690,6 +27736,29 @@ $as_echo "---------------------------------------------" >&6; }
 $as_echo "----- Configuring core library features -----" >&6; }
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: ---------------------------------------------" >&5
 $as_echo "---------------------------------------------" >&6; }
+
+
+# -------------------------------------------------------------
+# gdb backtrace command-- default "gdb"
+# -------------------------------------------------------------
+
+# Check whether --with-gdb-command was given.
+if test "${with_gdb_command+set}" = set; then :
+  withval=$with_gdb_command; gdb_command="$withval"
+else
+  gdb_command="gdb"
+fi
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define GDB_COMMAND "$gdb_command"
+_ACEOF
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: configuring gdb command... \"$gdb_command\"" >&5
+$as_echo "configuring gdb command... \"$gdb_command\"" >&6; }
+# -------------------------------------------------------------
+
 
 
 # --------------------------------------------------------------
@@ -35121,28 +35190,6 @@ else
 fi
 
 
-    # Check whether --enable-fparser-optimizer was given.
-if test "${enable_fparser_optimizer+set}" = set; then :
-  enableval=$enable_fparser_optimizer; case "${enableval}" in
-                    yes)  enablefparseroptimizer=yes ;;
-                     no)  enablefparseroptimizer=no ;;
-                      *)  as_fn_error $? "bad value ${enableval} for --enable-fparser-optimizer" "$LINENO" 5 ;;
-                   esac
-else
-  enablefparseroptimizer=yes
-fi
-
-
-    # note - fparser optimization may fail on cygwin (please test), so disable it regardless
-    case "${host_os}" in
-      *cygwin*)
-        enablefparseroptimizer=no
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: >>> Disabling fparser optimization on ${host_os} <<<" >&5
-$as_echo ">>> Disabling fparser optimization on ${host_os} <<<" >&6; }
-        ;;
-        *) ;;
-      esac
-
     # The FPARSER API is distributed with libmesh, so we don't have to guess
     # where it might be installed...
 
@@ -35385,22 +35432,6 @@ fi
 else
   FPARSER_DEVEL_TRUE='#'
   FPARSER_DEVEL_FALSE=
-fi
-
-   if test x$enablefparseroptimizer = xno; then
-  FPARSER_NO_SUPPORT_OPTIMIZER_TRUE=
-  FPARSER_NO_SUPPORT_OPTIMIZER_FALSE='#'
-else
-  FPARSER_NO_SUPPORT_OPTIMIZER_TRUE='#'
-  FPARSER_NO_SUPPORT_OPTIMIZER_FALSE=
-fi
-
-   if test x$enablefparseroptimizer = xyes; then
-  FPARSER_SUPPORT_OPTIMIZER_TRUE=
-  FPARSER_SUPPORT_OPTIMIZER_FALSE='#'
-else
-  FPARSER_SUPPORT_OPTIMIZER_TRUE='#'
-  FPARSER_SUPPORT_OPTIMIZER_FALSE=
 fi
 
    if test x$enablefparserdebugging = xyes; then
@@ -35818,7 +35849,7 @@ $as_echo "#define BUILD_DATE __DATE__ \" \" __TIME__" >>confdefs.h
 
 # Each example gets a makefile
 if (test "x$enableexamples" = "xyes"); then
-   ac_config_files="$ac_config_files examples/introduction/introduction_ex1/Makefile examples/introduction/introduction_ex2/Makefile examples/introduction/introduction_ex3/Makefile examples/introduction/introduction_ex4/Makefile examples/introduction/introduction_ex5/Makefile examples/adaptivity/adaptivity_ex1/Makefile examples/adaptivity/adaptivity_ex2/Makefile examples/adaptivity/adaptivity_ex3/Makefile examples/adaptivity/adaptivity_ex4/Makefile examples/adaptivity/adaptivity_ex5/Makefile examples/adjoints/adjoints_ex1/Makefile examples/adjoints/adjoints_ex2/Makefile examples/adjoints/adjoints_ex3/Makefile examples/adjoints/adjoints_ex4/Makefile examples/adjoints/adjoints_ex5/Makefile examples/eigenproblems/eigenproblems_ex1/Makefile examples/eigenproblems/eigenproblems_ex2/Makefile examples/eigenproblems/eigenproblems_ex3/Makefile examples/fem_system/fem_system_ex1/Makefile examples/fem_system/fem_system_ex2/Makefile examples/solution_transfer/solution_transfer_ex1/Makefile examples/miscellaneous/miscellaneous_ex1/Makefile examples/miscellaneous/miscellaneous_ex2/Makefile examples/miscellaneous/miscellaneous_ex3/Makefile examples/miscellaneous/miscellaneous_ex4/Makefile examples/miscellaneous/miscellaneous_ex5/Makefile examples/miscellaneous/miscellaneous_ex6/Makefile examples/miscellaneous/miscellaneous_ex7/Makefile examples/miscellaneous/miscellaneous_ex8/Makefile examples/miscellaneous/miscellaneous_ex9/Makefile examples/miscellaneous/miscellaneous_ex10/Makefile examples/miscellaneous/miscellaneous_ex11/Makefile examples/subdomains/subdomains_ex1/Makefile examples/subdomains/subdomains_ex2/Makefile examples/subdomains/subdomains_ex3/Makefile examples/systems_of_equations/systems_of_equations_ex1/Makefile examples/systems_of_equations/systems_of_equations_ex2/Makefile examples/systems_of_equations/systems_of_equations_ex3/Makefile examples/systems_of_equations/systems_of_equations_ex4/Makefile examples/systems_of_equations/systems_of_equations_ex5/Makefile examples/systems_of_equations/systems_of_equations_ex6/Makefile examples/reduced_basis/reduced_basis_ex1/Makefile examples/reduced_basis/reduced_basis_ex2/Makefile examples/reduced_basis/reduced_basis_ex3/Makefile examples/reduced_basis/reduced_basis_ex4/Makefile examples/reduced_basis/reduced_basis_ex5/Makefile examples/reduced_basis/reduced_basis_ex6/Makefile examples/reduced_basis/reduced_basis_ex7/Makefile examples/transient/transient_ex1/Makefile examples/transient/transient_ex2/Makefile examples/vector_fe/vector_fe_ex1/Makefile examples/vector_fe/vector_fe_ex2/Makefile examples/vector_fe/vector_fe_ex3/Makefile examples/vector_fe/vector_fe_ex4/Makefile examples/Makefile"
+   ac_config_files="$ac_config_files examples/introduction/introduction_ex1/Makefile examples/introduction/introduction_ex2/Makefile examples/introduction/introduction_ex3/Makefile examples/introduction/introduction_ex4/Makefile examples/introduction/introduction_ex5/Makefile examples/adaptivity/adaptivity_ex1/Makefile examples/adaptivity/adaptivity_ex2/Makefile examples/adaptivity/adaptivity_ex3/Makefile examples/adaptivity/adaptivity_ex4/Makefile examples/adaptivity/adaptivity_ex5/Makefile examples/adjoints/adjoints_ex1/Makefile examples/adjoints/adjoints_ex2/Makefile examples/adjoints/adjoints_ex3/Makefile examples/adjoints/adjoints_ex4/Makefile examples/adjoints/adjoints_ex5/Makefile examples/eigenproblems/eigenproblems_ex1/Makefile examples/eigenproblems/eigenproblems_ex2/Makefile examples/eigenproblems/eigenproblems_ex3/Makefile examples/fem_system/fem_system_ex1/Makefile examples/fem_system/fem_system_ex2/Makefile examples/solution_transfer/solution_transfer_ex1/Makefile examples/miscellaneous/miscellaneous_ex1/Makefile examples/miscellaneous/miscellaneous_ex2/Makefile examples/miscellaneous/miscellaneous_ex3/Makefile examples/miscellaneous/miscellaneous_ex4/Makefile examples/miscellaneous/miscellaneous_ex5/Makefile examples/miscellaneous/miscellaneous_ex6/Makefile examples/miscellaneous/miscellaneous_ex7/Makefile examples/miscellaneous/miscellaneous_ex8/Makefile examples/miscellaneous/miscellaneous_ex9/Makefile examples/miscellaneous/miscellaneous_ex10/Makefile examples/miscellaneous/miscellaneous_ex11/Makefile examples/subdomains/subdomains_ex1/Makefile examples/subdomains/subdomains_ex2/Makefile examples/subdomains/subdomains_ex3/Makefile examples/systems_of_equations/systems_of_equations_ex1/Makefile examples/systems_of_equations/systems_of_equations_ex2/Makefile examples/systems_of_equations/systems_of_equations_ex3/Makefile examples/systems_of_equations/systems_of_equations_ex4/Makefile examples/systems_of_equations/systems_of_equations_ex5/Makefile examples/systems_of_equations/systems_of_equations_ex6/Makefile examples/systems_of_equations/systems_of_equations_ex7/Makefile examples/reduced_basis/reduced_basis_ex1/Makefile examples/reduced_basis/reduced_basis_ex2/Makefile examples/reduced_basis/reduced_basis_ex3/Makefile examples/reduced_basis/reduced_basis_ex4/Makefile examples/reduced_basis/reduced_basis_ex5/Makefile examples/reduced_basis/reduced_basis_ex6/Makefile examples/reduced_basis/reduced_basis_ex7/Makefile examples/transient/transient_ex1/Makefile examples/transient/transient_ex2/Makefile examples/vector_fe/vector_fe_ex1/Makefile examples/vector_fe/vector_fe_ex2/Makefile examples/vector_fe/vector_fe_ex3/Makefile examples/vector_fe/vector_fe_ex4/Makefile examples/Makefile"
 
 fi
 
@@ -36184,14 +36215,6 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${FPARSER_DEVEL_TRUE}" && test -z "${FPARSER_DEVEL_FALSE}"; then
   as_fn_error $? "conditional \"FPARSER_DEVEL\" was never defined.
-Usually this means the macro was only invoked conditionally." "$LINENO" 5
-fi
-if test -z "${FPARSER_NO_SUPPORT_OPTIMIZER_TRUE}" && test -z "${FPARSER_NO_SUPPORT_OPTIMIZER_FALSE}"; then
-  as_fn_error $? "conditional \"FPARSER_NO_SUPPORT_OPTIMIZER\" was never defined.
-Usually this means the macro was only invoked conditionally." "$LINENO" 5
-fi
-if test -z "${FPARSER_SUPPORT_OPTIMIZER_TRUE}" && test -z "${FPARSER_SUPPORT_OPTIMIZER_FALSE}"; then
-  as_fn_error $? "conditional \"FPARSER_SUPPORT_OPTIMIZER\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${FPARSER_SUPPORT_DEBUGGING_TRUE}" && test -z "${FPARSER_SUPPORT_DEBUGGING_FALSE}"; then
@@ -37446,6 +37469,7 @@ do
     "examples/systems_of_equations/systems_of_equations_ex4/Makefile") CONFIG_FILES="$CONFIG_FILES examples/systems_of_equations/systems_of_equations_ex4/Makefile" ;;
     "examples/systems_of_equations/systems_of_equations_ex5/Makefile") CONFIG_FILES="$CONFIG_FILES examples/systems_of_equations/systems_of_equations_ex5/Makefile" ;;
     "examples/systems_of_equations/systems_of_equations_ex6/Makefile") CONFIG_FILES="$CONFIG_FILES examples/systems_of_equations/systems_of_equations_ex6/Makefile" ;;
+    "examples/systems_of_equations/systems_of_equations_ex7/Makefile") CONFIG_FILES="$CONFIG_FILES examples/systems_of_equations/systems_of_equations_ex7/Makefile" ;;
     "examples/reduced_basis/reduced_basis_ex1/Makefile") CONFIG_FILES="$CONFIG_FILES examples/reduced_basis/reduced_basis_ex1/Makefile" ;;
     "examples/reduced_basis/reduced_basis_ex2/Makefile") CONFIG_FILES="$CONFIG_FILES examples/reduced_basis/reduced_basis_ex2/Makefile" ;;
     "examples/reduced_basis/reduced_basis_ex3/Makefile") CONFIG_FILES="$CONFIG_FILES examples/reduced_basis/reduced_basis_ex3/Makefile" ;;

@@ -4770,7 +4770,7 @@ namespace FPoptimizer_CodeTree
     }
 }
 
-/* 
+/*
 // line removed for fpoptimizer.cc: #include "instantiate.hh"
 namespace FPoptimizer_CodeTree
 {
@@ -4783,7 +4783,6 @@ namespace FPoptimizer_CodeTree
  */
 
 #endif
-
 
 #line 1 "fpoptimizer/debug.cc"
 // line removed for fpoptimizer.cc: #include "codetree.hh"
@@ -11772,30 +11771,30 @@ namespace
     template<typename Value_t>
     const Value_t RootPowerTable<Value_t>::RootPowers[(1+4)*(1+3)] =
     {
-        // (sqrt^n(x))
+        // (sqrt^n(x)) // Workaround for gcc-4.6 bug by RHS
         Value_t(1),
-        Value_t(1) / Value_t(2),
-        Value_t(1) / Value_t(2*2),
-        Value_t(1) / Value_t(2*2*2),
-        Value_t(1) / Value_t(2*2*2*2),
+        Value_t(1.L/2.L),
+        Value_t(1.L/ (2.L*2.L)),
+        Value_t(1.L/ (2.L*2.L*2.L)),
+        Value_t(1.L/ (2.L*2.L*2.L*2.L)),
         // cbrt^1(sqrt^n(x))
-        Value_t(1) / Value_t(3),
-        Value_t(1) / Value_t(3*2),
-        Value_t(1) / Value_t(3*2*2),
-        Value_t(1) / Value_t(3*2*2*2),
-        Value_t(1) / Value_t(3*2*2*2*2),
+        Value_t(1.L/ (3.L)),
+        Value_t(1.L/ (3.L*2.L)),
+        Value_t(1.L/ (3.L*2.L*2.L)),
+        Value_t(1.L/ (3.L*2.L*2.L*2.L)),
+        Value_t(1.L/ (3.L*2.L*2.L*2.L*2.L)),
         // cbrt^2(sqrt^n(x))
-        Value_t(1) / Value_t(3*3),
-        Value_t(1) / Value_t(3*3*2),
-        Value_t(1) / Value_t(3*3*2*2),
-        Value_t(1) / Value_t(3*3*2*2*2),
-        Value_t(1) / Value_t(3*3*2*2*2*2),
+        Value_t(1.L/ (3.L*3.L)),
+        Value_t(1.L/ (3.L*3.L*2.L)),
+        Value_t(1.L/ (3.L*3.L*2.L*2.L)),
+        Value_t(1.L/ (3.L*3.L*2.L*2.L*2.L)),
+        Value_t(1.L/ (3.L*3.L*2.L*2.L*2.L*2.L)),
         // cbrt^3(sqrt^n(x))
-        Value_t(1) / Value_t(3*3*3),
-        Value_t(1) / Value_t(3*3*3*2),
-        Value_t(1) / Value_t(3*3*3*2*2),
-        Value_t(1) / Value_t(3*3*3*2*2*2),
-        Value_t(1) / Value_t(3*3*3*2*2*2*2)
+        Value_t(1.L/ (3.L*3.L*3.L)),
+        Value_t(1.L/ (3.L*3.L*3.L*2.L)),
+        Value_t(1.L/ (3.L*3.L*3.L*2.L*2.L)),
+        Value_t(1.L/ (3.L*3.L*3.L*2.L*2.L*2.L)),
+        Value_t(1.L/ (3.L*3.L*3.L*2.L*2.L*2.L*2.L))
     };
 
     struct PowiResolver
@@ -13163,7 +13162,7 @@ namespace FPoptimizer_CodeTree
 // line removed for fpoptimizer.cc: #include "codetree.hh"
 // line removed for fpoptimizer.cc: #include "optimize.hh"
 
-#ifdef FP_SUPPORT_OPTIMIZER
+#ifndef FP_DUMMY_OPTIMIZER
 
 template<typename Value_t>
 void FunctionParserBase<Value_t>::Optimize()
@@ -13255,7 +13254,9 @@ FUNCTIONPARSER_INSTANTIATE_OPTIMIZE(long double)
 FUNCTIONPARSER_INSTANTIATE_OPTIMIZE(long)
 #endif
 
-#endif // FP_SUPPORT_OPTIMIZER
+#endif //FP_DUMMY_OPTIMIZER
 
 
 #endif
+
+#include "instantiate_for_ad.hh"

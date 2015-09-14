@@ -3,6 +3,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 
+# Import stuff for working with dates
+from datetime import datetime
+from matplotlib.dates import date2num, num2date
+
 # Github has a "traffic" page now, but it doesn't seem like you can
 # put in an arbitrary date range?  When I looked at it, it showed the
 # numbers of unique visitors and views for the last two weeks only...
@@ -277,7 +281,105 @@ data = [
     '2014-Nov-05', 135, 39,
     '2014-Nov-06', 99,  29,
     '2014-Nov-07', 68,  24,
-    '2014-Nov-08', 53,  19
+    '2014-Nov-08', 53,  19,
+    '2014-Nov-09', 25,  11,
+    '2014-Nov-10', 126, 23,
+    '2014-Nov-11', 165, 33,
+    '2014-Nov-12', 101, 27,
+    '2014-Nov-13', 40,  18,
+    '2014-Nov-14', 57,  20,
+    '2014-Nov-15', 94,  13,
+    '2014-Nov-16', 9,   6 ,
+    '2014-Nov-17', 66,  29,
+    '2014-Nov-18', 112, 30,
+    '2014-Nov-19', 89,  22,
+    '2014-Nov-20', 54,  15,
+    '2014-Nov-21', 66,  24,
+    '2014-Nov-22', 38,  13,
+    '2014-Nov-23', 12,  8 ,
+    '2014-Nov-24', 102, 25,
+    '2014-Nov-25', 113, 20,
+    '2014-Nov-26', 63,  22,
+    '2014-Nov-27', 39,  14,
+    '2014-Nov-28', 67,  21,
+    '2014-Nov-29', 29,  11,
+    '2014-Nov-30', 116, 11,
+    '2014-Dec-01', 95,  28,
+    '2014-Dec-02', 101, 31,
+    '2014-Dec-03', 170, 24,
+    '2014-Dec-04', 124, 34,
+    '2014-Dec-05', 88,  13,
+    '2014-Dec-06', 8,   7,
+    '2014-Dec-07', 14,  8,
+    '2014-Dec-08', 28,  15,
+    '2014-Dec-09', 69,  20,
+    '2014-Dec-10', 176, 21,
+    '2014-Dec-11', 158, 34,
+    '2014-Dec-12', 53,  13,
+    '2014-Dec-13', 8,   5,
+    '2014-Dec-14', 16,  7,
+    '2014-Dec-15', 187, 24,
+    '2014-Dec-16', 93,  20,
+    '2014-Dec-17', 81,  24,
+    '2014-Dec-18', 76,  18,
+    '2014-Dec-19', 52,  18,
+    '2014-Dec-20', 32,  13,
+    '2014-Dec-21', 22,  6,
+    '2014-Dec-22', 38,  18,
+    '2014-Dec-23', 24,  13,
+    '2014-Dec-24', 15,  11,
+    '2014-Dec-25', 34,  9,
+    '2014-Dec-26', 26,  8,
+    '2014-Dec-27', 16,  8,
+    '2014-Dec-28', 9,   5,
+    '2014-Dec-29', 45,  8,
+    '2014-Dec-30', 79,  7,
+    '2014-Dec-31', 16,  10,
+    '2015-Jan-01', 2,   2,
+    '2015-Jan-02', 22,  13,
+    '2015-Jan-03', 11,  7,
+    '2015-Jan-04', 90,  4,
+    '2015-Jan-05', 40,  21,
+    '2015-Jan-06', 77,  18,
+    '2015-Jan-07', 101, 22,
+    '2015-Jan-08', 160, 30,
+    '2015-Jan-09', 94,  22,
+    '2015-Jan-10', 23,  9,
+    '2015-Jan-11', 26,  10,
+    '2015-Jan-12', 84,  26,
+    '2015-Jan-13', 140, 31,
+    '2015-Jan-14', 207, 27,
+    '2015-Jan-15', 113, 23,
+    '2015-Jan-16', 134, 27,
+    '2015-Jan-17', 45,  9,
+    '2015-Jan-18', 34,  11,
+    '2015-Jan-19', 62,  20,
+    '2015-Jan-20', 63,  16,
+    '2015-Jan-21', 74,  24,
+    '2015-Jan-22', 69,  26,
+    '2015-Jan-23', 77,  17,
+    '2015-Jan-24', 63,  14,
+    '2015-Jan-25', 27,  9,
+    '2015-Jan-26', 57,  22,
+    '2015-Jan-27', 118, 19,
+    '2015-Jan-28', 91,  21,
+    '2015-Jan-29', 66,  21,
+    '2015-Jan-30', 123, 28,
+    '2015-Jan-31', 27,  11,
+    '2015-Feb-01', 52,  9,
+    '2015-Feb-02', 89,  22,
+    '2015-Feb-03', 47,  14,
+    '2015-Feb-04', 82,  22,
+    '2015-Feb-05', 127, 27,
+    '2015-Feb-06', 74,  24,
+    '2015-Feb-07', 23,  8,
+    '2015-Feb-08', 20,  11,
+    '2015-Feb-09', 61,  22,
+    '2015-Feb-10', 90,  30,
+    '2015-Feb-11', 86,  20,
+    '2015-Feb-12', 127, 23,
+    '2015-Feb-13', 259, 27,
+    '2015-Feb-14', 17,  9,
     ]
 
 # Github now tracks the total number of clones and unique cloners
@@ -379,11 +481,114 @@ clone_data = [
     '2014-Nov-05', 7,   7,
     '2014-Nov-06', 6,   6,
     '2014-Nov-07', 8,   8,
-    '2014-Nov-08', 9,   7
+    '2014-Nov-08', 9,   7,
+    '2014-Nov-09', 4,   4,
+    '2014-Nov-10', 12, 10,
+    '2014-Nov-11', 15, 13,
+    '2014-Nov-12', 18, 12,
+    '2014-Nov-13', 13,  8,
+    '2014-Nov-14', 16, 13,
+    '2014-Nov-15', 6,   4,
+    '2014-Nov-16', 5,   4,
+    '2014-Nov-17', 17, 12,
+    '2014-Nov-18', 11,  9,
+    '2014-Nov-19', 19, 12,
+    '2014-Nov-20', 25, 16,
+    '2014-Nov-21', 14, 10,
+    '2014-Nov-22', 7,   5,
+    '2014-Nov-23', 4,   4,
+    '2014-Nov-24', 11,  8,
+    '2014-Nov-25', 8,   6,
+    '2014-Nov-26', 19, 13,
+    '2014-Nov-27', 3,   3,
+    '2014-Nov-28', 12,  7,
+    '2014-Nov-29', 5,   4,
+    '2014-Nov-30', 7,   7,
+    '2014-Dec-01', 15, 11,
+    '2014-Dec-02', 11,  8,
+    '2014-Dec-03', 7,   6,
+    '2014-Dec-04', 7,   6,
+    '2014-Dec-05', 13, 11,
+    '2014-Dec-06', 8,   7,
+    '2014-Dec-07', 2,   2,
+    '2014-Dec-08', 15, 11,
+    '2014-Dec-09', 9,   4,
+    '2014-Dec-10', 4,   3,
+    '2014-Dec-11', 8,   7,
+    '2014-Dec-12', 15,  9,
+    '2014-Dec-13', 7,   4,
+    '2014-Dec-14', 4,   3,
+    '2014-Dec-15', 27, 13,
+    '2014-Dec-16', 15, 11,
+    '2014-Dec-17', 27, 17,
+    '2014-Dec-18', 18, 14,
+    '2014-Dec-19', 19, 16,
+    '2014-Dec-20', 6,  5,
+    '2014-Dec-21', 3,  3,
+    '2014-Dec-22', 4,  4,
+    '2014-Dec-23', 7,  7,
+    '2014-Dec-24', 5,  4,
+    '2014-Dec-25', 1,  1,
+    '2014-Dec-26', 4,  3,
+    '2014-Dec-27', 6,  4,
+    '2014-Dec-28', 1,  1,
+    '2014-Dec-29', 3,  3,
+    '2014-Dec-30', 2,  2,
+    '2014-Dec-31', 1,  1,
+    '2015-Jan-01', 5,  2,
+    '2015-Jan-02', 5,  5,
+    '2015-Jan-03', 4,  4,
+    '2015-Jan-04', 2,  2,
+    '2015-Jan-05', 10, 10,
+    '2015-Jan-06', 20, 17,
+    '2015-Jan-07', 13, 11,
+    '2015-Jan-08', 14, 8,
+    '2015-Jan-09', 18, 11,
+    '2015-Jan-10', 3,  2,
+    '2015-Jan-11', 2,  1,
+    '2015-Jan-12', 28, 14,
+    '2015-Jan-13', 22, 15,
+    '2015-Jan-14', 19, 15,
+    '2015-Jan-15', 13, 11,
+    '2015-Jan-16', 13, 11,
+    '2015-Jan-17', 4,  3,
+    '2015-Jan-18', 8,  8,
+    '2015-Jan-19', 16, 7,
+    '2015-Jan-20', 34, 21,
+    '2015-Jan-21', 28, 20,
+    '2015-Jan-22', 24, 14,
+    '2015-Jan-23', 11, 9,
+    '2015-Jan-24', 5,  4,
+    '2015-Jan-25', 5,  5,
+    '2015-Jan-26', 27, 12,
+    '2015-Jan-27', 25, 19,
+    '2015-Jan-28', 45, 20,
+    '2015-Jan-29', 39, 26,
+    '2015-Jan-30', 26, 19,
+    '2015-Jan-31', 8,  6,
+    '2015-Feb-01', 10, 6,
+    '2015-Feb-02', 11, 8,
+    '2015-Feb-03', 22, 17,
+    '2015-Feb-04', 16, 13,
+    '2015-Feb-05', 25, 18,
+    '2015-Feb-06', 14, 10,
+    '2015-Feb-07', 3,  3,
+    '2015-Feb-08', 5,  5,
+    '2015-Feb-09', 16, 15,
+    '2015-Feb-10', 16, 12,
+    '2015-Feb-11', 18, 15,
+    '2015-Feb-12', 24, 18,
+    '2015-Feb-13', 16, 11,
+    '2015-Feb-14', 16, 8,
     ]
 
 # Extract the dates from the data array
-dates = data[0::3]
+date_strings = data[0::3]
+
+# Convert date strings into numbers
+date_nums = []
+for d in date_strings:
+  date_nums.append(date2num(datetime.strptime(d, '%Y-%b-%d')))
 
 # Extract number of views from data array
 n_views = data[1::3]
@@ -392,46 +597,39 @@ n_views = data[1::3]
 n_visitors = data[2::3]
 
 # Initialize an array with 1, 7, 14, ...
-N = len(dates)
+N = len(date_strings)
 week_indexes = range(0, N, 7)
 
 # Get total views and average unique viewers for each week
-week_views = [];
-week_visitors = [];
+week_views = []
+week_visitors = []
+x_axis = []
 for i in range(0, len(week_indexes)-1):
     start = week_indexes[i]
     stop = week_indexes[i+1]
     week_views.append(sum(n_views[start:stop]));
     week_visitors.append(np.mean(n_visitors[start:stop]));
-
-# Make an x-axis to plot against
-x = np.linspace(1, len(week_views), len(week_views));
-Nx = len(x)
+    x_axis.append(date_nums[week_indexes[i]])
 
 # Get a reference to the figure
 fig = plt.figure()
 
 # 111 is equivalent to Matlab's subplot(1,1,1) command
 ax1 = fig.add_subplot(111)
-ax1.plot(x, week_views, 'bo-')
+ax1.plot(x_axis, week_views, 'bo-')
 ax1.set_ylabel('Weekly page views (blue circles)')
 
-# Set location of x ticks.  Again, placing a tick at index 0 does not
-# seem to work...
-ticks = [1, int(math.ceil(Nx/2)), Nx]
-ax1.set_xticks(ticks)
+# Choose the number of labels to create, then use linspace to create them and convert them to ints
+n_labels = 4
+x_axis_ticks = np.linspace(0, len(x_axis)-1, n_labels).astype(int)
 
-# Create a list of tick labels using an in-place for loop.  Translate
-# the weekly tick indices chosen above back into the array of daily
-# values by multiplying by 7.
-tick_labels = ['Week of \n' + dates[7*(i-1)] for i in ticks]
-
-# Apply the tick labels to the figure
-ax1.set_xticklabels(tick_labels)
+# Set tick labels and positions
+ax1.set_xticks([x_axis[i] for i in x_axis_ticks])
+ax1.set_xticklabels(['Week of \n' + str(num2date(x_axis[i]).date()) for i in x_axis_ticks])
 
 # Plot the average weekly unique visitors
 ax2 = ax1.twinx()
-ax2.plot(x, week_visitors, 'gs--')
+ax2.plot(x_axis, week_visitors, 'gs--')
 ax2.set_ylabel('Avg. Daily Unique Visitors (green squares)')
 
 # Add title
@@ -446,7 +644,6 @@ plt.savefig('weekly_github_traffic.pdf')
 
 
 
-
 # Make monthly plot
 fig.clf()
 
@@ -458,47 +655,43 @@ month_intervals = ['2014-Feb-17',
                    '2014-Jul-17',
                    '2014-Aug-17',
                    '2014-Sep-17',
-                   '2014-Oct-17']
+                   '2014-Oct-17',
+                   '2014-Nov-17',
+                   '2014-Dec-17',
+                   '2015-Jan-17']
 
 # Find the indexes of each date
 month_indexes = []
 for date in month_intervals:
-    month_indexes.append(dates.index(date))
+    month_indexes.append(date_strings.index(date))
 
 # Get total views and average unique viewers for each month
 month_views = [];
 month_visitors = [];
+x_axis = []
 for i in range(0, len(month_indexes)-1):
     start = month_indexes[i]
     stop = month_indexes[i+1]
     month_views.append(sum(n_views[start:stop]));
     month_visitors.append(np.mean(n_visitors[start:stop]));
-
-# Make an x-axis to plot against
-x = np.linspace(1, len(month_views), len(month_views));
+    x_axis.append(date_nums[month_indexes[i]])
 
 # 111 is equivalent to Matlab's subplot(1,1,1) command
 ax1 = fig.add_subplot(111)
-ax1.plot(x, month_views, 'bo-')
+ax1.plot(x_axis, month_views, 'bo-')
 ax1.set_ylabel('Monthly page views (blue circles)')
 
-# Set the xticks and labels.
-tick_labels = []
-for date in month_intervals:
-    month_string = date[5:8]
-    year_string = date[0:4]
-    tick_labels.append(month_string + '\n' + year_string)
+# Choose the number of labels to create, then use linspace to create them and convert them to ints
+n_labels = 6
+x_axis_ticks = np.linspace(0, len(x_axis)-1, n_labels).astype(int)
 
-# This gives us an extra tick label (there are N dates, N-1 ranges)
-# and we want to report the end of the period, so pop the first entry
-tick_labels.pop(0)
-
-# Apply the tick labels to the figure
-ax1.set_xticklabels(tick_labels)
+# Set tick labels and positions
+ax1.set_xticks([x_axis[i] for i in x_axis_ticks])
+ax1.set_xticklabels([num2date(x_axis[i]).strftime('%b\n%Y') for i in x_axis_ticks])
 
 # Plot the average weekly unique visitors
 ax2 = ax1.twinx()
-ax2.plot(x, month_visitors, 'gs--')
+ax2.plot(x_axis, month_visitors, 'gs--')
 ax2.set_ylabel('Avg. Daily Unique Visitors (green squares)')
 
 # Save as PDF

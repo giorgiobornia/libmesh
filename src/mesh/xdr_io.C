@@ -1114,6 +1114,9 @@ void XdrIO::read (const std::string& name)
   mesh.reserve_elem(n_elem);
   mesh.reserve_nodes(n_nodes);
 
+  // Our mesh is pre-partitioned as it's created
+  this->set_n_partitions(this->n_processors());
+
   /**
    * We are future proofing the layout of this file by adding in size information for all stored types.
    * TODO: All types are stored as the same size. Use the size information to pack things efficiently.
@@ -1250,8 +1253,8 @@ void XdrIO::read_serialized_connectivity (Xdr &io, const dof_id_type n_elem, std
        last_elem<n_elem; blk++)
     {
       first_elem = cast_int<dof_id_type>(blk*io_blksize);
-      last_elem  = cast_int<dof_id_type>(std::min((blk+1)*io_blksize,
-                            cast_int<std::size_t>(n_elem)));
+      last_elem  = cast_int<dof_id_type>(std::min(cast_int<std::size_t>((blk+1)*io_blksize),
+                                                  cast_int<std::size_t>(n_elem)));
 
       conn.clear();
 

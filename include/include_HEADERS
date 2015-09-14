@@ -188,6 +188,7 @@ include_HEADERS =  \
         mesh/mesh_triangle_holes.h \
         mesh/mesh_triangle_interface.h \
         mesh/mesh_triangle_wrapper.h \
+        mesh/namebased_io.h \
         mesh/nemesis_io.h \
         mesh/off_io.h \
         mesh/parallel_mesh.h \
@@ -208,6 +209,8 @@ include_HEADERS =  \
         mesh/xdr_shead.h \
         mesh/xdr_soln.h \
         numerics/analytic_function.h \
+        numerics/composite_fem_function.h \
+        numerics/composite_function.h \
         numerics/const_fem_function.h \
         numerics/const_function.h \
         numerics/coupling_matrix.h \
@@ -335,7 +338,6 @@ include_HEADERS =  \
         solvers/nonlinear_solver.h \
         solvers/petsc_auto_fieldsplit.h \
         solvers/petsc_diff_solver.h \
-        solvers/petsc_dm_nonlinear_solver.h \
         solvers/petsc_linear_solver.h \
         solvers/petsc_nonlinear_solver.h \
         solvers/petscdmlibmesh.h \
@@ -365,6 +367,8 @@ include_HEADERS =  \
         systems/linear_implicit_system.h \
         systems/newmark_system.h \
         systems/nonlinear_implicit_system.h \
+        systems/parameter_accessor.h \
+        systems/parameter_pointer.h \
         systems/parameter_vector.h \
         systems/qoi_set.h \
         systems/sensitivity_data.h \

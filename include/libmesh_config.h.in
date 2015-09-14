@@ -144,6 +144,10 @@
 /* Flag indicating if the library should be built with second derivatives */
 #undef ENABLE_SECOND_DERIVATIVES
 
+/* Flag indicating if the library should be built with compile time and date
+   timestamps */
+#undef ENABLE_TIMESTAMPS
+
 /* Flag indicating if the library should be built to write stack trace files
    on unexpected errors */
 #undef ENABLE_TRACEFILES
@@ -160,6 +164,9 @@
 
 /* Enable fparser debugging functions */
 #undef FPARSER_SUPPORT_DEBUGGING
+
+/* command to invoke gdb */
+#undef GDB_COMMAND
 
 /* Flag indicating whether the library shall be compiled to use the Trilinos
    solver collection */

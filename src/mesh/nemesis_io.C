@@ -169,6 +169,10 @@ void Nemesis_IO::read (const std::string& base_filename)
   // MeshBase& mesh = this->mesh();
   MeshBase& mesh = MeshInput<MeshBase>::mesh();
 
+  // We're reading a file on each processor, so our mesh is
+  // partitioned into that many parts as it's created
+  this->set_n_partitions(this->n_processors());
+
   // Local information: Read the following information from the standard Exodus header
   //  title[0]
   //  num_dim
@@ -1026,11 +1030,9 @@ void Nemesis_IO::read (const std::string& base_filename)
       // Finally, we are ready to add the element and its side to the BoundaryInfo object.
       // Call the version of add_side which takes a pointer, since we have already gone to
       // the trouble of getting said pointer...
-      mesh.get_boundary_info().add_side 
-        (elem,
-         cast_int<unsigned short>
-           (conv.get_side_map(nemhelper->side_list[e]-1/*Exodus numbering is 1-based*/)),
-         cast_int<boundary_id_type>(nemhelper->id_list[e]));
+      mesh.get_boundary_info().add_side(elem,
+                                        cast_int<unsigned short>(conv.get_side_map(nemhelper->side_list[e]-1)), // Exodus numbering is 1-based
+                                        cast_int<boundary_id_type>(nemhelper->id_list[e]));
     }
 
   // Debugging: make sure there are as many boundary conditions in the

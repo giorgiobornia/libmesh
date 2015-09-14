@@ -742,7 +742,57 @@ void MeshCommunication::find_global_indices (const Parallel::Communicator &commu
             std::vector<Hilbert::HilbertIndices>::const_iterator pos =
               std::lower_bound (my_bin.begin(), my_bin.end(), hilbert_indices);
             libmesh_assert (pos != my_bin.end());
-            libmesh_assert_equal_to (*pos, hilbert_indices);
+#ifdef DEBUG
+            // If we could not find the requested Hilbert index in
+            // my_bin, something went terribly wrong, possibly the
+            // Mesh was displaced differently on different processors,
+            // and therefore the Hilbert indices don't agree.
+            if (*pos != hilbert_indices)
+              {
+                // The input will be hilbert_indices.  We convert it
+                // to BitVecType using the operator= provided by the
+                // BitVecType class. BitVecType is a CBigBitVec!
+                Hilbert::BitVecType input;
+                input = hilbert_indices;
+
+                // Get output in a vector of CBigBitVec
+                std::vector<CBigBitVec> output(3);
+
+                // Call the indexToCoords function
+                Hilbert::indexToCoords(&output[0], 8*sizeof(Hilbert::inttype), 3, input);
+
+                // The entries in the output racks are integers in the
+                // range [0, Hilbert::inttype::max] which can be
+                // converted to floating point values in [0,1] and
+                // finally to actual values using the bounding box.
+                Real max_int_as_real = static_cast<Real>(std::numeric_limits<Hilbert::inttype>::max());
+
+                // Get the points in [0,1]^3.  The zeroth rack of each entry in
+                // 'output' maps to the normalized x, y, and z locations,
+                // respectively.
+                Point p_hat(static_cast<Real>(output[0].racks()[0]) / max_int_as_real,
+                            static_cast<Real>(output[1].racks()[0]) / max_int_as_real,
+                            static_cast<Real>(output[2].racks()[0]) / max_int_as_real);
+
+                // Convert the points from [0,1]^3 to their actual (x,y,z) locations
+                Real
+                  xmin = bbox.first(0),
+                  xmax = bbox.second(0),
+                  ymin = bbox.first(1),
+                  ymax = bbox.second(1),
+                  zmin = bbox.first(2),
+                  zmax = bbox.second(2);
+
+                // Convert the points from [0,1]^3 to their actual (x,y,z) locations
+                Point p(xmin + (xmax-xmin)*p_hat(0),
+                        ymin + (ymax-ymin)*p_hat(1),
+                        zmin + (zmax-zmin)*p_hat(2));
+
+                libmesh_error_msg("Could not find hilbert indices: "
+                                  << hilbert_indices
+                                  << " corresponding to point " << p);
+              }
+#endif
 
             // Finally, assign the global index based off the position of the index
             // in my array, properly offset.

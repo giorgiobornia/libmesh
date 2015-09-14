@@ -284,7 +284,8 @@ void System::init_data ()
   current_local_solution->init (this->n_dofs(), false, SERIAL);
 #endif
 
-  // from now on, no chance to add additional vectors
+  // from now on, adding additional vectors can't be done without
+  // immediately initializing them
   _can_add_vectors = false;
 
   // initialize & zero other vectors, if necessary
@@ -408,6 +409,14 @@ void System::reinit ()
 }
 
 
+void System::reinit_constraints()
+{
+  get_dof_map().create_dof_constraints(_mesh, this->time);
+  user_constrain();
+  get_dof_map().process_constraints(_mesh);
+  get_dof_map().prepare_send_list();
+}
+
 
 void System::update ()
 {
@@ -493,10 +502,9 @@ void System::assemble_qoi (const QoISet& qoi_indices)
 
 
 
-void System::assemble_qoi_derivative
-  (const QoISet& qoi_indices,
-   bool include_liftfunc,
-   bool apply_constraints)
+void System::assemble_qoi_derivative(const QoISet& qoi_indices,
+                                     bool include_liftfunc,
+                                     bool apply_constraints)
 {
   // Log how long the user's assembly code takes
   START_LOG("assemble_qoi_derivative()", "System");
@@ -1870,9 +1878,8 @@ void System::attach_QOI_object (QOI& qoi_in)
 
 
 
-void System::attach_QOI_derivative
-  (void fptr(EquationSystems&, const std::string&,
-             const QoISet&, bool, bool))
+void System::attach_QOI_derivative(void fptr(EquationSystems&, const std::string&,
+                                             const QoISet&, bool, bool))
 {
   libmesh_assert(fptr);
 
@@ -1962,10 +1969,9 @@ void System::user_QOI (const QoISet& qoi_indices)
 
 
 
-void System::user_QOI_derivative
-  (const QoISet& qoi_indices,
-   bool include_liftfunc,
-   bool apply_constraints)
+void System::user_QOI_derivative(const QoISet& qoi_indices,
+                                 bool include_liftfunc,
+                                 bool apply_constraints)
 {
   // Call the user-provided quantity of interest derivative,
   // if it was provided

@@ -1411,8 +1411,7 @@ unsigned int BoundaryInfo::side_with_boundary_id(const Elem* const elem,
 }
 
 void
-BoundaryInfo::build_node_boundary_ids(std::vector<boundary_id_type> &b_ids)
-const
+BoundaryInfo::build_node_boundary_ids(std::vector<boundary_id_type> &b_ids) const
 {
   b_ids.clear();
 
@@ -1429,8 +1428,7 @@ const
 }
 
 void
-BoundaryInfo::build_side_boundary_ids(std::vector<boundary_id_type> &b_ids)
-const
+BoundaryInfo::build_side_boundary_ids(std::vector<boundary_id_type> &b_ids) const
 {
   b_ids.clear();
 
@@ -1882,7 +1880,7 @@ void BoundaryInfo::print_summary(std::ostream& out_stream) const
 const std::string& BoundaryInfo::get_sideset_name(boundary_id_type id) const
 {
   static const std::string empty_string;
-  std::map<boundary_id_type, std::string>::const_iterator it = 
+  std::map<boundary_id_type, std::string>::const_iterator it =
     _ss_id_to_name.find(id);
   if (it == _ss_id_to_name.end())
     return empty_string;
@@ -1899,7 +1897,7 @@ std::string& BoundaryInfo::sideset_name(boundary_id_type id)
 const std::string& BoundaryInfo::get_nodeset_name(boundary_id_type id) const
 {
   static const std::string empty_string;
-  std::map<boundary_id_type, std::string>::const_iterator it = 
+  std::map<boundary_id_type, std::string>::const_iterator it =
     _ns_id_to_name.find(id);
   if (it == _ns_id_to_name.end())
     return empty_string;
@@ -1914,27 +1912,25 @@ std::string& BoundaryInfo::nodeset_name(boundary_id_type id)
 
 boundary_id_type BoundaryInfo::get_id_by_name(const std::string& name) const
 {
-  // This function is searching the keys of the map
-  // We might want to make this more efficient
-  std::map<boundary_id_type, std::string>::const_iterator iter = _ss_id_to_name.begin();
-  std::map<boundary_id_type, std::string>::const_iterator end_iter = _ss_id_to_name.end();
+  // Search sidesets
+  std::map<boundary_id_type, std::string>::const_iterator
+    iter = _ss_id_to_name.begin(),
+    end_iter = _ss_id_to_name.end();
 
-  for ( ; iter != end_iter; ++iter)
-    {
-      if (iter->second == name)
-        return iter->first;
-    }
+  for (; iter != end_iter; ++iter)
+    if (iter->second == name)
+      return iter->first;
 
-  // Loop over nodesets
+  // Search nodesets
   iter = _ns_id_to_name.begin();
   end_iter = _ns_id_to_name.end();
-  for ( ; iter != end_iter; ++iter)
-    {
-      if (iter->second == name)
-        return iter->first;
-    }
+  for (; iter != end_iter; ++iter)
+    if (iter->second == name)
+      return iter->first;
 
-  libmesh_error_msg("The sideset/nodeset named " << name << " does not exist in mesh!");
+  // If we made it here without returning, we don't have a sideset or
+  // nodeset by the requested name, so return invalid_id
+  return invalid_id;
 }
 
 } // namespace libMesh

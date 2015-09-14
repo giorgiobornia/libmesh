@@ -474,15 +474,16 @@ BUILT_SOURCES = auto_ptr.h dirichlet_boundaries.h dof_map.h \
 	mesh_smoother_vsmoother.h mesh_subdivision_support.h \
 	mesh_tetgen_interface.h mesh_tetgen_wrapper.h mesh_tools.h \
 	mesh_triangle_holes.h mesh_triangle_interface.h \
-	mesh_triangle_wrapper.h nemesis_io.h nemesis_io_helper.h \
-	off_io.h parallel_mesh.h patch.h postscript_io.h serial_mesh.h \
-	tecplot_io.h tetgen_io.h ucd_io.h unstructured_mesh.h unv_io.h \
-	vtk_io.h xdr_head.h xdr_io.h xdr_mesh.h xdr_mgf.h xdr_mhead.h \
-	xdr_shead.h xdr_soln.h analytic_function.h \
-	const_fem_function.h const_function.h coupling_matrix.h \
-	dense_matrix.h dense_matrix_base.h dense_submatrix.h \
-	dense_subvector.h dense_vector.h dense_vector_base.h \
-	distributed_vector.h eigen_core_support.h \
+	mesh_triangle_wrapper.h namebased_io.h nemesis_io.h \
+	nemesis_io_helper.h off_io.h parallel_mesh.h patch.h \
+	postscript_io.h serial_mesh.h tecplot_io.h tetgen_io.h \
+	ucd_io.h unstructured_mesh.h unv_io.h vtk_io.h xdr_head.h \
+	xdr_io.h xdr_mesh.h xdr_mgf.h xdr_mhead.h xdr_shead.h \
+	xdr_soln.h analytic_function.h composite_fem_function.h \
+	composite_function.h const_fem_function.h const_function.h \
+	coupling_matrix.h dense_matrix.h dense_matrix_base.h \
+	dense_submatrix.h dense_subvector.h dense_vector.h \
+	dense_vector_base.h distributed_vector.h eigen_core_support.h \
 	eigen_preconditioner.h eigen_sparse_matrix.h \
 	eigen_sparse_vector.h fem_function_base.h function_base.h \
 	laspack_matrix.h laspack_vector.h numeric_vector.h \
@@ -529,18 +530,18 @@ BUILT_SOURCES = auto_ptr.h dirichlet_boundaries.h dof_map.h \
 	memory_solution_history.h newton_solver.h \
 	no_solution_history.h nonlinear_solver.h \
 	petsc_auto_fieldsplit.h petsc_diff_solver.h \
-	petsc_dm_nonlinear_solver.h petsc_linear_solver.h \
-	petsc_nonlinear_solver.h petscdmlibmesh.h slepc_eigen_solver.h \
-	slepc_macro.h solution_history.h solver.h steady_solver.h \
-	time_solver.h trilinos_aztec_linear_solver.h \
-	trilinos_nox_nonlinear_solver.h twostep_time_solver.h \
-	unsteady_solver.h condensed_eigen_system.h \
-	continuation_system.h dg_fem_context.h diff_context.h \
-	diff_system.h eigen_system.h elem_assembly.h \
-	equation_systems.h explicit_system.h fem_context.h \
-	fem_system.h frequency_system.h implicit_system.h \
-	linear_implicit_system.h newmark_system.h \
-	nonlinear_implicit_system.h parameter_vector.h qoi_set.h \
+	petsc_linear_solver.h petsc_nonlinear_solver.h \
+	petscdmlibmesh.h slepc_eigen_solver.h slepc_macro.h \
+	solution_history.h solver.h steady_solver.h time_solver.h \
+	trilinos_aztec_linear_solver.h trilinos_nox_nonlinear_solver.h \
+	twostep_time_solver.h unsteady_solver.h \
+	condensed_eigen_system.h continuation_system.h \
+	dg_fem_context.h diff_context.h diff_system.h eigen_system.h \
+	elem_assembly.h equation_systems.h explicit_system.h \
+	fem_context.h fem_system.h frequency_system.h \
+	implicit_system.h linear_implicit_system.h newmark_system.h \
+	nonlinear_implicit_system.h parameter_accessor.h \
+	parameter_pointer.h parameter_vector.h qoi_set.h \
 	sensitivity_data.h steady_system.h system.h system_norm.h \
 	system_subset.h system_subset_by_subdomain.h \
 	transient_system.h compare_types.h error_vector.h hashword.h \
@@ -1307,6 +1308,9 @@ mesh_triangle_interface.h: $(top_srcdir)/include/mesh/mesh_triangle_interface.h
 mesh_triangle_wrapper.h: $(top_srcdir)/include/mesh/mesh_triangle_wrapper.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
+namebased_io.h: $(top_srcdir)/include/mesh/namebased_io.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
 nemesis_io.h: $(top_srcdir)/include/mesh/nemesis_io.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
@@ -1368,6 +1372,12 @@ xdr_soln.h: $(top_srcdir)/include/mesh/xdr_soln.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 analytic_function.h: $(top_srcdir)/include/numerics/analytic_function.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+composite_fem_function.h: $(top_srcdir)/include/numerics/composite_fem_function.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+composite_function.h: $(top_srcdir)/include/numerics/composite_function.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 const_fem_function.h: $(top_srcdir)/include/numerics/const_fem_function.h
@@ -1763,9 +1773,6 @@ petsc_auto_fieldsplit.h: $(top_srcdir)/include/solvers/petsc_auto_fieldsplit.h
 petsc_diff_solver.h: $(top_srcdir)/include/solvers/petsc_diff_solver.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
-petsc_dm_nonlinear_solver.h: $(top_srcdir)/include/solvers/petsc_dm_nonlinear_solver.h
-	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
-
 petsc_linear_solver.h: $(top_srcdir)/include/solvers/petsc_linear_solver.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
@@ -1851,6 +1858,12 @@ newmark_system.h: $(top_srcdir)/include/systems/newmark_system.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 nonlinear_implicit_system.h: $(top_srcdir)/include/systems/nonlinear_implicit_system.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+parameter_accessor.h: $(top_srcdir)/include/systems/parameter_accessor.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+parameter_pointer.h: $(top_srcdir)/include/systems/parameter_pointer.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 parameter_vector.h: $(top_srcdir)/include/systems/parameter_vector.h

@@ -83,8 +83,9 @@ public:
 
 #ifdef LIBMESH_ENABLE_PERIODIC
     AutoPtr<PointLocatorBase> point_locator;
-    bool have_periodic_boundaries = !_periodic_boundaries.empty();
-    if (have_periodic_boundaries)
+    const bool have_periodic_boundaries =
+      !_periodic_boundaries.empty();
+    if (have_periodic_boundaries && !range.empty())
       point_locator = _mesh.sub_point_locator();
 #endif
 
@@ -146,7 +147,7 @@ public:
 #ifdef LIBMESH_ENABLE_PERIODIC
     AutoPtr<PointLocatorBase> point_locator;
     bool have_periodic_boundaries = !_periodic_boundaries.empty();
-    if (have_periodic_boundaries)
+    if (have_periodic_boundaries && !range.empty())
       point_locator = _mesh.sub_point_locator();
 #endif
 
@@ -261,7 +262,7 @@ private:
         if (c)
           return f_fem->component(*c, i, p, time);
         else
-          return std::numeric_limits<Number>::quiet_NaN();
+          return std::numeric_limits<Real>::quiet_NaN();
       }
     return f->component(i, p, time);
   }
@@ -278,7 +279,7 @@ private:
         if (c)
           return g_fem->component(*c, i, p, time);
         else
-          return std::numeric_limits<Number>::quiet_NaN();
+          return std::numeric_limits<Real>::quiet_NaN();
       }
     return g->component(i, p, time);
   }
@@ -1088,10 +1089,15 @@ void DofMap::create_dof_constraints(const MeshBase& mesh, Real time)
   //                       mesh.elements_end());
 
   // compute_periodic_constraints requires a point_locator() from our
-  // Mesh, that point_locator() construction is threaded.  Rather than
-  // nest threads within threads we'll make sure it's preconstructed.
+  // Mesh, but point_locator() construction is parallel and threaded.
+  // Rather than nest threads within threads we'll make sure it's
+  // preconstructed.
 #ifdef LIBMESH_ENABLE_PERIODIC
-  if (!_periodic_boundaries->empty() && !range.empty())
+  bool need_point_locator = !_periodic_boundaries->empty() && !range.empty();
+
+  this->comm().max(need_point_locator);
+
+  if (need_point_locator)
     mesh.sub_point_locator();
 #endif
 
@@ -2966,8 +2972,19 @@ void DofMap::allgather_recursive_constraints(MeshBase& mesh)
                     }
                 }
               else
-                dof_row_rhss[i] =
-                  std::numeric_limits<Number>::quiet_NaN();
+                {
+                  // Get NaN from Real, where it should exist, not
+                  // from Number, which may be std::complex, in which
+                  // case quiet_NaN() silently returns zero, rather
+                  // than sanely returning NaN or throwing an
+                  // exception or sending Stroustrop hate mail.
+                  dof_row_rhss[i] =
+                    std::numeric_limits<Real>::quiet_NaN();
+
+                  // Make sure we don't get caught by "!isnan(NaN)"
+                  // bugs again.
+                  libmesh_assert(libmesh_isnan(dof_row_rhss[i]));
+                }
             }
 
 #ifdef LIBMESH_ENABLE_NODE_CONSTRAINTS

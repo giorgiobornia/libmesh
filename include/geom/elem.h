@@ -114,24 +114,24 @@ public:
   /**
    * @returns the \p Point associated with local \p Node \p i.
    */
-  virtual const Point & point (const unsigned int i) const;
+  const Point & point (const unsigned int i) const;
 
   /**
    * @returns the \p Point associated with local \p Node \p i
    * as a writeable reference.
    */
-  virtual Point & point (const unsigned int i);
+  Point & point (const unsigned int i);
 
   /**
    * @returns the global id number of local \p Node \p i.
    */
-  virtual dof_id_type node (const unsigned int i) const;
+  dof_id_type node (const unsigned int i) const;
 
   /**
    * @returns the local id number of global \p Node id \p i,
    * or \p invalid_uint if Node id \p i is not local.
    */
-  virtual unsigned int local_node (const dof_id_type i) const;
+  unsigned int local_node (const dof_id_type i) const;
 
   /**
    * @returns the local index for the \p Node pointer \p node_ptr,
@@ -140,9 +140,14 @@ public:
   unsigned int get_node_index (const Node* node_ptr) const;
 
   /**
+   * @returns a pointer to an array of local node pointers.
+   */
+  const Node* const * get_nodes () const;
+
+  /**
    * @returns the pointer to local \p Node \p i.
    */
-  virtual Node* get_node (const unsigned int i) const;
+  Node* get_node (const unsigned int i) const;
 
   /**
    * @returns the pointer to local \p Node \p i as a writeable reference.
@@ -159,6 +164,22 @@ public:
    * writeable reference.
    */
   subdomain_id_type & subdomain_id ();
+
+  /**
+   * A static integral constant representing an invalid subdomain id.
+   * See also DofObject::{invalid_id, invalid_unique_id, invalid_processor_id}.
+   *
+   * Note 1: we don't use the static_cast(-1) trick here since
+   * subdomain_id_type is sometimes a *signed* integer for
+   * compatibility reasons (see libmesh/id_types.h).
+   *
+   * Note 2: Normally you can declare static const integral types
+   * directly in the header file (C++ standard, 9.4.2/4) but
+   * std::numeric_limits<T>::max() is not considered a "constant
+   * expression".  This one is therefore defined in elem.C.
+   * http://stackoverflow.com/questions/2738435/using-numeric-limitsmax-in-constant-expressions
+   */
+  static const subdomain_id_type invalid_subdomain_id;
 
   /**
    * @returns a pointer to the "reference element" associated
@@ -1367,6 +1388,14 @@ unsigned int Elem::local_node (const dof_id_type i) const
       return n;
 
   return libMesh::invalid_uint;
+}
+
+
+
+inline
+const Node * const * Elem::get_nodes () const
+{
+  return _nodes;
 }
 
 

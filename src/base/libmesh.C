@@ -63,6 +63,9 @@
 EXTERN_C_FOR_PETSC_BEGIN
 # include <petsc.h>
 # include <petscerror.h>
+#if !PETSC_RELEASE_LESS_THAN(3,3,0)
+#include "libmesh/petscdmlibmesh.h"
+#endif
 EXTERN_C_FOR_PETSC_END
 # if defined(LIBMESH_HAVE_SLEPC)
 #  include "libmesh/slepc_macro.h"
@@ -306,6 +309,11 @@ void libmesh_terminate_handler()
   // unwind, for example.
   libMesh::write_traceout();
 
+  // We may care about performance data pre-crash; it would be sad to
+  // throw that away.
+  libMesh::perflog.print_log();
+  libMesh::perflog.clear();
+
   // If we have MPI and it has been initialized, we need to be sure
   // and call MPI_Abort instead of std::abort, so that the parallel
   // job can die nicely.
@@ -520,6 +528,15 @@ LibMeshInit::LibMeshInit (int argc, const char* const* argv,
           CHKERRABORT(libMesh::GLOBAL_COMM_WORLD,ierr);
         }
 # endif
+#if !PETSC_RELEASE_LESS_THAN(3,3,0)
+      // Register the reference implementation of DMlibMesh
+#if PETSC_RELEASE_LESS_THAN(3,4,0)
+  ierr = DMRegister(DMLIBMESH, PETSC_NULL, "DMCreate_libMesh", DMCreate_libMesh); CHKERRABORT(libMesh::GLOBAL_COMM_WORLD,ierr);
+#else
+  ierr = DMRegister(DMLIBMESH, DMCreate_libMesh); CHKERRABORT(libMesh::GLOBAL_COMM_WORLD,ierr);
+#endif
+
+#endif
     }
 #endif
 

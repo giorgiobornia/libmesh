@@ -28,6 +28,7 @@
 #include "libmesh/elem.h"
 #include "libmesh/fe_type.h"
 #include "libmesh/fe_interface.h"
+#include "libmesh/node_elem.h"
 #include "libmesh/edge_edge2.h"
 #include "libmesh/edge_edge3.h"
 #include "libmesh/edge_edge4.h"
@@ -71,6 +72,8 @@
 
 namespace libMesh
 {
+
+const subdomain_id_type Elem::invalid_subdomain_id = std::numeric_limits<subdomain_id_type>::max();
 
 // Initialize static member variables
 const unsigned int Elem::type_to_n_nodes_map [] =
@@ -213,6 +216,13 @@ AutoPtr<Elem> Elem::build(const ElemType type,
 
   switch (type)
     {
+      // 0D elements
+    case NODEELEM:
+      {
+        elem = new NodeElem(p);
+        break;
+      }
+
       // 1D elements
     case EDGE2:
       {
@@ -876,8 +886,7 @@ Elem* Elem::topological_neighbor (const unsigned int i,
       // topological neighbor
 
       std::vector<boundary_id_type> boundary_ids =
-        mesh.get_boundary_info().boundary_ids
-          (this, cast_int<unsigned short>(i));
+        mesh.get_boundary_info().boundary_ids(this, cast_int<unsigned short>(i));
       for (std::vector<boundary_id_type>::iterator j = boundary_ids.begin(); j != boundary_ids.end(); ++j)
         if (pb->boundary(*j))
           {
@@ -916,8 +925,7 @@ const Elem* Elem::topological_neighbor (const unsigned int i,
       // topological neighbor
 
       std::vector<boundary_id_type> boundary_ids =
-        mesh.get_boundary_info().boundary_ids
-          (this, cast_int<unsigned short>(i));
+        mesh.get_boundary_info().boundary_ids(this, cast_int<unsigned short>(i));
       for (std::vector<boundary_id_type>::iterator j = boundary_ids.begin(); j != boundary_ids.end(); ++j)
         if (pb->boundary(*j))
           {

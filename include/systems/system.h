@@ -204,10 +204,9 @@ public:
      * be called to compute derivatived of quantities of interest and
      * must be provided by the user in a derived class.
      */
-    virtual void qoi_derivative 
-      (const QoISet& qoi_indices,
-       bool include_liftfunc,
-       bool apply_constraints) = 0;
+    virtual void qoi_derivative (const QoISet& qoi_indices,
+                                 bool include_liftfunc,
+                                 bool apply_constraints) = 0;
   };
 
 
@@ -246,6 +245,11 @@ public:
    * for all applications. @e Should be overloaded in derived classes.
    */
   virtual void reinit ();
+
+  /**
+   * Reinitializes the constraints for this system.
+   */
+  virtual void reinit_constraints ();
 
   /**
    * Update the local values to reflect the solution

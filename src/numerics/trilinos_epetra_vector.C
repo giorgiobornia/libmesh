@@ -206,27 +206,14 @@ void EpetraVector<T>::add (const numeric_index_type i_in, const T value_in)
 
 
 template <typename T>
-void EpetraVector<T>::add_vector (const std::vector<T>& v,
+void EpetraVector<T>::add_vector (const T* v,
                                   const std::vector<numeric_index_type>& dof_indices)
 {
-  libmesh_assert_equal_to (v.size(), dof_indices.size());
   libmesh_assert_equal_to (sizeof(numeric_index_type), sizeof(int));
 
-  SumIntoGlobalValues (v.size(),
+  SumIntoGlobalValues (dof_indices.size(),
                        (int*) &dof_indices[0],
-                       const_cast<T*>(&v[0]));
-}
-
-
-
-template <typename T>
-void EpetraVector<T>::add_vector (const NumericVector<T>& V,
-                                  const std::vector<numeric_index_type>& dof_indices)
-{
-  libmesh_assert_equal_to (V.size(), dof_indices.size());
-
-  for (unsigned int i=0; i<V.size(); i++)
-    this->add (dof_indices[i], V(i));
+                       const_cast<T*>(v));
 }
 
 
@@ -246,19 +233,6 @@ void EpetraVector<T>::add_vector (const NumericVector<T>& V_in,
   *this += *temp;
 }
 
-
-
-template <typename T>
-void EpetraVector<T>::add_vector (const DenseVector<T>& V_in,
-                                  const std::vector<numeric_index_type>& dof_indices)
-{
-  libmesh_assert_equal_to (V_in.size(), dof_indices.size());
-  libmesh_assert_equal_to (sizeof(numeric_index_type), sizeof(int));
-
-  SumIntoGlobalValues(dof_indices.size(),
-                      (int *)&dof_indices[0],
-                      &const_cast<DenseVector<T> *>(&V_in)->get_values()[0]);
-}
 
 
 // TODO: fill this in after creating an EpetraMatrix
@@ -305,56 +279,14 @@ void EpetraVector<T>::add (const T a_in, const NumericVector<T>& v_in)
 
 
 template <typename T>
-void EpetraVector<T>::insert (const std::vector<T>& v,
+void EpetraVector<T>::insert (const T* v,
                               const std::vector<numeric_index_type>& dof_indices)
 {
-  libmesh_assert_equal_to (v.size(), dof_indices.size());
   libmesh_assert_equal_to (sizeof(numeric_index_type), sizeof(int));
 
-  ReplaceGlobalValues (v.size(),
+  ReplaceGlobalValues (dof_indices.size(),
                        (int*) &dof_indices[0],
-                       const_cast<T*>(&v[0]));
-}
-
-
-
-template <typename T>
-void EpetraVector<T>::insert (const NumericVector<T>& V,
-                              const std::vector<numeric_index_type>& dof_indices)
-{
-  libmesh_assert_equal_to (V.size(), dof_indices.size());
-
-  // TODO: If V is an EpetraVector this can be optimized
-  for (unsigned int i=0; i<V.size(); i++)
-    this->set (dof_indices[i], V(i));
-}
-
-
-
-template <typename T>
-void EpetraVector<T>::insert (const DenseVector<T>& v,
-                              const std::vector<numeric_index_type>& dof_indices)
-{
-  libmesh_assert_equal_to (v.size(), dof_indices.size());
-  libmesh_assert_equal_to (sizeof(numeric_index_type), sizeof(int));
-
-  std::vector<T> &vals = const_cast<DenseVector<T>&>(v).get_values();
-
-  ReplaceGlobalValues (v.size(),
-                       (int*) &dof_indices[0],
-                       &vals[0]);
-}
-
-
-
-template <typename T>
-void EpetraVector<T>::insert (const DenseSubVector<T>& v,
-                              const std::vector<numeric_index_type>& dof_indices)
-{
-  libmesh_assert_equal_to (v.size(), dof_indices.size());
-
-  for (unsigned int i=0; i < v.size(); ++i)
-    this->set (dof_indices[i], v(i));
+                       const_cast<T*>(v));
 }
 
 
