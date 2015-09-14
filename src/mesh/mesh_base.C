@@ -48,8 +48,8 @@ MeshBase::MeshBase (const Parallel::Communicator &comm_in,
   boundary_info  (new BoundaryInfo(*this)),
   _n_parts       (1),
   _is_prepared   (false),
-  _point_locator (NULL),
-  _partitioner   (NULL),
+  _point_locator (),
+  _partitioner   (),
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
   _next_unique_id(DofObject::invalid_unique_id),
 #endif
@@ -69,8 +69,8 @@ MeshBase::MeshBase (unsigned char d) :
   boundary_info  (new BoundaryInfo(*this)),
   _n_parts       (1),
   _is_prepared   (false),
-  _point_locator (NULL),
-  _partitioner   (NULL),
+  _point_locator (),
+  _partitioner   (),
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
   _next_unique_id(DofObject::invalid_unique_id),
 #endif
@@ -91,8 +91,8 @@ MeshBase::MeshBase (const MeshBase& other_mesh) :
   boundary_info  (new BoundaryInfo(*this)),
   _n_parts       (other_mesh._n_parts),
   _is_prepared   (other_mesh._is_prepared),
-  _point_locator (NULL),
-  _partitioner   (NULL),
+  _point_locator (),
+  _partitioner   (),
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
   _next_unique_id(other_mesh._next_unique_id),
 #endif
@@ -117,26 +117,25 @@ MeshBase::~MeshBase()
 
 unsigned int MeshBase::mesh_dimension() const
 {
-  libmesh_assert(!_elem_dims.empty());
-  return cast_int<unsigned int>(*_elem_dims.rbegin());
+  if (!_elem_dims.empty())
+    return cast_int<unsigned int>(*_elem_dims.rbegin());
+  return 0;
 }
 
 void MeshBase::prepare_for_use (const bool skip_renumber_nodes_and_elements, const bool skip_find_neighbors)
 {
   parallel_object_only();
 
+  libmesh_assert(this->comm().verify(this->is_serial()));
+
   // A distributed mesh may have processors with no elements (or
   // processors with no elements of higher dimension, if we ever
   // support mixed-dimension meshes), but we want consistent
   // mesh_dimension anyways.
-  libmesh_assert(this->comm().verify(this->is_serial()));
+  //
+  // cache_elem_dims() should get the elem_dimensions() and
+  // mesh_dimension() correct later, and we don't need it earlier.
 
-  if (!this->is_serial())
-    {
-      unsigned char dim = this->mesh_dimension();
-      this->comm().max(dim);
-      this->set_mesh_dimension(dim);
-    }
 
   // Renumber the nodes and elements so that they in contiguous
   // blocks.  By default, _skip_renumber_nodes_and_elements is false.
@@ -318,9 +317,19 @@ std::string MeshBase::get_info() const
 {
   std::ostringstream oss;
 
-  oss << " Mesh Information:"                                  << '\n'
-      << "  mesh_dimension()="    << this->mesh_dimension()    << '\n'
-      << "  spatial_dimension()=" << this->spatial_dimension() << '\n'
+  oss << " Mesh Information:"                                  << '\n';
+
+  if (!_elem_dims.empty())
+    {
+      oss << "  elem_dimensions()={";
+      std::copy(_elem_dims.begin(),
+                --_elem_dims.end(), // --end() is valid if the set is non-empty
+                std::ostream_iterator<unsigned int>(oss, ", "));
+      oss << cast_int<unsigned int>(*_elem_dims.rbegin());
+      oss << "}\n";
+    }
+
+  oss << "  spatial_dimension()=" << this->spatial_dimension() << '\n'
       << "  n_nodes()="           << this->n_nodes()           << '\n'
       << "    n_local_nodes()="   << this->n_local_nodes()     << '\n'
       << "  n_elem()="            << this->n_elem()            << '\n'
@@ -365,8 +374,7 @@ void MeshBase::partition (const unsigned int n_parts)
   // NULL partitioner means don't repartition
   // Non-serial meshes may not be ready for repartitioning here.
   else if(!skip_partitioning() &&
-          partitioner().get() &&
-          this->is_serial())
+          partitioner().get())
     {
       partitioner()->partition (*this, n_parts);
     }
@@ -424,7 +432,7 @@ const PointLocatorBase& MeshBase::point_locator () const
 }
 
 
-AutoPtr<PointLocatorBase> MeshBase::sub_point_locator () const
+UniquePtr<PointLocatorBase> MeshBase::sub_point_locator () const
 {
   // If there's no master point locator, then we need one.
   if (_point_locator.get() == NULL)
@@ -492,6 +500,10 @@ void MeshBase::cache_elem_dims()
 {
   // This requires an inspection on every processor
   parallel_object_only();
+
+  // Need to clear _elem_dims first in case all elements of a
+  // particular dimension have been deleted.
+  _elem_dims.clear();
 
   const_element_iterator el  = this->active_local_elements_begin();
   const_element_iterator end = this->active_local_elements_end();

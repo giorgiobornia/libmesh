@@ -58,7 +58,7 @@ public:
   StandardType(const TypeVector<T> *example=NULL) {
     // We need an example for MPI_Address to use
     TypeVector<T> *ex;
-    AutoPtr<TypeVector<T> > temp;
+    UniquePtr<TypeVector<T> > temp;
     if (example)
       ex = const_cast<TypeVector<T> *>(example);
     else
@@ -78,28 +78,24 @@ public:
 
 #if MPI_VERSION == 1
 
-        int blocklengths[LIBMESH_DIM+2];
-        MPI_Aint displs[LIBMESH_DIM+2];
-        MPI_Datatype types[LIBMESH_DIM+2];
+        int blocklengths[3] = {1, LIBMESH_DIM, 1};
+        MPI_Aint displs[3];
+        MPI_Datatype types[3] = {MPI_LB, T_type, MPI_UB};
         MPI_Aint start, later;
 
-        MPI_Address(ex, &start);
-        blocklengths[0] = 1;
+        libmesh_call_mpi
+          (MPI_Address(ex, &start));
         displs[0] = 0;
-        types[0] = MPI_LB;
-        for (unsigned int i=0; i != LIBMESH_DIM; ++i)
-          {
-            MPI_Address(&((*ex)(i)), &later);
-            blocklengths[i+1] = 1;
-            displs[i+1] = later - start;
-            types[i+1] = T_type;
-          }
-        MPI_Address((ex+1), &later);
-        blocklengths[LIBMESH_DIM+1] = 1;
-        displs[LIBMESH_DIM+1] = later - start;
-        types[LIBMESH_DIM+1] = MPI_UB;
+        libmesh_call_mpi
+          (MPI_Address(&((*ex)(0)), &later));
+        displs[1] = later - start;
+        libmesh_call_mpi
+          (MPI_Address((ex+1), &later));
+        displs[2] = later - start;
 
-        MPI_Type_struct (LIBMESH_DIM+2, blocklengths, displs, types, &_static_type);
+        libmesh_call_mpi
+          (MPI_Type_struct (3, blocklengths, displs, types,
+                            &_static_type));
 
 #else // MPI_VERSION >= 2
 
@@ -107,20 +103,29 @@ public:
         MPI_Aint displs, start;
         MPI_Datatype tmptype, type = T_type;
 
-        MPI_Get_address (ex,   &start);
-        MPI_Get_address (&((*ex)(0)), &displs);
+        libmesh_call_mpi
+          (MPI_Get_address (ex, &start));
+        libmesh_call_mpi
+          (MPI_Get_address (&((*ex)(0)), &displs));
 
         // subtract off offset to first value from the beginning of the structure
         displs -= start;
 
         // create a prototype structure
-        MPI_Type_create_struct (1, &blocklength, &displs, &type, &tmptype);
+        libmesh_call_mpi
+          (MPI_Type_create_struct (1, &blocklength, &displs, &type,
+                                   &tmptype));
+        libmesh_call_mpi
+          (MPI_Type_commit (&tmptype));
 
         // resize the structure type to account for padding, if any
-        MPI_Type_create_resized (tmptype, 0, sizeof(TypeVector<T>), &_static_type);
+        libmesh_call_mpi
+          (MPI_Type_create_resized (tmptype, 0, sizeof(TypeVector<T>),
+                                    &_static_type));
 #endif
 
-        MPI_Type_commit (&_static_type);
+        libmesh_call_mpi
+          (MPI_Type_commit (&_static_type));
 #endif // #ifdef LIBMESH_HAVE_MPI
 
         _is_initialized = true;
@@ -137,7 +142,7 @@ public:
   StandardType(const VectorValue<T> *example=NULL) {
     // We need an example for MPI_Address to use
     VectorValue<T> *ex;
-    AutoPtr<VectorValue<T> > temp;
+    UniquePtr<VectorValue<T> > temp;
     if (example)
       ex = const_cast<VectorValue<T> *>(example);
     else
@@ -157,28 +162,24 @@ public:
 
 #if MPI_VERSION == 1
 
-        int blocklengths[LIBMESH_DIM+2];
-        MPI_Aint displs[LIBMESH_DIM+2];
-        MPI_Datatype types[LIBMESH_DIM+2];
+        int blocklengths[3] = {1, LIBMESH_DIM, 1};
+        MPI_Aint displs[3];
+        MPI_Datatype types[3] = {MPI_LB, T_type, MPI_UB};
         MPI_Aint start, later;
 
-        MPI_Address(ex, &start);
-        blocklengths[0] = 1;
+        libmesh_call_mpi
+          (MPI_Address(ex, &start));
         displs[0] = 0;
-        types[0] = MPI_LB;
-        for (unsigned int i=0; i != LIBMESH_DIM; ++i)
-          {
-            MPI_Address(&((*ex)(i)), &later);
-            blocklengths[i+1] = 1;
-            displs[i+1] = later - start;
-            types[i+1] = T_type;
-          }
-        MPI_Address((ex+1), &later);
-        blocklengths[LIBMESH_DIM+1] = 1;
-        displs[LIBMESH_DIM+1] = later - start;
-        types[LIBMESH_DIM+1] = MPI_UB;
+        libmesh_call_mpi
+          (MPI_Address(&((*ex)(0)), &later));
+        displs[1] = later - start;
+        libmesh_call_mpi
+          (MPI_Address((ex+1), &later));
+        displs[2] = later - start;
 
-        MPI_Type_struct (LIBMESH_DIM+2, blocklengths, displs, types, &_static_type);
+        libmesh_call_mpi
+          (MPI_Type_struct (3, blocklengths, displs, types,
+                            &_static_type));
 
 #else // MPI_VERSION >= 2
 
@@ -186,20 +187,30 @@ public:
         MPI_Aint displs, start;
         MPI_Datatype tmptype, type = T_type;
 
-        MPI_Get_address (ex,   &start);
-        MPI_Get_address (&((*ex)(0)), &displs);
+        libmesh_call_mpi
+          (MPI_Get_address (ex, &start));
+        libmesh_call_mpi
+          (MPI_Get_address (&((*ex)(0)), &displs));
 
         // subtract off offset to first value from the beginning of the structure
         displs -= start;
 
         // create a prototype structure
-        MPI_Type_create_struct (1, &blocklength, &displs, &type, &tmptype);
+        libmesh_call_mpi
+          (MPI_Type_create_struct (1, &blocklength, &displs, &type,
+                                   &tmptype));
+        libmesh_call_mpi
+          (MPI_Type_commit (&tmptype));
 
         // resize the structure type to account for padding, if any
-        MPI_Type_create_resized (tmptype, 0, sizeof(VectorValue<T>), &_static_type);
+        libmesh_call_mpi
+          (MPI_Type_create_resized (tmptype, 0,
+                                    sizeof(VectorValue<T>),
+                                    &_static_type));
 #endif
 
-        MPI_Type_commit (&_static_type);
+        libmesh_call_mpi
+          (MPI_Type_commit (&_static_type));
 #endif // #ifdef LIBMESH_HAVE_MPI
 
         _is_initialized = true;
@@ -229,7 +240,7 @@ public:
         // We need an example for MPI_Address to use
         Point *ex;
 
-        AutoPtr<Point> temp;
+        UniquePtr<Point> temp;
         if (example)
           ex = const_cast<Point *>(example);
         else
@@ -242,28 +253,24 @@ public:
 
 #if MPI_VERSION == 1
 
-        int blocklengths[LIBMESH_DIM+2];
-        MPI_Aint displs[LIBMESH_DIM+2];
-        MPI_Datatype types[LIBMESH_DIM+2];
+        int blocklengths[3] = {1, LIBMESH_DIM, 1};
+        MPI_Aint displs[3];
+        MPI_Datatype types[3] = {MPI_LB, T_type, MPI_UB};
         MPI_Aint start, later;
 
-        MPI_Address(ex, &start);
-        blocklengths[0] = 1;
+        libmesh_call_mpi
+          (MPI_Address(ex, &start));
         displs[0] = 0;
-        types[0] = MPI_LB;
-        for (unsigned int i=0; i != LIBMESH_DIM; ++i)
-          {
-            MPI_Address(&((*ex)(i)), &later);
-            blocklengths[i+1] = 1;
-            displs[i+1] = later - start;
-            types[i+1] = T_type;
-          }
-        MPI_Address((ex+1), &later);
-        blocklengths[LIBMESH_DIM+1] = 1;
-        displs[LIBMESH_DIM+1] = later - start;
-        types[LIBMESH_DIM+1] = MPI_UB;
+        libmesh_call_mpi
+          (MPI_Address(&((*ex)(0)), &later));
+        displs[1] = later - start;
+        libmesh_call_mpi
+          (MPI_Address((ex+1), &later));
+        displs[2] = later - start;
 
-        MPI_Type_struct (LIBMESH_DIM+2, blocklengths, displs, types, &_static_type);
+        libmesh_call_mpi
+          (MPI_Type_struct (3, blocklengths, displs, types,
+                            &_static_type));
 
 #else // MPI_VERSION >= 2
 
@@ -271,20 +278,29 @@ public:
         MPI_Aint displs, start;
         MPI_Datatype tmptype, type = T_type;
 
-        MPI_Get_address (ex,   &start);
-        MPI_Get_address (&((*ex)(0)), &displs);
+        libmesh_call_mpi
+          (MPI_Get_address (ex, &start));
+        libmesh_call_mpi
+          (MPI_Get_address (&((*ex)(0)), &displs));
 
         // subtract off offset to first value from the beginning of the structure
         displs -= start;
 
         // create a prototype structure
-        MPI_Type_create_struct (1, &blocklength, &displs, &type, &tmptype);
+        libmesh_call_mpi
+          (MPI_Type_create_struct (1, &blocklength, &displs, &type,
+                                   &tmptype));
+        libmesh_call_mpi
+          (MPI_Type_commit (&tmptype));
 
         // resize the structure type to account for padding, if any
-        MPI_Type_create_resized (tmptype, 0, sizeof(Point), &_static_type);
+        libmesh_call_mpi
+          (MPI_Type_create_resized (tmptype, 0, sizeof(Point),
+                                    &_static_type));
 #endif
 
-        MPI_Type_commit (&_static_type);
+        libmesh_call_mpi
+          (MPI_Type_commit (&_static_type));
 #endif // #ifdef LIBMESH_HAVE_MPI
 
         _is_initialized = true;
@@ -295,9 +311,6 @@ public:
 
 // StandardType<> specializations to return a derived MPI datatype
 // to handle communication of LIBMESH_DIM*LIBMESH_DIM-tensors.
-//
-// We use a singleton pattern here because a global variable would
-// have tried to call MPI functions before MPI got initialized.
 //
 // We assume contiguous storage here
 template <typename T>

@@ -193,6 +193,7 @@ libmesh_SOURCES =  \
         src/mesh/mesh_data_xdr_support.C \
         src/mesh/mesh_function.C \
         src/mesh/mesh_generation.C \
+        src/mesh/mesh_iterators.C \
         src/mesh/mesh_modification.C \
         src/mesh/mesh_output.C \
         src/mesh/mesh_refinement.C \
@@ -214,11 +215,9 @@ libmesh_SOURCES =  \
         src/mesh/nemesis_io_helper.C \
         src/mesh/off_io.C \
         src/mesh/parallel_mesh.C \
-        src/mesh/parallel_mesh_iterators.C \
         src/mesh/patch.C \
         src/mesh/postscript_io.C \
         src/mesh/serial_mesh.C \
-        src/mesh/serial_mesh_iterators.C \
         src/mesh/tecplot_io.C \
         src/mesh/tetgen_io.C \
         src/mesh/ucd_io.C \
@@ -318,11 +317,11 @@ libmesh_SOURCES =  \
         src/quadrature/quadrature_trap_1D.C \
         src/quadrature/quadrature_trap_2D.C \
         src/quadrature/quadrature_trap_3D.C \
-        src/reduced_basis/derived_rb_construction.C \
-        src/reduced_basis/derived_rb_evaluation.C \
         src/reduced_basis/rb_assembly_expansion.C \
         src/reduced_basis/rb_construction.C \
         src/reduced_basis/rb_construction_base.C \
+        src/reduced_basis/rb_data_deserialization.C \
+        src/reduced_basis/rb_data_serialization.C \
         src/reduced_basis/rb_eim_assembly.C \
         src/reduced_basis/rb_eim_construction.C \
         src/reduced_basis/rb_eim_evaluation.C \
@@ -334,7 +333,6 @@ libmesh_SOURCES =  \
         src/reduced_basis/rb_scm_evaluation.C \
         src/reduced_basis/rb_temporal_discretization.C \
         src/reduced_basis/rb_theta_expansion.C \
-        src/reduced_basis/steady_derived_rb_construction.C \
         src/reduced_basis/transient_rb_assembly_expansion.C \
         src/reduced_basis/transient_rb_construction.C \
         src/reduced_basis/transient_rb_evaluation.C \
@@ -358,17 +356,22 @@ libmesh_SOURCES =  \
         src/solvers/laspack_linear_solver.C \
         src/solvers/linear_solver.C \
         src/solvers/memory_solution_history.C \
+        src/solvers/newmark_solver.C \
         src/solvers/newton_solver.C \
+        src/solvers/nlopt_optimization_solver.C \
         src/solvers/no_solution_history.C \
         src/solvers/nonlinear_solver.C \
+        src/solvers/optimization_solver.C \
         src/solvers/petsc_auto_fieldsplit.C \
         src/solvers/petsc_diff_solver.C \
         src/solvers/petsc_linear_solver.C \
         src/solvers/petsc_nonlinear_solver.C \
         src/solvers/petscdmlibmesh.C \
         src/solvers/petscdmlibmeshimpl.C \
+        src/solvers/second_order_unsteady_solver.C \
         src/solvers/slepc_eigen_solver.C \
         src/solvers/steady_solver.C \
+        src/solvers/tao_optimization_solver.C \
         src/solvers/time_solver.C \
         src/solvers/trilinos_aztec_linear_solver.C \
         src/solvers/trilinos_nox_nonlinear_solver.C \
@@ -390,6 +393,7 @@ libmesh_SOURCES =  \
         src/systems/linear_implicit_system.C \
         src/systems/newmark_system.C \
         src/systems/nonlinear_implicit_system.C \
+        src/systems/optimization_system.C \
         src/systems/parameter_vector.C \
         src/systems/qoi_set.C \
         src/systems/steady_system.C \
@@ -414,8 +418,8 @@ libmesh_SOURCES =  \
         src/utils/statistics.C \
         src/utils/string_to_enum.C \
         src/utils/timestamp.C \
+        src/utils/topology_map.C \
         src/utils/tree.C \
-        src/utils/tree_base.C \
         src/utils/tree_node.C \
         src/utils/utility.C \
         src/utils/xdr_cxx.C 

@@ -27,6 +27,7 @@
 #include "libmesh/mesh_base.h"
 #include "libmesh/quadrature.h"
 #include "libmesh/system.h"
+#include "libmesh/diff_system.h"
 #include "libmesh/time_solver.h"
 #include "libmesh/unsteady_solver.h" // For euler_residual
 
@@ -44,6 +45,7 @@ FEMContext::FEMContext (const System &sys)
     _elem(NULL),
     _dim(sys.get_mesh().mesh_dimension()),
     _elem_dim(0), /* This will be reset in set_elem(). */
+    _elem_dims(sys.get_mesh().elem_dimensions()),
     _element_qrule(4,NULL),
     _side_qrule(4,NULL),
     _edge_qrule(NULL)
@@ -81,13 +83,12 @@ FEMContext::FEMContext (const System &sys)
         have_scalar = true;
     }
 
-  std::set<unsigned char> elem_dims( sys.get_mesh().elem_dimensions() );
   if(have_scalar)
     // SCALAR FEs have dimension 0 by assumption
-    elem_dims.insert(0);
+    _elem_dims.insert(0);
 
-  for( std::set<unsigned char>::const_iterator dim_it = elem_dims.begin();
-       dim_it != elem_dims.end(); ++dim_it )
+  for( std::set<unsigned char>::const_iterator dim_it = _elem_dims.begin();
+       dim_it != _elem_dims.end(); ++dim_it )
     {
       const unsigned char dim = *dim_it;
 
@@ -136,7 +137,7 @@ FEMContext::FEMContext (const System &sys)
 
 FEMContext::~FEMContext()
 {
-  // We don't want to store AutoPtrs in STL containers, but we don't
+  // We don't want to store UniquePtrs in STL containers, but we don't
   // want to leak memory either
   for (std::vector<std::map<FEType, FEAbstract *> >::iterator d = _element_fe.begin();
        d != _element_fe.end(); ++d)
@@ -185,11 +186,10 @@ std::vector<boundary_id_type> FEMContext::side_boundary_ids() const
 
 
 template<typename OutputType,
+         typename FEMContext::FENeeded<OutputType>::value_getter fe_getter,
          FEMContext::diff_subsolution_getter subsolution_getter>
-void FEMContext::some_interior_value(unsigned int var, unsigned int qp, OutputType& u) const
+void FEMContext::some_value(unsigned int var, unsigned int qp, OutputType& u) const
 {
-  typedef typename TensorTools::MakeReal<OutputType>::type OutputShape;
-
   // Get local-to-global dof index lookup
   libmesh_assert_greater (this->get_dof_indices().size(), var);
   const unsigned int n_dofs = cast_int<unsigned int>
@@ -199,11 +199,12 @@ void FEMContext::some_interior_value(unsigned int var, unsigned int qp, OutputTy
   const DenseSubVector<Number> &coef = (this->*subsolution_getter)(var);
 
   // Get finite element object
-  FEGenericBase<OutputShape>* fe = NULL;
-  this->get_element_fe<OutputShape>( var, fe );
+  typename FENeeded<OutputType>::value_base* fe = NULL;
+  (this->*fe_getter)( var, fe, this->get_elem_dim() );
 
   // Get shape function values at quadrature point
-  const std::vector<std::vector<OutputShape> > &phi = fe->get_phi();
+  const std::vector<std::vector
+                    <typename FENeeded<OutputType>::value_shape> > &phi = fe->get_phi();
 
   // Accumulate solution value
   u = 0.;
@@ -215,13 +216,10 @@ void FEMContext::some_interior_value(unsigned int var, unsigned int qp, OutputTy
 
 
 template<typename OutputType,
+         typename FEMContext::FENeeded<OutputType>::grad_getter fe_getter,
          FEMContext::diff_subsolution_getter subsolution_getter>
-void FEMContext::some_interior_gradient(unsigned int var, unsigned int qp, OutputType& du) const
+void FEMContext::some_gradient(unsigned int var, unsigned int qp, OutputType& du) const
 {
-  typedef typename TensorTools::MakeReal
-    <typename TensorTools::DecrementRank<OutputType>::type>::type
-    OutputShape;
-
   // Get local-to-global dof index lookup
   libmesh_assert_greater (this->get_dof_indices().size(), var);
   const unsigned int n_dofs = cast_int<unsigned int>
@@ -231,11 +229,13 @@ void FEMContext::some_interior_gradient(unsigned int var, unsigned int qp, Outpu
   const DenseSubVector<Number> &coef = (this->*subsolution_getter)(var);
 
   // Get finite element object
-  FEGenericBase<OutputShape>* fe = NULL;
-  this->get_element_fe<OutputShape>( var, fe );
+  typename FENeeded<OutputType>::grad_base* fe = NULL;
+  (this->*fe_getter)( var, fe, this->get_elem_dim() );
 
   // Get shape function values at quadrature point
-  const std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputGradient> > &dphi = fe->get_dphi();
+  const std::vector<std::vector
+                    <typename FENeeded<OutputType>::grad_base::OutputGradient> >
+    &dphi = fe->get_dphi();
 
   // Accumulate solution derivatives
   du = 0;
@@ -250,15 +250,10 @@ void FEMContext::some_interior_gradient(unsigned int var, unsigned int qp, Outpu
 
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
 template<typename OutputType,
+         typename FEMContext::FENeeded<OutputType>::hess_getter fe_getter,
          FEMContext::diff_subsolution_getter subsolution_getter>
-void FEMContext::some_interior_hessian(unsigned int var, unsigned int qp, OutputType& d2u) const
+void FEMContext::some_hessian(unsigned int var, unsigned int qp, OutputType& d2u) const
 {
-  typedef typename TensorTools::MakeReal<
-    typename TensorTools::DecrementRank<
-    typename TensorTools::DecrementRank<
-    OutputType>::type>::type>::type
-    OutputShape;
-
   // Get local-to-global dof index lookup
   libmesh_assert_greater (this->get_dof_indices().size(), var);
   const unsigned int n_dofs = cast_int<unsigned int>
@@ -268,11 +263,13 @@ void FEMContext::some_interior_hessian(unsigned int var, unsigned int qp, Output
   const DenseSubVector<Number> &coef = (this->*subsolution_getter)(var);
 
   // Get finite element object
-  FEGenericBase<OutputShape>* fe = NULL;
-  this->get_element_fe<OutputShape>( var, fe );
+  typename FENeeded<OutputType>::hess_base* fe = NULL;
+  (this->*fe_getter)( var, fe, this->get_elem_dim() );
 
   // Get shape function values at quadrature point
-  const std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputTensor> > &d2phi = fe->get_d2phi();
+  const std::vector<std::vector
+                    <typename FENeeded<OutputType>::hess_base::OutputTensor> >
+    &d2phi = fe->get_d2phi();
 
   // Accumulate solution second derivatives
   d2u = 0.0;
@@ -285,36 +282,6 @@ void FEMContext::some_interior_hessian(unsigned int var, unsigned int qp, Output
 #endif
 
 
-
-template<typename OutputType,
-         FEMContext::diff_subsolution_getter subsolution_getter>
-void FEMContext::some_side_value(unsigned int var, unsigned int qp, OutputType& u) const
-{
-  typedef typename TensorTools::MakeReal<OutputType>::type OutputShape;
-
-  // Get local-to-global dof index lookup
-  libmesh_assert_greater (this->get_dof_indices().size(), var);
-  const unsigned int n_dofs = cast_int<unsigned int>
-    (this->get_dof_indices(var).size());
-
-  // Get current local coefficients
-  const DenseSubVector<Number> &coef = (this->*subsolution_getter)(var);
-
-  // Get finite element object
-  FEGenericBase<OutputShape>* the_side_fe = NULL;
-  this->get_side_fe<OutputShape>( var, the_side_fe );
-
-  // Get shape function values at quadrature point
-  const std::vector<std::vector<OutputShape> > &phi = the_side_fe->get_phi();
-
-  // Accumulate solution value
-  u = 0.;
-
-  for (unsigned int l=0; l != n_dofs; l++)
-    u += phi[l][qp] * coef(l);
-
-  return;
-}
 
 Number FEMContext::interior_value(unsigned int var, unsigned int qp) const
 {
@@ -329,8 +296,9 @@ template<typename OutputType>
 void FEMContext::interior_value(unsigned int var, unsigned int qp,
                                 OutputType& u) const
 {
-  this->some_interior_value <OutputType,&DiffContext::get_elem_solution>
-    (var, qp, u);
+  this->some_value<OutputType,
+                   &FEMContext::get_element_fe<typename TensorTools::MakeReal<OutputType>::type>,
+                   &DiffContext::get_elem_solution>(var, qp, u);
 }
 
 
@@ -351,7 +319,7 @@ void FEMContext::interior_values (unsigned int var,
 
   // Get the finite element object
   FEGenericBase<OutputShape>* fe = NULL;
-  this->get_element_fe<OutputShape>( var, fe );
+  this->get_element_fe<OutputShape>( var, fe, this->get_elem_dim() );
 
   // Get shape function values at quadrature point
   const std::vector<std::vector<OutputShape> > &phi = fe->get_phi();
@@ -386,8 +354,11 @@ template<typename OutputType>
 void FEMContext::interior_gradient(unsigned int var, unsigned int qp,
                                    OutputType& du) const
 {
-  this->some_interior_gradient <OutputType,&DiffContext::get_elem_solution>
-    (var, qp, du);
+  this->some_gradient<OutputType,
+                      &FEMContext::get_element_fe<typename TensorTools::MakeReal
+                                                  <typename TensorTools::DecrementRank
+                                                   <OutputType>::type>::type>,
+                      &DiffContext::get_elem_solution>(var, qp, du);
 }
 
 
@@ -412,7 +383,7 @@ void FEMContext::interior_gradients
 
   // Get finite element object
   FEGenericBase<OutputShape>* fe = NULL;
-  this->get_element_fe<OutputShape>( var, fe );
+  this->get_element_fe<OutputShape>( var, fe, this->get_elem_dim() );
 
   // Get shape function values at quadrature point
   const std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputGradient> > &dphi = fe->get_dphi();
@@ -446,8 +417,13 @@ template<typename OutputType>
 void FEMContext::interior_hessian(unsigned int var, unsigned int qp,
                                   OutputType& d2u) const
 {
-  this->some_interior_hessian <OutputType,&DiffContext::get_elem_solution>
-    (var, qp, d2u);
+  this->some_hessian<OutputType,
+                     &FEMContext::get_element_fe
+                     <typename TensorTools::MakeReal
+                      <typename TensorTools::DecrementRank
+                       <typename TensorTools::DecrementRank
+                        <OutputType>::type>::type>::type>,
+                     &DiffContext::get_elem_solution>(var, qp, d2u);
 }
 
 
@@ -459,8 +435,8 @@ void FEMContext::interior_hessians
 {
   typedef typename TensorTools::MakeReal<
     typename TensorTools::DecrementRank<
-    typename TensorTools::DecrementRank<
-    OutputType>::type>::type>::type
+      typename TensorTools::DecrementRank<
+        OutputType>::type>::type>::type
     OutputShape;
 
   // Get local-to-global dof index lookup
@@ -473,7 +449,7 @@ void FEMContext::interior_hessians
 
   // Get finite element object
   FEGenericBase<OutputShape>* fe = NULL;
-  this->get_element_fe<OutputShape>( var, fe );
+  this->get_element_fe<OutputShape>( var, fe, this->get_elem_dim() );
 
   // Get shape function values at quadrature point
   const std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputTensor> > &d2phi = fe->get_d2phi();
@@ -510,12 +486,11 @@ void FEMContext::interior_curl(unsigned int var, unsigned int qp,
 
   // Get current local coefficients
   libmesh_assert_greater (this->_elem_subsolutions.size(), var);
-  libmesh_assert(&(this->get_elem_solution(var)));
   const DenseSubVector<Number> &coef = this->get_elem_solution(var);
 
   // Get finite element object
   FEGenericBase<OutputShape>* fe = NULL;
-  this->get_element_fe<OutputShape>( var, fe );
+  this->get_element_fe<OutputShape>( var, fe, this->get_elem_dim() );
 
   // Get shape function values at quadrature point
   const std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputShape> > &curl_phi = fe->get_curl_phi();
@@ -545,12 +520,11 @@ void FEMContext::interior_div(unsigned int var, unsigned int qp,
 
   // Get current local coefficients
   libmesh_assert_greater (this->_elem_subsolutions.size(), var);
-  libmesh_assert(&(this->get_elem_solution(var)));
   const DenseSubVector<Number> &coef = this->get_elem_solution(var);
 
   // Get finite element object
   FEGenericBase<OutputShape>* fe = NULL;
-  this->get_element_fe<OutputShape>( var, fe );
+  this->get_element_fe<OutputShape>( var, fe, this->get_elem_dim() );
 
   // Get shape function values at quadrature point
   const std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputDivergence> > &div_phi = fe->get_div_phi();
@@ -579,32 +553,9 @@ template<typename OutputType>
 void FEMContext::side_value(unsigned int var, unsigned int qp,
                             OutputType& u) const
 {
-  typedef typename TensorTools::MakeReal<OutputType>::type OutputShape;
-
-  // Get local-to-global dof index lookup
-  libmesh_assert_greater (this->get_dof_indices().size(), var);
-  const unsigned int n_dofs = cast_int<unsigned int>
-    (this->get_dof_indices(var).size());
-
-  // Get current local coefficients
-  libmesh_assert_greater (this->_elem_subsolutions.size(), var);
-  libmesh_assert(&(this->get_elem_solution(var)));
-  const DenseSubVector<Number> &coef = this->get_elem_solution(var);
-
-  // Get finite element object
-  FEGenericBase<OutputShape>* the_side_fe = NULL;
-  this->get_side_fe<OutputShape>( var, the_side_fe );
-
-  // Get shape function values at quadrature point
-  const std::vector<std::vector<OutputShape> > &phi = the_side_fe->get_phi();
-
-  // Accumulate solution value
-  u = 0.;
-
-  for (unsigned int l=0; l != n_dofs; l++)
-    u += phi[l][qp] * coef(l);
-
-  return;
+  this->some_value<OutputType,
+                   &FEMContext::get_side_fe<typename TensorTools::MakeReal<OutputType>::type>,
+                   &DiffContext::get_elem_solution>(var, qp, u);
 }
 
 
@@ -626,7 +577,7 @@ void FEMContext::side_values
 
   // Get the finite element object
   FEGenericBase<OutputShape>* the_side_fe = NULL;
-  this->get_side_fe<OutputShape>( var, the_side_fe );
+  this->get_side_fe<OutputShape>( var, the_side_fe, this->get_elem_dim() );
 
   // Get shape function values at quadrature point
   const std::vector<std::vector<OutputShape> > &phi = the_side_fe->get_phi();
@@ -671,12 +622,11 @@ void FEMContext::side_gradient(unsigned int var, unsigned int qp,
 
   // Get current local coefficients
   libmesh_assert_greater (this->_elem_subsolutions.size(), var);
-  libmesh_assert(&(this->get_elem_solution(var)));
   const DenseSubVector<Number> &coef = this->get_elem_solution(var);
 
   // Get finite element object
   FEGenericBase<OutputShape>* the_side_fe = NULL;
-  this->get_side_fe<OutputShape>( var, the_side_fe );
+  this->get_side_fe<OutputShape>( var, the_side_fe, this->get_elem_dim() );
 
   // Get shape function values at quadrature point
   const std::vector<std::vector< typename FEGenericBase<OutputShape>::OutputGradient> > &dphi = the_side_fe->get_dphi();
@@ -712,7 +662,7 @@ void FEMContext::side_gradients
 
   // Get finite element object
   FEGenericBase<OutputShape>* the_side_fe = NULL;
-  this->get_side_fe<OutputShape>( var, the_side_fe );
+  this->get_side_fe<OutputShape>( var, the_side_fe, this->get_elem_dim() );
 
   // Get shape function values at quadrature point
   const std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputGradient> > &dphi = the_side_fe->get_dphi();
@@ -742,41 +692,21 @@ Tensor FEMContext::side_hessian(unsigned int var, unsigned int qp) const
   return d2u;
 }
 
+
+
 template<typename OutputType>
 void FEMContext::side_hessian(unsigned int var, unsigned int qp,
                               OutputType& d2u) const
 {
-  typedef typename TensorTools::MakeReal<
-    typename TensorTools::DecrementRank<
-    typename TensorTools::DecrementRank<
-    OutputType>::type>::type>::type
-    OutputShape;
-
-  // Get local-to-global dof index lookup
-  libmesh_assert_greater (this->get_dof_indices().size(), var);
-  const unsigned int n_dofs = cast_int<unsigned int>
-    (this->get_dof_indices(var).size());
-
-  // Get current local coefficients
-  libmesh_assert_greater (this->_elem_subsolutions.size(), var);
-  libmesh_assert(&(this->get_elem_solution(var)));
-  const DenseSubVector<Number> &coef = this->get_elem_solution(var);
-
-  // Get finite element object
-  FEGenericBase<OutputShape>* the_side_fe = NULL;
-  this->get_side_fe<OutputShape>( var, the_side_fe );
-
-  // Get shape function values at quadrature point
-  const std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputTensor> > &d2phi = the_side_fe->get_d2phi();
-
-  // Accumulate solution second derivatives
-  d2u = 0.0;
-
-  for (unsigned int l=0; l != n_dofs; l++)
-    d2u.add_scaled(d2phi[l][qp], coef(l));
-
-  return;
+  this->some_hessian<OutputType,
+                     &FEMContext::get_side_fe
+                     <typename TensorTools::MakeReal
+                      <typename TensorTools::DecrementRank
+                       <typename TensorTools::DecrementRank
+                        <OutputType>::type>::type>::type>,
+                     &DiffContext::get_elem_solution>(var, qp, d2u);
 }
+
 
 
 template<typename OutputType>
@@ -787,8 +717,8 @@ void FEMContext::side_hessians
 {
   typedef typename TensorTools::MakeReal<
     typename TensorTools::DecrementRank<
-    typename TensorTools::DecrementRank<
-    OutputType>::type>::type>::type
+      typename TensorTools::DecrementRank<
+        OutputType>::type>::type>::type
     OutputShape;
 
   // Get local-to-global dof index lookup
@@ -801,7 +731,7 @@ void FEMContext::side_hessians
 
   // Get finite element object
   FEGenericBase<OutputShape>* the_side_fe = NULL;
-  this->get_side_fe<OutputShape>( var, the_side_fe );
+  this->get_side_fe<OutputShape>( var, the_side_fe, this->get_elem_dim() );
 
   // Get shape function values at quadrature point
   const std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputTensor> > &d2phi = the_side_fe->get_d2phi();
@@ -849,15 +779,14 @@ void FEMContext::point_value(unsigned int var, const Point &p,
 
   // Get current local coefficients
   libmesh_assert_greater (this->_elem_subsolutions.size(), var);
-  libmesh_assert(&(this->get_elem_solution(var)));
   const DenseSubVector<Number> &coef = this->get_elem_solution(var);
 
   // Get finite element object
   FEGenericBase<OutputShape>* fe = NULL;
-  this->get_element_fe<OutputShape>( var, fe );
+  this->get_element_fe<OutputShape>( var, fe, this->get_elem_dim() );
 
   // Build a FE for calculating u(p)
-  AutoPtr<FEGenericBase<OutputShape> > fe_new = this->build_new_fe( fe, p );
+  UniquePtr<FEGenericBase<OutputShape> > fe_new = this->build_new_fe( fe, p );
 
   // Get the values of the shape function derivatives
   const std::vector<std::vector<OutputShape> >&  phi = fe_new->get_phi();
@@ -898,15 +827,14 @@ void FEMContext::point_gradient(unsigned int var, const Point &p,
 
   // Get current local coefficients
   libmesh_assert_greater (this->_elem_subsolutions.size(), var);
-  libmesh_assert(&(this->get_elem_solution(var)));
   const DenseSubVector<Number> &coef = this->get_elem_solution(var);
 
   // Get finite element object
   FEGenericBase<OutputShape>* fe = NULL;
-  this->get_element_fe<OutputShape>( var, fe );
+  this->get_element_fe<OutputShape>( var, fe, this->get_elem_dim() );
 
   // Build a FE for calculating u(p)
-  AutoPtr<FEGenericBase<OutputShape> > fe_new = this->build_new_fe( fe, p );
+  UniquePtr<FEGenericBase<OutputShape> > fe_new = this->build_new_fe( fe, p );
 
   // Get the values of the shape function derivatives
   const std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputGradient> >&  dphi = fe_new->get_dphi();
@@ -939,8 +867,8 @@ void FEMContext::point_hessian(unsigned int var, const Point &p,
 {
   typedef typename TensorTools::MakeReal<
     typename TensorTools::DecrementRank<
-    typename TensorTools::DecrementRank<
-    OutputType>::type>::type>::type
+      typename TensorTools::DecrementRank<
+        OutputType>::type>::type>::type
     OutputShape;
 
   // Get local-to-global dof index lookup
@@ -950,15 +878,14 @@ void FEMContext::point_hessian(unsigned int var, const Point &p,
 
   // Get current local coefficients
   libmesh_assert_greater (this->_elem_subsolutions.size(), var);
-  libmesh_assert(&(this->get_elem_solution(var)));
   const DenseSubVector<Number> &coef = this->get_elem_solution(var);
 
   // Get finite element object
   FEGenericBase<OutputShape>* fe = NULL;
-  this->get_element_fe<OutputShape>( var, fe );
+  this->get_element_fe<OutputShape>( var, fe, this->get_elem_dim() );
 
   // Build a FE for calculating u(p)
-  AutoPtr<FEGenericBase<OutputShape> > fe_new = this->build_new_fe( fe, p );
+  UniquePtr<FEGenericBase<OutputShape> > fe_new = this->build_new_fe( fe, p );
 
   // Get the values of the shape function derivatives
   const std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputTensor> >&  d2phi = fe_new->get_d2phi();
@@ -987,15 +914,14 @@ void FEMContext::point_curl(unsigned int var, const Point &p,
 
   // Get current local coefficients
   libmesh_assert_greater (this->_elem_subsolutions.size(), var);
-  libmesh_assert(&(this->get_elem_solution(var)));
   const DenseSubVector<Number> &coef = this->get_elem_solution(var);
 
   // Get finite element object
   FEGenericBase<OutputShape>* fe = NULL;
-  this->get_element_fe<OutputShape>( var, fe );
+  this->get_element_fe<OutputShape>( var, fe, this->get_elem_dim() );
 
   // Build a FE for calculating u(p)
-  AutoPtr<FEGenericBase<OutputShape> > fe_new = this->build_new_fe( fe, p );
+  UniquePtr<FEGenericBase<OutputShape> > fe_new = this->build_new_fe( fe, p );
 
   // Get the values of the shape function derivatives
   const std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputShape> >&  curl_phi = fe_new->get_curl_phi();
@@ -1025,8 +951,10 @@ template<typename OutputType>
 void FEMContext::fixed_interior_value(unsigned int var, unsigned int qp,
                                       OutputType& u) const
 {
-  this->some_interior_value <OutputType,&DiffContext::get_elem_fixed_solution>
-    (var, qp, u);
+  this->some_value<OutputType,
+                   &FEMContext::get_element_fe
+                   <typename TensorTools::MakeReal<OutputType>::type>,
+                   &DiffContext::get_elem_fixed_solution>(var, qp, u);
 }
 
 
@@ -1045,7 +973,13 @@ template<typename OutputType>
 void FEMContext::FEMContext::fixed_interior_gradient(unsigned int var, unsigned int qp,
                                                      OutputType& du) const
 {
-  this->some_interior_gradient <OutputType,&DiffContext::get_elem_fixed_solution>
+  this->some_gradient
+    <OutputType,
+     &FEMContext::get_element_fe
+     <typename TensorTools::MakeReal
+      <typename TensorTools::DecrementRank
+       <OutputType>::type>::type>,
+     &DiffContext::get_elem_fixed_solution>
     (var, qp, du);
 }
 
@@ -1066,8 +1000,13 @@ template<typename OutputType>
 void FEMContext::fixed_interior_hessian(unsigned int var, unsigned int qp,
                                         OutputType& d2u) const
 {
-  this->some_interior_hessian <OutputType,&DiffContext::get_elem_fixed_solution>
-    (var, qp, d2u);
+  this->some_hessian<OutputType,
+                     &FEMContext::get_element_fe
+                     <typename TensorTools::MakeReal
+                      <typename TensorTools::DecrementRank
+                       <typename TensorTools::DecrementRank
+                        <OutputType>::type>::type>::type>,
+                     &DiffContext::get_elem_fixed_solution>(var, qp, d2u);
 }
 #endif // ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
 
@@ -1087,32 +1026,12 @@ template<typename OutputType>
 void FEMContext::fixed_side_value(unsigned int var, unsigned int qp,
                                   OutputType& u) const
 {
-  typedef typename TensorTools::MakeReal<OutputType>::type OutputShape;
-
-  // Get local-to-global dof index lookup
-  libmesh_assert_greater (this->get_dof_indices().size(), var);
-  const unsigned int n_dofs = cast_int<unsigned int>
-    (this->get_dof_indices(var).size());
-
-  // Get current local coefficients
-  libmesh_assert_greater (_elem_fixed_subsolutions.size(), var);
-  libmesh_assert(&(this->get_elem_fixed_solution(var)));
-  const DenseSubVector<Number> &coef = this->get_elem_fixed_solution(var);
-
-  // Get finite element object
-  FEGenericBase<OutputShape>* the_side_fe = NULL;
-  this->get_side_fe<OutputShape>( var, the_side_fe );
-
-  // Get shape function values at quadrature point
-  const std::vector<std::vector<OutputShape> > &phi = the_side_fe->get_phi();
-
-  // Accumulate solution value
-  u = 0.0;
-
-  for (unsigned int l=0; l != n_dofs; l++)
-    u += phi[l][qp] * coef(l);
-
-  return;
+  this->some_value
+    <OutputType,
+     &FEMContext::get_side_fe
+     <typename TensorTools::MakeReal<OutputType>::type>,
+     &DiffContext::get_elem_fixed_solution>
+    (var, qp, u);
 }
 
 
@@ -1128,37 +1047,15 @@ Gradient FEMContext::fixed_side_gradient(unsigned int var, unsigned int qp) cons
 
 
 template<typename OutputType>
-void FEMContext::fixed_side_gradient(unsigned int var, unsigned int qp,
-                                     OutputType& du) const
+void FEMContext::FEMContext::fixed_side_gradient(unsigned int var, unsigned int qp,
+                                                 OutputType& du) const
 {
-  typedef typename TensorTools::MakeReal
-    <typename TensorTools::DecrementRank<OutputType>::type>::type
-    OutputShape;
-
-  // Get local-to-global dof index lookup
-  libmesh_assert_greater (this->get_dof_indices().size(), var);
-  const unsigned int n_dofs = cast_int<unsigned int>
-    (this->get_dof_indices(var).size());
-
-  // Get current local coefficients
-  libmesh_assert_greater (_elem_fixed_subsolutions.size(), var);
-  libmesh_assert(&(this->get_elem_fixed_solution(var)));
-  const DenseSubVector<Number> &coef = this->get_elem_fixed_solution(var);
-
-  // Get finite element object
-  FEGenericBase<OutputShape>* the_side_fe = NULL;
-  this->get_side_fe<OutputShape>( var, the_side_fe );
-
-  // Get shape function values at quadrature point
-  const std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputGradient> > &dphi = the_side_fe->get_dphi();
-
-  // Accumulate solution derivatives
-  du = 0.0;
-
-  for (unsigned int l=0; l != n_dofs; l++)
-    du.add_scaled(dphi[l][qp], coef(l));
-
-  return;
+  this->some_gradient<OutputType,
+                      &FEMContext::get_side_fe
+                      <typename TensorTools::MakeReal
+                       <typename TensorTools::DecrementRank
+                        <OutputType>::type>::type>,
+                      &DiffContext::get_elem_fixed_solution>(var, qp, du);
 }
 
 
@@ -1177,36 +1074,13 @@ template<typename OutputType>
 void FEMContext::fixed_side_hessian(unsigned int var, unsigned int qp,
                                     OutputType& d2u) const
 {
-  typedef typename TensorTools::MakeReal<
-    typename TensorTools::DecrementRank<
-    typename TensorTools::DecrementRank<
-    OutputType>::type>::type>::type
-    OutputShape;
-
-  // Get local-to-global dof index lookup
-  libmesh_assert_greater (this->get_dof_indices().size(), var);
-  const unsigned int n_dofs = cast_int<unsigned int>
-    (this->get_dof_indices(var).size());
-
-  // Get current local coefficients
-  libmesh_assert_greater (_elem_fixed_subsolutions.size(), var);
-  libmesh_assert(&(this->get_elem_fixed_solution(var)));
-  const DenseSubVector<Number> &coef = this->get_elem_fixed_solution(var);
-
-  // Get finite element object
-  FEGenericBase<OutputShape>* the_side_fe = NULL;
-  this->get_side_fe<OutputShape>( var, the_side_fe );
-
-  // Get shape function values at quadrature point
-  const std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputTensor> > &d2phi = the_side_fe->get_d2phi();
-
-  // Accumulate solution second derivatives
-  d2u = 0.0;
-
-  for (unsigned int l=0; l != n_dofs; l++)
-    d2u.add_scaled(d2phi[l][qp], coef(l));
-
-  return;
+  this->some_hessian<OutputType,
+                     &FEMContext::get_side_fe
+                     <typename TensorTools::MakeReal
+                      <typename TensorTools::DecrementRank
+                       <typename TensorTools::DecrementRank
+                        <OutputType>::type>::type>::type>,
+                     &DiffContext::get_elem_fixed_solution>(var, qp, d2u);
 }
 #endif // ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
 
@@ -1234,15 +1108,14 @@ void FEMContext::fixed_point_value(unsigned int var, const Point &p,
 
   // Get current local coefficients
   libmesh_assert_greater (_elem_fixed_subsolutions.size(), var);
-  libmesh_assert(&(this->get_elem_fixed_solution(var)));
   const DenseSubVector<Number> &coef = this->get_elem_fixed_solution(var);
 
   // Get finite element object
   FEGenericBase<OutputShape>* fe = NULL;
-  this->get_element_fe<OutputShape>( var, fe );
+  this->get_element_fe<OutputShape>( var, fe, this->get_elem_dim() );
 
   // Build a FE for calculating u(p)
-  AutoPtr<FEGenericBase<OutputShape> > fe_new = this->build_new_fe( fe, p );
+  UniquePtr<FEGenericBase<OutputShape> > fe_new = this->build_new_fe( fe, p );
 
   // Get the values of the shape function derivatives
   const std::vector<std::vector<OutputShape> >&  phi = fe_new->get_phi();
@@ -1283,15 +1156,14 @@ void FEMContext::fixed_point_gradient(unsigned int var, const Point &p,
 
   // Get current local coefficients
   libmesh_assert_greater (_elem_fixed_subsolutions.size(), var);
-  libmesh_assert(&(this->get_elem_fixed_solution(var)));
   const DenseSubVector<Number> &coef = this->get_elem_fixed_solution(var);
 
   // Get finite element object
   FEGenericBase<OutputShape>* fe = NULL;
-  this->get_element_fe<OutputShape>( var, fe );
+  this->get_element_fe<OutputShape>( var, fe, this->get_elem_dim() );
 
   // Build a FE for calculating u(p)
-  AutoPtr<FEGenericBase<OutputShape> > fe_new = this->build_new_fe( fe, p );
+  UniquePtr<FEGenericBase<OutputShape> > fe_new = this->build_new_fe( fe, p );
 
   // Get the values of the shape function derivatives
   const std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputGradient> >&  dphi = fe_new->get_dphi();
@@ -1324,8 +1196,8 @@ void FEMContext::fixed_point_hessian(unsigned int var, const Point &p,
 {
   typedef typename TensorTools::MakeReal<
     typename TensorTools::DecrementRank<
-    typename TensorTools::DecrementRank<
-    OutputType>::type>::type>::type
+      typename TensorTools::DecrementRank<
+        OutputType>::type>::type>::type
     OutputShape;
 
   // Get local-to-global dof index lookup
@@ -1335,15 +1207,14 @@ void FEMContext::fixed_point_hessian(unsigned int var, const Point &p,
 
   // Get current local coefficients
   libmesh_assert_greater (_elem_fixed_subsolutions.size(), var);
-  libmesh_assert(&(this->get_elem_fixed_solution(var)));
   const DenseSubVector<Number> &coef = this->get_elem_fixed_solution(var);
 
   // Get finite element object
   FEGenericBase<OutputShape>* fe = NULL;
-  this->get_element_fe<OutputShape>( var, fe );
+  this->get_element_fe<OutputShape>( var, fe, this->get_elem_dim() );
 
   // Build a FE for calculating u(p)
-  AutoPtr<FEGenericBase<OutputShape> > fe_new = this->build_new_fe( fe, p );
+  UniquePtr<FEGenericBase<OutputShape> > fe_new = this->build_new_fe( fe, p );
 
   // Get the values of the shape function derivatives
   const std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputTensor> >&  d2phi = fe_new->get_d2phi();
@@ -1364,8 +1235,44 @@ template<typename OutputType>
 void FEMContext::interior_rate(unsigned int var, unsigned int qp,
                                OutputType& u) const
 {
-  this->some_interior_value <OutputType,&DiffContext::get_elem_solution_rate>
-    (var, qp, u);
+  this->some_value<OutputType,
+                   &FEMContext::get_element_fe
+                   <typename TensorTools::MakeReal<OutputType>::type>,
+                   &DiffContext::get_elem_solution_rate>(var, qp, u);
+}
+
+
+
+template<typename OutputType>
+void FEMContext::side_rate(unsigned int var, unsigned int qp,
+                           OutputType& u) const
+{
+  this->some_value<OutputType,
+                   &FEMContext::get_side_fe
+                   <typename TensorTools::MakeReal<OutputType>::type>,
+                   &DiffContext::get_elem_solution_rate>(var, qp, u);
+}
+
+template<typename OutputType>
+void FEMContext::interior_accel(unsigned int var, unsigned int qp,
+                                OutputType& u) const
+{
+  this->some_value<OutputType,
+                   &FEMContext::get_element_fe
+                   <typename TensorTools::MakeReal<OutputType>::type>,
+                   &DiffContext::get_elem_solution_accel>(var, qp, u);
+}
+
+
+
+template<typename OutputType>
+void FEMContext::side_accel(unsigned int var, unsigned int qp,
+                            OutputType& u) const
+{
+  this->some_value<OutputType,
+                   &FEMContext::get_side_fe
+                   <typename TensorTools::MakeReal<OutputType>::type>,
+                   &DiffContext::get_elem_solution_accel>(var, qp, u);
 }
 
 
@@ -1647,7 +1554,24 @@ void FEMContext::pre_fe_reinit(const System &sys, const Elem *e)
 
   if (sys.use_fixed_solution)
     this->get_elem_fixed_solution().resize(n_dofs);
-  this->get_elem_solution_rate().resize(n_dofs);
+
+  // Only make space for these if we're using DiffSystem
+  // This is assuming *only* DiffSystem is using elem_solution_rate/accel
+  const DifferentiableSystem* diff_system = dynamic_cast<const DifferentiableSystem*>(&sys);
+  if(diff_system)
+    {
+      // Now, we only need these if the solver is unsteady
+      if( !diff_system->get_time_solver().is_steady() )
+        {
+          this->get_elem_solution_rate().resize(n_dofs);
+
+          // We only need accel space if the TimeSolver is second order
+          const UnsteadySolver& time_solver = cast_ref<const UnsteadySolver&>(diff_system->get_time_solver());
+
+          if( time_solver.time_order() >= 2 )
+            this->get_elem_solution_accel().resize(n_dofs);
+        }
+    }
 
   // These resize calls also zero out the residual and jacobian
   this->get_elem_residual().resize(n_dofs);
@@ -1676,8 +1600,25 @@ void FEMContext::pre_fe_reinit(const System &sys, const Elem *e)
         this->get_elem_solution(i).reposition
           (sub_dofs, n_dofs_var);
 
-        this->get_elem_solution_rate(i).reposition
-          (sub_dofs, n_dofs_var);
+        // Only make space for these if we're using DiffSystem
+        // This is assuming *only* DiffSystem is using elem_solution_rate/accel
+        const DifferentiableSystem* diff_system = dynamic_cast<const DifferentiableSystem*>(&sys);
+        if(diff_system)
+          {
+            // Now, we only need these if the solver is unsteady
+            if( !diff_system->get_time_solver().is_steady() )
+              {
+                this->get_elem_solution_rate(i).reposition
+                  (sub_dofs, n_dofs_var);
+
+                // We only need accel space if the TimeSolver is second order
+                const UnsteadySolver& time_solver = cast_ref<const UnsteadySolver&>(diff_system->get_time_solver());
+
+                if( time_solver.time_order() >= 2 )
+                  this->get_elem_solution_accel(i).reposition
+                    (sub_dofs, n_dofs_var);
+              }
+          }
 
         if (sys.use_fixed_solution)
           this->get_elem_fixed_solution(i).reposition
@@ -1762,8 +1703,8 @@ void FEMContext::_update_time_from_system(Real theta)
 
 
 template<typename OutputShape>
-AutoPtr<FEGenericBase<OutputShape> > FEMContext::build_new_fe( const FEGenericBase<OutputShape>* fe,
-                                                               const Point &p ) const
+UniquePtr<FEGenericBase<OutputShape> > FEMContext::build_new_fe( const FEGenericBase<OutputShape>* fe,
+                                                                 const Point &p ) const
 {
   FEType fe_type = fe->get_fe_type();
 
@@ -1774,8 +1715,8 @@ AutoPtr<FEGenericBase<OutputShape> > FEMContext::build_new_fe( const FEGenericBa
 
   unsigned int elem_dim = this->has_elem() ? this->get_elem().dim() : 0;
 
-  AutoPtr<FEGenericBase<OutputShape> >
-    fe_new(FEGenericBase<OutputShape>::build(elem_dim, fe_type));
+  FEGenericBase<OutputShape>* fe_new =
+    FEGenericBase<OutputShape>::build(elem_dim, fe_type).release();
 
   // Map the physical co-ordinates to the master co-ordinates using the inverse_map from fe_interface.h
   // Build a vector of point co-ordinates to send to reinit
@@ -1792,7 +1733,7 @@ AutoPtr<FEGenericBase<OutputShape> > FEMContext::build_new_fe( const FEGenericBa
     // If !this->has_elem(), then we assume we are dealing with a SCALAR variable
     fe_new->reinit (NULL, &coor);
 
-  return fe_new;
+  return UniquePtr<FEGenericBase<OutputShape> >(fe_new);
 }
 
 
@@ -1907,8 +1848,17 @@ template void FEMContext::fixed_point_hessian<Tensor>(unsigned int, const Point&
 template void FEMContext::interior_rate<Number>(unsigned int, unsigned int, Number&) const;
 template void FEMContext::interior_rate<Gradient>(unsigned int, unsigned int, Gradient&) const;
 
-template AutoPtr<FEGenericBase<Real> > FEMContext::build_new_fe( const FEGenericBase<Real>*, const Point & ) const;
-template AutoPtr<FEGenericBase<RealGradient> > FEMContext::build_new_fe( const FEGenericBase<RealGradient>*, const Point & ) const;
+template void FEMContext::side_rate<Number>(unsigned int, unsigned int, Number&) const;
+template void FEMContext::side_rate<Gradient>(unsigned int, unsigned int, Gradient&) const;
+
+template void FEMContext::interior_accel<Number>(unsigned int, unsigned int, Number&) const;
+template void FEMContext::interior_accel<Gradient>(unsigned int, unsigned int, Gradient&) const;
+
+template void FEMContext::side_accel<Number>(unsigned int, unsigned int, Number&) const;
+template void FEMContext::side_accel<Gradient>(unsigned int, unsigned int, Gradient&) const;
+
+template UniquePtr<FEGenericBase<Real> > FEMContext::build_new_fe( const FEGenericBase<Real>*, const Point & ) const;
+template UniquePtr<FEGenericBase<RealGradient> > FEMContext::build_new_fe( const FEGenericBase<RealGradient>*, const Point & ) const;
 
 
 } // namespace libMesh

@@ -40,15 +40,11 @@ namespace libMesh
 // ElemCutter implementation
 ElemCutter::ElemCutter()
 {
-  _comm_self.reset (new Parallel::Communicator (MPI_COMM_SELF));
+  _inside_mesh_2D.reset  (new SerialMesh(_comm_self,2)); /**/ _triangle_inside.reset  (new TriangleInterface (*_inside_mesh_2D));
+  _outside_mesh_2D.reset (new SerialMesh(_comm_self,2)); /**/ _triangle_outside.reset (new TriangleInterface (*_outside_mesh_2D));
 
-  libmesh_assert (_comm_self.get() != NULL);
-
-  _inside_mesh_2D.reset  (new SerialMesh(*_comm_self,2)); /**/ _triangle_inside.reset  (new TriangleInterface (*_inside_mesh_2D));
-  _outside_mesh_2D.reset (new SerialMesh(*_comm_self,2)); /**/ _triangle_outside.reset (new TriangleInterface (*_outside_mesh_2D));
-
-  _inside_mesh_3D.reset  (new SerialMesh(*_comm_self,3)); /**/ _tetgen_inside.reset  (new TetGenMeshInterface (*_inside_mesh_3D));
-  _outside_mesh_3D.reset (new SerialMesh(*_comm_self,3)); /**/ _tetgen_outside.reset (new TetGenMeshInterface (*_outside_mesh_3D));
+  _inside_mesh_3D.reset  (new SerialMesh(_comm_self,3)); /**/ _tetgen_inside.reset  (new TetGenMeshInterface (*_inside_mesh_3D));
+  _outside_mesh_3D.reset (new SerialMesh(_comm_self,3)); /**/ _tetgen_outside.reset (new TetGenMeshInterface (*_outside_mesh_3D));
 
   cut_cntr = 0;
 }
@@ -164,7 +160,7 @@ void ElemCutter::find_intersection_points(const Elem &elem,
 
   for (unsigned int e=0; e<elem.n_edges(); e++)
     {
-      AutoPtr<Elem> edge (elem.build_edge(e));
+      UniquePtr<Elem> edge (elem.build_edge(e));
 
       // find the element nodes el0, el1 that map
       unsigned int
@@ -197,7 +193,7 @@ void ElemCutter::find_intersection_points(const Elem &elem,
           if ( (d_star > endpoint_tol) &&
                (d_star < (1.-endpoint_tol)) )
             {
-              const Point x_star = (edge->point(0)*(1.-d_star) +
+              const Point x_star = (edge->point(0)*(1-d_star) +
                                     edge->point(1)*d_star);
 
               std::cout << "adding cut point (d_star, x_star) = "

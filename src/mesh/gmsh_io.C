@@ -30,279 +30,81 @@
 #include "libmesh/mesh_base.h"
 
 
-// anonymous namespace to hold local data
-namespace
-{
-using namespace libMesh;
-
-/**
- * Defines mapping from libMesh element types to Gmsh element types.
- */
-struct elementDefinition
-{
-  std::string label;
-  std::vector<unsigned int> nodes;
-  ElemType type;
-  unsigned int exptype;
-  unsigned int dim;
-  unsigned int nnodes;
-};
-
-
-// maps from a libMesh element type to the proper
-// Gmsh elementDefinition.  Placing the data structure
-// here in this anonymous namespace gives us the
-// benefits of a global variable without the nasty
-// side-effects
-std::map<ElemType, elementDefinition> eletypes_exp;
-std::map<unsigned int, elementDefinition> eletypes_imp;
-
-
-
-// ------------------------------------------------------------
-// helper function to initialize the eletypes map
-void init_eletypes ()
-{
-  if (eletypes_exp.empty() && eletypes_imp.empty())
-    {
-      // This should happen only once.  The first time this method
-      // is called the eletypes data struture will be empty, and
-      // we will fill it.  Any subsequent calls will find an initialized
-      // eletypes map and will do nothing.
-
-      // set up the element definitions
-      elementDefinition eledef;
-
-      // use "swap trick" from Scott Meyer's "Effective STL" to initialize
-      // eledef.nodes vector
-
-      // POINT (only Gmsh)
-      {
-        eledef.type    = NODEELEM;
-        eledef.exptype = 15;
-        eledef.dim     = 0;
-        eledef.nnodes  = 1;
-        eledef.nodes.clear();
-
-        // import only
-        eletypes_imp[15] = eledef;
-      }
-
-      // EDGE2
-      {
-        eledef.type    = EDGE2;
-        eledef.dim     = 1;
-        eledef.nnodes  = 2;
-        eledef.exptype = 1;
-        eledef.nodes.clear();
-
-        eletypes_exp[EDGE2] = eledef;
-        eletypes_imp[1]     = eledef;
-      }
-
-      // EDGE3
-      {
-        eledef.type    = EDGE3;
-        eledef.dim     = 1;
-        eledef.nnodes  = 3;
-        eledef.exptype = 8;
-        eledef.nodes.clear();
-
-        eletypes_exp[EDGE3] = eledef;
-        eletypes_imp[8]     = eledef;
-      }
-
-      // TRI3
-      {
-        eledef.type    = TRI3;
-        eledef.dim     = 2;
-        eledef.nnodes  = 3;
-        eledef.exptype = 2;
-        eledef.nodes.clear();
-
-        eletypes_exp[TRI3] = eledef;
-        eletypes_imp[2] = eledef;
-      }
-
-      // TRI6
-      {
-        eledef.type    = TRI6;
-        eledef.dim     = 2;
-        eledef.nnodes  = 6;
-        eledef.exptype = 9;
-        eledef.nodes.clear();
-
-        eletypes_exp[TRI6] = eledef;
-        eletypes_imp[9]    = eledef;
-      }
-
-      // QUAD4
-      {
-        eledef.type    = QUAD4;
-        eledef.dim     = 2;
-        eledef.nnodes  = 4;
-        eledef.exptype = 3;
-        eledef.nodes.clear();
-
-        eletypes_exp[QUAD4] = eledef;
-        eletypes_imp[3]     = eledef;
-      }
-
-      // QUAD8
-      // TODO: what should be done with this on writing?
-      {
-        eledef.type    = QUAD8;
-        eledef.dim     = 2;
-        eledef.nnodes  = 8;
-        eledef.exptype = 100;
-        const unsigned int nodes[] = {1,2,3,4,5,6,7,8};
-        std::vector<unsigned int>(nodes, nodes+eledef.nnodes).swap(eledef.nodes);
-
-        eletypes_exp[QUAD8] = eledef;
-        eletypes_imp[10]    = eledef;
-      }
-
-      // QUAD9
-      {
-        eledef.type    = QUAD9;
-        eledef.dim     = 2;
-        eledef.nnodes  = 9;
-        eledef.exptype = 10;
-        eledef.nodes.clear();
-
-        eletypes_exp[QUAD9] = eledef;
-        eletypes_imp[10]    = eledef;
-      }
-
-      // HEX8
-      {
-        eledef.type    = HEX8;
-        eledef.dim     = 3;
-        eledef.nnodes  = 8;
-        eledef.exptype = 5;
-        eledef.nodes.clear();
-
-        eletypes_exp[HEX8] = eledef;
-        eletypes_imp[5]    = eledef;
-      }
-
-      // HEX20
-      // TODO: what should be done with this on writing?
-      {
-        eledef.type    = HEX20;
-        eledef.dim     = 3;
-        eledef.nnodes  = 20;
-        eledef.exptype = 101;
-        const unsigned int nodes[] = {1,2,3,4,5,6,7,8,9,10,11,16,17,18,19,12,13,14,15,16};
-        std::vector<unsigned int>(nodes, nodes+eledef.nnodes).swap(eledef.nodes);
-
-        eletypes_exp[HEX20] = eledef;
-        eletypes_imp[12]    = eledef;
-      }
-
-      // HEX27
-      {
-        eledef.type    = HEX27;
-        eledef.dim     = 3;
-        eledef.nnodes  = 27;
-        eledef.exptype = 12;
-        const unsigned int nodes[] = {0,1,2,3,4,5,6,7,8,11,12,9,13,10,14,
-                                      15,16,19,17,18,20,21,24,22,23,25,26};
-        std::vector<unsigned int>(nodes, nodes+eledef.nnodes).swap(eledef.nodes);
-
-        eletypes_exp[HEX27] = eledef;
-        eletypes_imp[12]    = eledef;
-      }
-
-      // TET4
-      {
-        eledef.type    = TET4;
-        eledef.dim     = 3;
-        eledef.nnodes  = 4;
-        eledef.exptype = 4;
-        eledef.nodes.clear();
-
-        eletypes_exp[TET4] = eledef;
-        eletypes_imp[4]    = eledef;
-      }
-
-      // TET10
-      {
-        eledef.type    = TET10;
-        eledef.dim     = 3;
-        eledef.nnodes  = 10;
-        eledef.exptype = 11;
-        const unsigned int nodes[] = {0,1,2,3,4,5,6,7,9,8};
-        std::vector<unsigned int>(nodes, nodes+eledef.nnodes).swap(eledef.nodes);
-        eletypes_exp[TET10] = eledef;
-        eletypes_imp[11]    = eledef;
-      }
-
-      // PRISM6
-      {
-        eledef.type    = PRISM6;
-        eledef.dim     = 3;
-        eledef.nnodes  = 6;
-        eledef.exptype = 6;
-        eledef.nodes.clear();
-
-        eletypes_exp[PRISM6] = eledef;
-        eletypes_imp[6]      = eledef;
-      }
-
-      // PRISM15
-      // TODO: what should be done with this on writing?
-      {
-        eledef.type    = PRISM15;
-        eledef.dim     = 3;
-        eledef.nnodes  = 15;
-        eledef.exptype = 103;
-        eledef.nodes.clear();
-
-        eletypes_exp[PRISM15] = eledef;
-        eletypes_imp[13] = eledef;
-      }
-
-      // PRISM18
-      {
-        eledef.type    = PRISM18;
-        eledef.dim     = 3;
-        eledef.nnodes  = 18;
-        eledef.exptype = 13;
-        const unsigned int nodes[] = {0,1,2,3,4,5,6,8,9,7,10,11,
-                                      12,14,13,15,17,16};
-        std::vector<unsigned int>(nodes, nodes+eledef.nnodes).swap(eledef.nodes);
-
-        eletypes_exp[PRISM18] = eledef;
-        eletypes_imp[13]      = eledef;
-      }
-
-      // PYRAMID5
-      {
-        eledef.type    = PYRAMID5;
-        eledef.dim     = 3;
-        eledef.nnodes  = 5;
-        eledef.exptype = 7;
-        eledef.nodes.clear();
-
-        eletypes_exp[PYRAMID5] = eledef;
-        eletypes_imp[7]        = eledef;
-      }
-    }
-}
-
-} // end anonymous namespace
-
-
 namespace libMesh
 {
 
-// ------------------------------------------------------------
-// GmshIO  members
+// Initialize the static data member
+GmshIO::ElementMaps GmshIO::_element_maps = GmshIO::build_element_maps();
+
+
+
+// Definition of the static function which constructs the ElementMaps object.
+GmshIO::ElementMaps GmshIO::build_element_maps()
+{
+  // Object to be filled up
+  ElementMaps em;
+
+  // POINT (import only)
+  em.in.insert(std::make_pair(15, ElementDefinition(NODEELEM, 15, 0, 1)));
+
+  // Add elements with trivial node mappings
+  em.add_def(ElementDefinition(EDGE2, 1, 1, 2));
+  em.add_def(ElementDefinition(EDGE3, 8, 1, 3));
+  em.add_def(ElementDefinition(TRI3, 2, 2, 3));
+  em.add_def(ElementDefinition(TRI6, 9, 2, 6));
+  em.add_def(ElementDefinition(QUAD4, 3, 2, 4));
+  em.add_def(ElementDefinition(QUAD8, 16, 2, 8));
+  em.add_def(ElementDefinition(QUAD9, 10, 2, 9));
+  em.add_def(ElementDefinition(HEX8, 5, 3, 8));
+  em.add_def(ElementDefinition(TET4, 4, 3, 4));
+  em.add_def(ElementDefinition(PRISM6, 6, 3, 6));
+  em.add_def(ElementDefinition(PRISM15, 13, 3, 15)); // TODO: what should be done with this on writing?
+  em.add_def(ElementDefinition(PYRAMID5, 7, 3, 5));
+
+  // Add elements with non-trivial node mappings
+
+  // HEX20
+  {
+    ElementDefinition eledef(HEX20, 17, 3, 20);
+    const unsigned int nodes[] = {0,1,2,3,4,5,6,7,8,11,12,9,13,10,14,15,16,19,17,18};
+    std::vector<unsigned int>(nodes, nodes+eledef.nnodes).swap(eledef.nodes); // swap trick
+    em.add_def(eledef);
+  }
+
+  // HEX27
+  {
+    ElementDefinition eledef(HEX27, 12, 3, 27);
+    const unsigned int nodes[] = {0,1,2,3,4,5,6,7,8,11,12,9,13,10,14,
+                                  15,16,19,17,18,20,21,24,22,23,25,26};
+    std::vector<unsigned int>(nodes, nodes+eledef.nnodes).swap(eledef.nodes); // swap trick
+    em.add_def(eledef);
+  }
+
+  // TET10
+  {
+    ElementDefinition eledef(TET10, 11, 3, 10);
+    const unsigned int nodes[] = {0,1,2,3,4,5,6,7,9,8};
+    std::vector<unsigned int>(nodes, nodes+eledef.nnodes).swap(eledef.nodes); // swap trick
+    em.add_def(eledef);
+  }
+
+  // PRISM18
+  {
+    ElementDefinition eledef(PRISM18, 13, 3, 18);
+    const unsigned int nodes[] = {0,1,2,3,4,5,6,8,9,7,10,11,12,14,13,15,17,16};
+    std::vector<unsigned int>(nodes, nodes+eledef.nnodes).swap(eledef.nodes); // swap trick
+    em.add_def(eledef);
+  }
+
+  return em;
+}
+
+
 
 GmshIO::GmshIO (const MeshBase& mesh) :
   MeshOutput<MeshBase>(mesh),
-  _binary(false)
+  _binary(false),
+  _write_lower_dimensional_elements(true)
 {
 }
 
@@ -311,7 +113,8 @@ GmshIO::GmshIO (const MeshBase& mesh) :
 GmshIO::GmshIO (MeshBase& mesh) :
   MeshInput<MeshBase>  (mesh),
   MeshOutput<MeshBase> (mesh),
-  _binary (false)
+  _binary (false),
+  _write_lower_dimensional_elements(true)
 {
 }
 
@@ -320,6 +123,13 @@ GmshIO::GmshIO (MeshBase& mesh) :
 bool & GmshIO::binary ()
 {
   return _binary;
+}
+
+
+
+bool & GmshIO::write_lower_dimensional_elements ()
+{
+  return _write_lower_dimensional_elements;
 }
 
 
@@ -341,9 +151,6 @@ void GmshIO::read_mesh(std::istream& in)
 
   libmesh_assert(in.good());
 
-  // initialize the map with element types
-  init_eletypes();
-
   // clear any data in the mesh
   MeshBase& mesh = MeshInput<MeshBase>::mesh();
   mesh.clear();
@@ -351,6 +158,19 @@ void GmshIO::read_mesh(std::istream& in)
   // some variables
   int format=0, size=0;
   Real version = 1.0;
+
+  // Keep track of lower-dimensional blocks which are not BCs, but
+  // actually blocks of lower-dimensional elements.
+  std::set<subdomain_id_type> lower_dimensional_blocks;
+
+  // Mapping from physical id -> (physical dim, physical name) pairs.
+  // These can refer to either "sidesets" or "subdomains"; we need to
+  // wait until the Mesh has been read to know which is which.  Note
+  // that we are using 'int' as the key here rather than
+  // subdomain_id_type or boundary_id_type, since at this point, it
+  // could be either.
+  typedef std::pair<unsigned, std::string> GmshPhysical;
+  std::map<int, GmshPhysical> gmsh_physicals;
 
   // map to hold the node numbers for translation
   // note the the nodes can be non-consecutive
@@ -391,6 +211,60 @@ void GmshIO::read_mesh(std::istream& in)
 
               if (format)
                 libmesh_error_msg("Error: Unknown data format for mesh in Gmsh reader.");
+            }
+
+          // Read and process the "PhysicalNames" section.
+          else if (s.find("$PhysicalNames") == static_cast<std::string::size_type>(0))
+            {
+              // The lines in the PhysicalNames section should look like the following:
+              // 2 1 "frac" lower_dimensional_block
+              // 2 3 "top"
+              // 2 4 "bottom"
+              // 3 2 "volume"
+
+              // Read in the number of physical groups to expect in the file.
+              unsigned int num_physical_groups = 0;
+              in >> num_physical_groups;
+
+              // Read rest of line including newline character.
+              std::getline(in, s);
+
+              for (unsigned int i=0; i<num_physical_groups; ++i)
+                {
+                  // Read an entire line of the PhysicalNames section.
+                  std::getline(in, s);
+
+                  // Use an istringstream to extract the physical
+                  // dimension, physical id, and physical name from
+                  // this line.
+                  std::istringstream s_stream(s);
+                  unsigned phys_dim;
+                  int phys_id;
+                  std::string phys_name;
+                  s_stream >> phys_dim >> phys_id >> phys_name;
+
+                  // Not sure if this is true for all Gmsh files, but
+                  // my test file has quotes around the phys_name
+                  // string.  So let's erase any quotes now...
+                  phys_name.erase(std::remove(phys_name.begin(), phys_name.end(), '"'), phys_name.end());
+
+                  // Record this ID for later assignment of subdomain/sideset names.
+                  gmsh_physicals[phys_id] = std::make_pair(phys_dim, phys_name);
+
+                  // If 's' also contains the libmesh-specific string
+                  // "lower_dimensional_block", add this block ID to
+                  // the list of blocks which are not boundary
+                  // conditions.
+                  if (s.find("lower_dimensional_block") != std::string::npos)
+                    {
+                      lower_dimensional_blocks.insert(cast_int<subdomain_id_type>(phys_id));
+
+                      // The user has explicitly told us that this
+                      // block is a subdomain, so set that association
+                      // in the Mesh.
+                      mesh.subdomain_name(cast_int<subdomain_id_type>(phys_id)) = phys_name;
+                    }
+                }
             }
 
           // read the node block
@@ -483,14 +357,14 @@ void GmshIO::read_mesh(std::istream& in)
                     }
 
                   // Consult the import element table to determine which element to build
-                  std::map<unsigned int, elementDefinition>::iterator eletypes_it = eletypes_imp.find(type);
+                  std::map<unsigned int, GmshIO::ElementDefinition>::iterator eletypes_it = _element_maps.in.find(type);
 
                   // Make sure we actually found something
-                  if (eletypes_it == eletypes_imp.end())
+                  if (eletypes_it == _element_maps.in.end())
                     libmesh_error_msg("Element type " << type << " not found!");
 
-                  // Get a reference to the elementDefinition
-                  const elementDefinition& eletype = eletypes_it->second;
+                  // Get a reference to the ElementDefinition
+                  const GmshIO::ElementDefinition& eletype = eletypes_it->second;
 
                   // If we read nnodes, make sure it matches the number in eletype.nnodes
                   if (nnodes != 0 && nnodes != eletype.nnodes)
@@ -521,7 +395,7 @@ void GmshIO::read_mesh(std::istream& in)
                         if (elem->n_nodes() != nnodes)
                           libmesh_error_msg("Number of nodes for element " \
                                             << id \
-                                            << " of type " << eletypes_imp[type].type \
+                                            << " of type " << eletype.type \
                                             << " (Gmsh type " << type \
                                             << ") does not match Libmesh definition. " \
                                             << "I expected " << elem->n_nodes() \
@@ -608,6 +482,31 @@ void GmshIO::read_mesh(std::istream& in)
               // Set mesh_dimension based on the largest element dimension seen.
               mesh.set_mesh_dimension(max_elem_dimension_seen);
 
+              // Now that we know the maximum element dimension seen,
+              // we know whether the physical names are subdomain
+              // names or sideset names.
+              {
+                std::map<int, GmshPhysical>::iterator it = gmsh_physicals.begin();
+                for (; it != gmsh_physicals.end(); ++it)
+                  {
+                    // Extract data
+                    int phys_id = it->first;
+                    unsigned phys_dim = it->second.first;
+                    std::string phys_name = it->second.second;
+
+                    // If the physical's dimension matches the largest
+                    // dimension we've seen, it's a subdomain name.
+                    if (phys_dim == max_elem_dimension_seen)
+                      mesh.subdomain_name(cast_int<subdomain_id_type>(phys_id)) = phys_name;
+
+                    // Otherwise, if it's not a lower-dimensional
+                    // block, it's a sideset name.
+                    else if (phys_dim < max_elem_dimension_seen &&
+                             !lower_dimensional_blocks.count(cast_int<boundary_id_type>(phys_id)))
+                      mesh.boundary_info->sideset_name(cast_int<boundary_id_type>(phys_id)) = phys_name;
+                  }
+              }
+
               if (n_dims_seen > 1)
                 {
                   // map from (node ids) -> elem of lower dimensional elements that can provide boundary conditions
@@ -622,7 +521,8 @@ void GmshIO::read_mesh(std::istream& in)
                       {
                         Elem* elem = *it;
 
-                        if (elem->dim() < max_elem_dimension_seen)
+                        if (elem->dim() < max_elem_dimension_seen &&
+                            !lower_dimensional_blocks.count(elem->subdomain_id()))
                           {
                             // Debugging status
                             // libMesh::out << "Processing Elem " << elem->id() << " as a boundary element." << std::endl;
@@ -686,7 +586,7 @@ void GmshIO::read_mesh(std::istream& in)
                             for (unsigned short sn=0;
                                  sn<elem->n_sides(); sn++)
                               {
-                                AutoPtr<Elem> side (elem->build_side(sn));
+                                UniquePtr<Elem> side (elem->build_side(sn));
 
                                 // Build up a node_ids vector, which is the key
                                 std::vector<dof_id_type> node_ids(side->n_nodes());
@@ -729,7 +629,8 @@ void GmshIO::read_mesh(std::istream& in)
                       {
                         Elem* elem = *it;
 
-                        if (elem->dim() < max_elem_dimension_seen)
+                        if (elem->dim() < max_elem_dimension_seen &&
+                            !lower_dimensional_blocks.count(elem->subdomain_id()))
                           mesh.delete_elem(elem);
                       }
                   } // end 3rd loop over active elements
@@ -790,11 +691,14 @@ void GmshIO::write_mesh (std::ostream& out_stream)
   // Be sure that the stream is valid.
   libmesh_assert (out_stream.good());
 
-  // initialize the map with element types
-  init_eletypes();
-
   // Get a const reference to the mesh
   const MeshBase& mesh = MeshOutput<MeshBase>::mesh();
+
+  // If requested, write out lower-dimensional elements for
+  // element-side-based boundary conditions.
+  unsigned int n_boundary_faces = 0;
+  if (this->write_lower_dimensional_elements())
+    n_boundary_faces = mesh.boundary_info->n_boundary_conds();
 
   // Note: we are using version 2.0 of the gmsh output format.
 
@@ -817,7 +721,7 @@ void GmshIO::write_mesh (std::ostream& out_stream)
   {
     // write the connectivity
     out_stream << "$Elements\n";
-    out_stream << mesh.n_active_elem() << '\n';
+    out_stream << mesh.n_active_elem() + n_boundary_faces << '\n';
 
     MeshBase::const_element_iterator       it  = mesh.active_elements_begin();
     const MeshBase::const_element_iterator end = mesh.active_elements_end();
@@ -829,10 +733,18 @@ void GmshIO::write_mesh (std::ostream& out_stream)
 
         // Make sure we have a valid entry for
         // the current element type.
-        libmesh_assert (eletypes_exp.count(elem->type()));
+        libmesh_assert (_element_maps.out.count(elem->type()));
 
         // consult the export element table
-        const elementDefinition& eletype = eletypes_exp[elem->type()];
+        std::map<ElemType, ElementDefinition>::iterator def_it =
+          _element_maps.out.find(elem->type());
+
+        // Assert that we found it
+        if (def_it == _element_maps.out.end())
+          libmesh_error_msg("Element type " << elem->type() << " not found in _element_maps.");
+
+        // Get a reference to the ElementDefinition object
+        const ElementDefinition& eletype = def_it->second;
 
         // The element mapper better not require any more nodes
         // than are present in the current element!
@@ -840,16 +752,18 @@ void GmshIO::write_mesh (std::ostream& out_stream)
 
         // elements ids are 1 based in Gmsh
         out_stream << elem->id()+1 << " ";
-
         // element type
-        out_stream << eletype.exptype;
+        out_stream << eletype.gmsh_type;
 
-        // write the number of tags and
-        // tag1 (physical entity), tag2 (geometric entity), and tag3 (partition entity)
+        // write the number of tags (3) and their values:
+        // 1 (physical entity)
+        // 2 (geometric entity)
+        // 3 (partition entity)
         out_stream << " 3 "
                    << static_cast<unsigned int>(elem->subdomain_id())
-                   << " 1 "
-                   << (elem->processor_id()+1) << " ";
+                   << " 0 "
+                   << elem->processor_id()+1
+                   << " ";
 
         // if there is a node translation table, use it
         if (eletype.nodes.size() > 0)
@@ -861,6 +775,90 @@ void GmshIO::write_mesh (std::ostream& out_stream)
             out_stream << elem->node(i)+1 << " ";                  // gmsh is 1-based
         out_stream << "\n";
       } // element loop
+  }
+
+  {
+    // A counter for writing surface elements to the Gmsh file
+    // sequentially.  We start numbering them with a number strictly
+    // larger than the largest element ID in the mesh.  Note: the
+    // MeshBase docs say "greater than or equal to" the maximum
+    // element id in the mesh, so technically we might need a +1 here,
+    // but all of the implementations return an ID strictly greater
+    // than the largest element ID in the Mesh.
+    unsigned int e_id = mesh.max_elem_id();
+
+    // loop over the elements, writing out boundary faces
+    MeshBase::const_element_iterator       it  = mesh.active_elements_begin();
+    const MeshBase::const_element_iterator end = mesh.active_elements_end();
+
+    if (n_boundary_faces)
+      {
+        // Construct the list of boundary sides
+        std::vector<dof_id_type> element_id_list;
+        std::vector<unsigned short int> side_list;
+        std::vector<boundary_id_type> bc_id_list;
+
+        mesh.boundary_info->build_side_list(element_id_list, side_list, bc_id_list);
+
+        // Loop over these lists, writing data to the file.
+        for (unsigned idx=0; idx<element_id_list.size(); ++idx)
+          {
+            const Elem * elem = mesh.elem(element_id_list[idx]);
+
+            if (!elem)
+              libmesh_error_msg("Mesh returned a NULL pointer for element " << element_id_list[idx]);
+
+            UniquePtr<Elem> side = elem->build_side(side_list[idx]);
+
+            // Map from libmesh elem type to gmsh elem type.
+            std::map<ElemType, ElementDefinition>::iterator def_it =
+              _element_maps.out.find(side->type());
+
+            // If we didn't find it, that's an error
+            if (def_it == _element_maps.out.end())
+              libmesh_error_msg("Element type " << side->type() << " not found in _element_maps.");
+
+            // consult the export element table
+            const GmshIO::ElementDefinition& eletype = def_it->second;
+
+            // The element mapper better not require any more nodes
+            // than are present in the current element!
+            libmesh_assert_less_equal (eletype.nodes.size(), side->n_nodes());
+
+            // elements ids are 1-based in Gmsh
+            out_stream << e_id+1 << " ";
+
+            // element type
+            out_stream << eletype.gmsh_type;
+
+            // write the number of tags:
+            // 1 (physical entity)
+            // 2 (geometric entity)
+            // 3 (partition entity)
+            out_stream << " 3 "
+                       << bc_id_list[idx]
+                       << " 0 "
+                       << elem->processor_id()+1
+                       << " ";
+
+            // if there is a node translation table, use it
+            if (eletype.nodes.size() > 0)
+              for (unsigned int i=0; i < side->n_nodes(); i++)
+                out_stream << side->node(eletype.nodes[i])+1 << " "; // gmsh is 1-based
+
+            // otherwise keep the same node order
+            else
+              for (unsigned int i=0; i < side->n_nodes(); i++)
+                out_stream << side->node(i)+1 << " ";                // gmsh is 1-based
+
+            // Go to the next line
+            out_stream << "\n";
+
+            // increment this index too...
+            ++e_id;
+          }
+      }
+
     out_stream << "$EndElements\n";
   }
 }
@@ -881,9 +879,6 @@ void GmshIO::write_post (const std::string& fname,
   // Make sure it opened correctly
   if (!out_stream.good())
     libmesh_file_error(fname.c_str());
-
-  // initialize the map with element types
-  init_eletypes();
 
   // create a character buffer
   char buf[80];

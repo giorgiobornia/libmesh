@@ -132,14 +132,14 @@ public:
   /**
    * Creates a vector which has the same type, size and partitioning
    * as this vector, but whose data is all zero.  Returns it in an \p
-   * AutoPtr.
+   * UniquePtr.
    */
-  virtual AutoPtr<NumericVector<T> > zero_clone () const;
+  virtual UniquePtr<NumericVector<T> > zero_clone () const;
 
   /**
-   * Creates a copy of this vector and returns it in an \p AutoPtr.
+   * Creates a copy of this vector and returns it in an \p UniquePtr.
    */
-  AutoPtr<NumericVector<T> > clone () const;
+  UniquePtr<NumericVector<T> > clone () const;
 
   /**
    * Change the dimension of the vector to \p N. The reserved memory for
@@ -598,19 +598,19 @@ private:
 template <typename T>
 inline
 EpetraVector<T>::EpetraVector (const Parallel::Communicator &comm,
-                               const ParallelType type)
-  : NumericVector<T>(comm, type),
-    _destroy_vec_on_exit(true),
-    myFirstID_(0),
-    myNumIDs_(0),
-    myCoefs_(NULL),
-    nonlocalIDs_(NULL),
-    nonlocalElementSize_(NULL),
-    numNonlocalIDs_(0),
-    allocatedNonlocalLength_(0),
-    nonlocalCoefs_(NULL),
-    last_edit(0),
-    ignoreNonLocalEntries_(false)
+                               const ParallelType type) :
+  NumericVector<T>(comm, type),
+  _destroy_vec_on_exit(true),
+  myFirstID_(0),
+  myNumIDs_(0),
+  myCoefs_(NULL),
+  nonlocalIDs_(NULL),
+  nonlocalElementSize_(NULL),
+  numNonlocalIDs_(0),
+  allocatedNonlocalLength_(0),
+  nonlocalCoefs_(NULL),
+  last_edit(0),
+  ignoreNonLocalEntries_(false)
 {
   this->_type = type;
 }
@@ -621,19 +621,19 @@ template <typename T>
 inline
 EpetraVector<T>::EpetraVector (const Parallel::Communicator &comm,
                                const numeric_index_type n,
-                               const ParallelType type)
-  : NumericVector<T>(comm, type),
-    _destroy_vec_on_exit(true),
-    myFirstID_(0),
-    myNumIDs_(0),
-    myCoefs_(NULL),
-    nonlocalIDs_(NULL),
-    nonlocalElementSize_(NULL),
-    numNonlocalIDs_(0),
-    allocatedNonlocalLength_(0),
-    nonlocalCoefs_(NULL),
-    last_edit(0),
-    ignoreNonLocalEntries_(false)
+                               const ParallelType type) :
+  NumericVector<T>(comm, type),
+  _destroy_vec_on_exit(true),
+  myFirstID_(0),
+  myNumIDs_(0),
+  myCoefs_(NULL),
+  nonlocalIDs_(NULL),
+  nonlocalElementSize_(NULL),
+  numNonlocalIDs_(0),
+  allocatedNonlocalLength_(0),
+  nonlocalCoefs_(NULL),
+  last_edit(0),
+  ignoreNonLocalEntries_(false)
 
 {
   this->init(n, n, false, type);
@@ -646,19 +646,19 @@ inline
 EpetraVector<T>::EpetraVector (const Parallel::Communicator &comm,
                                const numeric_index_type n,
                                const numeric_index_type n_local,
-                               const ParallelType type)
-  : NumericVector<T>(comm, type),
-    _destroy_vec_on_exit(true),
-    myFirstID_(0),
-    myNumIDs_(0),
-    myCoefs_(NULL),
-    nonlocalIDs_(NULL),
-    nonlocalElementSize_(NULL),
-    numNonlocalIDs_(0),
-    allocatedNonlocalLength_(0),
-    nonlocalCoefs_(NULL),
-    last_edit(0),
-    ignoreNonLocalEntries_(false)
+                               const ParallelType type) :
+  NumericVector<T>(comm, type),
+  _destroy_vec_on_exit(true),
+  myFirstID_(0),
+  myNumIDs_(0),
+  myCoefs_(NULL),
+  nonlocalIDs_(NULL),
+  nonlocalElementSize_(NULL),
+  numNonlocalIDs_(0),
+  allocatedNonlocalLength_(0),
+  nonlocalCoefs_(NULL),
+  last_edit(0),
+  ignoreNonLocalEntries_(false)
 {
   this->init(n, n_local, false, type);
 }
@@ -669,19 +669,19 @@ EpetraVector<T>::EpetraVector (const Parallel::Communicator &comm,
 template <typename T>
 inline
 EpetraVector<T>::EpetraVector(Epetra_Vector & v,
-                              const Parallel::Communicator &comm)
-  : NumericVector<T>(comm, AUTOMATIC),
-    _destroy_vec_on_exit(false),
-    myFirstID_(0),
-    myNumIDs_(0),
-    myCoefs_(NULL),
-    nonlocalIDs_(NULL),
-    nonlocalElementSize_(NULL),
-    numNonlocalIDs_(0),
-    allocatedNonlocalLength_(0),
-    nonlocalCoefs_(NULL),
-    last_edit(0),
-    ignoreNonLocalEntries_(false)
+                              const Parallel::Communicator &comm) :
+  NumericVector<T>(comm, AUTOMATIC),
+  _destroy_vec_on_exit(false),
+  myFirstID_(0),
+  myNumIDs_(0),
+  myCoefs_(NULL),
+  nonlocalIDs_(NULL),
+  nonlocalElementSize_(NULL),
+  numNonlocalIDs_(0),
+  allocatedNonlocalLength_(0),
+  nonlocalCoefs_(NULL),
+  last_edit(0),
+  ignoreNonLocalEntries_(false)
 {
   _vec = &v;
 
@@ -712,19 +712,19 @@ EpetraVector<T>::EpetraVector (const Parallel::Communicator &comm,
                                const numeric_index_type n,
                                const numeric_index_type n_local,
                                const std::vector<numeric_index_type>& ghost,
-                               const ParallelType type)
-  : NumericVector<T>(comm, AUTOMATIC),
-    _destroy_vec_on_exit(true),
-    myFirstID_(0),
-    myNumIDs_(0),
-    myCoefs_(NULL),
-    nonlocalIDs_(NULL),
-    nonlocalElementSize_(NULL),
-    numNonlocalIDs_(0),
-    allocatedNonlocalLength_(0),
-    nonlocalCoefs_(NULL),
-    last_edit(0),
-    ignoreNonLocalEntries_(false)
+                               const ParallelType type) :
+  NumericVector<T>(comm, AUTOMATIC),
+  _destroy_vec_on_exit(true),
+  myFirstID_(0),
+  myNumIDs_(0),
+  myCoefs_(NULL),
+  nonlocalIDs_(NULL),
+  nonlocalElementSize_(NULL),
+  numNonlocalIDs_(0),
+  allocatedNonlocalLength_(0),
+  nonlocalCoefs_(NULL),
+  last_edit(0),
+  ignoreNonLocalEntries_(false)
 {
   this->init(n, n_local, ghost, false, type);
 }
@@ -892,9 +892,9 @@ void EpetraVector<T>::zero ()
 
 template <typename T>
 inline
-AutoPtr<NumericVector<T> > EpetraVector<T>::zero_clone () const
+UniquePtr<NumericVector<T> > EpetraVector<T>::zero_clone () const
 {
-  AutoPtr<NumericVector<T> > cloned_vector
+  UniquePtr<NumericVector<T> > cloned_vector
     (new EpetraVector<T>(this->comm(), AUTOMATIC));
 
   cloned_vector->init(*this);
@@ -906,9 +906,9 @@ AutoPtr<NumericVector<T> > EpetraVector<T>::zero_clone () const
 
 template <typename T>
 inline
-AutoPtr<NumericVector<T> > EpetraVector<T>::clone () const
+UniquePtr<NumericVector<T> > EpetraVector<T>::clone () const
 {
-  AutoPtr<NumericVector<T> > cloned_vector
+  UniquePtr<NumericVector<T> > cloned_vector
     (new EpetraVector<T>(this->comm(), AUTOMATIC));
 
   cloned_vector->init(*this, true);
@@ -1030,5 +1030,5 @@ void EpetraVector<T>::swap (NumericVector<T> &other)
 } // namespace libMesh
 
 
-#endif // #ifdef HAVE_EPETRA
+#endif // #ifdef LIBMESH_HAVE_TRILINOS
 #endif // LIBMESH_TRILINOS_EPETRA_VECTOR_H

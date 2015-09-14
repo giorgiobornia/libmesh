@@ -162,6 +162,13 @@ data = [
     'Nov 2014',   9243,      0, 0.0,
     'Dec 2014',  10714,      0, 0.0,
     'Jan 2015',  11508,      0, 0.0,
+    'Feb 2015',  11278,      0, 0.0,
+    'Mar 2015',  13305,      0, 0.0,
+    'Apr 2015',  12347,      0, 0.0,
+    'May 2015',  11368,      0, 0.0,
+    'Jun 2015',  11203,      0, 0.0,
+    'Jul 2015',  10419,      0, 0.0,
+    'Aug 2015',  11282,      0, 0.0,
 ]
 
 # Extract number of hits/month
@@ -211,3 +218,7 @@ ax.get_xaxis().set_tick_params(direction='out')
 
 # Save as PDF
 plt.savefig('libmesh_pagehits.pdf')
+
+# Local Variables:
+# python-indent: 2
+# End:

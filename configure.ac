@@ -40,6 +40,7 @@ AC_CONFIG_FILES([Makefile
                  contrib/utils/Makefile
                  contrib/utils/Make.common
                  tests/Makefile
+                 tests/base/getpot_test.C
                  contrib/utils/libmesh.pc:contrib/utils/libmesh-opt.pc.in
                  contrib/utils/libmesh-opt.pc
                  contrib/utils/libmesh-dbg.pc
@@ -57,6 +58,7 @@ AC_CONFIG_FILES(contrib/bin/libmesh-config,          [chmod +x contrib/bin/libme
 AC_CONFIG_FILES(contrib/bin/xda2mgf,                 [chmod +x contrib/bin/xda2mgf])
 AC_CONFIG_FILES(contrib/bin/create_libmesh_release,  [chmod +x contrib/bin/create_libmesh_release])
 AC_CONFIG_FILES(doc/dot,                             [chmod +x doc/dot])
+AC_CONFIG_FILES(tests/run_unit_tests.sh,             [chmod +x tests/run_unit_tests.sh])
 
 # Create a temporary file with e.g. HAVE_MPI
 AC_CONFIG_HEADER(include/libmesh_config.h.tmp:include/libmesh_config.h.in)
@@ -337,6 +339,8 @@ if (test "x$enableexamples" = "xyes"); then
                 examples/eigenproblems/eigenproblems_ex3/Makefile
                 examples/fem_system/fem_system_ex1/Makefile
                 examples/fem_system/fem_system_ex2/Makefile
+                examples/fem_system/fem_system_ex3/Makefile
+                examples/fem_system/fem_system_ex4/Makefile
                 examples/solution_transfer/solution_transfer_ex1/Makefile
                 examples/miscellaneous/miscellaneous_ex1/Makefile
                 examples/miscellaneous/miscellaneous_ex2/Makefile
@@ -349,6 +353,8 @@ if (test "x$enableexamples" = "xyes"); then
                 examples/miscellaneous/miscellaneous_ex9/Makefile
                 examples/miscellaneous/miscellaneous_ex10/Makefile
                 examples/miscellaneous/miscellaneous_ex11/Makefile
+                examples/optimization/optimization_ex1/Makefile
+                examples/optimization/optimization_ex2/Makefile
                 examples/subdomains/subdomains_ex1/Makefile
                 examples/subdomains/subdomains_ex2/Makefile
                 examples/subdomains/subdomains_ex3/Makefile
@@ -359,6 +365,7 @@ if (test "x$enableexamples" = "xyes"); then
                 examples/systems_of_equations/systems_of_equations_ex5/Makefile
                 examples/systems_of_equations/systems_of_equations_ex6/Makefile
                 examples/systems_of_equations/systems_of_equations_ex7/Makefile
+                examples/systems_of_equations/systems_of_equations_ex8/Makefile
                 examples/reduced_basis/reduced_basis_ex1/Makefile
                 examples/reduced_basis/reduced_basis_ex2/Makefile
                 examples/reduced_basis/reduced_basis_ex3/Makefile

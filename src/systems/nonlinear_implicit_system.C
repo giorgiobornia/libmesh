@@ -38,7 +38,7 @@ NonlinearImplicitSystem::NonlinearImplicitSystem (EquationSystems& es,
 
   Parent                    (es, name_in, number_in),
   nonlinear_solver          (NonlinearSolver<Number>::build(*this)),
-  diff_solver               (NULL),
+  diff_solver               (),
   _n_nonlinear_iterations   (0),
   _final_nonlinear_residual (1.e20)
 {
@@ -210,7 +210,7 @@ std::pair<unsigned int, Real> NonlinearImplicitSystem::get_linear_solve_paramete
 
 void NonlinearImplicitSystem::assembly(bool get_residual,
                                        bool get_jacobian,
-                                       bool apply_heterogeneous_constraints)
+                                       bool /*apply_heterogeneous_constraints*/)
 {
   // Get current_local_solution in sync
   this->update();

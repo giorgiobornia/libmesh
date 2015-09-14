@@ -40,6 +40,7 @@ PointLocatorTree::PointLocatorTree (const MeshBase& mesh,
   _tree            (NULL),
   _element         (NULL),
   _out_of_mesh_mode(false),
+  _target_bin_size (200),
   _build_type(Trees::NODES)
 {
   this->init(_build_type);
@@ -54,6 +55,7 @@ PointLocatorTree::PointLocatorTree (const MeshBase& mesh,
   _tree            (NULL),
   _element         (NULL),
   _out_of_mesh_mode(false),
+  _target_bin_size (200),
   _build_type(build_type)
 {
   this->init(_build_type);
@@ -120,7 +122,7 @@ void PointLocatorTree::init (Trees::BuildType build_type)
           START_LOG("init(no master)", "PointLocatorTree");
 
           if (this->_mesh.mesh_dimension() == 3)
-            _tree = new Trees::OctTree (this->_mesh, 200, _build_type);
+            _tree = new Trees::OctTree (this->_mesh, get_target_bin_size(), _build_type);
           else
             {
               // A 1D/2D mesh in 3D space needs special consideration.
@@ -144,13 +146,13 @@ void PointLocatorTree::init (Trees::BuildType build_type)
               }
 
               if (!is_planar_xy)
-                _tree = new Trees::OctTree (this->_mesh, 200, _build_type);
+                _tree = new Trees::OctTree (this->_mesh, get_target_bin_size(), _build_type);
               else
 #endif
 #if LIBMESH_DIM > 1
-                _tree = new Trees::QuadTree (this->_mesh, 200, _build_type);
+                _tree = new Trees::QuadTree (this->_mesh, get_target_bin_size(), _build_type);
 #else
-              _tree = new Trees::BinaryTree (this->_mesh, 200, _build_type);
+              _tree = new Trees::BinaryTree (this->_mesh, get_target_bin_size(), _build_type);
 #endif
             }
 
@@ -187,32 +189,20 @@ void PointLocatorTree::init (Trees::BuildType build_type)
 
 
 
-const Elem* PointLocatorTree::operator() (const Point& p, const unsigned int elem_dim,
-                                          const std::set<subdomain_id_type> *allowed_subdomains) const
+const Elem* PointLocatorTree::operator() (const Point& p, const std::set<subdomain_id_type> *allowed_subdomains) const
 {
   libmesh_assert (this->_initialized);
-
-  // Make sure the mesh has elements of dimension elem_dim
-  if( _mesh.elem_dimensions().find(elem_dim) == _mesh.elem_dimensions().end() )
-    {
-      libMesh::err << "ERROR: There are no elements of dimension " << elem_dim
-                   << " in the mesh to find!" << std::endl;
-      libmesh_error();
-    }
 
   START_LOG("operator()", "PointLocatorTree");
 
   // If we're provided with an allowed_subdomains list and have a cached element, make sure it complies
   if (allowed_subdomains && this->_element && !allowed_subdomains->count(this->_element->subdomain_id())) this->_element = NULL;
 
-  // If we have a cached element, make sure it is of the right dimension
-  if( this->_element && this->_element->dim() != elem_dim ) this->_element = NULL;
-
   // First check the element from last time before asking the tree
   if (this->_element==NULL || !(this->_element->contains_point(p)))
     {
       // ask the tree
-      this->_element = this->_tree->find_element (p,elem_dim,allowed_subdomains);
+      this->_element = this->_tree->find_element (p,allowed_subdomains);
 
       if (this->_element == NULL)
         {
@@ -271,18 +261,8 @@ const Elem* PointLocatorTree::operator() (const Point& p, const unsigned int ele
 }
 
 
-const Elem* PointLocatorTree::perform_linear_search(const Point& p,
-                                                    const std::set<subdomain_id_type> *allowed_subdomains,
-                                                    bool use_close_to_point,
-                                                    Real close_to_point_tolerance) const
-{
-  return this->perform_linear_search(p, this->_mesh.mesh_dimension(), allowed_subdomains,
-                                     use_close_to_point, close_to_point_tolerance);
-}
-
 
 const Elem* PointLocatorTree::perform_linear_search(const Point& p,
-                                                    unsigned int elem_dim,
                                                     const std::set<subdomain_id_type> *allowed_subdomains,
                                                     bool use_close_to_point,
                                                     Real close_to_point_tolerance) const
@@ -303,9 +283,8 @@ const Elem* PointLocatorTree::perform_linear_search(const Point& p,
 
   for ( ; pos != end_pos; ++pos)
     {
-      if ( (!allowed_subdomains ||
-            allowed_subdomains->count((*pos)->subdomain_id())) &&
-           (*pos)->dim() == elem_dim )
+      if (!allowed_subdomains ||
+          allowed_subdomains->count((*pos)->subdomain_id()))
         {
           if(!use_close_to_point)
             {
@@ -357,6 +336,18 @@ void PointLocatorTree::enable_out_of_mesh_mode ()
 void PointLocatorTree::disable_out_of_mesh_mode ()
 {
   _out_of_mesh_mode = false;
+}
+
+
+void PointLocatorTree::set_target_bin_size (unsigned int target_bin_size)
+{
+  _target_bin_size = target_bin_size;
+}
+
+
+unsigned int PointLocatorTree::get_target_bin_size () const
+{
+  return _target_bin_size;
 }
 
 

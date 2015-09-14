@@ -1317,7 +1317,7 @@ void MeshTools::Generation::build_cube(UnstructuredMesh& mesh,
                       boundary_id_type b_id = boundary_info.boundary_id(*el, s);
 
                       // Need to build the full-ordered side!
-                      AutoPtr<Elem> side = base_hex->build_side(s);
+                      UniquePtr<Elem> side = base_hex->build_side(s);
 
                       if ((type == TET4) || (type == TET10))
                         {
@@ -1864,7 +1864,7 @@ void MeshTools::Generation::build_sphere (UnstructuredMesh& mesh,
           for (unsigned int s=0; s<elem->n_sides(); s++)
             if (elem->neighbor(s) == NULL || (mesh.mesh_dimension() == 2 && !flat))
               {
-                AutoPtr<Elem> side(elem->build_side(s));
+                UniquePtr<Elem> side(elem->build_side(s));
 
                 // Pop each point to the sphere boundary
                 for (unsigned int n=0; n<side->n_nodes(); n++)
@@ -1891,7 +1891,7 @@ void MeshTools::Generation::build_sphere (UnstructuredMesh& mesh,
 
 
   // Convert to second-order elements if the user requested it.
-  if (Elem::second_order_equivalent_type(type) == INVALID_ELEM)
+  if (Elem::build(type)->default_order() != FIRST)
     {
       // type is already a second-order, determine if it is the
       // "full-ordered" second-order element, or the "serendipity"
@@ -1911,7 +1911,7 @@ void MeshTools::Generation::build_sphere (UnstructuredMesh& mesh,
           for (unsigned int s=0; s<elem->n_sides(); s++)
             if (elem->neighbor(s) == NULL)
               {
-                AutoPtr<Elem> side(elem->build_side(s));
+                UniquePtr<Elem> side(elem->build_side(s));
 
                 // Pop each point to the sphere boundary
                 for (unsigned int n=0; n<side->n_nodes(); n++)
@@ -1954,7 +1954,8 @@ void MeshTools::Generation::build_sphere (UnstructuredMesh& mesh,
 void MeshTools::Generation::build_extrusion (UnstructuredMesh& mesh,
                                              const MeshBase& cross_section,
                                              const unsigned int nz,
-                                             RealVectorValue extrusion_vector)
+                                             RealVectorValue extrusion_vector,
+                                             QueryElemSubdomainIDBase * elem_subdomain)
 {
   if (!cross_section.n_elem())
     return;
@@ -2136,8 +2137,12 @@ void MeshTools::Generation::build_extrusion (UnstructuredMesh& mesh,
           new_elem->set_id(elem->id() + (k * orig_elem));
           new_elem->processor_id() = elem->processor_id();
 
-          // maintain the subdomain_id
-          new_elem->subdomain_id() = elem->subdomain_id();
+          if (!elem_subdomain)
+            // maintain the subdomain_id
+            new_elem->subdomain_id() = elem->subdomain_id();
+          else
+            // Allow the user to choose new subdomain_ids
+            new_elem->subdomain_id() = elem_subdomain->get_subdomain_for_layer(elem, k);
 
           new_elem = mesh.add_elem(new_elem);
 
@@ -2269,7 +2274,7 @@ void MeshTools::Generation::build_delaunay_square(UnstructuredMesh& mesh,
       for (unsigned int s=0; s<elem->n_sides(); s++)
         if (elem->neighbor(s) == NULL)
           {
-            AutoPtr<Elem> side (elem->build_side(s));
+            UniquePtr<Elem> side (elem->build_side(s));
 
             // Check the location of the side's midpoint.  Since
             // the square has straight sides, the midpoint is not

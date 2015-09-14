@@ -252,6 +252,11 @@ public:
   virtual void reinit_constraints ();
 
   /**
+   * Returns true iff this system has been initialized.
+   */
+  bool is_initialized();
+
+  /**
    * Update the local values to reflect the solution
    * on neighboring processors.
    */
@@ -1507,7 +1512,7 @@ public:
   /**
    * Data structure to hold solution values.
    */
-  AutoPtr<NumericVector<Number> > solution;
+  UniquePtr<NumericVector<Number> > solution;
 
   /**
    * All the values I need to compute my contribution
@@ -1519,7 +1524,7 @@ public:
    * the contents of the \p solution and \p current_local_solution
    * vectors.
    */
-  AutoPtr<NumericVector<Number> > current_local_solution;
+  UniquePtr<NumericVector<Number> > current_local_solution;
 
   /**
    * For time-dependent problems, this is the time t at the beginning of
@@ -1611,6 +1616,14 @@ public:
    * var_num.
    */
   void zero_variable (NumericVector<Number>& v, unsigned int var_num) const;
+
+
+  /**
+   * Returns a writeable reference to a boolean that determines if this system
+   * can be written to file or not.  If set to \p true, then
+   * \p EquationSystems::write will ignore this system.
+   */
+  bool & hide_output() { return _hide_output; }
 
 protected:
 
@@ -1810,7 +1823,7 @@ private:
    * Data structure describing the relationship between
    * nodes, variables, etc... and degrees of freedom.
    */
-  AutoPtr<DofMap> _dof_map;
+  UniquePtr<DofMap> _dof_map;
 
   /**
    * Constant reference to the \p EquationSystems object
@@ -1894,10 +1907,10 @@ private:
   bool _basic_system_only;
 
   /**
-   * \p true when additional vectors do not require immediate
-   * initialization, \p false otherwise.
+   * \p true when additional vectors and variables do not require
+   * immediate initialization, \p false otherwise.
    */
-  bool _can_add_vectors;
+  bool _is_initialized;
 
   /**
    * \p true when \p VariableGroup structures should be automatically
@@ -1930,6 +1943,12 @@ private:
    * it again.
    */
   bool adjoint_already_solved;
+
+  /**
+   * Are we allowed to write this system to file?  If \p _hide_output is
+   * \p true, then \p EquationSystems::write will ignore this system.
+   */
+  bool _hide_output;
 };
 
 
@@ -2004,6 +2023,14 @@ inline
 void System::deactivate ()
 {
   _active = false;
+}
+
+
+
+inline
+bool System::is_initialized ()
+{
+  return _is_initialized;
 }
 
 

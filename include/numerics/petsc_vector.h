@@ -135,14 +135,14 @@ public:
   /**
    * Creates a vector which has the same type, size and partitioning
    * as this vector, but whose data is all zero.  Returns it in an \p
-   * AutoPtr.
+   * UniquePtr.
    */
-  virtual AutoPtr<NumericVector<T> > zero_clone () const;
+  virtual UniquePtr<NumericVector<T> > zero_clone () const;
 
   /**
-   * Creates a copy of this vector and returns it in an \p AutoPtr.
+   * Creates a copy of this vector and returns it in an \p UniquePtr.
    */
-  AutoPtr<NumericVector<T> > clone () const;
+  UniquePtr<NumericVector<T> > clone () const;
 
   /**
    * Change the dimension of the vector to \p N. The reserved memory for
@@ -558,20 +558,24 @@ private:
   /**
    * Pointer to the actual Petsc array of the values of the vector.
    * This pointer is only valid if \p _array_is_present is \p true.
+   * We're using Petsc's VecGetArrayRead() function, which requires a
+   * constant PetscScalar*, but _get_array and _restore_array are
+   * const member functions, so _values also needs to be mutable
+   * (otherwise it is a "const PetscScalar * const" in that context).
    */
-  mutable PetscScalar* _values;
+  mutable const PetscScalar* _values;
 
   /**
    * Queries the array (and the local form if the vector is ghosted)
    * from Petsc.
    */
-  void _get_array(void) const;
+  void _get_array() const;
 
   /**
    * Restores the array (and the local form if the vector is ghosted)
    * to Petsc.
    */
-  void _restore_array(void) const;
+  void _restore_array() const;
 
   /**
    * Type for map that maps global to local ghost cells.
@@ -598,15 +602,15 @@ private:
 
 template <typename T>
 inline
-PetscVector<T>::PetscVector (const Parallel::Communicator &comm_in, const ParallelType ptype)
-  : NumericVector<T>(comm_in, ptype),
-    _array_is_present(false),
-    _first(0),
-    _last(0),
-    _local_form(NULL),
-    _values(NULL),
-    _global_to_local_map(),
-    _destroy_vec_on_exit(true)
+PetscVector<T>::PetscVector (const Parallel::Communicator &comm_in, const ParallelType ptype) :
+  NumericVector<T>(comm_in, ptype),
+  _array_is_present(false),
+  _first(0),
+  _last(0),
+  _local_form(NULL),
+  _values(NULL),
+  _global_to_local_map(),
+  _destroy_vec_on_exit(true)
 {
   this->_type = ptype;
 }
@@ -617,13 +621,13 @@ template <typename T>
 inline
 PetscVector<T>::PetscVector (const Parallel::Communicator &comm_in,
                              const numeric_index_type n,
-                             const ParallelType ptype)
-  : NumericVector<T>(comm_in, ptype),
-    _array_is_present(false),
-    _local_form(NULL),
-    _values(NULL),
-    _global_to_local_map(),
-    _destroy_vec_on_exit(true)
+                             const ParallelType ptype) :
+  NumericVector<T>(comm_in, ptype),
+  _array_is_present(false),
+  _local_form(NULL),
+  _values(NULL),
+  _global_to_local_map(),
+  _destroy_vec_on_exit(true)
 {
   this->init(n, n, false, ptype);
 }
@@ -635,13 +639,13 @@ inline
 PetscVector<T>::PetscVector (const Parallel::Communicator &comm_in,
                              const numeric_index_type n,
                              const numeric_index_type n_local,
-                             const ParallelType ptype)
-  : NumericVector<T>(comm_in, ptype),
-    _array_is_present(false),
-    _local_form(NULL),
-    _values(NULL),
-    _global_to_local_map(),
-    _destroy_vec_on_exit(true)
+                             const ParallelType ptype) :
+  NumericVector<T>(comm_in, ptype),
+  _array_is_present(false),
+  _local_form(NULL),
+  _values(NULL),
+  _global_to_local_map(),
+  _destroy_vec_on_exit(true)
 {
   this->init(n, n_local, false, ptype);
 }
@@ -654,13 +658,13 @@ PetscVector<T>::PetscVector (const Parallel::Communicator &comm_in,
                              const numeric_index_type n,
                              const numeric_index_type n_local,
                              const std::vector<numeric_index_type>& ghost,
-                             const ParallelType ptype)
-  : NumericVector<T>(comm_in, ptype),
-    _array_is_present(false),
-    _local_form(NULL),
-    _values(NULL),
-    _global_to_local_map(),
-    _destroy_vec_on_exit(true)
+                             const ParallelType ptype) :
+  NumericVector<T>(comm_in, ptype),
+  _array_is_present(false),
+  _local_form(NULL),
+  _values(NULL),
+  _global_to_local_map(),
+  _destroy_vec_on_exit(true)
 {
   this->init(n, n_local, ghost, false, ptype);
 }
@@ -672,13 +676,13 @@ PetscVector<T>::PetscVector (const Parallel::Communicator &comm_in,
 template <typename T>
 inline
 PetscVector<T>::PetscVector (Vec v,
-                             const Parallel::Communicator &comm_in)
-  : NumericVector<T>(comm_in, AUTOMATIC),
-    _array_is_present(false),
-    _local_form(NULL),
-    _values(NULL),
-    _global_to_local_map(),
-    _destroy_vec_on_exit(false)
+                             const Parallel::Communicator &comm_in) :
+  NumericVector<T>(comm_in, AUTOMATIC),
+  _array_is_present(false),
+  _local_form(NULL),
+  _values(NULL),
+  _global_to_local_map(),
+  _destroy_vec_on_exit(false)
 {
   this->_vec = v;
   this->_is_closed = true;
@@ -746,8 +750,6 @@ PetscVector<T>::PetscVector (Vec v,
     }
   else
     this->_type = SERIAL;
-
-  this->close();
 }
 
 
@@ -769,6 +771,8 @@ void PetscVector<T>::init (const numeric_index_type n,
                            const bool fast,
                            const ParallelType ptype)
 {
+  parallel_object_only();
+
   PetscErrorCode ierr=0;
   PetscInt petsc_n=static_cast<PetscInt>(n);
   PetscInt petsc_n_local=static_cast<PetscInt>(n_local);
@@ -849,6 +853,8 @@ void PetscVector<T>::init (const numeric_index_type n,
                            const bool fast,
                            const ParallelType libmesh_dbg_var(ptype))
 {
+  parallel_object_only();
+
   PetscErrorCode ierr=0;
   PetscInt petsc_n=static_cast<PetscInt>(n);
   PetscInt petsc_n_local=static_cast<PetscInt>(n_local);
@@ -906,6 +912,8 @@ inline
 void PetscVector<T>::init (const NumericVector<T>& other,
                            const bool fast)
 {
+  parallel_object_only();
+
   // Clear initialized vectors
   if (this->initialized())
     this->clear();
@@ -928,13 +936,9 @@ void PetscVector<T>::init (const NumericVector<T>& other,
 
   this->_type = v._type;
 
-  if (v.size() != 0)
-    {
-      PetscErrorCode ierr = 0;
-
-      ierr = VecDuplicate (v._vec, &this->_vec);
-      LIBMESH_CHKERRABORT(ierr);
-    }
+  // We want to have a valid Vec, even if it's initially of size zero
+  PetscErrorCode ierr = VecDuplicate (v._vec, &this->_vec);
+  LIBMESH_CHKERRABORT(ierr);
 
   if (fast == false)
     this->zero ();
@@ -946,6 +950,8 @@ template <typename T>
 inline
 void PetscVector<T>::close ()
 {
+  parallel_object_only();
+
   this->_restore_array();
 
   PetscErrorCode ierr=0;
@@ -972,6 +978,8 @@ template <typename T>
 inline
 void PetscVector<T>::clear ()
 {
+  parallel_object_only();
+
   if (this->initialized())
     this->_restore_array();
 
@@ -994,6 +1002,8 @@ template <typename T>
 inline
 void PetscVector<T>::zero ()
 {
+  parallel_object_only();
+
   libmesh_assert(this->closed());
 
   this->_restore_array();
@@ -1039,30 +1049,23 @@ void PetscVector<T>::zero ()
 
 template <typename T>
 inline
-AutoPtr<NumericVector<T> > PetscVector<T>::zero_clone () const
+UniquePtr<NumericVector<T> > PetscVector<T>::zero_clone () const
 {
-  AutoPtr<NumericVector<T> > cloned_vector
-    (new PetscVector<T>(this->comm(), this->type()));
-
+  NumericVector<T>* cloned_vector = new PetscVector<T>(this->comm(), this->type());
   cloned_vector->init(*this);
-
-  return cloned_vector;
+  return UniquePtr<NumericVector<T> >(cloned_vector);
 }
 
 
 
 template <typename T>
 inline
-AutoPtr<NumericVector<T> > PetscVector<T>::clone () const
+UniquePtr<NumericVector<T> > PetscVector<T>::clone () const
 {
-  AutoPtr<NumericVector<T> > cloned_vector
-    (new PetscVector<T>(this->comm(), this->type()));
-
+  NumericVector<T>* cloned_vector = new PetscVector<T>(this->comm(), this->type());
   cloned_vector->init(*this, true);
-
   *cloned_vector = *this;
-
-  return cloned_vector;
+  return UniquePtr<NumericVector<T> >(cloned_vector);
 }
 
 
@@ -1259,6 +1262,8 @@ template <typename T>
 inline
 Real PetscVector<T>::min () const
 {
+  parallel_object_only();
+
   this->_restore_array();
 
   PetscErrorCode ierr=0;
@@ -1278,6 +1283,8 @@ template <typename T>
 inline
 Real PetscVector<T>::max() const
 {
+  parallel_object_only();
+
   this->_restore_array();
 
   PetscErrorCode ierr=0;
@@ -1297,6 +1304,8 @@ template <typename T>
 inline
 void PetscVector<T>::swap (NumericVector<T> &other)
 {
+  parallel_object_only();
+
   NumericVector<T>::swap(other);
 
   PetscVector<T>& v = cast_ref<PetscVector<T>&>(other);
@@ -1311,76 +1320,6 @@ void PetscVector<T>::swap (NumericVector<T> &other)
 
 
 
-template <typename T>
-inline
-void PetscVector<T>::_get_array(void) const
-{
-  libmesh_assert (this->initialized());
-  if(!_array_is_present)
-    {
-      PetscErrorCode ierr=0;
-      if(this->type() != GHOSTED)
-        {
-          ierr = VecGetArray(_vec, &_values);
-          LIBMESH_CHKERRABORT(ierr);
-        }
-      else
-        {
-          ierr = VecGhostGetLocalForm (_vec,&_local_form);
-          LIBMESH_CHKERRABORT(ierr);
-          ierr = VecGetArray(_local_form, &_values);
-          LIBMESH_CHKERRABORT(ierr);
-#ifndef NDEBUG
-          PetscInt my_local_size = 0;
-          ierr = VecGetLocalSize(_local_form, &my_local_size);
-          LIBMESH_CHKERRABORT(ierr);
-          _local_size = static_cast<numeric_index_type>(my_local_size);
-#endif
-        }
-
-      { // cache ownership range
-        PetscInt petsc_first=0, petsc_last=0;
-        ierr = VecGetOwnershipRange (_vec, &petsc_first, &petsc_last);
-        LIBMESH_CHKERRABORT(ierr);
-        _first = static_cast<numeric_index_type>(petsc_first);
-        _last = static_cast<numeric_index_type>(petsc_last);
-      }
-
-      _array_is_present = true;
-    }
-}
-
-
-
-template <typename T>
-inline
-void PetscVector<T>::_restore_array(void) const
-{
-  libmesh_assert (this->initialized());
-  if(_array_is_present)
-    {
-      PetscErrorCode ierr=0;
-      if(this->type() != GHOSTED)
-        {
-          ierr = VecRestoreArray (_vec, &_values);
-          LIBMESH_CHKERRABORT(ierr);
-          _values = NULL;
-        }
-      else
-        {
-          ierr = VecRestoreArray (_local_form, &_values);
-          LIBMESH_CHKERRABORT(ierr);
-          _values = NULL;
-          ierr = VecGhostRestoreLocalForm (_vec,&_local_form);
-          LIBMESH_CHKERRABORT(ierr);
-          _local_form = NULL;
-#ifndef NDEBUG
-          _local_size = 0;
-#endif
-        }
-      _array_is_present = false;
-    }
-}
 
 
 #ifdef LIBMESH_HAVE_CXX11

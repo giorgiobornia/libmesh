@@ -24,6 +24,7 @@
 // Local Includes -----------------------------------
 #include "libmesh/libmesh_common.h"
 #include "libmesh/compare_types.h" // remove_const
+#include "libmesh/auto_ptr.h"
 
 namespace libMesh
 {
@@ -69,7 +70,8 @@ public:
    * This is included for backward compatibility, but will be
    * deprecated in some classes and not implemented in others.
    */
-  virtual void operator= (T * /* new_ptr */) { libmesh_error(); }
+  virtual ParameterAccessor<T> &
+  operator= (T * /* new_ptr */) { libmesh_error(); return *this; }
 
   /**
    * Proxy: for backward compatibility, we allow codes to treat a
@@ -80,6 +82,13 @@ public:
   ParameterProxy<T> operator* () { return ParameterProxy<T>(*this); }
 
   ConstParameterProxy<T> operator* () const { return ConstParameterProxy<T>(*this); }
+
+  /**
+   * Returns a new copy of the accessor.  The new copy should probably
+   * be as shallow as possible, but should still access the same
+   * parameter.
+   */
+  virtual UniquePtr<ParameterAccessor<T> > clone() const = 0;
 };
 
 template <typename T=Number>

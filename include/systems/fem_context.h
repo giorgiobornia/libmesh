@@ -220,9 +220,11 @@ public:
 
   /**
    * Accessor for interior finite element object for variable var for
-   * the largest dimension in the mesh. If you have lower dimensional elements
-   * in the mesh and need to query for those FE objects, use the alternative
-   * get_element_fe method.
+   * the largest dimension in the mesh. We default to the largest mesh dim
+   * because this method may be called before the Elem* is set in the FEMContext,
+   * e.g. in FEMSystem::init_context (or a subclass).
+   * If you have lower dimensional elements in the mesh and need to query for
+   * those FE objects, use the alternative get_element_fe method.
    */
   template<typename OutputShape>
   void get_element_fe( unsigned int var, FEGenericBase<OutputShape> *& fe ) const
@@ -230,9 +232,11 @@ public:
 
   /**
    * Accessor for interior finite element object for scalar-valued variable var
-   * for the largest dimension in the mesh. If you have lower dimensional elements
-   * in the mesh and need to query for those FE objects, use the alternative
-   * get_element_fe method.
+   * for the largest dimension in the mesh. We default to the largest mesh dim
+   * because this method may be called before the Elem* is set in the FEMContext,
+   * e.g. in FEMSystem::init_context (or a subclass).
+   * If you have lower dimensional elements in the mesh and need to query for
+   * those FE objects, use the alternative get_element_fe method.
    */
   FEBase* get_element_fe( unsigned int var ) const
   { return this->get_element_fe(var,this->get_dim()); }
@@ -253,9 +257,11 @@ public:
 
   /**
    * Accessor for edge/face (2D/3D) finite element object for variable var
-   * for the largest dimension in the mesh. If you have lower dimensional elements
-   * in the mesh and need to query for those FE objects, use the alternative
-   * get_side_fe method.
+   * for the largest dimension in the mesh. We default to the largest mesh dim
+   * because this method may be called before the Elem* is set in the FEMContext,
+   * e.g. in FEMSystem::init_context (or a subclass).
+   * If you have lower dimensional elements in the mesh and need to query for
+   * those FE objects, use the alternative get_side_fe method.
    */
   template<typename OutputShape>
   void get_side_fe( unsigned int var, FEGenericBase<OutputShape> *& fe ) const
@@ -263,9 +269,11 @@ public:
 
   /**
    * Accessor for side finite element object for scalar-valued variable var
-   * for the largest dimension in the mesh. If you have lower dimensional elements
-   * in the mesh and need to query for those FE objects, use the alternative
-   * get_side_fe method.
+   * for the largest dimension in the mesh. We default to the largest mesh dim
+   * because this method may be called before the Elem* is set in the FEMContext,
+   * e.g. in FEMSystem::init_context (or a subclass).
+   * If you have lower dimensional elements in the mesh and need to query for
+   * those FE objects, use the alternative get_side_fe method.
    */
   FEBase* get_side_fe( unsigned int var ) const
   { return this->get_side_fe(var,this->get_dim()); }
@@ -444,6 +452,31 @@ public:
   template<typename OutputType>
   void point_rate(unsigned int var, const Point &p,
                   OutputType& u) const;
+
+  /**
+   * Returns the second time derivative (acceleration) of the solution variable
+   * \p var at the quadrature point \p qp on the current element
+   * interior.
+   */
+  template<typename OutputType>
+  void interior_accel(unsigned int var, unsigned int qp,
+                      OutputType& u) const;
+
+  /**
+   * Returns the second time derivative (acceleration) of the solution variable
+   * \p var at the quadrature point \p qp on the current element side.
+   */
+  template<typename OutputType>
+  void side_accel(unsigned int var, unsigned int qp,
+                  OutputType& u) const;
+
+  /**
+   * Returns the second time derivative (acceleration) of the solution variable
+   * \p var at the physical point \p p on the current element.
+   */
+  template<typename OutputType>
+  void point_accel(unsigned int var, const Point &p,
+                   OutputType& u) const;
 
   /**
    * Returns the value of the fixed_solution variable \p var at the quadrature
@@ -744,6 +777,12 @@ public:
   unsigned char get_elem_dim() const
   { return _elem_dim; }
 
+  /**
+   * @returns set of dimensions of elements present in the mesh at
+   * context initialization.
+   */
+  const std::set<unsigned char>& elem_dimensions() const
+  { return _elem_dims; }
 
   /**
    * Uses the coordinate data specified by mesh_*_position configuration
@@ -784,7 +823,7 @@ protected:
    * Helper function to reduce some code duplication in the *_point_* methods.
    */
   template<typename OutputShape>
-  AutoPtr<FEGenericBase<OutputShape> > build_new_fe( const FEGenericBase<OutputShape>* fe, const Point &p ) const;
+  UniquePtr<FEGenericBase<OutputShape> > build_new_fe( const FEGenericBase<OutputShape>* fe, const Point &p ) const;
 
   /**
    * Helper function to promote accessor usage
@@ -802,20 +841,50 @@ public:
 
 protected:
   /**
+   * Helper nested class for C++03-compatible "template typedef"
+   */
+  template <typename OutputType>
+  struct FENeeded
+  {
+    // Rank decrementer helper types
+    typedef typename TensorTools::DecrementRank<OutputType>::type Rank1Decrement;
+    typedef typename TensorTools::DecrementRank<Rank1Decrement>::type Rank2Decrement;
+
+    // Typedefs for "Value getter" function pointer
+    typedef typename TensorTools::MakeReal<OutputType>::type value_shape;
+    typedef FEGenericBase<value_shape> value_base;
+    typedef void (FEMContext::*value_getter) (unsigned int, value_base *&, unsigned char) const;
+
+    // Typedefs for "Grad getter" function pointer
+    typedef typename TensorTools::MakeReal<Rank1Decrement>::type grad_shape;
+    typedef FEGenericBase<grad_shape> grad_base;
+    typedef void (FEMContext::*grad_getter) (unsigned int, grad_base *&, unsigned char) const;
+
+    // Typedefs for "Hessian getter" function pointer
+    typedef typename TensorTools::MakeReal<Rank2Decrement>::type hess_shape;
+    typedef FEGenericBase<hess_shape> hess_base;
+    typedef void (FEMContext::*hess_getter) (unsigned int, hess_base *&, unsigned char) const;
+  };
+
+
+
+  /**
    * Helper function to reduce some code duplication in the
    * *interior_value methods.
    */
   template<typename OutputType,
+           typename FENeeded<OutputType>::value_getter fe_getter,
            diff_subsolution_getter subsolution_getter>
-  void some_interior_value(unsigned int var, unsigned int qp, OutputType& u) const;
+  void some_value(unsigned int var, unsigned int qp, OutputType& u) const;
 
   /**
    * Helper function to reduce some code duplication in the
    * *interior_gradient methods.
    */
   template<typename OutputType,
+           typename FENeeded<OutputType>::grad_getter fe_getter,
            diff_subsolution_getter subsolution_getter>
-  void some_interior_gradient(unsigned int var, unsigned int qp, OutputType& u) const;
+  void some_gradient(unsigned int var, unsigned int qp, OutputType& u) const;
 
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
   /**
@@ -823,18 +892,10 @@ protected:
    * *interior_hessian methods.
    */
   template<typename OutputType,
+           typename FENeeded<OutputType>::hess_getter fe_getter,
            diff_subsolution_getter subsolution_getter>
-  void some_interior_hessian(unsigned int var, unsigned int qp, OutputType& u) const;
+  void some_hessian(unsigned int var, unsigned int qp, OutputType& u) const;
 #endif
-
-  /**
-   * Helper function to reduce some code duplication in the
-   * *side_value methods.
-   */
-  template<typename OutputType,
-           diff_subsolution_getter subsolution_getter>
-  void some_side_value(unsigned int var, unsigned int qp, OutputType& u) const;
-
 
   /**
    * Finite element objects for each variable's interior, sides and edges.
@@ -876,6 +937,12 @@ protected:
    * Cached dimension of this->_elem.
    */
   unsigned char _elem_dim;
+
+  /**
+   * Cached dimensions of elements in the mesh, plus dimension 0 if
+   * SCALAR variables are in use.
+   */
+  std::set<unsigned char> _elem_dims;
 
   /**
    * Quadrature rule for element interior.

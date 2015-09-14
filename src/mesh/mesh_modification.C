@@ -30,7 +30,6 @@
 #include "libmesh/face_tri3.h"
 #include "libmesh/face_tri6.h"
 #include "libmesh/libmesh_logging.h"
-#include "libmesh/location_maps.h"
 #include "libmesh/mesh_communication.h"
 #include "libmesh/mesh_modification.h"
 #include "libmesh/mesh_tools.h"
@@ -146,7 +145,7 @@ void MeshTools::Modification::redistribute (MeshBase& mesh,
   DenseVector<Real> output_vec(LIBMESH_DIM);
 
   // FIXME - we should thread this later.
-  AutoPtr<FunctionBase<Real> > myfunc = mapfunc.clone();
+  UniquePtr<FunctionBase<Real> > myfunc = mapfunc.clone();
 
   MeshBase::node_iterator       it  = mesh.nodes_begin();
   const MeshBase::node_iterator end = mesh.nodes_end();
@@ -611,7 +610,7 @@ void UnstructuredMesh::all_second_order (const bool full_ordered)
 
           // does this set of vertices already has a mid-node added?
           std::pair<std::map<std::vector<dof_id_type>, Node*>::iterator,
-            std::map<std::vector<dof_id_type>, Node*>::iterator>
+                    std::map<std::vector<dof_id_type>, Node*>::iterator>
             pos = adj_vertices_to_so_nodes.equal_range (adjacent_vertices_ids);
 
           // no, not added yet
@@ -704,11 +703,7 @@ void UnstructuredMesh::all_second_order (const bool full_ordered)
   // the ids of nodes touching remote elements may be inconsistent.
   // Fix them.
   if (!this->is_serial())
-    {
-      LocationMap<Node> loc_map;
-      MeshCommunication().make_nodes_parallel_consistent
-        (*this, loc_map);
-    }
+    MeshCommunication().make_nodes_parallel_consistent (*this);
 
   // renumber nodes, elements etc
   this->prepare_for_use(/*skip_renumber =*/ false);
@@ -1240,7 +1235,7 @@ void MeshTools::Modification::smooth (MeshBase& mesh,
                         if ((elem->neighbor(s) != NULL) &&
                             (elem->id() > elem->neighbor(s)->id()) )
                           {
-                            AutoPtr<Elem> side(elem->build_side(s));
+                            UniquePtr<Elem> side(elem->build_side(s));
 
                             Node* node0 = side->get_node(0);
                             Node* node1 = side->get_node(1);

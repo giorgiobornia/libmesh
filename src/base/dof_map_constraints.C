@@ -82,7 +82,7 @@ public:
     const Variable &var_description = _dof_map.variable(_variable_number);
 
 #ifdef LIBMESH_ENABLE_PERIODIC
-    AutoPtr<PointLocatorBase> point_locator;
+    UniquePtr<PointLocatorBase> point_locator;
     const bool have_periodic_boundaries =
       !_periodic_boundaries.empty();
     if (have_periodic_boundaries && !range.empty())
@@ -145,7 +145,7 @@ public:
   void operator()(const ConstElemRange &range) const
   {
 #ifdef LIBMESH_ENABLE_PERIODIC
-    AutoPtr<PointLocatorBase> point_locator;
+    UniquePtr<PointLocatorBase> point_locator;
     bool have_periodic_boundaries = !_periodic_boundaries.empty();
     if (have_periodic_boundaries && !range.empty())
       point_locator = _mesh.sub_point_locator();
@@ -279,7 +279,7 @@ private:
         if (c)
           return g_fem->component(*c, i, p, time);
         else
-          return std::numeric_limits<Real>::quiet_NaN();
+          return std::numeric_limits<Number>::quiet_NaN();
       }
     return g->component(i, p, time);
   }
@@ -335,11 +335,11 @@ private:
       variable.first_scalar_number();
 
     // Get FE objects of the appropriate type
-    AutoPtr<FEGenericBase<OutputType> > fe = FEGenericBase<OutputType>::build(dim, fe_type);
+    UniquePtr<FEGenericBase<OutputType> > fe = FEGenericBase<OutputType>::build(dim, fe_type);
 
     // Prepare variables for projection
-    AutoPtr<QBase> qedgerule (fe_type.default_quadrature_rule(1));
-    AutoPtr<QBase> qsiderule (fe_type.default_quadrature_rule(dim-1));
+    UniquePtr<QBase> qedgerule (fe_type.default_quadrature_rule(1));
+    UniquePtr<QBase> qsiderule (fe_type.default_quadrature_rule(dim-1));
 
     // The values of the shape functions at the quadrature
     // points
@@ -351,7 +351,7 @@ private:
 
     const FEContinuity cont = fe->get_continuity();
 
-    if (cont == C_ONE)
+    if ( (cont == C_ONE) && (fe_type.family != SUBDIVISION) )
       {
         // We'll need gradient data for a C1 projection
         libmesh_assert(g || g_fem);
@@ -383,13 +383,13 @@ private:
     // If our supplied functions require a FEMContext, and if we have
     // an initialized solution to use with that FEMContext, then
     // create one
-    AutoPtr<FEMContext> context;
+    UniquePtr<FEMContext> context;
     if (f_fem)
       {
         libmesh_assert(f_system);
         if (f_system->current_local_solution->initialized())
           {
-            context = AutoPtr<FEMContext>(new FEMContext(*f_system));
+            context = UniquePtr<FEMContext>(new FEMContext(*f_system));
             f_fem->init_context(*context);
             if (g_fem)
               g_fem->init_context(*context);
@@ -528,7 +528,7 @@ private:
               }
             // Assume that C_ZERO elements have a single nodal
             // value shape function
-            else if (cont == C_ZERO)
+            else if ( (cont == C_ZERO) || (fe_type.family == SUBDIVISION) )
               {
                 libmesh_assert_equal_to (nc, n_vec_dim);
                 for( unsigned int c = 0; c < n_vec_dim; c++ )
@@ -702,7 +702,7 @@ private:
               for (unsigned int qp=0; qp<n_qp; qp++)
                 {
                   // solution at the quadrature point
-                  OutputNumber fineval = 0;
+                  OutputNumber fineval(0);
                   libMesh::RawAccessor<OutputNumber> f_accessor( fineval, dim );
 
                   for( unsigned int c = 0; c < n_vec_dim; c++)
@@ -824,7 +824,7 @@ private:
               for (unsigned int qp=0; qp<n_qp; qp++)
                 {
                   // solution at the quadrature point
-                  OutputNumber fineval = 0;
+                  OutputNumber fineval(0);
                   libMesh::RawAccessor<OutputNumber> f_accessor( fineval, dim );
 
                   for( unsigned int c = 0; c < n_vec_dim; c++)
@@ -1036,6 +1036,7 @@ void DofMap::create_dof_constraints(const MeshBase& mesh, Real time)
   // We might get constraint equations from AMR hanging nodes in 2D/3D
   // or from boundary conditions in any dimension
   const bool possible_local_constraints = false
+    || !mesh.n_elem()
 #ifdef LIBMESH_ENABLE_AMR
     || mesh.mesh_dimension() > 1
 #endif
@@ -1916,7 +1917,7 @@ void DofMap::enforce_constraints_exactly (const System &system,
 
   NumericVector<Number> *v_local  = NULL; // will be initialized below
   NumericVector<Number> *v_global = NULL; // will be initialized below
-  AutoPtr<NumericVector<Number> > v_built;
+  UniquePtr<NumericVector<Number> > v_built;
   if (v->type() == SERIAL)
     {
       v_built = NumericVector<Number>::build(this->comm());
@@ -2014,7 +2015,7 @@ void DofMap::enforce_adjoint_constraints_exactly
 
   NumericVector<Number> *v_local  = NULL; // will be initialized below
   NumericVector<Number> *v_global = NULL; // will be initialized below
-  AutoPtr<NumericVector<Number> > v_built;
+  UniquePtr<NumericVector<Number> > v_built;
   if (v.type() == SERIAL)
     {
       v_built = NumericVector<Number>::build(this->comm());
@@ -2442,11 +2443,11 @@ void DofMap::build_constraint_matrix_and_vector
       if ((C.n() == Cnew.m()) &&          // If the constraint matrix
           (Cnew.n() == elem_dofs.size())) // is constrained...
         {
-          C.right_multiply(Cnew);
-
           // If x = Cy + h and y = Dz + g
           // Then x = (CD)z + (Cg + h)
           C.vector_mult_add(H, 1, Hnew);
+
+          C.right_multiply(Cnew);
         }
 
       libmesh_assert_equal_to (C.n(), elem_dofs.size());

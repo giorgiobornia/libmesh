@@ -123,6 +123,12 @@ public:
   Point & point (const unsigned int i);
 
   /**
+   * @returns the \p Point associated with local \p Node \p i,
+   * in master element rather than physical coordinates.
+   */
+  virtual Point master_point (const unsigned int i) const = 0;
+
+  /**
    * @returns the global id number of local \p Node \p i.
    */
   dof_id_type node (const unsigned int i) const;
@@ -316,34 +322,64 @@ public:
   bool contains_edge_of(const Elem *e) const;
 
   /**
-   * This function finds all elements (including this one) which
-   * touch the current active element at the specified point, which
-   * should be a point in the current element.
+   * This function finds all active elements (including this one)
+   * which are in the same manifold as this element and which touch
+   * the current active element at the specified point, which should
+   * be a point in the current element.
+   *
+   * Elements which are not "in the same manifold" (e.g. the
+   * interior_parent of a boundary element) will not be found with
+   * this method.
+   *
+   * Elements which overlap the specified point but which are only
+   * connected to the current element via elements which do not
+   * overlap that point (e.g. in a folded or tangled mesh) are not
+   * considered to "touch" the current element and will not be found
+   * with this method.
    */
   void find_point_neighbors(const Point &p,
                             std::set<const Elem *> &neighbor_set) const;
 
   /**
-   * This function finds all elements (including this one) which
-   * touch the current element at any point
+   * This function finds all active elements (including this one) in
+   * the same manifold as this element which touch this active element
+   * at any point
    */
   void find_point_neighbors(std::set<const Elem *> &neighbor_set) const;
 
   /**
-   * This function finds all active elements which touch the current
-   * active element along the specified edge defined by the two points
-   * \p p1 and \p p2
+   * This function finds all active elements (including this one) in
+   * the same manifold as start_elem (which must be active and must
+   * touch this element) which touch this element at any point
+   */
+  void find_point_neighbors(std::set<const Elem *> &neighbor_set,
+                            const Elem * start_elem) const;
+
+  /**
+   * This function finds all active elements in the same manifold as
+   * this element which touch the current active element along the
+   * whole edge defined by the two points \p p1 and \p p2
    */
   void find_edge_neighbors(const Point& p1,
                            const Point& p2,
                            std::set<const Elem *> &neighbor_set) const;
 
   /**
-   * This function finds all active elements which touch the current
-   * active element along any edge (more precisely, at at least two
-   * points).
+   * This function finds all active elements in the same manifold as
+   * this element which touch the current active element along any
+   * edge (more precisely, at at least two points).
+   *
+   * In this case, elements are included even if they do not touch a
+   * *whole* edge of this element.
    */
   void find_edge_neighbors(std::set<const Elem *> &neighbor_set) const;
+
+  /**
+   * This function finds all active elements (*not* including this
+   * one) in the parent manifold of this element whose intersection
+   * with this element has non-zero measure.
+   */
+  void find_interior_neighbors(std::set<const Elem *> &neighbor_set) const;
 
   /**
    * Resets this element's neighbors' appropriate neighbor pointers
@@ -423,6 +459,14 @@ public:
   virtual unsigned int n_nodes () const = 0;
 
   /**
+   * @returns the number of nodes the given child of this element
+   * contains.  Except in odd cases like pyramid refinement this will
+   * be the same as the number of nodes in the parent element.
+   */
+  virtual unsigned int n_nodes_in_child (unsigned int /*c*/) const
+  { return this->n_nodes(); }
+
+  /**
    * This array maps the integer representation of the \p ElemType enum
    * to the number of sides on the element.
    */
@@ -478,6 +522,18 @@ public:
    * @returns true iff the specified (local) node number is a vertex.
    */
   virtual bool is_vertex(const unsigned int i) const = 0;
+
+  /**
+   * @returns true iff the specified child has a vertex at the
+   * specified (child-local) node number.
+   * Except in odd cases like pyramid refinement the child will have
+   * the same local structure as the parent element.
+   * same as the parent element.
+   */
+  virtual unsigned int is_vertex_on_child (unsigned int /*c*/,
+                                           unsigned int i) const
+  { return this->is_vertex(i); }
+
 
   /**
    * @returns true iff the specified (local) node number is an edge.
@@ -544,7 +600,7 @@ public:
    * you want the full-ordered face (i.e. a 9-noded quad face for a 27-noded
    * hexahedral) use the build_side method.
    */
-  virtual AutoPtr<Elem> side (const unsigned int i) const = 0;
+  virtual UniquePtr<Elem> side (const unsigned int i) const = 0;
 
   /**
    * Creates an element coincident with side \p i. The element returned is
@@ -552,7 +608,7 @@ public:
    * build_side(0) on a 20-noded hex will build a 8-noded quadrilateral
    * coincident with face 0 and pass back the pointer.
    *
-   * A \p AutoPtr<Elem> is returned to prevent a memory leak.
+   * A \p UniquePtr<Elem> is returned to prevent a memory leak.
    * This way the user need not remember to delete the object.
    *
    * The second argument, which is true by default, specifies that a
@@ -562,18 +618,18 @@ public:
    * If you really need a full-ordered, non-proxy side object, call
    * this function with proxy=false.
    */
-  virtual AutoPtr<Elem> build_side (const unsigned int i,
-                                    bool proxy=true) const = 0;
+  virtual UniquePtr<Elem> build_side (const unsigned int i,
+                                      bool proxy=true) const = 0;
 
   /**
    * Creates an element coincident with edge \p i. The element returned is
    * full-ordered.  For example, calling build_edge(0) on a 20-noded hex will
    * build a 3-noded edge coincident with edge 0 and pass back the pointer.
    *
-   * A \p AutoPtr<Elem> is returned to prevent a memory leak.
+   * A \p UniquePtr<Elem> is returned to prevent a memory leak.
    * This way the user need not remember to delete the object.
    */
-  virtual AutoPtr<Elem> build_edge (const unsigned int i) const = 0;
+  virtual UniquePtr<Elem> build_edge (const unsigned int i) const = 0;
 
   /**
    * @returns the default approximation order for this element type.
@@ -750,8 +806,14 @@ public:
    * were extracted.  We can easily do that for the level-0 manifold elements
    * by storing the D-dimensional parent.  This method provides access to that
    * element.
+   *
+   * This method is not safe to call if this->dim() == LIBMESH_DIM; in
+   * such cases no data storage for an interior parent pointer has
+   * been allocated.
    */
   const Elem* interior_parent () const;
+
+  Elem* interior_parent ();
 
   /**
    * Sets the pointer to the element's interior_parent.
@@ -1141,22 +1203,57 @@ public:
   /**
    * Build an element of type \p type.  Since this method
    * allocates memory the new \p Elem is returned in a
-   * \p AutoPtr<>
+   * \p UniquePtr<>
    */
-  static AutoPtr<Elem> build (const ElemType type,
-                              Elem* p=NULL);
+  static UniquePtr<Elem> build (const ElemType type,
+                                Elem* p=NULL);
 
 #ifdef LIBMESH_ENABLE_AMR
+
+  /**
+   * Returns the local node id on the parent which corresponds to
+   * node n of child c, or returns invalid_uint if no such parent node
+   * exists.
+   */
+  virtual unsigned int as_parent_node (unsigned int c,
+                                       unsigned int n) const;
+
+  /**
+   * Returns all the pairs of nodes (indexed by local node id) which
+   * should bracket node n of child c.
+   */
+  virtual
+  const std::vector<std::pair<unsigned char, unsigned char> >&
+  parent_bracketing_nodes(unsigned int c,
+                          unsigned int n) const;
+
+  /**
+   * Returns all the pairs of nodes (indexed by global node id) which
+   * should bracket node n of child c.
+   */
+  virtual
+  const std::vector<std::pair<dof_id_type, dof_id_type> >
+  bracketing_nodes(unsigned int c,
+                   unsigned int n) const;
+
 
   /**
    * Matrix that transforms the parents nodes into the children's
    * nodes
    */
-  virtual float embedding_matrix (const unsigned int i,
-                                  const unsigned int j,
-                                  const unsigned int k) const = 0;
+  virtual float embedding_matrix (const unsigned int child_num,
+                                  const unsigned int child_node_num,
+                                  const unsigned int parent_node_num) const = 0;
 
-#endif
+  /**
+   * Some element types may use a different embedding matrix for
+   * different elements.  But we may want to cache data based on that
+   * matrix.  So we return a "version number" that can be used to
+   * identify which matrix is in use.
+   */
+  virtual unsigned int embedding_matrix_version () const { return 0; }
+
+#endif // LIBMESH_ENABLE_AMR
 
 
 protected:
@@ -1190,9 +1287,39 @@ protected:
                                   dof_id_type n1,
                                   dof_id_type n2,
                                   dof_id_type n3);
-  //-------------------------------------------------------
 
 
+#ifdef LIBMESH_ENABLE_AMR
+
+  /**
+   * Elem subclasses which don't do their own bracketing node
+   * calculations will need to supply a static cache, since the
+   * default calculation is slow.
+   */
+  virtual
+  std::vector<std::vector<std::vector<std::vector<std::pair<unsigned char, unsigned char> > > > > &
+  _get_bracketing_node_cache() const
+  {
+    static std::vector<std::vector<std::vector<std::vector<std::pair<unsigned char, unsigned char> > > > > c;
+    libmesh_error();
+    return c;
+  }
+
+  /**
+   * Elem subclasses which don't do their own child-to-parent node
+   * calculations will need to supply a static cache, since the
+   * default calculation is slow.
+   */
+  virtual
+  std::vector<std::vector<std::vector<signed char> > > &
+  _get_parent_indices_cache() const
+  {
+    static std::vector<std::vector<std::vector<signed char> > > c;
+    libmesh_error();
+    return c;
+  }
+
+#endif // LIBMESH_ENABLE_AMR
 
 public:
 
@@ -1722,45 +1849,6 @@ const Elem* Elem::top_parent () const
 
 
 inline
-const Elem* Elem::interior_parent () const
-{
-  // interior parents make no sense for full-dimensional elements.
-  libmesh_assert_less (this->dim(), LIBMESH_DIM);
-
-  // // and they [USED TO BE] only good for level-0 elements
-  // if (this->level() != 0)
-  // return this->parent()->interior_parent();
-
-  // We store the interior_parent pointer after both the parent
-  // neighbor and neighbor pointers
-  Elem *interior_p = _elemlinks[1+this->n_sides()];
-
-  // If we have an interior_parent, it had better be the
-  // one-higher-dimensional interior element we are looking for.
-  libmesh_assert (!interior_p ||
-                  interior_p->dim() == (this->dim()+1));
-
-  return interior_p;
-}
-
-
-
-inline
-void Elem::set_interior_parent (Elem *p)
-{
-  // interior parents make no sense for full-dimensional elements.
-  libmesh_assert_less (this->dim(), LIBMESH_DIM);
-
-  // this had better be a one-higher-dimensional interior element
-  libmesh_assert (!p ||
-                  p->dim() == (this->dim()+1));
-
-  _elemlinks[1+this->n_sides()] = p;
-}
-
-
-
-inline
 unsigned int Elem::level() const
 {
 #ifdef LIBMESH_ENABLE_AMR
@@ -2071,7 +2159,7 @@ public:
   // unary op*
   Elem*& operator*() const
   {
-    // Set the AutoPtr
+    // Set the UniquePtr
     this->_update_side_ptr();
 
     // Return a reference to _side_ptr
@@ -2108,22 +2196,22 @@ private:
   // This has to be called before dereferencing.
   void _update_side_ptr() const
   {
-    // Construct new side, store in AutoPtr
+    // Construct new side, store in UniquePtr
     this->_side = this->_parent->build_side(this->_side_number);
 
     // Also set our internal naked pointer.  Memory is still owned
-    // by the AutoPtr.
+    // by the UniquePtr.
     this->_side_ptr = _side.get();
   }
 
-  // AutoPtr to the actual side, handles memory management for
+  // UniquePtr to the actual side, handles memory management for
   // the sides which are created during the course of iteration.
-  mutable AutoPtr<Elem> _side;
+  mutable UniquePtr<Elem> _side;
 
   // Raw pointer needed to facilitate passing back to the user a
   // reference to a non-temporary raw pointer in order to conform to
   // the variant_filter_iterator interface.  It points to the same
-  // thing the AutoPtr "_side" above holds.  What happens if the user
+  // thing the UniquePtr "_side" above holds.  What happens if the user
   // calls delete on the pointer passed back?  Well, this is an issue
   // which is not addressed by the iterators in libMesh.  Basically it
   // is a bad idea to ever call delete on an iterator from the library.
@@ -2165,9 +2253,7 @@ Elem::SideIter Elem::_last_side()
  * The definition of the struct used for iterating over sides.
  */
 struct
-Elem::side_iterator :
-variant_filter_iterator<Elem::Predicate,
-                        Elem*>
+Elem::side_iterator : variant_filter_iterator<Elem::Predicate, Elem*>
 {
   // Templated forwarding ctor -- forwards to appropriate variant_filter_iterator ctor
   template <typename PredType, typename IterType>
@@ -2180,6 +2266,26 @@ variant_filter_iterator<Elem::Predicate,
 
 
 } // namespace libMesh
+
+
+// Helper function for default caches in Elem subclases
+
+#define LIBMESH_ENABLE_TOPOLOGY_CACHES                                  \
+  virtual                                                               \
+  std::vector<std::vector<std::vector<std::vector<std::pair<unsigned char, unsigned char> > > > > & \
+  _get_bracketing_node_cache() const                                    \
+  {                                                                     \
+    static std::vector<std::vector<std::vector<std::vector<std::pair<unsigned char, unsigned char> > > > > c; \
+    return c;                                                           \
+  }                                                                     \
+                                                                        \
+  virtual                                                               \
+  std::vector<std::vector<std::vector<signed char> > > &                \
+  _get_parent_indices_cache() const                                     \
+  {                                                                     \
+    static std::vector<std::vector<std::vector<signed char> > > c;      \
+    return c;                                                           \
+  }
 
 
 #endif // LIBMESH_ELEM_H

@@ -58,7 +58,16 @@ public:
    * Reseater: change the location of the parameter we access.
    * This is included for backward compatibility, but is deprecated.
    */
-  virtual void operator= (T * new_ptr) { libmesh_deprecated(); _ptr = new_ptr; }
+  virtual ParameterAccessor<T> &
+  operator= (T * new_ptr) { libmesh_deprecated(); _ptr = new_ptr; return *this; }
+
+  /**
+   * Returns a new copy of the accessor.
+   */
+  virtual UniquePtr<ParameterAccessor<T> > clone() const {
+    return UniquePtr<ParameterAccessor<T> >
+      (new ParameterPointer<T>(_ptr));
+  }
 
 private:
   T* _ptr;

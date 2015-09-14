@@ -34,6 +34,15 @@ using namespace libMesh;
   TEST_ONE_ORDER(qtype, EIGHTH, mymin(8,maxorder)); \
   TEST_ONE_ORDER(qtype, NINTH, mymin(9,maxorder));
 
+#define LIBMESH_ASSERT_REALS_EQUAL(first, second, tolerance) \
+  if (std::abs(first-second) >= tolerance) \
+    { \
+      std::cerr << "first = " << first << std::endl; \
+      std::cerr << "second = " << second << std::endl; \
+      std::cerr << "error = " << std::abs(first-second) << std::endl; \
+      std::cerr << "tolerance = " << tolerance << std::endl; \
+    } \
+  CPPUNIT_ASSERT (std::abs(first-second) < tolerance)
 
 class QuadratureTest : public CppUnit::TestCase {
 public:
@@ -86,10 +95,12 @@ public:
 
 private:
 
+  Real quadrature_tolerance;
+
 
 public:
   void setUp ()
-  {}
+  { quadrature_tolerance = TOLERANCE * std::sqrt(TOLERANCE); }
 
   void tearDown ()
   {}
@@ -105,9 +116,9 @@ public:
 
         for (int order=0; order<7; ++order)
           {
-            AutoPtr<QBase> qrule = QBase::build(QMONOMIAL,
-                                                dims[i],
-                                                static_cast<Order>(order));
+            UniquePtr<QBase> qrule = QBase::build(QMONOMIAL,
+                                                  dims[i],
+                                                  static_cast<Order>(order));
             qrule->init(elem_type[i]);
 
             // In 3D, max(z_power)==order, in 2D max(z_power)==0
@@ -146,10 +157,8 @@ public:
 
                     Real exact = exact_x*exact_y*exact_z;
 
-                    // std::cout << "Exact solution is " << exact << std::endl;
-
                     // Make sure that the quadrature solution matches the exact solution
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(exact, sumq, TOLERANCE*TOLERANCE);
+                    LIBMESH_ASSERT_REALS_EQUAL(exact, sumq, quadrature_tolerance);
                   }
           } // end for (order)
       } // end for (i)
@@ -163,9 +172,9 @@ public:
     for (int qt=0; qt<3; ++qt)
       for (int order=0; order<7; ++order)
         {
-          AutoPtr<QBase> qrule = QBase::build(qtype[qt],
-                                              /*dim=*/3,
-                                              static_cast<Order>(order));
+          UniquePtr<QBase> qrule = QBase::build(qtype[qt],
+                                                /*dim=*/3,
+                                                static_cast<Order>(order));
 
           // Initialize on a TET element
           qrule->init (TET4);
@@ -176,7 +185,7 @@ public:
             sumw += qrule->w(qp);
 
           // Make sure that the weights add up to the value we expect
-          CPPUNIT_ASSERT_DOUBLES_EQUAL(1./6., sumw, TOLERANCE*TOLERANCE);
+          LIBMESH_ASSERT_REALS_EQUAL(1./6., sumw, quadrature_tolerance);
 
           // Test integrating different polynomial powers
           for (int x_power=0; x_power<=order; ++x_power)
@@ -232,7 +241,7 @@ public:
                   // std::cout << "analytical = " << analytical << std::endl;
 
                   // Make sure that the computed integral agrees with the "true" value
-                  CPPUNIT_ASSERT_DOUBLES_EQUAL(analytical, sumq, TOLERANCE*TOLERANCE);
+                  LIBMESH_ASSERT_REALS_EQUAL(analytical, sumq, quadrature_tolerance);
                 } // end for(testpower)
         } // end for(order)
   }
@@ -244,9 +253,9 @@ public:
     for (int qt=0; qt<4; ++qt)
       for (int order=0; order<10; ++order)
         {
-          AutoPtr<QBase> qrule = QBase::build(qtype[qt],
-                                              /*dim=*/2,
-                                              static_cast<Order>(order));
+          UniquePtr<QBase> qrule = QBase::build(qtype[qt],
+                                                /*dim=*/2,
+                                                static_cast<Order>(order));
 
           // Initialize on a TRI element
           qrule->init (TRI3);
@@ -257,7 +266,7 @@ public:
             sumw += qrule->w(qp);
 
           // Make sure that the weights add up to the value we expect
-          CPPUNIT_ASSERT_DOUBLES_EQUAL(0.5, sumw, TOLERANCE*TOLERANCE);
+          LIBMESH_ASSERT_REALS_EQUAL(0.5, sumw, quadrature_tolerance);
 
           // Test integrating different polynomial powers
           for (int x_power=0; x_power<=order; ++x_power)
@@ -303,7 +312,7 @@ public:
                 // std::cout << "analytical = " << analytical << std::endl;
 
                 // Make sure that the computed integral agrees with the "true" value
-                CPPUNIT_ASSERT_DOUBLES_EQUAL(analytical, sumq, TOLERANCE*TOLERANCE);
+                LIBMESH_ASSERT_REALS_EQUAL(analytical, sumq, quadrature_tolerance);
               } // end for(testpower)
         } // end for(order)
   }
@@ -346,7 +355,7 @@ public:
       {
         for (int order=0; order<10; ++order)
           {
-            AutoPtr<QBase> qrule = QBase::build(qtype[qt],
+            UniquePtr<QBase> qrule = QBase::build(qtype[qt],
                                                 /*dim=*/1,
                                                 static_cast<Order>(order));
 
@@ -359,7 +368,7 @@ public:
               sumw += qrule->w(qp);
 
             // Make sure that the weights add up to the value we expect
-            CPPUNIT_ASSERT_DOUBLES_EQUAL(initial_sum_weights[qt], sumw, TOLERANCE*TOLERANCE);
+            LIBMESH_ASSERT_REALS_EQUAL(initial_sum_weights[qt], sumw, quadrature_tolerance);
 
             // Test integrating different polynomial powers
             for (int testpower=0; testpower<=order; ++testpower)
@@ -373,7 +382,7 @@ public:
                   sumq += qrule->w(qp) * std::pow(qrule->qp(qp)(0), testpower);
 
                 // Make sure that the computed integral agrees with the "true" value
-                CPPUNIT_ASSERT_DOUBLES_EQUAL(true_integrals[qt][testpower], sumq, TOLERANCE*TOLERANCE);
+                LIBMESH_ASSERT_REALS_EQUAL(true_integrals[qt][testpower], sumq, quadrature_tolerance);
               } // end for(testpower)
           } // end for(order)
       } // end for(qt)
@@ -384,9 +393,9 @@ public:
   template <QuadratureType qtype, Order order>
   void testBuild ()
   {
-    AutoPtr<QBase> qrule1D = QBase::build (qtype, 1, order);
-    AutoPtr<QBase> qrule2D = QBase::build (qtype, 2, order);
-    AutoPtr<QBase> qrule3D = QBase::build (qtype, 3, order);
+    UniquePtr<QBase> qrule1D = QBase::build (qtype, 1, order);
+    UniquePtr<QBase> qrule2D = QBase::build (qtype, 2, order);
+    UniquePtr<QBase> qrule3D = QBase::build (qtype, 3, order);
 
     CPPUNIT_ASSERT_EQUAL ( static_cast<unsigned int>(1) , qrule1D->get_dim() );
     CPPUNIT_ASSERT_EQUAL ( static_cast<unsigned int>(2) , qrule2D->get_dim() );
@@ -404,7 +413,7 @@ public:
   template <QuadratureType qtype, Order order, unsigned int exactorder>
   void test1DWeights ()
   {
-    AutoPtr<QBase> qrule = QBase::build(qtype , 1, order);
+    UniquePtr<QBase> qrule = QBase::build(qtype , 1, order);
     qrule->init (EDGE3);
 
     for (unsigned int mode=0; mode <= exactorder; ++mode)
@@ -417,7 +426,7 @@ public:
         const Real exact = (mode % 2) ?
           0 : (Real(2.0) / (mode+1));
 
-        if (std::abs(exact - sum) >= TOLERANCE*TOLERANCE)
+        if (std::abs(exact - sum) >= quadrature_tolerance)
           {
             std::cout << "qtype = " << qtype << std::endl;
             std::cout << "order = " << order << std::endl;
@@ -427,7 +436,7 @@ public:
             std::cout << "sum = " << sum << std::endl << std::endl;
           }
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL( exact , sum , TOLERANCE*TOLERANCE );
+        LIBMESH_ASSERT_REALS_EQUAL( exact , sum , quadrature_tolerance );
       }
   }
 
@@ -438,7 +447,7 @@ public:
   template <QuadratureType qtype, Order order, unsigned int exactorder>
   void test2DWeights ()
   {
-    AutoPtr<QBase> qrule = QBase::build(qtype, 2, order);
+    UniquePtr<QBase> qrule = QBase::build(qtype, 2, order);
     qrule->init (QUAD8);
 
     for (unsigned int modex=0; modex <= exactorder; ++modex)
@@ -458,7 +467,7 @@ public:
 
           const Real exact = exactx*exacty;
 
-          CPPUNIT_ASSERT_DOUBLES_EQUAL( exact , sum , TOLERANCE*TOLERANCE );
+          LIBMESH_ASSERT_REALS_EQUAL( exact , sum , quadrature_tolerance );
         }
 
     // We may eventually support Gauss-Lobatto type quadrature on triangles...
@@ -471,7 +480,7 @@ public:
         for (unsigned int qp=0; qp<qrule->n_points(); qp++)
           sum += qrule->w(qp);
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL( 0.5 , sum , TOLERANCE*TOLERANCE );
+        LIBMESH_ASSERT_REALS_EQUAL( 0.5 , sum , quadrature_tolerance );
       }
   }
 
@@ -482,7 +491,7 @@ public:
   template <QuadratureType qtype, Order order, unsigned int exactorder>
   void test3DWeights ()
   {
-    AutoPtr<QBase> qrule = QBase::build(qtype, 3, order);
+    UniquePtr<QBase> qrule = QBase::build(qtype, 3, order);
     qrule->init (HEX20);
 
     for (unsigned int modex=0; modex <= exactorder; ++modex)
@@ -507,7 +516,7 @@ public:
 
             const Real exact = exactx*exacty*exactz;
 
-            CPPUNIT_ASSERT_DOUBLES_EQUAL( exact , sum , TOLERANCE*TOLERANCE );
+            LIBMESH_ASSERT_REALS_EQUAL( exact , sum , quadrature_tolerance );
           }
 
     // We may eventually support Gauss-Lobatto type quadrature on tets and prisms...
@@ -520,7 +529,7 @@ public:
         for (unsigned int qp=0; qp<qrule->n_points(); qp++)
           sum += qrule->w(qp);
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL( 1./6., sum , TOLERANCE*TOLERANCE );
+        LIBMESH_ASSERT_REALS_EQUAL( 1./6., sum , quadrature_tolerance );
 
         qrule->init (PRISM15);
 
@@ -529,7 +538,7 @@ public:
         for (unsigned int qp=0; qp<qrule->n_points(); qp++)
           sum += qrule->w(qp);
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL( 1., sum , TOLERANCE*TOLERANCE );
+        LIBMESH_ASSERT_REALS_EQUAL( 1., sum , quadrature_tolerance );
       }
   }
 };

@@ -21,6 +21,11 @@ public:
   int AutoDiff(const std::string & var_name);
 
   /**
+   * add another variable
+   */
+  bool AddVariable(const std::string & var_name);
+
+  /**
    * check if the function is equal to 0
    * This is a common case for vanishing derivatives. This relies on the
    * function to be optimized.
@@ -46,6 +51,12 @@ public:
    */
   bool JITCompile(bool cacheFunction = true);
 
+  /**
+   * wrap Optimize of the parent class to check for a JIT compiled version and redo
+   * the compilation after Optimization
+   */
+  void Optimize();
+
 #if LIBMESH_HAVE_FPARSER_JIT
   /**
    * Overwrite the Exec function with one that tests for a JIT compiled version
@@ -66,13 +77,14 @@ public:
   void RegisterDerivative(const std::string & a, const std::string & b, const std::string & c);
 
 private:
-  typename FunctionParserBase<Value_t>::Data * mData;
-
   /// helper function to perform the JIT compilation (needs the Value_t typename as a string)
   bool JITCompileHelper(const std::string &, bool);
 
   /// JIT function pointer
   Value_t (*compiledFunction)(const Value_t *, const Value_t *, const Value_t);
+
+  /// pointer to the mImmed values (or NULL if the mImmed vector is empty)
+  Value_t * pImmed;
 
   /**
    * In certain applications derivatives are built proactively and may never be used.

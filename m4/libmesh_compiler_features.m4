@@ -164,21 +164,6 @@ AC_ARG_ENABLE(unordered-containers,
               enableunorderedcontainers=$enableval,
               enableunorderedcontainers=yes)
 
-  # After a lengthy investigation in Jan. 2015, it was determined that
-  # there is a quality of implementation issue with clang's
-  # unordered container types on OSX, which does not appear to affect
-  # Linux.  Until this gets resolved, we will fall back to the "ordered"
-  # containers (map/set/multimap) for this compiler/architecture combination.
-  # https://github.com/idaholab/moose/issues/4624#issuecomment-72278831
-  if test "x$is_clang" != "x" ; then
-    case "${host_os}" in
-      *darwin*)
-        AC_MSG_RESULT(<<< Disabling unordered containers to work around Clang/OSX QOI issues >>>)
-        enableunorderedcontainers=no
-        ;;
-    esac
-  fi
-
   if test "$enableunorderedcontainers" != no ; then
     # The following routines, defined in unordered.m4, check to see if the compiler can compile programs using
     # various quasi-standard hash containers.
@@ -191,7 +176,16 @@ AC_ARG_ENABLE(unordered-containers,
     ACX_STD_SET
   fi
 
-AC_CHECK_HEADERS(dlfcn.h)
+# Determine which of std::hash, std::tr1::hash, or __gnu_cxx::hash is available
+ACX_BEST_HASH
+
+AX_CXX_DLOPEN
+
+dnl Set preprocessor macro if the test code succeeded
+if (test "$ac_cv_cxx_dlopen" = yes); then
+  AC_DEFINE(HAVE_DLOPEN, 1, [define if the compiler supports dlopen/dlsym/dlclose])
+fi
+
 AX_CXX_GCC_ABI_DEMANGLE
 AX_CXX_GLIBC_BACKTRACE
 

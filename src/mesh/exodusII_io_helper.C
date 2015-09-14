@@ -299,8 +299,9 @@ void ExodusII_IO_Helper::open(const char* filename, bool read_only)
   float ex_version = 0.;
 
   // Word size in bytes of the floating point variables used in the
-  // application program (0, 4, or 8)
-  int comp_ws = sizeof(Real);
+  // application program.  Exodus only supports 4-byte and 8-byte
+  // floats.
+  int comp_ws = std::min(sizeof(Real), std::size_t(8));
 
   // Word size in bytes of the floating point data as they are stored
   // in the ExodusII file.  "If this argument is 0, the word size of the
@@ -701,9 +702,13 @@ void ExodusII_IO_Helper::close()
   // we call close on all processors...
   if ((this->processor_id() == 0) || (!_run_only_on_proc0))
     {
-      ex_err = exII::ex_close(ex_id);
-      EX_CHECK_ERR(ex_err, "Error closing Exodus file.");
-      message("Exodus file closed successfully.");
+      // Don't close the file if it was never opened, this raises an Exodus error
+      if (opened_for_writing || opened_for_reading)
+        {
+          ex_err = exII::ex_close(ex_id);
+          EX_CHECK_ERR(ex_err, "Error closing Exodus file.");
+          message("Exodus file closed successfully.");
+        }
     }
 }
 
@@ -907,12 +912,10 @@ void ExodusII_IO_Helper::write_var_names_impl(const char* var_type, int& count, 
 
 
 
-void ExodusII_IO_Helper::read_elemental_var_values(std::string elemental_var_name, int time_step)
+void ExodusII_IO_Helper::read_elemental_var_values(std::string elemental_var_name,
+                                                   int time_step,
+                                                   std::map<dof_id_type, Real> & elem_var_value_map)
 {
-  // There is no way to get the whole elemental field from the
-  // exodus file, so we have to go block by block.
-  elem_var_values.resize(num_elem);
-
   this->read_var_names(ELEMENTAL);
 
   // See if we can find the variable we are looking for
@@ -921,11 +924,11 @@ void ExodusII_IO_Helper::read_elemental_var_values(std::string elemental_var_nam
 
   // Do a linear search for nodal_var_name in nodal_var_names
   for (; var_index<elem_var_names.size(); ++var_index)
-    {
-      found = (elem_var_names[var_index] == elemental_var_name);
-      if (found)
+    if (elem_var_names[var_index] == elemental_var_name)
+      {
+        found = true;
         break;
-    }
+      }
 
   if (!found)
     {
@@ -964,13 +967,8 @@ void ExodusII_IO_Helper::read_elemental_var_values(std::string elemental_var_nam
           // and remember to subtract 1 since libmesh is zero-based and Exodus is 1-based.
           unsigned mapped_elem_id = this->elem_num_map[ex_el_num] - 1;
 
-          // Make sure we can actually write into this location in the elem_var_values vector
-          if (mapped_elem_id >= elem_var_values.size())
-            libmesh_error_msg("Error reading elemental variable values in Exodus!");
-
-          // Write into the mapped_elem_id entry of the
-          // elem_var_values vector.
-          elem_var_values[mapped_elem_id] = block_elem_var_values[j];
+          // Store the elemental value in the map.
+          elem_var_value_map[mapped_elem_id] = block_elem_var_values[j];
 
           // Go to the next sequential element ID.
           ex_el_num++;
@@ -1792,7 +1790,6 @@ std::vector<std::string> ExodusII_IO_Helper::get_complex_names(const std::vector
   // (i.e. names that start with r_, i_ or a_
   for (; names_it != names_end; ++names_it)
     {
-//      std::cout << "VARIABLE: " << *names_it << std::endl;
       std::stringstream name_real, name_imag, name_abs;
       name_real << "r_" << *names_it;
       name_imag << "i_" << *names_it;

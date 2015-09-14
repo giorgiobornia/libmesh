@@ -27,6 +27,9 @@
 namespace libMesh
 {
 
+// Forward declarations
+class BoundaryInfo;
+
 /**
  * This namespace defines several multi_predicates which are used by
  * the element and node iterators.  These classes are not in general
@@ -108,8 +111,9 @@ protected:
 
 
 
-// Instantiation of the IsNull abstract_multi_predicate.
-// This would be used to iterate over NULL entries in a container.
+/**
+ * Used to iterate over NULL entries in a container.
+ */
 template <typename T>
 struct IsNull : abstract_multi_predicate<T>
 {
@@ -122,10 +126,9 @@ struct IsNull : abstract_multi_predicate<T>
 
 
 
-
-
-
-// Instantiation for the NotNull abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL entries in a container.
+ */
 template <typename T>
 struct NotNull : abstract_multi_predicate<T>
 {
@@ -138,9 +141,9 @@ struct NotNull : abstract_multi_predicate<T>
 
 
 
-
-
-// Instantiation for the Active abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL, active entries in a container.
+ */
 template <typename T>
 struct Active : abstract_multi_predicate<T>
 {
@@ -154,7 +157,9 @@ struct Active : abstract_multi_predicate<T>
 
 
 
-// Instantiation for the NotActive abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL, inactive entries in a container.
+ */
 template <typename T>
 struct NotActive : abstract_multi_predicate<T>
 {
@@ -169,7 +174,10 @@ struct NotActive : abstract_multi_predicate<T>
 
 
 
-// Instantiation for the Ancestor abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL, entries that have children (i.e. are
+ * ancestors) in a container.
+ */
 template <typename T>
 struct Ancestor : abstract_multi_predicate<T>
 {
@@ -184,7 +192,10 @@ struct Ancestor : abstract_multi_predicate<T>
 
 
 
-// Instantiation for the NotAncestor abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL, entries that have no children (i.e. are not
+ * ancestors) in a container.
+ */
 template <typename T>
 struct NotAncestor : abstract_multi_predicate<T>
 {
@@ -199,7 +210,10 @@ struct NotAncestor : abstract_multi_predicate<T>
 
 
 
-// Instantiation for the SubActive abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL, subactive entries (i.e. has no
+ * active children) in a container.
+ */
 template <typename T>
 struct SubActive : abstract_multi_predicate<T>
 {
@@ -214,7 +228,10 @@ struct SubActive : abstract_multi_predicate<T>
 
 
 
-// Instantiation for the NotSubActive abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL, non-subactive entries (i.e. has one
+ * or more active children) in a container.
+ */
 template <typename T>
 struct NotSubActive : abstract_multi_predicate<T>
 {
@@ -228,84 +245,99 @@ struct NotSubActive : abstract_multi_predicate<T>
 
 
 
-// Instantiation for the Local abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL, local entries (i.e. owned by the
+ * current processor) in a container.
+ */
 template <typename T>
 struct Local : abstract_multi_predicate<T>
 {
   // Constructor, pushes back two single predicates
-  Local(const processor_id_type my_pid)
+  Local(processor_id_type my_pid)
   {
     this->_predicates.push_back(new not_null<T>);
     this->_predicates.push_back(new pid<T>(my_pid));
   }
-
 };
 
 
-// Instantiation for the Local abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL, semi-local entries (i.e. are not
+ * subactive and have are owned by an attached processor) in a
+ * container.
+ */
 template <typename T>
 struct SemiLocal : abstract_multi_predicate<T>
 {
   // Constructor, pushes back two single predicates
-  SemiLocal(const processor_id_type my_pid)
+  SemiLocal(processor_id_type my_pid)
   {
     this->_predicates.push_back(new not_null<T>);
     this->_predicates.push_back(new not_subactive<T>);
     this->_predicates.push_back(new semilocal_pid<T>(my_pid));
   }
-
 };
 
 
-// Instantiation for the Local abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL, face-local entries (i.e. are not
+ * subactive and are on or have a neighbor on processor my_pid) in a
+ * container.
+ */
 template <typename T>
 struct FaceLocal : abstract_multi_predicate<T>
 {
   // Constructor, pushes back two single predicates
-  FaceLocal(const processor_id_type my_pid)
+  FaceLocal(processor_id_type my_pid)
   {
     this->_predicates.push_back(new not_null<T>);
     this->_predicates.push_back(new not_subactive<T>);
     this->_predicates.push_back(new facelocal_pid<T>(my_pid));
   }
-
 };
 
 
-// Instantiation for the NotLocal abstract_multi_predicate
+
+/**
+ * Used to iterate over non-NULL, non-local entries in a
+ * container.
+ */
 template <typename T>
 struct NotLocal : abstract_multi_predicate<T>
 {
   // Constructor, pushes back two single predicates
-  NotLocal(const processor_id_type my_pid)
+  NotLocal(processor_id_type my_pid)
   {
     this->_predicates.push_back(new not_null<T>);
     this->_predicates.push_back(new not_pid<T>(my_pid));
   }
-
 };
 
 
-// Instantiation for the ActiveNotLocal abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL, active, non-local entries in a
+ * container.
+ */
 template <typename T>
 struct ActiveNotLocal : abstract_multi_predicate<T>
 {
   // Constructor, pushes back two single predicates
-  ActiveNotLocal(const processor_id_type my_pid)
+  ActiveNotLocal(processor_id_type my_pid)
   {
     this->_predicates.push_back(new not_null<T>);
     this->_predicates.push_back(new active<T>);
     this->_predicates.push_back(new not_pid<T>(my_pid));
   }
-
 };
 
 
-// Instantiation for the Type abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL, elements of a given geometric type.
+ */
 template <typename T>
 struct Type : abstract_multi_predicate<T>
 {
-  Type(const ElemType type)
+  Type(ElemType type)
   {
     this->_predicates.push_back(new not_null<T>);
     this->_predicates.push_back(new elem_type<T>(type));
@@ -314,11 +346,13 @@ struct Type : abstract_multi_predicate<T>
 
 
 
-// Instantiation for the ActiveType abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL, active elements of a given geometric type.
+ */
 template <typename T>
 struct ActiveType : abstract_multi_predicate<T>
 {
-  ActiveType(const ElemType type)
+  ActiveType(ElemType type)
   {
     this->_predicates.push_back(new not_null<T>);
     this->_predicates.push_back(new active<T>);
@@ -328,11 +362,14 @@ struct ActiveType : abstract_multi_predicate<T>
 
 
 
-// Instantiation for the ActivePID abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL, active elements owned by a given
+ * processor.
+ */
 template <typename T>
 struct ActivePID : abstract_multi_predicate<T>
 {
-  ActivePID(const processor_id_type proc_id)
+  ActivePID(processor_id_type proc_id)
   {
     this->_predicates.push_back(new not_null<T>);
     this->_predicates.push_back(new active<T>);
@@ -344,11 +381,14 @@ struct ActivePID : abstract_multi_predicate<T>
 
 
 
-// Instantiation for the ActiveLocal abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL, active, local elements owned by a
+ * given processor.
+ */
 template <typename T>
 struct ActiveLocal : abstract_multi_predicate<T>
 {
-  ActiveLocal(const processor_id_type my_pid)
+  ActiveLocal(processor_id_type my_pid)
   {
     this->_predicates.push_back(new not_null<T>);
     this->_predicates.push_back(new active<T>);
@@ -360,11 +400,13 @@ struct ActiveLocal : abstract_multi_predicate<T>
 
 
 
-// Instantiation for the PID abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL elements owned by a given processor.
+ */
 template <typename T>
 struct PID : abstract_multi_predicate<T>
 {
-  PID(const processor_id_type proc_id)
+  PID(processor_id_type proc_id)
   {
     this->_predicates.push_back(new not_null<T>);
     this->_predicates.push_back(new pid<T>(proc_id));
@@ -373,11 +415,45 @@ struct PID : abstract_multi_predicate<T>
 
 
 
-// Instantiation for the NotPID abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL elements on the boundary with a given
+ * ID.
+ */
+template <typename T>
+struct BID : abstract_multi_predicate<T>
+{
+  BID(boundary_id_type bndry_id, const BoundaryInfo& bndry_info)
+  {
+    this->_predicates.push_back(new not_null<T>);
+    this->_predicates.push_back(new bid<T>(bndry_id, bndry_info));
+  }
+};
+
+
+
+/**
+ * Used to iterate over non-NULL elements on the boundary.
+ */
+template <typename T>
+struct BND : abstract_multi_predicate<T>
+{
+  BND(const BoundaryInfo& bndry_info)
+  {
+    this->_predicates.push_back(new not_null<T>);
+    this->_predicates.push_back(new bnd<T>(bndry_info));
+  }
+};
+
+
+
+/**
+ * Used to iterate over non-NULL elements *not* owned by a given
+ * processor.
+ */
 template <typename T>
 struct NotPID : abstract_multi_predicate<T>
 {
-  NotPID(const processor_id_type proc_id)
+  NotPID(processor_id_type proc_id)
   {
     this->_predicates.push_back(new not_null<T>);
     this->_predicates.push_back(new not_pid<T>(proc_id));
@@ -386,12 +462,13 @@ struct NotPID : abstract_multi_predicate<T>
 
 
 
-
-// Instantiation for the Level abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL elements of a specified (refinement) level.
+ */
 template <typename T>
 struct Level : abstract_multi_predicate<T>
 {
-  Level(const unsigned int l)
+  Level(unsigned int l)
   {
     this->_predicates.push_back(new not_null<T>);
     this->_predicates.push_back(new level<T>(l));
@@ -400,12 +477,14 @@ struct Level : abstract_multi_predicate<T>
 
 
 
-
-// Instantiation for the NotLevel abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL elements *not* of a specified
+ * (refinement) level.
+ */
 template <typename T>
 struct NotLevel : abstract_multi_predicate<T>
 {
-  NotLevel(const unsigned int l)
+  NotLevel(unsigned int l)
   {
     this->_predicates.push_back(new not_null<T>);
     this->_predicates.push_back(new not_level<T>(l));
@@ -414,13 +493,15 @@ struct NotLevel : abstract_multi_predicate<T>
 
 
 
-
-// Instantiation for the LocalLevel abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL local elements with a specified
+ * (refinement) level.
+ */
 template <typename T>
 struct LocalLevel : abstract_multi_predicate<T>
 {
-  LocalLevel(const processor_id_type my_pid,
-             const unsigned int l)
+  LocalLevel(processor_id_type my_pid,
+             unsigned int l)
   {
     this->_predicates.push_back(new not_null<T>);
     this->_predicates.push_back(new pid<T>(my_pid));
@@ -430,13 +511,15 @@ struct LocalLevel : abstract_multi_predicate<T>
 
 
 
-
-// Instantiation for the LocalNotLevel abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL local elements *not* of a specified
+ * (refinement) level.
+ */
 template <typename T>
 struct LocalNotLevel : abstract_multi_predicate<T>
 {
-  LocalNotLevel(const processor_id_type my_pid,
-                const unsigned int l)
+  LocalNotLevel(processor_id_type my_pid,
+                unsigned int l)
   {
     this->_predicates.push_back(new not_null<T>);
     this->_predicates.push_back(new pid<T>(my_pid));
@@ -446,7 +529,10 @@ struct LocalNotLevel : abstract_multi_predicate<T>
 
 
 
-// Instantiation for the ActiveOnBoundary abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL, active elements which are on the
+ * boundary.
+ */
 template <typename T>
 struct ActiveOnBoundary : abstract_multi_predicate<T>
 {
@@ -460,7 +546,10 @@ struct ActiveOnBoundary : abstract_multi_predicate<T>
 
 
 
-// Instantiation for the BoundarySide abstract_multi_predicate
+/**
+ * Used to iterate over the sides of an element which are on the
+ * boundary of the Mesh.
+ */
 template <typename T>
 struct BoundarySide : abstract_multi_predicate<T>
 {
@@ -472,12 +561,15 @@ struct BoundarySide : abstract_multi_predicate<T>
 
 
 
-// Instantiation for the ActiveLocalSubdomain abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL, active elements with a given PID on
+ * a given subdomain.
+ */
 template <typename T>
 struct ActiveLocalSubdomain : abstract_multi_predicate<T>
 {
-  ActiveLocalSubdomain(const processor_id_type my_pid,
-                       const subdomain_id_type subdomain_id)
+  ActiveLocalSubdomain(processor_id_type my_pid,
+                       subdomain_id_type subdomain_id)
   {
     this->_predicates.push_back(new not_null<T>);
     this->_predicates.push_back(new active<T>);
@@ -488,15 +580,36 @@ struct ActiveLocalSubdomain : abstract_multi_predicate<T>
 
 
 
-// Instantiation for the ActiveSubdomain abstract_multi_predicate
+/**
+ * Used to iterate over non-NULL, active elements on a given
+ * subdomain.
+ */
 template <typename T>
 struct ActiveSubdomain : abstract_multi_predicate<T>
 {
-  ActiveSubdomain(const subdomain_id_type subdomain_id)
+  ActiveSubdomain(subdomain_id_type subdomain_id)
   {
     this->_predicates.push_back(new not_null<T>);
     this->_predicates.push_back(new active<T>);
     this->_predicates.push_back(new subdomain<T>(subdomain_id));
+  }
+};
+
+
+
+/**
+ * Used to iterate over non-NULL elements not owned by a given
+ * processor but semi-local to that processor, i.e. ghost elements.
+ */
+template <typename T>
+struct Ghost : abstract_multi_predicate<T>
+{
+  Ghost(processor_id_type my_pid)
+  {
+    this->_predicates.push_back(new not_null<T>);
+    this->_predicates.push_back(new active<T>);
+    this->_predicates.push_back(new not_pid<T>(my_pid));
+    this->_predicates.push_back(new semilocal_pid<T>(my_pid));
   }
 };
 

@@ -18,6 +18,8 @@
 
 #include "libmesh/diff_context.h"
 #include "libmesh/diff_system.h"
+#include "libmesh/diff_system.h"
+#include "libmesh/unsteady_solver.h"
 
 namespace libMesh
 {
@@ -29,6 +31,7 @@ DiffContext::DiffContext (const System& sys) :
   system_time(sys.time),
   elem_solution_derivative(1.),
   elem_solution_rate_derivative(1.),
+  elem_solution_accel_derivative(1.),
   fixed_solution_derivative(0.),
   _dof_indices_var(sys.n_vars()),
   _deltat(NULL),
@@ -42,10 +45,12 @@ DiffContext::DiffContext (const System& sys) :
   _elem_subresiduals.reserve(nv);
   _elem_subjacobians.resize(nv);
   _elem_subsolution_rates.reserve(nv);
+  _elem_subsolution_accels.reserve(nv);
   if (sys.use_fixed_solution)
     _elem_fixed_subsolutions.reserve(nv);
 
   // If the user resizes sys.qoi, it will invalidate us
+
   std::size_t n_qoi = sys.qoi.size();
   _elem_qoi.resize(n_qoi);
   _elem_qoi_derivative.resize(n_qoi);
@@ -60,7 +65,24 @@ DiffContext::DiffContext (const System& sys) :
       for (std::size_t q=0; q != n_qoi; ++q)
         _elem_qoi_subderivatives[q].push_back(new DenseSubVector<Number>(_elem_qoi_derivative[q]));
       _elem_subjacobians[i].reserve(nv);
-      _elem_subsolution_rates.push_back(new DenseSubVector<Number>(_elem_solution_rate));
+
+      // Only make space for these if we're using DiffSystem
+      // This is assuming *only* DiffSystem is using elem_solution_rate/accel
+      const DifferentiableSystem* diff_system = dynamic_cast<const DifferentiableSystem*>(&sys);
+      if(diff_system)
+        {
+          // Now, we only need these if the solver is unsteady
+          if( !diff_system->get_time_solver().is_steady() )
+            {
+              _elem_subsolution_rates.push_back(new DenseSubVector<Number>(_elem_solution_rate));
+
+              // We only need accel space if the TimeSolver is second order
+              const UnsteadySolver& time_solver = cast_ref<const UnsteadySolver&>(diff_system->get_time_solver());
+
+              if( time_solver.time_order() >= 2 )
+                _elem_subsolution_accels.push_back(new DenseSubVector<Number>(_elem_solution_accel));
+            }
+        }
 
       if (sys.use_fixed_solution)
         _elem_fixed_subsolutions.push_back
@@ -84,7 +106,10 @@ DiffContext::~DiffContext ()
       delete _elem_subresiduals[i];
       for (std::size_t q=0; q != _elem_qoi_subderivatives.size(); ++q)
         delete _elem_qoi_subderivatives[q][i];
-      delete _elem_subsolution_rates[i];
+      if( !_elem_subsolution_rates.empty() )
+        delete _elem_subsolution_rates[i];
+      if( !_elem_subsolution_accels.empty() )
+        delete _elem_subsolution_accels[i];
       if (!_elem_fixed_subsolutions.empty())
         delete _elem_fixed_subsolutions[i];
 

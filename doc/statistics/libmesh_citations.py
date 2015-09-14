@@ -33,10 +33,10 @@ data = [
     '\'11', 37,
     '\'12', 50,
     '\'13', 78,
-    '\'14', 58,
-    '\'15',  8,
-    'P',     7, # Preprints
-    'T',    36  # Theses
+    '\'14', 62,
+    '\'15', 37,
+    'P',     8, # Preprints
+    'T',    41  # Theses
     ]
 
 # Extract the x-axis labels from the data array
@@ -79,3 +79,7 @@ fig.suptitle(title_string)
 
 # Save as PDF
 plt.savefig('libmesh_citations.pdf')
+
+# Local Variables:
+# python-indent: 2
+# End:

@@ -5,7 +5,6 @@
 #include <libmesh/restore_warnings.h>
 
 #include <libmesh/parallel.h>
-#include <libmesh/parallel_algebra.h>
 
 #include "test_comm.h"
 
@@ -18,14 +17,14 @@ public:
   CPPUNIT_TEST( testGather );
   CPPUNIT_TEST( testAllGather );
   CPPUNIT_TEST( testBroadcast );
-  CPPUNIT_TEST( testBroadcastVectorValueInt );
-  CPPUNIT_TEST( testBroadcastVectorValueReal );
-  CPPUNIT_TEST( testBroadcastPoint );
   CPPUNIT_TEST( testBarrier );
   CPPUNIT_TEST( testMin );
   CPPUNIT_TEST( testMax );
+  CPPUNIT_TEST( testInfinityMin );
+  CPPUNIT_TEST( testInfinityMax );
   CPPUNIT_TEST( testIsendRecv );
   CPPUNIT_TEST( testIrecvSend );
+  CPPUNIT_TEST( testSemiVerify );
 
   CPPUNIT_TEST_SUITE_END();
 
@@ -82,67 +81,6 @@ public:
 
 
 
-  template <typename T>
-  void testBroadcastVectorValue()
-  {
-    std::vector<VectorValue<T> > src(3), dest(3);
-
-    {
-      T val=T(0);
-      for (unsigned int i=0; i<3; i++)
-        for (unsigned int j=0; j<LIBMESH_DIM; j++)
-          src[i](j) = val++;
-
-      if (TestCommWorld->rank() == 0)
-        dest = src;
-    }
-
-    TestCommWorld->broadcast(dest);
-
-    for (unsigned int i=0; i<3; i++)
-      for (unsigned int j=0; j<LIBMESH_DIM; j++)
-        CPPUNIT_ASSERT_EQUAL (src[i](j), dest[i](j) );
-  }
-
-
-
-  void testBroadcastVectorValueInt()
-  {
-    this->testBroadcastVectorValue<int>();
-  }
-
-
-
-  void testBroadcastVectorValueReal()
-  {
-    this->testBroadcastVectorValue<Real>();
-  }
-
-
-
-  void testBroadcastPoint()
-  {
-    std::vector<Point> src(3), dest(3);
-
-    {
-      Real val=0.;
-      for (unsigned int i=0; i<3; i++)
-        for (unsigned int j=0; j<LIBMESH_DIM; j++)
-          src[i](j) = val++;
-
-      if (TestCommWorld->rank() == 0)
-        dest = src;
-    }
-
-    TestCommWorld->broadcast(dest);
-
-    for (unsigned int i=0; i<3; i++)
-      for (unsigned int j=0; j<LIBMESH_DIM; j++)
-        CPPUNIT_ASSERT_EQUAL (src[i](j), dest[i](j) );
-  }
-
-
-
   void testBarrier()
   {
     TestCommWorld->barrier();
@@ -169,6 +107,40 @@ public:
 
     CPPUNIT_ASSERT_EQUAL (cast_int<processor_id_type>(max+1),
                           cast_int<processor_id_type>(TestCommWorld->size()));
+  }
+
+
+
+  void testInfinityMin ()
+  {
+    double min = std::numeric_limits<double>::infinity();
+
+    TestCommWorld->min(min);
+
+    CPPUNIT_ASSERT_EQUAL (min, std::numeric_limits<double>::infinity());
+
+    min = -std::numeric_limits<double>::infinity();
+
+    TestCommWorld->min(min);
+
+    CPPUNIT_ASSERT_EQUAL (min, -std::numeric_limits<double>::infinity());
+  }
+
+
+
+  void testInfinityMax ()
+  {
+    double max = std::numeric_limits<double>::infinity();
+
+    TestCommWorld->max(max);
+
+    CPPUNIT_ASSERT_EQUAL (max, std::numeric_limits<double>::infinity());
+
+    max = -std::numeric_limits<double>::infinity();
+
+    TestCommWorld->max(max);
+
+    CPPUNIT_ASSERT_EQUAL (max, -std::numeric_limits<double>::infinity());
   }
 
 
@@ -292,6 +264,22 @@ public:
         TestCommWorld->send_mode(Parallel::Communicator::DEFAULT);
       }
   }
+
+
+
+  void testSemiVerify ()
+  {
+    double inf = std::numeric_limits<double>::infinity();
+
+    double *infptr = TestCommWorld->rank()%2 ? NULL : &inf;
+
+    CPPUNIT_ASSERT (TestCommWorld->semiverify(infptr));
+
+    inf = -std::numeric_limits<double>::infinity();
+
+    CPPUNIT_ASSERT (TestCommWorld->semiverify(infptr));
+  }
+
 
 };
 

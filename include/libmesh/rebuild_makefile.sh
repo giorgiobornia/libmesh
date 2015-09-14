@@ -30,16 +30,22 @@ cat <<EOF > Makefile.am
 # include the magic script!
 EXTRA_DIST = rebuild_makefile.sh
 
-BUILT_SOURCES = $built_sources
-
-DISTCLEANFILES = \$(BUILT_SOURCES)
-
 EOF
 
+printf '%s' "BUILT_SOURCES =" >> Makefile.am
+for built_src in $built_sources ; do
+    echo " \\" >> Makefile.am
+    printf '%s' "        "$built_src >> Makefile.am
+done
+
+echo >> Makefile.am
+echo >> Makefile.am
+echo "DISTCLEANFILES = \$(BUILT_SOURCES)" >> Makefile.am
 
 
 # handle contrib directly
 cat <<EOF >> Makefile.am
+
 #
 # contrib rules
 if LIBMESH_ENABLE_FPARSER
@@ -108,6 +114,27 @@ netcdf.h: \$(top_srcdir)/contrib/netcdf/v4/include/netcdf.h
 
   BUILT_SOURCES  += netcdf.h
   DISTCLEANFILES += netcdf.h
+
+endif
+
+if LIBMESH_INSTALL_HINNANT_UNIQUE_PTR
+
+unique_ptr.hpp: \$(top_srcdir)/contrib/unique_ptr/unique_ptr.hpp
+	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) \$< \$@
+
+  BUILT_SOURCES  += unique_ptr.hpp
+  DISTCLEANFILES += unique_ptr.hpp
+
+endif
+
+if LIBMESH_ENABLE_CAPNPROTO
+
+rb_data.capnp.h:
+	\$(MAKE) -C \$(top_builddir)/contrib/capnproto rb_data.capnp.h
+	\$(AM_V_GEN)rm -f \$@ && \$(LN_S) \$(top_builddir)/contrib/capnproto/rb_data.capnp.h \$@
+
+  BUILT_SOURCES  += rb_data.capnp.h
+  DISTCLEANFILES += rb_data.capnp.h
 
 endif
 

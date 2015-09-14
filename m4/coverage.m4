@@ -11,7 +11,7 @@
 #
 # LAST MODIFICATION
 #
-#   $Id: coverage.m4 35027 2012-12-04 00:01:34Z roystgnr $
+#   $Id: coverage.m4 48028 2015-08-21 21:08:00Z roystgnr $
 #
 # COPYLEFT
 #
@@ -45,7 +45,7 @@ if test "x$enable_coverage" = "xyes"; then
       gcov coverage testing tool not found. Please install or update
       your PATH accordingly prior to enabling code coverage features.
 
-      	   ])
+      ])
    fi
 
    # ----------------------------------
@@ -53,7 +53,11 @@ if test "x$enable_coverage" = "xyes"; then
    # ----------------------------------
 
    HAVE_GCOV_TOOLS=1
-   GCOV_FLAGS="--coverage"
+   GCOV_FLAGS="-fprofile-arcs -ftest-coverage --coverage"
+   GCOV_LDFLAGS="--coverage -lgcov"
+
+   ac_coverage_save_LDFLAGS="$LDFLAGS"
+   LDFLAGS="${LDFLAGS} ${GCOV_LDFLAGS}"
 
    # Test for C...
 
@@ -71,6 +75,7 @@ if test "x$enable_coverage" = "xyes"; then
 
    AC_LANG_PUSH([C++])
    CXXFLAGS="${GCOV_FLAGS} ${CXXFLAGS}"
+   LIBS="-lgcov ${LIBS}"
    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],[])],[],
      [AC_MSG_ERROR([unable to compile with code coverage ($CXX --coverage)])])
    AC_LANG_POP([C++])
@@ -88,9 +93,8 @@ if test "x$enable_coverage" = "xyes"; then
 fi
 
 AC_SUBST(GCOV_FLAGS)
+AC_SUBST(GCOV_LDFLAGS)
 AC_SUBST(HAVE_GCOV_TOOLS)
 AM_CONDITIONAL(CODE_COVERAGE_ENABLED,test x$HAVE_GCOV_TOOLS = x1)
 
 ])
-
-

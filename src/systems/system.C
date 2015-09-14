@@ -82,10 +82,11 @@ System::System (EquationSystems& es,
   _active                           (true),
   _solution_projection              (true),
   _basic_system_only                (false),
-  _can_add_vectors                  (true),
+  _is_initialized                   (false),
   _identify_variable_groups         (true),
   _additional_data_written          (false),
-  adjoint_already_solved            (false)
+  adjoint_already_solved            (false),
+  _hide_output                      (false)
 {
 }
 
@@ -217,7 +218,7 @@ void System::clear ()
     _vector_projections.clear();
     _vector_is_adjoint.clear();
     _vector_types.clear();
-    _can_add_vectors = true;
+    _is_initialized = false;
   }
 
 }
@@ -256,18 +257,8 @@ void System::init_data ()
   // Distribute the degrees of freedom on the mesh
   _dof_map->distribute_dofs (mesh);
 
-#ifdef LIBMESH_ENABLE_CONSTRAINTS
-
-  // Recreate any hanging node constraints
-  _dof_map->create_dof_constraints(mesh);
-
-  // Apply any user-defined constraints
-  this->user_constrain();
-
-  // Expand any recursive constraints
-  _dof_map->process_constraints(mesh);
-
-#endif
+  // Recreate any user or internal constraints
+  this->reinit_constraints();
 
   // And clean up the send_list before we first use it
   _dof_map->prepare_send_list();
@@ -284,9 +275,9 @@ void System::init_data ()
   current_local_solution->init (this->n_dofs(), false, SERIAL);
 #endif
 
-  // from now on, adding additional vectors can't be done without
-  // immediately initializing them
-  _can_add_vectors = false;
+  // from now on, adding additional vectors or variables can't be done
+  // without immediately initializing them
+  _is_initialized = true;
 
   // initialize & zero other vectors, if necessary
   for (vectors_iterator pos = _vectors.begin(); pos != _vectors.end(); ++pos)
@@ -411,9 +402,11 @@ void System::reinit ()
 
 void System::reinit_constraints()
 {
+#ifdef LIBMESH_ENABLE_CONSTRAINTS
   get_dof_map().create_dof_constraints(_mesh, this->time);
   user_constrain();
   get_dof_map().process_constraints(_mesh);
+#endif
   get_dof_map().prepare_send_list();
 }
 
@@ -541,8 +534,8 @@ bool System::compare (const System& other_system,
                       const bool verbose) const
 {
   // we do not care for matrices, but for vectors
-  libmesh_assert (!_can_add_vectors);
-  libmesh_assert (!other_system._can_add_vectors);
+  libmesh_assert (_is_initialized);
+  libmesh_assert (other_system._is_initialized);
 
   if (verbose)
     {
@@ -705,7 +698,7 @@ NumericVector<Number> & System::add_vector (const std::string& vec_name,
   _vector_is_adjoint.insert (std::make_pair (vec_name, -1));
 
   // Initialize it if necessary
-  if (!_can_add_vectors)
+  if (_is_initialized)
     {
       if(type == GHOSTED)
         {
@@ -1109,6 +1102,8 @@ unsigned int System::add_variable (const std::string& var,
                                    const FEType& type,
                                    const std::set<subdomain_id_type> * const active_subdomains)
 {
+  libmesh_assert(!this->is_initialized());
+
   // Make sure the variable isn't there already
   // or if it is, that it's the type we want
   for (unsigned int v=0; v<this->n_vars(); v++)
@@ -1197,6 +1192,8 @@ unsigned int System::add_variables (const std::vector<std::string> &vars,
                                     const FEType& type,
                                     const std::set<subdomain_id_type> * const active_subdomains)
 {
+  libmesh_assert(!this->is_initialized());
+
   // Make sure the variable isn't there already
   // or if it is, that it's the type we want
   for (unsigned int ov=0; ov<vars.size(); ov++)
@@ -1466,7 +1463,7 @@ Real System::calculate_norm(const NumericVector<Number>& v,
     }
 
   // Localize the potentially parallel vector
-  AutoPtr<NumericVector<Number> > local_v = NumericVector<Number>::build(this->comm());
+  UniquePtr<NumericVector<Number> > local_v = NumericVector<Number>::build(this->comm());
   local_v->init(v.size(), true, SERIAL);
   v.localize (*local_v, _dof_map->get_send_list());
 
@@ -1513,9 +1510,9 @@ Real System::calculate_norm(const NumericVector<Number>& v,
         libmesh_not_implemented();
 
       const FEType& fe_type = this->get_dof_map().variable_type(var);
-      AutoPtr<QBase> qrule =
+      UniquePtr<QBase> qrule =
         fe_type.default_quadrature_rule (dim);
-      AutoPtr<FEBase> fe
+      UniquePtr<FEBase> fe
         (FEBase::build(dim, fe_type));
       fe->attach_quadrature_rule (qrule.get());
 
@@ -1997,14 +1994,20 @@ Number System::point_value(unsigned int var, const Point &p, const bool insist_o
   // And every processor had better agree about which point we're
   // looking for
 #ifndef NDEBUG
-  this->comm().verify(p);
+  this->comm().verify(p(0));
+#if LIBMESH_DIM > 1
+  this->comm().verify(p(1));
+#endif
+#if LIBMESH_DIM > 2
+  this->comm().verify(p(2));
+#endif
 #endif // NDEBUG
 
   // Get a reference to the mesh object associated with the system object that calls this function
   const MeshBase &mesh = this->get_mesh();
 
   // Use an existing PointLocator or create a new one
-  AutoPtr<PointLocatorBase> locator_ptr = mesh.sub_point_locator();
+  UniquePtr<PointLocatorBase> locator_ptr = mesh.sub_point_locator();
   PointLocatorBase& locator = *locator_ptr;
 
   if (!insist_on_success)
@@ -2060,7 +2063,7 @@ Number System::point_value(unsigned int var, const Point &p, const Elem &e) cons
   FEType fe_type = dof_map.variable_type(var);
 
   // Build a FE so we can calculate u(p)
-  AutoPtr<FEBase> fe (FEBase::build(e.dim(), fe_type));
+  UniquePtr<FEBase> fe (FEBase::build(e.dim(), fe_type));
 
   // Map the physical co-ordinates to the master co-ordinates using the inverse_map from fe_interface.h
   // Build a vector of point co-ordinates to send to reinit
@@ -2094,14 +2097,20 @@ Gradient System::point_gradient(unsigned int var, const Point &p, const bool ins
   // And every processor had better agree about which point we're
   // looking for
 #ifndef NDEBUG
-  this->comm().verify(p);
+  this->comm().verify(p(0));
+#if LIBMESH_DIM > 1
+  this->comm().verify(p(1));
+#endif
+#if LIBMESH_DIM > 2
+  this->comm().verify(p(2));
+#endif
 #endif // NDEBUG
 
   // Get a reference to the mesh object associated with the system object that calls this function
   const MeshBase &mesh = this->get_mesh();
 
   // Use an existing PointLocator or create a new one
-  AutoPtr<PointLocatorBase> locator_ptr = mesh.sub_point_locator();
+  UniquePtr<PointLocatorBase> locator_ptr = mesh.sub_point_locator();
   PointLocatorBase& locator = *locator_ptr;
 
   if (!insist_on_success)
@@ -2158,7 +2167,7 @@ Gradient System::point_gradient(unsigned int var, const Point &p, const Elem &e)
   FEType fe_type = dof_map.variable_type(var);
 
   // Build a FE again so we can calculate u(p)
-  AutoPtr<FEBase> fe (FEBase::build(e.dim(), fe_type));
+  UniquePtr<FEBase> fe (FEBase::build(e.dim(), fe_type));
 
   // Map the physical co-ordinates to the master co-ordinates using the inverse_map from fe_interface.h
   // Build a vector of point co-ordinates to send to reinit
@@ -2193,14 +2202,20 @@ Tensor System::point_hessian(unsigned int var, const Point &p, const bool insist
   // And every processor had better agree about which point we're
   // looking for
 #ifndef NDEBUG
-  this->comm().verify(p);
+  this->comm().verify(p(0));
+#if LIBMESH_DIM > 1
+  this->comm().verify(p(1));
+#endif
+#if LIBMESH_DIM > 2
+  this->comm().verify(p(2));
+#endif
 #endif // NDEBUG
 
   // Get a reference to the mesh object associated with the system object that calls this function
   const MeshBase &mesh = this->get_mesh();
 
   // Use an existing PointLocator or create a new one
-  AutoPtr<PointLocatorBase> locator_ptr = mesh.sub_point_locator();
+  UniquePtr<PointLocatorBase> locator_ptr = mesh.sub_point_locator();
   PointLocatorBase& locator = *locator_ptr;
 
   if (!insist_on_success)
@@ -2256,7 +2271,7 @@ Tensor System::point_hessian(unsigned int var, const Point &p, const Elem &e) co
   FEType fe_type = dof_map.variable_type(var);
 
   // Build a FE again so we can calculate u(p)
-  AutoPtr<FEBase> fe (FEBase::build(e.dim(), fe_type));
+  UniquePtr<FEBase> fe (FEBase::build(e.dim(), fe_type));
 
   // Map the physical co-ordinates to the master co-ordinates using the inverse_map from fe_interface.h
   // Build a vector of point co-ordinates to send to reinit

@@ -291,8 +291,8 @@ void add_element_system
     {
       // Heterogeneous and homogeneous constraints are the same on the
       // matrix
-        _sys.get_dof_map().constrain_element_matrix
-          (_femcontext.get_elem_jacobian(), _femcontext.get_dof_indices(), false);
+      _sys.get_dof_map().constrain_element_matrix
+        (_femcontext.get_elem_jacobian(), _femcontext.get_dof_indices(), false);
     }
 #endif // #ifdef LIBMESH_ENABLE_CONSTRAINTS
 
@@ -354,7 +354,7 @@ public:
    */
   void operator()(const ConstElemRange &range) const
   {
-    AutoPtr<DiffContext> con = _sys.build_context();
+    UniquePtr<DiffContext> con = _sys.build_context();
     FEMContext &_femcontext = cast_ref<FEMContext&>(*con);
     _sys.init_context(_femcontext);
 
@@ -397,7 +397,7 @@ public:
    */
   void operator()(const ConstElemRange &range) const
   {
-    AutoPtr<DiffContext> con = _sys.build_context();
+    UniquePtr<DiffContext> con = _sys.build_context();
     FEMContext &_femcontext = cast_ref<FEMContext&>(*con);
     _sys.init_context(_femcontext);
 
@@ -460,7 +460,7 @@ public:
    */
   void operator()(const ConstElemRange &range)
   {
-    AutoPtr<DiffContext> con = _sys.build_context();
+    UniquePtr<DiffContext> con = _sys.build_context();
     FEMContext &_femcontext = cast_ref<FEMContext&>(*con);
     _diff_qoi.init_context(_femcontext);
 
@@ -475,6 +475,9 @@ public:
           have_some_heterogenous_qoi_bc = true;
         }
 #endif
+
+    if (have_some_heterogenous_qoi_bc)
+      _sys.init_context(_femcontext);
 
     for (ConstElemRange::const_iterator elem_it = range.begin();
          elem_it != range.end(); ++elem_it)
@@ -593,7 +596,7 @@ public:
    */
   void operator()(const ConstElemRange &range) const
   {
-    AutoPtr<DiffContext> con = _sys.build_context();
+    UniquePtr<DiffContext> con = _sys.build_context();
     FEMContext &_femcontext = cast_ref<FEMContext&>(*con);
     _qoi.init_context(_femcontext);
 
@@ -609,6 +612,9 @@ public:
             have_some_heterogenous_qoi_bc = true;
           }
 #endif
+
+    if (have_some_heterogenous_qoi_bc)
+      _sys.init_context(_femcontext);
 
     for (ConstElemRange::const_iterator elem_it = range.begin();
          elem_it != range.end(); ++elem_it)
@@ -661,7 +667,18 @@ public:
         // and/or for constraint application.
         if ((_include_liftfunc || _apply_constraints) &&
             elem_has_some_heterogenous_qoi_bc)
-          _sys.time_solver->element_residual(true, _femcontext);
+          {
+            bool jacobian_computed = _sys.time_solver->element_residual(true, _femcontext);
+
+            // If we're using numerical jacobians, above wont compute them
+            if (!jacobian_computed)
+              {
+                // Make sure we didn't compute a jacobian and lie about it
+                libmesh_assert_equal_to (_femcontext.get_elem_jacobian().l1_norm(), 0.0);
+                // Logging of numerical jacobians is done separately
+                _sys.numerical_elem_jacobian(_femcontext);
+              }
+          }
 
         // If we have some heterogenous dofs here, those are
         // themselves part of a regularized flux QoI which the library
@@ -917,7 +934,7 @@ void FEMSystem::assembly (bool get_residual, bool get_jacobian,
   // their equation terms there and only if we have a SCALAR variable
   if ( this->processor_id() == (this->n_processors()-1) && have_scalar )
     {
-      AutoPtr<DiffContext> con = this->build_context();
+      UniquePtr<DiffContext> con = this->build_context();
       FEMContext &_femcontext = cast_ref<FEMContext&>(*con);
       this->init_context(_femcontext);
       _femcontext.pre_fe_reinit(*this, NULL);
@@ -1046,7 +1063,7 @@ void FEMSystem::mesh_position_set()
 
   MeshBase& mesh = this->get_mesh();
 
-  AutoPtr<DiffContext> con = this->build_context();
+  UniquePtr<DiffContext> con = this->build_context();
   FEMContext &_femcontext = cast_ref<FEMContext&>(*con);
   this->init_context(_femcontext);
 
@@ -1296,11 +1313,9 @@ void FEMSystem::numerical_nonlocal_jacobian (FEMContext &context) const
 
 
 
-AutoPtr<DiffContext> FEMSystem::build_context ()
+UniquePtr<DiffContext> FEMSystem::build_context ()
 {
   FEMContext* fc = new FEMContext(*this);
-
-  AutoPtr<DiffContext> ap(fc);
 
   DifferentiablePhysics* phys = this->get_physics();
 
@@ -1312,12 +1327,12 @@ AutoPtr<DiffContext> FEMSystem::build_context ()
   fc->set_mesh_y_var(phys->get_mesh_y_var());
   fc->set_mesh_z_var(phys->get_mesh_z_var());
 
-  ap->set_deltat_pointer( &deltat );
+  fc->set_deltat_pointer( &deltat );
 
   // If we are solving the adjoint problem, tell that to the Context
-  ap->is_adjoint() = this->get_time_solver().is_adjoint();
+  fc->is_adjoint() = this->get_time_solver().is_adjoint();
 
-  return ap;
+  return UniquePtr<DiffContext>(fc);
 }
 
 
@@ -1388,7 +1403,7 @@ void FEMSystem::mesh_position_get()
   const MeshBase::const_element_iterator end_el =
     mesh.active_local_elements_end();
 
-  AutoPtr<DiffContext> con = this->build_context();
+  UniquePtr<DiffContext> con = this->build_context();
   FEMContext &_femcontext = cast_ref<FEMContext&>(*con);
   this->init_context(_femcontext);
 

@@ -132,9 +132,43 @@ void EquationSystems::reinit ()
 {
   parallel_object_only();
 
-  libmesh_assert_not_equal_to (this->n_systems(), 0);
+  const unsigned int n_sys = this->n_systems();
+  libmesh_assert_not_equal_to (n_sys, 0);
 
-#ifdef DEBUG
+  // We may have added new systems since our last
+  // EquationSystems::(re)init call
+  bool _added_new_systems = false;
+  for (unsigned int i=0; i != n_sys; ++i)
+    if (!this->get_system(i).is_initialized())
+      _added_new_systems = true;
+
+  if (_added_new_systems)
+    {
+      // Our DofObjects will need space for the additional systems
+      MeshBase::node_iterator       node_it  = _mesh.nodes_begin();
+      const MeshBase::node_iterator node_end = _mesh.nodes_end();
+
+      for ( ; node_it != node_end; ++node_it)
+        (*node_it)->set_n_systems(n_sys);
+
+      MeshBase::element_iterator       elem_it  = _mesh.elements_begin();
+      const MeshBase::element_iterator elem_end = _mesh.elements_end();
+
+      for ( ; elem_it != elem_end; ++elem_it)
+        (*elem_it)->set_n_systems(n_sys);
+
+      // And any new systems will need initialization
+      for (unsigned int i=0; i != n_sys; ++i)
+        if (!this->get_system(i).is_initialized())
+          this->get_system(i).init();
+    }
+
+
+  // We used to assert that all nodes and elements *already* had
+  // n_systems() properly set; however this is false in the case where
+  // user code has manually added nodes and/or elements to an
+  // already-initialized system.
+
   // Make sure all the \p DofObject entities know how many systems
   // there are.
   {
@@ -145,7 +179,7 @@ void EquationSystems::reinit ()
     for ( ; node_it != node_end; ++node_it)
       {
         Node *node = *node_it;
-        libmesh_assert_equal_to (node->n_systems(), this->n_systems());
+        node->set_n_systems(this->n_systems());
       }
 
     // All the elements
@@ -155,10 +189,9 @@ void EquationSystems::reinit ()
     for ( ; elem_it != elem_end; ++elem_it)
       {
         Elem *elem = *elem_it;
-        libmesh_assert_equal_to (elem->n_systems(), this->n_systems());
+        elem->set_n_systems(this->n_systems());
       }
   }
-#endif
 
   // Localize each system's vectors
   for (unsigned int i=0; i != this->n_systems(); ++i)
@@ -177,23 +210,19 @@ void EquationSystems::reinit ()
       {
         System &sys = this->get_system(i);
 
-        // Don't do anything if the system doesn't have any variables in it
-        if(!sys.n_vars())
-          continue;
+        // Even if the system doesn't have any variables in it we want
+        // consistent behavior; e.g. distribute_dofs should have the
+        // opportunity to count up zero dofs on each processor.
+        //
+        // Who's been adding zero-var systems anyway, outside of my
+        // unit tests? - RHS
+        // if(!sys.n_vars())
+        // continue;
 
         sys.get_dof_map().distribute_dofs(_mesh);
 
-        // Recreate any hanging node constraints
-        sys.get_dof_map().create_dof_constraints(_mesh, sys.time);
-
-        // Apply any user-defined constraints
-        sys.user_constrain();
-
-        // Expand any recursive constraints
-        sys.get_dof_map().process_constraints(_mesh);
-
-        // And clean up the send_list before we use it again
-        sys.get_dof_map().prepare_send_list();
+        // Recreate any user or internal constraints
+        sys.reinit_constraints();
 
         sys.prolong_vectors();
       }
@@ -218,10 +247,7 @@ void EquationSystems::reinit ()
           if (!dof_constraints_created)
             {
               sys.get_dof_map().distribute_dofs(_mesh);
-              sys.get_dof_map().create_dof_constraints(_mesh, sys.time);
-              sys.user_constrain();
-              sys.get_dof_map().process_constraints(_mesh);
-              sys.get_dof_map().prepare_send_list();
+              sys.reinit_constraints();
 
             }
           sys.restrict_vectors();
@@ -245,11 +271,7 @@ void EquationSystems::reinit ()
           if (!dof_constraints_created)
             {
               sys.get_dof_map().distribute_dofs(_mesh);
-              sys.get_dof_map().create_dof_constraints(_mesh, sys.time);
-              sys.user_constrain();
-              sys.get_dof_map().process_constraints(_mesh);
-              sys.get_dof_map().prepare_send_list();
-
+              sys.reinit_constraints();
             }
           sys.prolong_vectors();
         }
@@ -305,14 +327,10 @@ void EquationSystems::allgather ()
       DofMap &dof_map = sys.get_dof_map();
       dof_map.distribute_dofs(_mesh);
 
-#ifdef LIBMESH_ENABLE_CONSTRAINTS
       // The user probably won't need constraint equations or the
       // send_list after an allgather, but let's keep it in consistent
       // shape just in case.
-      dof_map.create_dof_constraints(_mesh, sys.time);
-      sys.user_constrain();
-      dof_map.process_constraints(_mesh);
-#endif
+      sys.reinit_constraints();
       dof_map.prepare_send_list();
     }
 }
@@ -718,13 +736,13 @@ void EquationSystems::build_solution_vector (std::vector<Number>& soln,
                    _mesh.local_nodes_end()));
 
   // Create a NumericVector to hold the parallel solution
-  AutoPtr<NumericVector<Number> > parallel_soln_ptr = NumericVector<Number>::build(_communicator);
+  UniquePtr<NumericVector<Number> > parallel_soln_ptr = NumericVector<Number>::build(_communicator);
   NumericVector<Number> &parallel_soln = *parallel_soln_ptr;
   parallel_soln.init(nn*nv, n_local_nodes*nv, false, PARALLEL);
 
   // Create a NumericVector to hold the "repeat_count" for each node - this is essentially
   // the number of elements contributing to that node's value
-  AutoPtr<NumericVector<Number> > repeat_count_ptr = NumericVector<Number>::build(_communicator);
+  UniquePtr<NumericVector<Number> > repeat_count_ptr = NumericVector<Number>::build(_communicator);
   NumericVector<Number> &repeat_count = *repeat_count_ptr;
   repeat_count.init(nn*nv, n_local_nodes*nv, false, PARALLEL);
 
@@ -772,7 +790,14 @@ void EquationSystems::build_solution_vector (std::vector<Number>& soln,
       // Update the current_local_solution
       {
         System & non_const_sys = const_cast<System &>(system);
-        non_const_sys.solution->close();
+        // We used to simply call non_const_sys.solution->close()
+        // here, but that is not allowed when the solution vector is
+        // locked read-only, for example when printing the solution
+        // during during the middle of a solve...  So try to be a bit
+        // more careful about calling close() unnecessarily.
+        libmesh_assert(this->comm().verify(non_const_sys.solution->closed()));
+        if (!non_const_sys.solution->closed())
+          non_const_sys.solution->close();
         non_const_sys.update();
       }
 
@@ -913,7 +938,7 @@ void EquationSystems::get_solution (std::vector<Number>& soln,
     return;
 
   // Create a NumericVector to hold the parallel solution
-  AutoPtr<NumericVector<Number> > parallel_soln_ptr = NumericVector<Number>::build(_communicator);
+  UniquePtr<NumericVector<Number> > parallel_soln_ptr = NumericVector<Number>::build(_communicator);
   NumericVector<Number> &parallel_soln = *parallel_soln_ptr;
   parallel_soln.init(ne*nv, n_local_elems*nv, false, PARALLEL);
 
@@ -934,7 +959,14 @@ void EquationSystems::get_solution (std::vector<Number>& soln,
       // Update the current_local_solution
       {
         System & non_const_sys = const_cast<System &>(system);
-        non_const_sys.solution->close();
+        // We used to simply call non_const_sys.solution->close()
+        // here, but that is not allowed when the solution vector is
+        // locked read-only, for example when printing the solution
+        // during during the middle of a solve...  So try to be a bit
+        // more careful about calling close() unnecessarily.
+        libmesh_assert(this->comm().verify(non_const_sys.solution->closed()));
+        if (!non_const_sys.solution->closed())
+          non_const_sys.solution->close();
         non_const_sys.update();
       }
 
