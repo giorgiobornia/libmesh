@@ -40,18 +40,6 @@
 
 // for MeshData backward compatibility
 #include "libmesh/unv_io.h"
-#include "libmesh/matlab_io.h"
-#include "libmesh/off_io.h"
-#include "libmesh/medit_io.h"
-#include "libmesh/nemesis_io.h"
-#include "libmesh/gmsh_io.h"
-#include "libmesh/fro_io.h"
-#include "libmesh/xdr_io.h"
-#include "libmesh/legacy_xdr_io.h"
-#include "libmesh/vtk_io.h"
-#include "libmesh/abaqus_io.h"
-#include "libmesh/checkpoint_io.h"
-#include "libmesh/gambit_io.h"
 #include "libmesh/tetgen_io.h"
 
 
@@ -519,134 +507,9 @@ void UnstructuredMesh::read (const std::string& name,
         TetGenIO(*this,mesh_data).read (name);
     }
   else
-<<<<<<< HEAD
-    {
-      START_LOG("read()", "Mesh");
 
-      // Read the file based on extension.  Only processor 0
-      // needs to read the mesh.  It will then broadcast it and
-      // the other processors will pick it up
-      if (this->processor_id() == 0)
-        {
-          std::ostringstream pid_suffix;
-          pid_suffix << '_' << getpid();
-          // Nasty hack for reading/writing zipped files
-          std::string new_name = name;
-          if (name.size() - name.rfind(".bz2") == 4)
-            {
-#ifdef LIBMESH_HAVE_BZIP
-              new_name.erase(new_name.end() - 4, new_name.end());
-              new_name += pid_suffix.str();
-              std::string system_string = "bunzip2 -f -k -c ";
-              system_string += name + " > " + new_name;
-              START_LOG("system(bunzip2)", "Mesh");
-              if (std::system(system_string.c_str()))
-                libmesh_file_error(system_string);
-              STOP_LOG("system(bunzip2)", "Mesh");
-#else
-              libmesh_error_msg("ERROR: need bzip2/bunzip2 to open .bz2 file " << name);
-#endif
-            }
-          else if (name.size() - name.rfind(".xz") == 3)
-            {
-#ifdef LIBMESH_HAVE_XZ
-              new_name.erase(new_name.end() - 3, new_name.end());
-              new_name += pid_suffix.str();
-              std::string system_string = "xz -f -d -k -c ";
-              system_string += name + " > " + new_name;
-              START_LOG("system(xz -d)", "XdrIO");
-              if (std::system(system_string.c_str()))
-                libmesh_file_error(system_string);
-              STOP_LOG("system(xz -d)", "XdrIO");
-#else
-              libmesh_error_msg("ERROR: need xz to open .xz file " << name);
-#endif
-            }
-
-          if (new_name.rfind(".mat") < new_name.size())
-            MatlabIO(*this).read(new_name);
-
-          else if (new_name.rfind(".ucd") < new_name.size())
-            UCDIO(*this).read (new_name);
-
-          else if ((new_name.rfind(".off")  < new_name.size()) ||
-                   (new_name.rfind(".ogl")  < new_name.size()) ||
-                   (new_name.rfind(".oogl") < new_name.size()))
-            OFFIO(*this).read (new_name);
-
-          else if (new_name.rfind(".mgf") < new_name.size())
-            LegacyXdrIO(*this,true).read_mgf (new_name);
-
-          else if (new_name.rfind(".unv") < new_name.size())
-            UNVIO(*this, mesh_data).read (new_name);
-
-          else if ((new_name.rfind(".node")  < new_name.size()) ||
-                   (new_name.rfind(".ele")   < new_name.size()))
-            TetGenIO(*this,mesh_data).read (new_name);
-
-          else if (new_name.rfind(".exd") < new_name.size() ||
-                   new_name.rfind(".e") < new_name.size())
-            ExodusII_IO(*this).read (new_name);
-
-          else if (new_name.rfind(".msh") < new_name.size())
-            GmshIO(*this).read (new_name);
-
-          else if (new_name.rfind(".gmv") < new_name.size())
-            GMVIO(*this).read (new_name);
-
-          else if (new_name.rfind(".vtu") < new_name.size())
-            VTKIO(*this).read(new_name);
-
-          else if (new_name.rfind(".inp") < new_name.size())
-            AbaqusIO(*this).read(new_name);
-
-          else if (new_name.rfind(".gam") < new_name.size())
-            GambitIO(*this).read(new_name);
-
-          else
-            {
-              libmesh_error_msg(" ERROR: Unrecognized file extension: " \
-                                << name                                 \
-                                << "\n   I understand the following:\n\n" \
-                                << "     *.e    -- Sandia's ExodusII format\n" \
-                                << "     *.exd  -- Sandia's ExodusII format\n" \
-                                << "     *.gmv  -- LANL's General Mesh Viewer format\n" \
-                                << "     *.mat  -- Matlab triangular ASCII file\n" \
-                                << "     *.n    -- Sandia's Nemesis format\n" \
-                                << "     *.nem  -- Sandia's Nemesis format\n" \
-                                << "     *.off  -- OOGL OFF surface format\n" \
-                                << "     *.ucd  -- AVS's ASCII UCD format\n" \
-                                << "     *.unv  -- I-deas Universal format\n" \
-                                << "     *.vtu  -- Paraview VTK format\n" \
-                                << "     *.inp  -- Abaqus .inp format\n" \
-                                << "     *.xda  -- libMesh ASCII format\n" \
-                                << "     *.xdr  -- libMesh binary format\n" \
-                                << "     *.gz   -- any above format gzipped\n" \
-                                << "     *.bz2  -- any above format bzip2'ed\n" \
-                                << "     *.xz   -- any above format xzipped\n" \
-                                << "     *.cpa  -- libMesh Checkpoint ASCII format\n" \
-                                << "     *.cpr  -- libMesh Checkpoint binary format\n" \
-                                << "     *.gam  -- Gambit neutral format (originally .neu) \n");
-            }
-
-          // If we temporarily decompressed a file, remove the
-          // uncompressed version
-          if (name.size() - name.rfind(".bz2") == 4)
-            std::remove(new_name.c_str());
-          if (name.size() - name.rfind(".xz") == 3)
-            std::remove(new_name.c_str());
-        }
-
-
-      STOP_LOG("read()", "Mesh");
-
-      // Send the mesh & bcs (which are now only on processor 0) to the other
-      // processors
-      MeshCommunication().broadcast (*this);
-    }
-=======
     NameBasedIO(*this).read(name);
->>>>>>> master
+
 
   if (skip_renumber_nodes_and_elements)
     {

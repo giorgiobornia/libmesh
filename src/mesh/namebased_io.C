@@ -49,6 +49,7 @@
 #include "libmesh/vtk_io.h"
 #include "libmesh/abaqus_io.h"
 #include "libmesh/checkpoint_io.h"
+#include "libmesh/gambit_io.h"
 
 #include "libmesh/equation_systems.h"
 
@@ -243,6 +244,9 @@ void NameBasedIO::read (const std::string& name)
           else if (new_name.rfind(".inp") < new_name.size())
             AbaqusIO(mymesh).read(new_name);
 
+          else if (new_name.rfind(".gam") < new_name.size())
+            GambitIO(mymesh).read(new_name);
+
           else
             {
               libmesh_error_msg(" ERROR: Unrecognized file extension: " \
@@ -265,7 +269,8 @@ void NameBasedIO::read (const std::string& name)
                                 << "     *.bz2  -- any above format bzip2'ed\n" \
                                 << "     *.xz   -- any above format xzipped\n" \
                                 << "     *.cpa  -- libMesh Checkpoint ASCII format\n" \
-                                << "     *.cpr  -- libMesh Checkpoint binary format\n");
+                                << "     *.cpr  -- libMesh Checkpoint binary format\n" \
+                                << "     *.gam  -- Gambit neutral format (originally .neu) \n");
             }
 
           // If we temporarily decompressed a file, remove the
