@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -27,7 +27,6 @@
 #include "libmesh/enum_elem_type.h"
 #include "libmesh/fe_abstract.h"
 #include "libmesh/fe_transformation_base.h"
-#include "libmesh/fe_type.h"
 #include "libmesh/point.h"
 #include "libmesh/reference_counted_object.h"
 #include "libmesh/tensor_tools.h"
@@ -54,6 +53,7 @@ class MeshBase;
 template <typename T> class NumericVector;
 class QBase;
 template <typename T> class FETransformationBase;
+class FEType;
 
 #ifdef LIBMESH_ENABLE_NODE_CONSTRAINTS
 class NodeConstraints;
@@ -93,11 +93,9 @@ class InfFE;
  * This class is well 'at the heart' of the library, so
  * things in here should better remain unchanged.
  *
- * @author Benjamin S. Kirk, 2002
+ * \author Benjamin S. Kirk
+ * \date 2002
  */
-
-// ------------------------------------------------------------
-// FEBase class definition
 template <typename OutputType>
 class FEGenericBase : public FEAbstract
 {

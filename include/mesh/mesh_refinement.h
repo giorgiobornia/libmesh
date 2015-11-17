@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -30,8 +30,6 @@
 #include "libmesh/libmesh_common.h"
 #include "libmesh/libmesh.h" // libMesh::invalid_uint
 #include "libmesh/topology_map.h"
-#include "libmesh/elem.h"
-#include "libmesh/point_locator_base.h"
 #include "libmesh/parallel_object.h"
 
 // C++ Includes   -----------------------------------
@@ -46,19 +44,16 @@ class Point;
 class Node;
 class ErrorVector;
 class PeriodicBoundaries;
-
-
+class Elem;
+class PointLocatorBase;
 
 /**
  * This is the \p MeshRefinement class.  This class implements
  * adaptive mesh refinement algorithms for a \p MeshBase.
  *
- * @author Benjamin S. Kirk, 2002-2007.
+ * \author Benjamin S. Kirk
+ * \date 2002-2007
  */
-
-
-// ------------------------------------------------------------
-// MeshRefinement class definition
 class MeshRefinement : public ParallelObject
 {
 public:
@@ -606,14 +601,14 @@ private:
    * to prevent corresponding boundary element refinement mismatch
    * from exceeding the given limit.
    */
-  bool limit_overrefined_boundary (const unsigned int max_mismatch);
+  bool limit_overrefined_boundary (const signed char max_mismatch);
 
   /*
    * This algorithm flags boundary elements for refinement as needed
    * to prevent corresponding interior element refinement mismatch
    * from exceeding the given limit.
    */
-  bool limit_underrefined_boundary (const unsigned int max_mismatch);
+  bool limit_underrefined_boundary (const signed char max_mismatch);
 
   /**
    * This algorithm selects an element for refinement
@@ -750,11 +745,12 @@ private:
 
   Real _absolute_global_tolerance;
 
-  unsigned char _face_level_mismatch_limit, _edge_level_mismatch_limit,
-    _node_level_mismatch_limit;
+  unsigned char _face_level_mismatch_limit;
+  unsigned char _edge_level_mismatch_limit;
+  unsigned char _node_level_mismatch_limit;
 
-  signed char _overrefined_boundary_limit,
-              _underrefined_boundary_limit;
+  signed char _overrefined_boundary_limit;
+  signed char _underrefined_boundary_limit;
 
   /**
    * This option enforces the mismatch level prior to refinement by checking

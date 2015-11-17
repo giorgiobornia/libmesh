@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -34,18 +34,14 @@ namespace libMesh
 // Forward Declarations
 template <typename T> class DenseVector;
 
-
-
 /**
  * Defines a dense matrix for use in Finite Element-type computations.
  * Useful for storing element stiffness matrices before summation
  * into a global matrix.
  *
- * @author Benjamin S. Kirk, 2002
+ * \author Benjamin S. Kirk
+ * \date 2002
  */
-
-// ------------------------------------------------------------
-// Dense Matrix class definition
 template<typename T>
 class DenseMatrix : public DenseMatrixBase<T>
 {
@@ -71,7 +67,7 @@ public:
   /**
    * Set every element in the matrix to 0.
    */
-  virtual void zero();
+  virtual void zero() libmesh_override;
 
   /**
    * @returns the \p (i,j) element of the matrix.
@@ -89,18 +85,20 @@ public:
    * @returns the \p (i,j) element of the matrix as a writeable reference.
    */
   virtual T el(const unsigned int i,
-               const unsigned int j) const { return (*this)(i,j); }
+               const unsigned int j) const libmesh_override
+  { return (*this)(i,j); }
 
   /**
    * @returns the \p (i,j) element of the matrix as a writeable reference.
    */
   virtual T & el(const unsigned int i,
-                 const unsigned int j)     { return (*this)(i,j); }
+                 const unsigned int j) libmesh_override
+  { return (*this)(i,j); }
 
   /**
    * Left multipliess by the matrix \p M2.
    */
-  virtual void left_multiply (const DenseMatrixBase<T>& M2);
+  virtual void left_multiply (const DenseMatrixBase<T>& M2) libmesh_override;
 
   /**
    * Left multipliess by the matrix \p M2 of different type
@@ -111,7 +109,7 @@ public:
   /**
    * Right multiplies by the matrix \p M2.
    */
-  virtual void right_multiply (const DenseMatrixBase<T>& M2);
+  virtual void right_multiply (const DenseMatrixBase<T>& M2) libmesh_override;
 
   /**
    * Right multiplies by the matrix \p M2 of different type

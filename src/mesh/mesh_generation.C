@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -25,7 +25,6 @@
 // Local includes
 #include "libmesh/mesh_generation.h"
 #include "libmesh/unstructured_mesh.h"
-// #include "libmesh/elem.h"
 #include "libmesh/mesh_refinement.h"
 #include "libmesh/edge_edge2.h"
 #include "libmesh/edge_edge3.h"
@@ -1984,6 +1983,9 @@ void MeshTools::Generation::build_extrusion (UnstructuredMesh& mesh,
 
   mesh.reserve_nodes((order*nz+1)*orig_nodes);
 
+  // Container to catch the boundary IDs handed back by the BoundaryInfo object
+  std::vector<boundary_id_type> ids_to_copy;
+
   MeshBase::const_node_iterator       nd  = cross_section.nodes_begin();
   const MeshBase::const_node_iterator nend = cross_section.nodes_end();
   for (; nd!=nend; ++nd)
@@ -1998,9 +2000,7 @@ void MeshTools::Generation::build_extrusion (UnstructuredMesh& mesh,
                            node->id() + (k * orig_nodes),
                            node->processor_id());
 
-          const std::vector<boundary_id_type> ids_to_copy =
-            cross_section_boundary_info.boundary_ids(node);
-
+          cross_section_boundary_info.boundary_ids(node, ids_to_copy);
           boundary_info.add_node(new_node, ids_to_copy);
         }
     }
@@ -2149,8 +2149,7 @@ void MeshTools::Generation::build_extrusion (UnstructuredMesh& mesh,
           // Copy any old boundary ids on all sides
           for (unsigned short s = 0; s != elem->n_sides(); ++s)
             {
-              const std::vector<boundary_id_type> ids_to_copy =
-                cross_section_boundary_info.boundary_ids(elem, s);
+              cross_section_boundary_info.boundary_ids(elem, s, ids_to_copy);
 
               if (new_elem->dim() == 3)
                 {
@@ -2158,9 +2157,9 @@ void MeshTools::Generation::build_extrusion (UnstructuredMesh& mesh,
                   // for side s on the old element to side s+1 on the
                   // new element.  This is just a happy coincidence as
                   // far as I can tell...
-                  boundary_info.add_side
-                    (new_elem, cast_int<unsigned short>(s+1),
-                     ids_to_copy);
+                  boundary_info.add_side(new_elem,
+                                         cast_int<unsigned short>(s+1),
+                                         ids_to_copy);
                 }
               else
                 {

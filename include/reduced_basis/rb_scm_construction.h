@@ -29,7 +29,6 @@
 
 // rbOOmit includes
 #include "libmesh/rb_construction_base.h"
-#include "libmesh/rb_scm_evaluation.h"
 
 // libMesh includes
 #include "libmesh/condensed_eigen_system.h"
@@ -39,18 +38,18 @@
 namespace libMesh
 {
 
+// Forward declarations
+class RBSCMEvaluation;
+
 /**
  * This class is part of the rbOOmit framework.
  *
  * RBSCMConstruction implements the the Successive Constraint Method (SCM)
  * for computing rigorous lower bounds for stability constants.
  *
- * @author David J. Knezevic 2009
+ * \author David J. Knezevic
+ * \date 2009
  */
-
-// ------------------------------------------------------------
-// RBSCMConstruction class definition
-
 class RBSCMConstruction : public RBConstructionBase<CondensedEigenSystem>
 {
 public:
@@ -82,7 +81,7 @@ public:
    * Clear all the data structures associated with
    * the system.
    */
-  virtual void clear ();
+  virtual void clear () libmesh_override;
 
   /**
    * Set the RBSCMEvaluation object.
@@ -125,7 +124,7 @@ public:
    * a negative value of the argument indicates we are
    * not performing a bounding box solve.
    */
-  virtual void set_eigensolver_properties(int ) { }
+  virtual void set_eigensolver_properties(int) {}
 
   /**
    * Set the name of the associated RB system --- we need
@@ -169,7 +168,7 @@ protected:
    * usually this is the mass or inner-product
    * matrix, but needs to be implemented in subclass.
    */
-  virtual void load_matrix_B() ;
+  virtual void load_matrix_B();
 
   /**
    * Compute the SCM bounding box.
@@ -237,7 +236,6 @@ private:
    * perform the Evaluation stage of the SCM.
    */
   RBSCMEvaluation* rb_scm_eval;
-
 };
 
 } // namespace libMesh

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -49,7 +49,8 @@ class NewtonSolver;
  * }
  * \endverbatim
  *
- * @author John W. Peterson 2007
+ * \author John W. Peterson
+ * \date 2007
  */
 class ContinuationSystem : public FEMSystem
 {
@@ -81,12 +82,12 @@ public:
    * Clear all the data structures associated with
    * the system.
    */
-  virtual void clear ();
+  virtual void clear () libmesh_override;
 
   /**
    * Perform a standard "solve" of the system, without doing continuation.
    */
-  virtual void solve();
+  virtual void solve () libmesh_override;
 
   /**
    * Perform a continuation solve of the system.  In general, you can only
@@ -259,7 +260,7 @@ protected:
    * Initializes the member data fields associated with
    * the system, so that, e.g., \p assemble() may be used.
    */
-  virtual void init_data ();
+  virtual void init_data () libmesh_override;
 
   /**
    * There are (so far) two different vectors which may be assembled using the assembly routine:

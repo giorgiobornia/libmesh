@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -112,6 +112,14 @@ Real Edge2::volume () const
   // OK, so this is probably overkill, since it is equivalent to
   // Elem::hmax() for the Edge2, but here it is nonetheless...
   return (this->point(1) - this->point(0)).size();
+}
+
+
+
+dof_id_type Edge2::key () const
+{
+  return this->compute_key(this->node(0),
+                           this->node(1));
 }
 
 } // namespace libMesh

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -52,12 +52,10 @@ class MeshData;
  * This class will not have any functionality unless VTK is detected
  * during configure and hence LIBMESH_HAVE_VTK is defined.
  *
- * @author Wout Ruijter, 2007
- * (Checked in to LibMesh by J.W. Peterson)
+ * \author Wout Ruijter
+ * \author John W. Peterson
+ * \date 2007
  */
-
-// ------------------------------------------------------------
-// VTKIO class definition
 class VTKIO : public MeshInput<MeshBase>,
               public MeshOutput<MeshBase>
 {
@@ -82,26 +80,18 @@ public:
    */
   virtual void write_nodal_data (const std::string&,
                                  const std::vector<Number>&,
-                                 const std::vector<std::string>&);
-
-  /**
-   * Overloads writing equation systems, this is done because when overloading
-   * write_nodal_data there would be no way to export cell centered data
-   */
-  // virtual void write_equation_systems(const std::string& fname,
-  //                                     const EquationSystems& es,
-  //                                     const std::set<std::string>* system_names=NULL);
+                                 const std::vector<std::string>&) libmesh_override;
 
   /**
    * This method implements reading a mesh from a specified file
    * in VTK format.
    */
-  virtual void read (const std::string&);
+  virtual void read (const std::string&) libmesh_override;
 
   /**
    * Output the mesh without solutions to a .pvtu file
    */
-  virtual void write (const std::string&);
+  virtual void write (const std::string&) libmesh_override;
 
   /**
    * Get a pointer to the VTK datastructure

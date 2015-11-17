@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -29,23 +29,18 @@
 namespace libMesh
 {
 
-
-
 /**
  * Defines a dense subvector for use in Finite Element-type computations.
  * Useful for storing element load vectors  before summation
  * into a global vector, particularly when you have systems of equations.
  *
- * @author Benjamin S. Kirk, 2003
+ * \author Benjamin S. Kirk
+ * \date 2003
  */
-
-// ------------------------------------------------------------
-// DenseSubVector class definition
 template<typename T>
 class DenseSubVector : public DenseVectorBase<T>
 {
 public:
-
   /**
    * Constructor.  Creates a dense subvector of the vector
    * \p parent.  The subvector has dimensions \f$(m \times n)\f$,
@@ -70,7 +65,7 @@ public:
   /**
    * Set every element in the subvector to 0.
    */
-  virtual void zero();
+  virtual void zero() libmesh_override;
 
   /**
    * @returns the \p (i,j) element of the subvector as a const
@@ -86,22 +81,26 @@ public:
   /**
    * @returns the \p (i) element of the vector.
    */
-  virtual T el(const unsigned int i) const { return (*this)(i); }
+  virtual T el(const unsigned int i) const libmesh_override
+  { return (*this)(i); }
 
   /**
    * @returns the \p (i) element of the vector as a writeable reference.
    */
-  virtual T & el(const unsigned int i)     { return (*this)(i); }
+  virtual T & el(const unsigned int i) libmesh_override
+  { return (*this)(i); }
 
   /**
    * @returns the size of the subvector.
    */
-  virtual unsigned int size() const { return _n; }
+  virtual unsigned int size() const libmesh_override
+  { return _n; }
 
   /**
    * @returns true iff size() is 0.
    */
-  virtual bool empty() const { return (_n == 0); }
+  virtual bool empty() const libmesh_override
+  { return (_n == 0); }
 
   /**
    * @returns the row offset into the parent vector.

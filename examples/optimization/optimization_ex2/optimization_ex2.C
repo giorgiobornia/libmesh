@@ -1,24 +1,29 @@
-/* The libMesh Finite Element Library. */
-/* Copyright (C) 2003  Benjamin S. Kirk */
+// The libMesh Finite Element Library.
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
-/* This library is free software; you can redistribute it and/or */
-/* modify it under the terms of the GNU Lesser General Public */
-/* License as published by the Free Software Foundation; either */
-/* version 2.1 of the License, or (at your option) any later version. */
+// This library is free software; you can redistribute it and/or
+// modify it under the terms of the GNU Lesser General Public
+// License as published by the Free Software Foundation; either
+// version 2.1 of the License, or (at your option) any later version.
 
-/* This library is distributed in the hope that it will be useful, */
-/* but WITHOUT ANY WARRANTY; without even the implied warranty of */
-/* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU */
-/* Lesser General Public License for more details. */
+// This library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+// Lesser General Public License for more details.
 
-/* You should have received a copy of the GNU Lesser General Public */
-/* License along with this library; if not, write to the Free Software */
-/* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
+// You should have received a copy of the GNU Lesser General Public
+// License along with this library; if not, write to the Free Software
+// Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+
 
 // <h1>Optimization Example 2 - Optimization with constraints</h1>
+// \author David Knezevic
+// \date 2015
 //
-// In this example we extend example 1 to demonstrate how to use OptimizationSystem's
-// interface for imposing equality and inequality constraints.
+// In this example we extend example 1 to demonstrate how to use
+// OptimizationSystem's interface for imposing equality and inequality
+// constraints.
 
 // C++ include files that we need
 #include <iostream>
@@ -228,9 +233,9 @@ Number AssembleOptimization::objective (
   UniquePtr< NumericVector<Number> > AxU = soln.zero_clone();
 
   A_matrix->vector_mult(*AxU, soln);
-  Real UTxAxU = AxU->dot(soln);
+  Number UTxAxU = AxU->dot(soln);
 
-  Real UTxF = F_vector->dot(soln);
+  Number UTxF = F_vector->dot(soln);
 
   return 0.5 * UTxAxU - UTxF;
 }
@@ -446,8 +451,18 @@ int main (int argc, char** argv)
   LibMeshInit init (argc, argv);
 
 #ifndef LIBMESH_HAVE_PETSC_TAO
+
   libmesh_example_requires(false, "PETSc >= 3.5.0 with built-in TAO support");
+
+#elif LIBMESH_USE_COMPLEX_NUMBERS
+
+  // According to
+  // http://www.mcs.anl.gov/research/projects/tao/documentation/installation.html
+  // TAO & PETSc-complex are currently mutually exclusive
+  libmesh_example_requires(false, "PETSc >= 3.5.0 with built-in TAO support & real-numbers only");
+
 #endif
+
 
   GetPot infile("optimization_ex2.in");
   const std::string approx_order = infile("approx_order", "FIRST");

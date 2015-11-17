@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -195,5 +195,15 @@ Real Edge3::volume () const
                            (ca - 0.25*ba*ba)*std::log( (1.-0.5*ba+s1)/(-1.-0.5*ba+s2) )
                            );
 }
+
+
+
+dof_id_type Edge3::key () const
+{
+  return this->compute_key(this->node(0),
+                           this->node(1),
+                           this->node(2));
+}
+
 
 } // namespace libMesh

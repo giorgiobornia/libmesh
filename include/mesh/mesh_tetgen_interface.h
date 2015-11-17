@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -24,7 +24,6 @@
 
 
 // Local includes
-#include "libmesh/elem.h"
 #include "libmesh/mesh_serializer.h"
 #include "libmesh/point.h" // used for specifying holes
 
@@ -39,7 +38,7 @@ namespace libMesh
 // Forward Declarations
 class UnstructuredMesh;
 class TetGenWrapper;
-
+class Elem;
 
 /**
  * Class \p TetGenMeshInterface provides an interface for
@@ -47,8 +46,10 @@ class TetGenWrapper;
  * information about TetGen cf.
  * <a href="http://tetgen.berlios.de/">TetGen home page</a>.
  *
- * @author, Steffen Petersen, 2004
- * Refactoring, John W. Peterson, 2011
+ * \author Steffen Petersen
+ * \date 2004
+ * \author John W. Peterson
+ * \date 2011
  */
 class TetGenMeshInterface
 {

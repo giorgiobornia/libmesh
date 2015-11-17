@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -42,13 +42,11 @@ class MeshBase;
  * GMSH software see
  * <a href="http://http://www.geuz.org/gmsh/">the Gmsh home page</a>
  *
- * @author John W. Peterson, 2004, 2014
- * @author Martin Luthi (mluthi@tnoo.net), 2005: massive overhaul and extension,
- *                                         plus support for reading meshes and writing results
+ * \author John W. Peterson
+ * \date 2004, 2014
+ * \author Martin Luthi
+ * \date 2005
  */
-
-// ------------------------------------------------------------
-// GMVIO class definition
 class GmshIO : public MeshInput<MeshBase>,
                public MeshOutput<MeshBase>
 {
@@ -75,13 +73,13 @@ public:
    * The user is responsible for calling Mesh::prepare_for_use()
    * after reading the mesh and before using it.
    */
-  virtual void read (const std::string& name);
+  virtual void read (const std::string& name) libmesh_override;
 
   /**
    * This method implements writing a mesh to a specified file
    * in the Gmsh *.msh format.
    */
-  virtual void write (const std::string& name);
+  virtual void write (const std::string& name) libmesh_override;
 
   /**
    * This method implements writing a mesh with nodal data to a
@@ -89,7 +87,7 @@ public:
    */
   virtual void write_nodal_data (const std::string&,
                                  const std::vector<Number>&,
-                                 const std::vector<std::string>&);
+                                 const std::vector<std::string>&) libmesh_override;
 
   /**
    * Flag indicating whether or not to write a binary file.  While binary
@@ -115,13 +113,13 @@ private:
    * is called by the public interface function and implements
    * reading the file.
    */
-  virtual void read_mesh (std::istream& in);
+  void read_mesh (std::istream& in);
 
   /**
    * This method implements writing a mesh to a
    * specified file.  This will write an ASCII *.msh file.
    */
-  virtual void write_mesh (std::ostream& out);
+  void write_mesh (std::ostream& out);
 
   /**
    * This method implements writing a mesh with nodal data to a specified file

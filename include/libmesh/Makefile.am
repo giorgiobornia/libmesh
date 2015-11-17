@@ -223,10 +223,13 @@ BUILT_SOURCES = \
         laspack_vector.h \
         numeric_vector.h \
         parsed_fem_function.h \
+        parsed_fem_function_parameter.h \
         parsed_function.h \
+        parsed_function_parameter.h \
         petsc_macro.h \
         petsc_matrix.h \
         petsc_preconditioner.h \
+        petsc_solver_exception.h \
         petsc_vector.h \
         preconditioner.h \
         raw_accessor.h \
@@ -329,7 +332,6 @@ BUILT_SOURCES = \
         euler_solver.h \
         first_order_unsteady_solver.h \
         laspack_linear_solver.h \
-        linear.h \
         linear_solver.h \
         memory_solution_history.h \
         newmark_solver.h \
@@ -347,7 +349,7 @@ BUILT_SOURCES = \
         slepc_eigen_solver.h \
         slepc_macro.h \
         solution_history.h \
-        solver.h \
+        solver_configuration.h \
         steady_solver.h \
         tao_optimization_solver.h \
         time_solver.h \
@@ -403,6 +405,7 @@ BUILT_SOURCES = \
         point_locator_tree.h \
         pool_allocator.h \
         restore_warnings.h \
+        safe_bool.h \
         statistics.h \
         string_to_enum.h \
         timestamp.h \
@@ -1170,7 +1173,13 @@ numeric_vector.h: $(top_srcdir)/include/numerics/numeric_vector.h
 parsed_fem_function.h: $(top_srcdir)/include/numerics/parsed_fem_function.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
+parsed_fem_function_parameter.h: $(top_srcdir)/include/numerics/parsed_fem_function_parameter.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
 parsed_function.h: $(top_srcdir)/include/numerics/parsed_function.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+parsed_function_parameter.h: $(top_srcdir)/include/numerics/parsed_function_parameter.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 petsc_macro.h: $(top_srcdir)/include/numerics/petsc_macro.h
@@ -1180,6 +1189,9 @@ petsc_matrix.h: $(top_srcdir)/include/numerics/petsc_matrix.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 petsc_preconditioner.h: $(top_srcdir)/include/numerics/petsc_preconditioner.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+petsc_solver_exception.h: $(top_srcdir)/include/numerics/petsc_solver_exception.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 petsc_vector.h: $(top_srcdir)/include/numerics/petsc_vector.h
@@ -1488,9 +1500,6 @@ first_order_unsteady_solver.h: $(top_srcdir)/include/solvers/first_order_unstead
 laspack_linear_solver.h: $(top_srcdir)/include/solvers/laspack_linear_solver.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
-linear.h: $(top_srcdir)/include/solvers/linear.h
-	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
-
 linear_solver.h: $(top_srcdir)/include/solvers/linear_solver.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
@@ -1542,7 +1551,7 @@ slepc_macro.h: $(top_srcdir)/include/solvers/slepc_macro.h
 solution_history.h: $(top_srcdir)/include/solvers/solution_history.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
-solver.h: $(top_srcdir)/include/solvers/solver.h
+solver_configuration.h: $(top_srcdir)/include/solvers/solver_configuration.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 steady_solver.h: $(top_srcdir)/include/solvers/steady_solver.h
@@ -1708,6 +1717,9 @@ pool_allocator.h: $(top_srcdir)/include/utils/pool_allocator.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 restore_warnings.h: $(top_srcdir)/include/utils/restore_warnings.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+safe_bool.h: $(top_srcdir)/include/utils/safe_bool.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 statistics.h: $(top_srcdir)/include/utils/statistics.h

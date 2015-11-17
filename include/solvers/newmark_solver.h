@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -38,11 +38,9 @@ namespace libMesh
  * which is still experimental.  Users of this framework should
  * beware of bugs and future API changes.
  *
- * @author Paul T. Bauman 2015
+ * \author Paul T. Bauman
+ * \date 2015
  */
-
-// ------------------------------------------------------------
-// Solver class definition
 class NewmarkSolver : public SecondOrderUnsteadySolver
 {
 public:
@@ -69,14 +67,14 @@ public:
    * UnsteadySolver::solve(), but adaptive mesh refinement and/or adaptive
    * time step selection may require some solve() steps to be repeated.
    */
-  virtual void advance_timestep ();
+  virtual void advance_timestep () libmesh_override;
 
   /**
    * This method advances the adjoint solution to the previous
    * timestep, after an adjoint_solve() has been performed.  This will
    * be done before every UnsteadySolver::adjoint_solve().
    */
-  virtual void adjoint_advance_timestep ();
+  virtual void adjoint_advance_timestep () libmesh_override;
 
   /**
    * This method uses the specified initial displacement and velocity
@@ -95,16 +93,24 @@ public:
   void project_initial_accel( FunctionBase<Number> *f, FunctionBase<Gradient> *g = NULL );
 
   /**
+   * Allow the user to (re)set whether the initial acceleration is available.
+   * This is not needed if either compute_initial_accel() or project_initial_accel()
+   * are called. This is useful is the user is restarting a calculation and the acceleration
+   * is available from the restart.
+   */
+  void set_initial_accel_avail( bool initial_accel_set );
+
+  /**
    * Error convergence order: 2 for \f$\gamma=0.5\f$, 1 otherwise
    */
-  virtual Real error_order() const;
+  virtual Real error_order() const libmesh_override;
 
   /**
    * This method solves for the solution at the next timestep.
    * Usually we will only need to solve one (non)linear system per timestep,
    * but more complex subclasses may override this.
    */
-  virtual void solve ();
+  virtual void solve () libmesh_override;
 
   /**
    * This method uses the DifferentiablePhysics'
@@ -113,7 +119,7 @@ public:
    * it uses will depend on theta.
    */
   virtual bool element_residual (bool request_jacobian,
-                                 DiffContext&);
+                                 DiffContext&) libmesh_override;
 
   /**
    * This method uses the DifferentiablePhysics'
@@ -122,7 +128,7 @@ public:
    * What combination it uses will depend on theta.
    */
   virtual bool side_residual (bool request_jacobian,
-                              DiffContext&);
+                              DiffContext&) libmesh_override;
 
   /**
    * This method uses the DifferentiablePhysics'
@@ -131,7 +137,7 @@ public:
    * What combination it uses will depend on theta.
    */
   virtual bool nonlocal_residual (bool request_jacobian,
-                                  DiffContext&);
+                                  DiffContext&) libmesh_override;
 
 
 protected:
@@ -173,7 +179,6 @@ protected:
                                   ResFuncType damping,
                                   ResFuncType time_deriv,
                                   ResFuncType constraint);
-
 };
 
 } // namespace libMesh

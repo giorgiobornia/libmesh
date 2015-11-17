@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -34,7 +34,8 @@ namespace libMesh
  * and NumberVectorValue defines a real or complex-valued vector depending
  * on how the library was configured.
  *
- * \author Benjamin S. Kirk, 2003.
+ * \author Benjamin S. Kirk
+ * \date 2003
  */
 template <typename T>
 class VectorValue : public TypeVector<T>
@@ -70,6 +71,20 @@ public:
                boostcopy::enable_if_c<ScalarTraits<Scalar3>::value,
                const Scalar3>::type z = 0);
 
+
+  /**
+   * Constructor-from-scalar.  Sets higher dimensional entries to 0.
+   * Necessary because for some reason the constructor-from-scalars
+   * alone is insufficient to let the compiler figure out
+   * VectorValue<Complex> v = 0;
+   */
+  template <typename Scalar>
+  VectorValue (const Scalar x,
+               typename
+               boostcopy::enable_if_c<ScalarTraits<Scalar>::value,
+               const Scalar>::type* sfinae = NULL);
+
+
   /**
    * Copy-constructor.
    */
@@ -101,11 +116,6 @@ public:
     VectorValue&>::type
   operator = (const Scalar& libmesh_dbg_var(p))
   { libmesh_assert_equal_to (p, Scalar(0)); this->zero(); return *this; }
-
-
-private:
-
-
 };
 
 
@@ -160,6 +170,16 @@ VectorValue<T>::VectorValue (typename
 }
 
 
+template <typename T>
+template <typename Scalar>
+inline
+VectorValue<T>::VectorValue (const Scalar x,
+                             typename
+                             boostcopy::enable_if_c<ScalarTraits<Scalar>::value,
+                             const Scalar>::type* /*sfinae*/) :
+  TypeVector<T> (x)
+{
+}
 
 template <typename T>
 template <typename T2>

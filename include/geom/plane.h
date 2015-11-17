@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -28,11 +28,11 @@
 namespace libMesh
 {
 
-
 /**
  * This class defines a plane.
  *
- * @author Benjamin S. Kirk, 2002
+ * \author Benjamin S. Kirk
+ * \date 2002
  */
 class Plane : public Surface
 {
@@ -98,13 +98,13 @@ public:
    * @returns true if the point p is above the surface,
    * false otherwise.
    */
-  bool above_surface (const Point& p) const;
+  virtual bool above_surface (const Point& p) const libmesh_override;
 
   /**
    * @returns true if the point p is below the surface,
    * false otherwise.
    */
-  bool below_surface (const Point& p) const;
+  virtual bool below_surface (const Point& p) const libmesh_override;
 
   /**
    * @returns true if the point p is on the surface,
@@ -112,18 +112,18 @@ public:
    * the surface really means "very close" to account
    * for roundoff error.
    */
-  bool on_surface (const Point& p) const;
+  virtual bool on_surface (const Point& p) const libmesh_override;
 
   /**
    * @returns the closest point on the surface to point p.
    */
-  Point closest_point (const Point& p) const;
+  virtual Point closest_point (const Point& p) const libmesh_override;
 
   /**
    * @returns a unit vector normal to the surface at
    * point p.
    */
-  Point unit_normal (const Point& p) const;
+  virtual Point unit_normal (const Point& p) const libmesh_override;
 
   /**
    * @returns a point on the plane useful

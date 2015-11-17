@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -35,6 +35,8 @@
 #include "libmesh/system.h"
 #include "libmesh/system_norm.h"
 #include "libmesh/utility.h"
+#include "libmesh/elem.h"
+#include "libmesh/fe_type.h"
 
 // includes for calculate_norm, point_*
 #include "libmesh/fe_base.h"
@@ -227,6 +229,10 @@ void System::clear ()
 
 void System::init ()
 {
+  // Calling init() twice on the same system currently works evil
+  // magic, whether done directly or via EquationSystems::read()
+  libmesh_assert(!this->is_initialized());
+
   // First initialize any required data:
   // either only the basic System data
   if (_basic_system_only)

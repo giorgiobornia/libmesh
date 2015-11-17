@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -463,101 +463,46 @@ Real Elem::length(const unsigned int n1,
 
 
 
+dof_id_type Elem::key () const
+{
+  std::vector<dof_id_type> node_ids(this->n_nodes());
+
+  for (unsigned n=0; n<this->n_nodes(); n++)
+    node_ids[n] = this->node(n);
+
+  // Always sort, so that different local node numberings hash to the
+  // same value.
+  std::sort (node_ids.begin(), node_ids.end());
+
+  return Utility::hashword(node_ids);
+}
+
+
+
 bool Elem::operator == (const Elem& rhs) const
 {
+  // If the elements aren't the same type, they aren't equal
+  if (this->type() != rhs.type())
+    return false;
 
-  // Cast rhs to an Elem*
-  //    const Elem* rhs_elem = dynamic_cast<const Elem*>(&rhs);
-  const Elem* rhs_elem = &rhs;
+  // Make two sorted vectors of global node ids and compare them for
+  // equality.
+  std::vector<dof_id_type>
+    this_ids(this->n_nodes()),
+    rhs_ids(rhs.n_nodes());
 
-  // If we cannot cast to an Elem*, rhs must be a Node
-  //    if(rhs_elem == static_cast<const Elem*>(NULL))
-  //        return false;
-
-  //   libmesh_assert (n_nodes());
-  //   libmesh_assert (rhs.n_nodes());
-
-  //   // Elements can only be equal if they
-  //   // contain the same number of nodes.
-  //   if (this->n_nodes() == rhs.n_nodes())
-  //     {
-  //       // Create a set that contains our global
-  //       // node numbers and those of our neighbor.
-  //       // If the set is the same size as the number
-  //       // of nodes in both elements then they must
-  //       // be connected to the same nodes.
-  //       std::set<unsigned int> nodes_set;
-
-  //       for (unsigned int n=0; n<this->n_nodes(); n++)
-  //         {
-  //           nodes_set.insert(this->node(n));
-  //           nodes_set.insert(rhs.node(n));
-  //         }
-
-  //       // If this passes the elements are connected
-  //       // to the same global nodes
-  //       if (nodes_set.size() == this->n_nodes())
-  //         return true;
-  //     }
-
-  //   // If we get here it is because the elements either
-  //   // do not have the same number of nodes or they are
-  //   // connected to different nodes.  Either way they
-  //   // are not the same element
-  //   return false;
-
-  // Useful typedefs
-  typedef std::vector<dof_id_type>::iterator iterator;
-
-
-  // Elements can only be equal if they
-  // contain the same number of nodes.
-  // However, we will only test the vertices,
-  // which is sufficient & cheaper
-  if (this->n_nodes() == rhs_elem->n_nodes())
+  for (unsigned n=0; n<this->n_nodes(); n++)
     {
-      // The number of nodes in the element
-      const unsigned int nn = this->n_nodes();
-
-      // Create a vector that contains our global
-      // node numbers and those of our neighbor.
-      // If the sorted, unique vector is the same size
-      // as the number of nodes in both elements then
-      // they must be connected to the same nodes.
-      //
-      // The vector will be no larger than 2*n_nodes(),
-      // so we might as well reserve the space.
-      std::vector<dof_id_type> common_nodes;
-      common_nodes.reserve (2*nn);
-
-      // Add the global indices of the nodes
-      for (unsigned int n=0; n<nn; n++)
-        {
-          common_nodes.push_back (this->node(n));
-          common_nodes.push_back (rhs_elem->node(n));
-        }
-
-      // Sort the vector and find out how long
-      // the sorted vector is.
-      std::sort (common_nodes.begin(), common_nodes.end());
-
-      iterator new_end = std::unique (common_nodes.begin(),
-                                      common_nodes.end());
-
-      const int new_size = cast_int<int>
-        (std::distance (common_nodes.begin(), new_end));
-
-      // If this passes the elements are connected
-      // to the same global vertex nodes
-      if (new_size == static_cast<int>(nn))
-        return true;
+      this_ids[n] = this->node(n);
+      rhs_ids[n] = rhs.node(n);
     }
 
-  // If we get here it is because the elements either
-  // do not have the same number of nodes or they are
-  // connected to different nodes.  Either way they
-  // are not the same element
-  return false;
+  // Sort the vectors to rule out different local node numberings.
+  std::sort(this_ids.begin(), this_ids.end());
+  std::sort(rhs_ids.begin(), rhs_ids.end());
+
+  // If the node ids match, the elements are equal!
+  return this_ids == rhs_ids;
 }
 
 
@@ -938,7 +883,7 @@ void Elem::find_interior_neighbors(std::set<const Elem *> &neighbor_set) const
       if (elem->level() > this->level())
         {
           unsigned int vertices_contained = 0;
-          for (unsigned int p=1; p < elem->n_nodes(); ++p)
+          for (unsigned int p=0; p < elem->n_nodes(); ++p)
             if (this->contains_point(elem->point(p)))
               vertices_contained++;
 
@@ -950,12 +895,14 @@ void Elem::find_interior_neighbors(std::set<const Elem *> &neighbor_set) const
         }
       else
         {
-          for (unsigned int p=1; p < this->n_nodes(); ++p)
+          for (unsigned int p=0; p < this->n_nodes(); ++p)
+          {
             if (!elem->contains_point(this->point(p)))
               {
                 neighbor_set.erase(current);
                 break;
               }
+          }
         }
     }
 }
@@ -1052,10 +999,9 @@ Elem* Elem::topological_neighbor (const unsigned int i,
       // Since the neighbor is NULL it must be on a boundary. We need
       // see if this is a periodic boundary in which case it will have a
       // topological neighbor
-
-      std::vector<boundary_id_type> boundary_ids =
-        mesh.get_boundary_info().boundary_ids(this, cast_int<unsigned short>(i));
-      for (std::vector<boundary_id_type>::iterator j = boundary_ids.begin(); j != boundary_ids.end(); ++j)
+      std::vector<boundary_id_type> bc_ids;
+      mesh.get_boundary_info().boundary_ids(this, cast_int<unsigned short>(i), bc_ids);
+      for (std::vector<boundary_id_type>::iterator j = bc_ids.begin(); j != bc_ids.end(); ++j)
         if (pb->boundary(*j))
           {
             // Since the point locator inside of periodic boundaries
@@ -1091,10 +1037,9 @@ const Elem* Elem::topological_neighbor (const unsigned int i,
       // Since the neighbor is NULL it must be on a boundary. We need
       // see if this is a periodic boundary in which case it will have a
       // topological neighbor
-
-      std::vector<boundary_id_type> boundary_ids =
-        mesh.get_boundary_info().boundary_ids(this, cast_int<unsigned short>(i));
-      for (std::vector<boundary_id_type>::iterator j = boundary_ids.begin(); j != boundary_ids.end(); ++j)
+      std::vector<boundary_id_type> bc_ids;
+      mesh.get_boundary_info().boundary_ids(this, cast_int<unsigned short>(i), bc_ids);
+      for (std::vector<boundary_id_type>::iterator j = bc_ids.begin(); j != bc_ids.end(); ++j)
         if (pb->boundary(*j))
           {
             // Since the point locator inside of periodic boundaries
@@ -1497,11 +1442,11 @@ bool Elem::ancestor() const
 {
 #ifdef LIBMESH_ENABLE_AMR
 
-// Use a fast, ParallelMesh-safe definition
+  // Use a fast, ParallelMesh-safe definition
   const bool is_ancestor =
     !this->active() && !this->subactive();
 
-// But check for inconsistencies if we have time
+  // But check for inconsistencies if we have time
 #ifdef DEBUG
   if (!is_ancestor && this->has_children())
     {

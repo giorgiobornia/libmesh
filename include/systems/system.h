@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -27,13 +27,11 @@
 #include "libmesh/enum_xdr_mode.h"
 #include "libmesh/enum_subset_solve_mode.h"
 #include "libmesh/enum_parallel_type.h"
-#include "libmesh/fe_type.h"
 #include "libmesh/fem_function_base.h"
 #include "libmesh/libmesh_common.h"
 #include "libmesh/parallel_object.h"
 #include "libmesh/qoi_set.h"
 #include "libmesh/reference_counted_object.h"
-#include "libmesh/system_norm.h" // for implicit conversion
 #include "libmesh/tensor_value.h" // For point_hessian
 #include "libmesh/variable.h"
 
@@ -61,6 +59,8 @@ template <typename T> class VectorValue;
 typedef VectorValue<Number> NumberVectorValue;
 typedef NumberVectorValue Gradient;
 class SystemSubset;
+class FEType;
+class SystemNorm;
 
 /**
  * This is the base class for classes which contain
@@ -71,11 +71,9 @@ class SystemSubset;
  * one or more of the children of this class.
  * Note that templating \p EqnSystems relaxes the use of virtual members.
  *
- * @author Benjamin S. Kirk, 2003-2004.
+ * \author Benjamin S. Kirk
+ * \date 2003-2004
  */
-
-// ------------------------------------------------------------
-// System class definition
 class System : public ReferenceCountedObject<System>,
                public ParallelObject
 {

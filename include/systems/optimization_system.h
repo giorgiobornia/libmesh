@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -36,11 +36,10 @@ template<typename T> class OptimizationSolver;
 /**
  * This System subclass enables us to assemble an objective function,
  * gradient, Hessian and bounds for optimization problems.
+ *
+ * \author David Knezevic
+ * \date 2015
  */
-
-// ------------------------------------------------------------
-// OptimizationSystem class definition
-
 class OptimizationSystem : public ImplicitSystem
 {
 public:
@@ -223,23 +222,23 @@ public:
    * Clear all the data structures associated with
    * the system.
    */
-  virtual void clear ();
+  virtual void clear () libmesh_override;
 
   /**
    * Initializes new data members of the system.
    */
-  virtual void init_data ();
+  virtual void init_data () libmesh_override;
 
   /**
    * Reinitializes the member data fields associated with
    * the system, so that, e.g., \p assemble() may be used.
    */
-  virtual void reinit ();
+  virtual void reinit () libmesh_override;
 
   /**
    * Solves the optimization problem.
    */
-  virtual void solve ();
+  virtual void solve () libmesh_override;
 
   /**
    * Initialize storage for the equality constraints, and the
@@ -260,7 +259,7 @@ public:
    * @returns \p "Optimization".  Helps in identifying
    * the system type in an equation system file.
    */
-  virtual std::string system_type () const { return "Optimization"; }
+  virtual std::string system_type () const libmesh_override { return "Optimization"; }
 
   /**
    * The \p OptimizationSolver that is used for performing the optimization.
@@ -300,21 +299,8 @@ public:
    */
   std::vector< std::set<numeric_index_type> > eq_constraint_jac_sparsity;
   std::vector< std::set<numeric_index_type> > ineq_constraint_jac_sparsity;
-
-private:
-
-  /**
-   * Boolean to indicate whether or not the lower and upper bounds
-   * should be applied.
-   */
-  // bool _apply_bounds;
-
 };
 
-
-
 } // namespace libMesh
-
-
 
 #endif // LIBMESH_OPTIMIZATION_SYSTEM_H

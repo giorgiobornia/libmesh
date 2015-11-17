@@ -28,7 +28,6 @@
 
 // rbOOmit includes
 #include "libmesh/rb_parametrized.h"
-#include "libmesh/rb_theta_expansion.h"
 
 // libMesh includes
 #include "libmesh/parallel_object.h"
@@ -38,6 +37,9 @@
 namespace libMesh
 {
 
+// Forward declarations
+class RBThetaExpansion;
+
 /**
  * This class is part of the rbOOmit framework.
  *
@@ -45,12 +47,9 @@ namespace libMesh
  * to _evaluate_ the Successive Constraint Method for
  * associated with a reduced basis model.
  *
- * @author David J. Knezevic, 2011
+ * \author David J. Knezevic
+ * \date 2011
  */
-
-// ------------------------------------------------------------
-// RBSCMEvaluation class definition
-
 class RBSCMEvaluation : public RBParametrized,
                         public ParallelObject
 {

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -42,7 +42,7 @@ namespace libMesh
 template <typename T> class SparseMatrix;
 template <typename T> class ShellMatrix;
 template <typename T> class NumericVector;
-
+class SolverConfiguration;
 
 /**
  * This class provides an interface to solvers for eigenvalue
@@ -213,6 +213,11 @@ public:
    */
   virtual void attach_deflation_space(NumericVector<T> &deflation_vector) = 0;
 
+  /**
+   * Set the solver configuration object.
+   */
+  void set_solver_configuration(SolverConfiguration& solver_configuration);
+
 protected:
 
   /**
@@ -235,6 +240,12 @@ protected:
    */
   bool _is_initialized;
 
+  /**
+   * Optionally store a SolverOptions object that can be used
+   * to set parameters like solver type, tolerances and iteration limits.
+   */
+  SolverConfiguration* _solver_configuration;
+
 };
 
 
@@ -248,7 +259,8 @@ EigenSolver<T>::EigenSolver (const Parallel::Communicator &comm_in) :
   _eigen_solver_type    (ARNOLDI),
   _eigen_problem_type   (NHEP),
   _position_of_spectrum (LARGEST_MAGNITUDE),
-  _is_initialized       (false)
+  _is_initialized       (false),
+  _solver_configuration(NULL)
 {
 }
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -30,12 +30,10 @@
 namespace libMesh
 {
 
-
 // Forward Declarations
 class MeshBase;
 class Point;
 class Elem;
-
 
 /**
  * This is a point locator.  It locates points in space
@@ -44,7 +42,8 @@ class Elem;
  * Use \p PointLocatorBase::build() to create objects of this
  * type at run time.
  *
- * @author Daniel Dreyer, 2003
+ * \author Daniel Dreyer
+ * \date 2003
  */
 class PointLocatorTree : public PointLocatorBase
 {
@@ -84,7 +83,7 @@ public:
   /**
    * Clears the locator.  This function frees dynamic memory with "delete".
    */
-  virtual void clear();
+  virtual void clear() libmesh_override;
 
   /**
    * Initializes the locator, so that the \p operator() methods can
@@ -96,7 +95,7 @@ public:
    * Initializes the locator, so that the \p operator() methods can
    * be used.  This function allocates dynamic memory with "new".
    */
-  virtual void init();
+  virtual void init() libmesh_override;
 
   /**
    * Locates the element in which the point with global coordinates
@@ -105,7 +104,7 @@ public:
    * the result and allow it to be used during the next call to
    * operator().
    */
-  virtual const Elem* operator() (const Point& p, const std::set<subdomain_id_type> *allowed_subdomains = NULL) const;
+  virtual const Elem* operator() (const Point& p, const std::set<subdomain_id_type> *allowed_subdomains = NULL) const libmesh_override;
 
   /**
    * As a fallback option, it's helpful to be able to do a linear
@@ -126,14 +125,14 @@ public:
    * return a NULL pointer instead of crashing.  Per default, this
    * mode is off.
    */
-  virtual void enable_out_of_mesh_mode ();
+  virtual void enable_out_of_mesh_mode () libmesh_override;
 
   /**
    * Disables out-of-mesh mode (default).  If asked to find a point
    * that is contained in no mesh at all, the point locator will now
    * crash.
    */
-  virtual void disable_out_of_mesh_mode ();
+  virtual void disable_out_of_mesh_mode () libmesh_override;
 
   /**
    * Set the target bin size.
@@ -176,7 +175,6 @@ protected:
    */
   Trees::BuildType _build_type;
 };
-
 
 } // namespace libMesh
 

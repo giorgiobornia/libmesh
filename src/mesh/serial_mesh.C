@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -913,6 +913,9 @@ void SerialMesh::stitching_helper (SerialMesh* other_mesh,
                   }
               }
 
+            // Container to catch boundary IDs passed back from BoundaryInfo.
+            std::vector<boundary_id_type> bc_ids;
+
             MeshBase::element_iterator elem_it  = mesh_array[i]->elements_begin();
             MeshBase::element_iterator elem_end = mesh_array[i]->elements_end();
             for ( ; elem_it != elem_end; ++elem_it)
@@ -924,10 +927,9 @@ void SerialMesh::stitching_helper (SerialMesh* other_mesh,
                   if (el->neighbor(side_id) == NULL)
                     {
                       // Get *all* boundary IDs on this side, not just the first one!
-                      std::vector<boundary_id_type> bc_ids =
-                        mesh_array[i]->get_boundary_info().boundary_ids (el, side_id);
+                      mesh_array[i]->get_boundary_info().boundary_ids (el, side_id, bc_ids);
 
-                      if (std::count(bc_ids.begin(), bc_ids.end(), id_array[i]))
+                      if (std::find(bc_ids.begin(), bc_ids.end(), id_array[i]) != bc_ids.end())
                         {
                           UniquePtr<Elem> side (el->build_side(side_id));
                           for (unsigned int node_id=0; node_id<side->n_nodes(); ++node_id)
@@ -964,10 +966,9 @@ void SerialMesh::stitching_helper (SerialMesh* other_mesh,
                           if(el->is_edge_on_side(edge_id, side_id))
                             {
                               // Get *all* boundary IDs on this edge, not just the first one!
-                              std::vector<boundary_id_type> edge_bc_ids =
-                                mesh_array[i]->get_boundary_info().edge_boundary_ids (el, edge_id);
+                              mesh_array[i]->get_boundary_info().edge_boundary_ids (el, edge_id, bc_ids);
 
-                              if (std::count(edge_bc_ids.begin(), edge_bc_ids.end(), id_array[i]))
+                              if (std::find(bc_ids.begin(), bc_ids.end(), id_array[i]) != bc_ids.end())
                                 {
                                   UniquePtr<Elem> edge (el->build_edge(edge_id));
                                   for (unsigned int node_id=0; node_id<edge->n_nodes(); ++node_id)
@@ -1230,6 +1231,9 @@ void SerialMesh::stitching_helper (SerialMesh* other_mesh,
           nd->set_id(new_id);
         }
 
+      // Container to catch boundary IDs passed back from BoundaryInfo.
+      std::vector<boundary_id_type> bc_ids;
+
       elem_it  = other_mesh->elements_begin();
       elem_end = other_mesh->elements_end();
       for (; elem_it != elem_end; ++elem_it)
@@ -1246,37 +1250,24 @@ void SerialMesh::stitching_helper (SerialMesh* other_mesh,
           unsigned int other_n_nodes = other_elem->n_nodes();
           for (unsigned int n=0; n != other_n_nodes; ++n)
             {
-              const std::vector<boundary_id_type>& ids =
-                other_mesh->get_boundary_info().boundary_ids(other_elem->get_node(n));
-              if (!ids.empty())
-                {
-                  this->get_boundary_info().add_node(this_elem->get_node(n), ids);
-                }
+              other_mesh->get_boundary_info().boundary_ids(other_elem->get_node(n), bc_ids);
+              this->get_boundary_info().add_node(this_elem->get_node(n), bc_ids);
             }
 
           // Copy edge boundary info
           unsigned int n_edges = other_elem->n_edges();
           for (unsigned short edge=0; edge != n_edges; ++edge)
             {
-              const std::vector<boundary_id_type>& ids =
-                other_mesh->get_boundary_info().edge_boundary_ids(other_elem, edge);
-              if (!ids.empty())
-                {
-                  this->get_boundary_info().add_edge( this_elem, edge, ids);
-                }
+              other_mesh->get_boundary_info().edge_boundary_ids(other_elem, edge, bc_ids);
+              this->get_boundary_info().add_edge(this_elem, edge, bc_ids);
             }
 
           unsigned int n_sides = other_elem->n_sides();
           for (unsigned short s=0; s != n_sides; ++s)
             {
-              const std::vector<boundary_id_type>& ids =
-                other_mesh->get_boundary_info().boundary_ids(other_elem, s);
-              if (!ids.empty())
-                {
-                  this->get_boundary_info().add_side( this_elem, s, ids);
-                }
+              other_mesh->get_boundary_info().boundary_ids(other_elem, s, bc_ids);
+              this->get_boundary_info().add_side(this_elem, s, bc_ids);
             }
-
         }
 
     } // end if(other_mesh)
@@ -1287,6 +1278,10 @@ void SerialMesh::stitching_helper (SerialMesh* other_mesh,
   // from this mesh, rather than from other_mesh.
   // Then we iterate over node_to_node_map and delete the
   // duplicate nodes that came from other_mesh.
+
+  // Container to catch boundary IDs passed back from BoundaryInfo.
+  std::vector<boundary_id_type> bc_ids;
+
   std::map<dof_id_type, std::vector<dof_id_type> >::iterator elem_map_it     = node_to_elems_map.begin();
   std::map<dof_id_type, std::vector<dof_id_type> >::iterator elem_map_it_end = node_to_elems_map.end();
   for( ; elem_map_it != elem_map_it_end; ++elem_map_it)
@@ -1306,12 +1301,9 @@ void SerialMesh::stitching_helper (SerialMesh* other_mesh,
 
           // We also need to copy over the nodeset info here,
           // because the node will get deleted below
-          const std::vector<boundary_id_type>& ids =
-            this->get_boundary_info().boundary_ids(el->get_node(local_node_index));
-
+          this->get_boundary_info().boundary_ids(el->get_node(local_node_index), bc_ids);
           el->set_node(local_node_index) = &target_node;
-
-          this->get_boundary_info().add_node(&target_node, ids);
+          this->get_boundary_info().add_node(&target_node, bc_ids);
         }
     }
 
@@ -1431,6 +1423,9 @@ void SerialMesh::stitching_helper (SerialMesh* other_mesh,
   // faces that are now internal to the mesh
   if(clear_stitched_boundary_ids)
     {
+      // Container to catch boundary IDs passed back from BoundaryInfo.
+      std::vector<boundary_id_type> bc_ids;
+
       MeshBase::element_iterator elem_it  = this->elements_begin();
       MeshBase::element_iterator elem_end = this->elements_end();
       for (; elem_it != elem_end; ++elem_it)
@@ -1443,17 +1438,15 @@ void SerialMesh::stitching_helper (SerialMesh* other_mesh,
                 {
                   // Completely remove the side from the boundary_info object if it has either
                   // this_mesh_boundary_id or other_mesh_boundary_id.
-                  std::vector<boundary_id_type> bc_ids =
-                    this->get_boundary_info().boundary_ids (el, side_id);
+                  this->get_boundary_info().boundary_ids (el, side_id, bc_ids);
 
-                  if (std::count(bc_ids.begin(), bc_ids.end(), this_mesh_boundary_id) ||
-                      std::count(bc_ids.begin(), bc_ids.end(), other_mesh_boundary_id))
+                  if (std::find(bc_ids.begin(), bc_ids.end(), this_mesh_boundary_id) != bc_ids.end() ||
+                      std::find(bc_ids.begin(), bc_ids.end(), other_mesh_boundary_id) != bc_ids.end())
                     this->get_boundary_info().remove_side(el, side_id);
                 }
             }
         }
     }
-
 }
 
 

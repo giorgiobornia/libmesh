@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -85,7 +85,8 @@ class PointLocatorBase;
  * In all that follows, nodes that live either on edges, faces or the
  * interior are named @e second-order nodes.
  *
- * \author Benjamin S. Kirk, 2002-2007
+ * \author Benjamin S. Kirk
+ * \date 2002-2007
  */
 class Elem : public ReferenceCountedObject<Elem>,
              public DofObject
@@ -203,6 +204,14 @@ public:
    * particularly useful in the \p MeshBase::find_neighbors() routine.
    */
   virtual dof_id_type key (const unsigned int s) const = 0;
+
+  /**
+   * @returns an id associated with the global node ids of this
+   * element.  The id is not necessariy unique, but should be
+   * close. Uses the same hash as the key(s) function, so for example
+   * if "tri3" is side 0 of "tet4", then tri3->key()==tet4->key(0).
+   */
+  virtual dof_id_type key () const;
 
   /**
    * @returns true if two elements are identical, false otherwise.
@@ -431,11 +440,6 @@ public:
   void write_connectivity (std::ostream& out,
                            const IOPackage iop) const;
 
-  //   /**
-  //    * @returns the VTK element type of the sc-th sub-element.
-  //    */
-  //   virtual unsigned int vtk_element_type (const unsigned int sc) const = 0;
-
   /**
    * @returns the type of element that has been derived from this
    * base class.
@@ -578,12 +582,6 @@ public:
    */
   virtual unsigned int opposite_node(const unsigned int n,
                                      const unsigned int s) const;
-
-  //   /**
-  //    * @returns the number of children this element has that
-  //    * share side \p s
-  //    */
-  //   virtual unsigned int n_children_per_side (const unsigned int) const = 0;
 
   /**
    * @returns the number of sub-elements this element may be broken
@@ -2273,7 +2271,7 @@ Elem::side_iterator : variant_filter_iterator<Elem::Predicate, Elem*>
 #define LIBMESH_ENABLE_TOPOLOGY_CACHES                                  \
   virtual                                                               \
   std::vector<std::vector<std::vector<std::vector<std::pair<unsigned char, unsigned char> > > > > & \
-  _get_bracketing_node_cache() const                                    \
+  _get_bracketing_node_cache() const libmesh_override                   \
   {                                                                     \
     static std::vector<std::vector<std::vector<std::vector<std::pair<unsigned char, unsigned char> > > > > c; \
     return c;                                                           \
@@ -2281,7 +2279,7 @@ Elem::side_iterator : variant_filter_iterator<Elem::Predicate, Elem*>
                                                                         \
   virtual                                                               \
   std::vector<std::vector<std::vector<signed char> > > &                \
-  _get_parent_indices_cache() const                                     \
+  _get_parent_indices_cache() const libmesh_override                    \
   {                                                                     \
     static std::vector<std::vector<std::vector<signed char> > > c;      \
     return c;                                                           \

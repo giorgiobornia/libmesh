@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -106,47 +106,51 @@ class Status;
 
 #ifdef LIBMESH_HAVE_MPI
 
-/*
+/**
  * Macros to test MPI return values
  */
-
 #ifndef NDEBUG
-#define libmesh_assert_mpi_success(error_code) \
-  do \
-    { \
-      if (error_code != MPI_SUCCESS) \
-        { \
-          char libmesh_mpi_error_string[MPI_MAX_ERROR_STRING+1]; \
-          int libmesh_mpi_error_string_len; \
-          MPI_Error_string(error_code, libmesh_mpi_error_string, \
-                           &libmesh_mpi_error_string_len); \
-          libmesh_assert_equal_to_msg(error_code, MPI_SUCCESS, \
-                                      libmesh_mpi_error_string); \
-        } \
-    } \
-  while(0)
-
-// Only catch MPI return values when asserts are active.
-#define libmesh_call_mpi(mpi_call) \
-  do \
-    { \
-      unsigned int libmesh_mpi_error_code = \
-        mpi_call; \
-      libmesh_assert_mpi_success (libmesh_mpi_error_code); \
-    } \
+#define libmesh_assert_mpi_success(error_code)                          \
+  do                                                                    \
+    {                                                                   \
+      if (error_code != MPI_SUCCESS)                                    \
+        {                                                               \
+          char libmesh_mpi_error_string[MPI_MAX_ERROR_STRING+1];        \
+          int libmesh_mpi_error_string_len;                             \
+          MPI_Error_string(error_code, libmesh_mpi_error_string,        \
+                           &libmesh_mpi_error_string_len);              \
+          libmesh_assert_equal_to_msg(error_code, MPI_SUCCESS,          \
+                                      libmesh_mpi_error_string);        \
+        }                                                               \
+    }                                                                   \
   while(0)
 
 #else
 
 #define libmesh_assert_mpi_success(error_code)  ((void) 0)
 
-#define libmesh_call_mpi(mpi_call) \
-  do \
-    { \
-      mpi_call; \
-    } \
+#endif
+
+
+
+// Only catch MPI return values when asserts are active.
+#ifndef NDEBUG
+#define libmesh_call_mpi(mpi_call)                              \
+  do                                                            \
+    {                                                           \
+      unsigned int libmesh_mpi_error_code = mpi_call;           \
+      libmesh_assert_mpi_success (libmesh_mpi_error_code);      \
+    }                                                           \
   while(0)
 
+#else
+
+#define libmesh_call_mpi(mpi_call)              \
+  do                                            \
+    {                                           \
+      mpi_call;                                 \
+    }                                           \
+  while(0)
 #endif
 
 
@@ -1230,7 +1234,7 @@ struct PostWaitCopyBuffer : public PostWaitWork {
   PostWaitCopyBuffer(const Container& buffer, const OutputIter out)
     : _buf(buffer), _out(out) {}
 
-  virtual void run() { std::copy(_buf.begin(), _buf.end(), _out); }
+  virtual void run() libmesh_override { std::copy(_buf.begin(), _buf.end(), _out); }
 
 private:
   const Container& _buf;
@@ -1243,7 +1247,7 @@ struct PostWaitUnpackBuffer : public PostWaitWork {
   PostWaitUnpackBuffer(const Container& buffer, Context *context, OutputIter out) :
     _buf(buffer), _context(context), _out(out) {}
 
-  virtual void run() { Parallel::unpack_range(_buf, _context, _out); }
+  virtual void run() libmesh_override { Parallel::unpack_range(_buf, _context, _out); }
 
 private:
   const Container& _buf;
@@ -1257,7 +1261,7 @@ template <typename Container>
 struct PostWaitDeleteBuffer : public PostWaitWork {
   PostWaitDeleteBuffer(Container* buffer) : _buf(buffer) {}
 
-  virtual void run() { delete _buf; }
+  virtual void run() libmesh_override { delete _buf; }
 
 private:
   Container* _buf;

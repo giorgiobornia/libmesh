@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -36,11 +36,9 @@ class System;
  * This is a base class for classes which represent subsets of the
  * dofs of a \p System.
  *
- * @author Tim Kroeger, 2010.
+ * \author Tim Kroeger
+ * \date 2010
  */
-
-// ------------------------------------------------------------
-// SystemSubset class definition
 class SystemSubset : public ReferenceCountedObject<SystemSubset>
 {
 public:
@@ -51,24 +49,22 @@ public:
   explicit
   SystemSubset (const System& system);
 
-public:
-
   /**
    * Destructor.
    */
-  virtual ~SystemSubset (void);
+  virtual ~SystemSubset ();
 
   /**
    * Method that returns the actual set of dofs that the subset
    * consists of.  The result must contain local dofs on each
    * processor only and must not contain duplictates.
    */
-  virtual const std::vector<unsigned int>& dof_ids(void)const=0;
+  virtual const std::vector<unsigned int>& dof_ids () const = 0;
 
   /**
    * Returns the \p System to which we belong.
    */
-  const System& get_system(void)const;
+  const System& get_system () const;
 
 protected:
 
@@ -92,8 +88,7 @@ private:
    * We won't even bother implementing this; we'll just make sure that
    * the compiler doesn't implement a default.
    */
-  SystemSubset& operator=(const SystemSubset&);
-
+  SystemSubset& operator= (const SystemSubset&);
 }; // class SystemSubset
 
 } // namespace libMesh

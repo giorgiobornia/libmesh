@@ -41,10 +41,10 @@ namespace libMesh
  * applying the base rule on each subelement.  This class uses the
  * ElemCutter, which is only available if libmesh is configured with
  * --disable-strict-lgpl.
+ *
+ * \author Benjamin Kirk
+ * \date 2013
  */
-
-// ------------------------------------------------------------
-// QComposite class definition
 template <class QSubCell>
 class QComposite : public QSubCell
 {
@@ -72,7 +72,7 @@ public:
   /**
    * @returns \p QCOMPOSITE
    */
-  QuadratureType type() const { return QCOMPOSITE; }
+  virtual QuadratureType type() const libmesh_override { return QCOMPOSITE; }
 
   /**
    * Initializes the data structures for a specific, potentially cut

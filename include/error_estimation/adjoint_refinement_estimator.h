@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -41,7 +41,8 @@ namespace libMesh
  * solution as weighted against an adjoint solution on a uniformly
  * refined (in h and/or p, for an arbitrary number of levels) grid.
  *
- * @author Roy H. Stogner, 2009.
+ * \author Roy H. Stogner
+ * \date 2009
  */
 class AdjointRefinementEstimator : public ErrorEstimator
 {
@@ -125,17 +126,6 @@ protected:
 
   /* A vector to hold the computed global QoI error estimate */
   std::vector<Number> computed_global_QoI_errors;
-
-  /* /\** */
-  /*  * The code for estimate_error and both estimate_errors versions is very */
-  /*  * similar, so we use the same function for all three */
-  /*  *\/ */
-  /* virtual void _estimate_error (const EquationSystems *equation_systems, */
-  /*                               const System* system, */
-  /* ErrorVector* error_per_cell, */
-  /*         std::map<std::pair<const System*, unsigned int>, ErrorVector*>* errors_per_cell, */
-  /*         const std::map<const System*, const NumericVector<Number>* >* solution_vectors = NULL, */
-  /* bool estimate_parent_error = false); */
 
   /**
    * A QoISet to handle cases with multiple QoIs available

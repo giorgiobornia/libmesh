@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -62,7 +62,8 @@ typedef RealTensorValue RealTensor;
  * This code is currently experimental and will not produce optimal
  * hp meshes without significant improvement.
  *
- * @author Roy H. Stogner, 2006.
+ * \author Roy H. Stogner
+ * \date 2006
  */
 class HPCoarsenTest : public HPSelector
 {
@@ -88,7 +89,7 @@ public:
    * refinement and potentially change the desired
    * refinement type.
    */
-  virtual void select_refinement (System& system);
+  virtual void select_refinement (System& system) libmesh_override;
 
   /**
    * Because the coarsening test seems to always choose p refinement, we're

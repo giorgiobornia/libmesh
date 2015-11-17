@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -25,11 +25,13 @@
 #include "libmesh/threads.h"
 #include "libmesh/meshfree_interpolation.h"
 #include "libmesh/function_base.h"
+#include "libmesh/node.h"
 
 // C++ includes
 #include <cstddef>
 
-namespace libMesh {
+namespace libMesh
+{
 
 // Forward Declarations
 template <typename T>
@@ -123,9 +125,11 @@ MeshfreeSolutionTransfer::transfer(const Variable & from_var, const Variable & t
   // We have only set local values - prepare for use by gathering remote gata
   idi.prepare_for_use();
 
-  // Create a MeshlessInterpolationFunction that uses our InverseDistanceInterpolation
-  // object.  Since each MeshlessInterpolationFunction shares the same InverseDistanceInterpolation
-  // object in a threaded environment we must also provide a locking mechanism.
+  // Create a MeshlessInterpolationFunction that uses our
+  // InverseDistanceInterpolation object.  Since each
+  // MeshlessInterpolationFunction shares the same
+  // InverseDistanceInterpolation object in a threaded environment we
+  // must also provide a locking mechanism.
   Threads::spin_mutex mutex;
   MeshlessInterpolationFunction mif(idi, mutex);
 

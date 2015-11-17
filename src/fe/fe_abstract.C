@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -953,13 +953,13 @@ void FEAbstract::compute_periodic_node_constraints (NodeConstraints &constraints
 
   // Look at the element faces.  Check to see if we need to
   // build constraints.
+  std::vector<boundary_id_type> bc_ids;
   for (unsigned short int s=0; s<elem->n_sides(); s++)
     {
       if (elem->neighbor(s))
         continue;
 
-      const std::vector<boundary_id_type>& bc_ids =
-        mesh.get_boundary_info().boundary_ids (elem, s);
+      mesh.get_boundary_info().boundary_ids (elem, s, bc_ids);
       for (std::vector<boundary_id_type>::const_iterator id_it=bc_ids.begin(); id_it!=bc_ids.end(); ++id_it)
         {
           const boundary_id_type boundary_id = *id_it;

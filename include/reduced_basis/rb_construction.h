@@ -22,14 +22,12 @@
 
 // rbOOmit includes
 #include "libmesh/rb_construction_base.h"
-#include "libmesh/rb_evaluation.h"
 
 // libMesh includes
 #include "libmesh/linear_implicit_system.h"
 #include "libmesh/dense_vector.h"
 #include "libmesh/dense_matrix.h"
 #include "libmesh/dg_fem_context.h"
-#include "libmesh/elem_assembly.h"
 #include "libmesh/dirichlet_boundaries.h"
 
 // C++ includes
@@ -39,6 +37,8 @@ namespace libMesh
 
 class RBThetaExpansion;
 class RBAssemblyExpansion;
+class RBEvaluation;
+class ElemAssembly;
 
 /**
  * This class is part of the rbOOmit framework.
@@ -47,13 +47,9 @@ class RBAssemblyExpansion;
  * of the certified reduced basis method for
  * steady-state elliptic parametrized PDEs.
  *
- * @author David J. Knezevic, 2009
+ * \author David J. Knezevic
+ * \date 2009
  */
-
-
-// ------------------------------------------------------------
-// RBConstruction class definition
-
 class RBConstruction : public RBConstructionBase<LinearImplicitSystem>
 {
 public:
@@ -129,12 +125,12 @@ public:
    * Clear all the data structures associated with
    * the system.
    */
-  virtual void clear ();
+  virtual void clear () libmesh_override;
 
   /**
    * @returns a string indicating the type of the system.
    */
-  virtual std::string system_type () const;
+  virtual std::string system_type () const libmesh_override;
 
   /**
    * Perform a "truth" solve, i.e. solve the finite element system at
@@ -222,16 +218,6 @@ public:
    * defined in low-memory mode).
    */
   SparseMatrix<Number>* get_inner_product_matrix();
-
-  /**
-   * Get a pointer to non_dirichlet_inner_product_matrix.
-   * Accessing via this function, rather than directly through
-   * the class member allows us to do error checking (e.g.
-   * non_dirichlet_inner_product_matrix is not
-   * defined in low-memory mode, and we need
-   * store_non_dirichlet_operators==true).
-   */
-  SparseMatrix<Number>* get_non_dirichlet_inner_product_matrix();
 
   /**
    * Get a pointer to Aq.
@@ -358,8 +344,7 @@ public:
    * Set the state of this RBConstruction object based on the arguments
    * to this function.
    */
-  void set_rb_construction_parameters(
-                                      unsigned int n_training_samples_in,
+  void set_rb_construction_parameters(unsigned int n_training_samples_in,
                                       bool deterministic_training_in,
                                       bool use_relative_bound_in_greedy_in,
                                       unsigned int training_parameters_random_seed_in,
@@ -450,12 +435,6 @@ public:
    * The inner product matrix.
    */
   UniquePtr< SparseMatrix<Number> > inner_product_matrix;
-
-  /**
-   * The inner product matrix without Dirichlet conditions enforced.
-   * (This is only computed if store_non_dirichlet_operators == true.)
-   */
-  UniquePtr< SparseMatrix<Number> > non_dirichlet_inner_product_matrix;
 
   /**
    * Vector storing the truth output values from the most

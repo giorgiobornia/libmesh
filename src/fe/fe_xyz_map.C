@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -16,8 +16,10 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 #include "libmesh/fe_xyz_map.h"
+#include "libmesh/elem.h"
 
-namespace libMesh {
+namespace libMesh
+{
 
 void FEXYZMap::compute_face_map(int dim, const std::vector<Real>& qw, const Elem* side)
 {

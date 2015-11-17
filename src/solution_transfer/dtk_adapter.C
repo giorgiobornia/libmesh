@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -19,7 +19,7 @@
 
 #include "libmesh/libmesh_config.h"
 
-#ifdef LIBMESH_HAVE_DTK
+#ifdef LIBMESH_TRILINOS_HAVE_DTK
 
 #include "libmesh/dtk_adapter.h"
 
@@ -27,6 +27,7 @@
 #include "libmesh/mesh.h"
 #include "libmesh/numeric_vector.h"
 #include "libmesh/elem.h"
+#include "libmesh/equation_systems.h"
 
 #include <DTK_MeshTypes.hpp>
 #include <Teuchos_Comm.hpp>
@@ -285,4 +286,4 @@ DTKAdapter::get_semi_local_nodes(std::set<unsigned int> & semi_local_nodes)
 
 } // namespace libMesh
 
-#endif // #ifdef LIBMESH_HAVE_DTK
+#endif // #ifdef LIBMESH_TRILINOS_HAVE_DTK

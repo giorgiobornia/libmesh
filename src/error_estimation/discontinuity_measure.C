@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -91,8 +91,9 @@ DiscontinuityMeasure::internal_side_integration ()
     {
       // Calculate solution values on fine and coarse elements
       // at this quadrature point
-      Number u_fine   = fine_context->side_value(var, qp),
-             u_coarse = coarse_context->side_value(var, qp);
+      Number
+        u_fine   = fine_context->side_value(var, qp),
+        u_coarse = coarse_context->side_value(var, qp);
 
       // Find the jump in the value
       // at this quadrature point

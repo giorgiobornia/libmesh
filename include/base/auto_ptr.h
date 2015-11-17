@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,6 +20,7 @@
 
 #include "libmesh/libmesh_config.h"
 #include "libmesh_common.h" // for libmesh_deprecated()
+#include "libmesh/safe_bool.h"
 
 // LibMesh's AutoPtr is now libmesh_deprecated(), just like the
 // std::auto_ptr it is based on.
@@ -159,7 +160,7 @@ struct AutoPtrRef
  * purpose.  It is provided "as is" without express or implied warranty.
  */
 template<typename Tp>
-class AutoPtr
+class AutoPtr : public safe_bool<AutoPtr<Tp> >
 {
 private:
 
@@ -370,6 +371,16 @@ public:
         _ptr = ref._ptr;
       }
     return *this;
+  }
+
+  /**
+   * A "safe" replacement for operator bool () that behaves more like
+   * an explicit conversion operator even in C++98. This allows code
+   * like if (!foo) to work with AutoPtr.
+   */
+  bool boolean_test() const
+  {
+    return (this->get() != NULL);
   }
 
   /**

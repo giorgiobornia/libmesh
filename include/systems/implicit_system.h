@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -42,10 +42,6 @@ template <typename T> class SparseMatrix;
  * that still additional vectors/matrices may be added,
  * as offered in the parent class \p ExplicitSystem.
  */
-
-// ------------------------------------------------------------
-// ImplicitSystem class definition
-
 class ImplicitSystem : public ExplicitSystem
 {
 public:
@@ -82,38 +78,32 @@ public:
    * Clear all the data structures associated with
    * the system.
    */
-  virtual void clear ();
+  virtual void clear () libmesh_override;
 
   /**
    * Reinitializes the member data fields associated with
    * the system, so that, e.g., \p assemble() may be used.
    */
-  virtual void reinit ();
+  virtual void reinit () libmesh_override;
 
   /**
    * Prepares \p matrix and \p rhs for system assembly, then calls
    * user assembly function.
    * @e Can be overloaded in derived classes.
    */
-  virtual void assemble ();
-
-  //   /**
-  //    * Assembles & solves the linear system Ax=b.
-  //    */
-  //   virtual void solve ();
-
+  virtual void assemble () libmesh_override;
 
   /**
    * Avoids use of any cached data that might affect any solve result.  Should
    * be overloaded in derived systems.
    */
-  virtual void disable_cache ();
+  virtual void disable_cache () libmesh_override;
 
   /**
    * @returns \p "Implicit".  Helps in identifying
    * the system type in an equation system file.
    */
-  virtual std::string system_type () const { return "Implicit"; }
+  virtual std::string system_type () const libmesh_override { return "Implicit"; }
 
   /**
    * Returns a pointer to a linear solver appropriate for use in
@@ -162,7 +152,7 @@ public:
    *
    * @e Can be overloaded in derived classes.
    */
-  virtual void assemble_residual_derivatives (const ParameterVector& parameters);
+  virtual void assemble_residual_derivatives (const ParameterVector& parameters) libmesh_override;
 
   /**
    * Assembles & solves the linear system(s) (dR/du)*u_p = -dR/dp, for
@@ -172,7 +162,7 @@ public:
    * performed and the (sum of the) final residual norms
    */
   virtual std::pair<unsigned int, Real>
-  sensitivity_solve (const ParameterVector& parameters);
+  sensitivity_solve (const ParameterVector& parameters) libmesh_override;
 
   /**
    * Assembles & solves the linear system(s) (dR/du)*u_w = sum(w_p*-dR/dp), for
@@ -184,7 +174,7 @@ public:
    */
   virtual std::pair<unsigned int, Real>
   weighted_sensitivity_solve (const ParameterVector& parameters,
-                              const ParameterVector& weights);
+                              const ParameterVector& weights) libmesh_override;
 
   /**
    * Assembles & solves the linear system (dR/du)^T*z = dq/du, for
@@ -196,7 +186,7 @@ public:
    * performed and the (sum of the) final residual norms
    */
   virtual std::pair<unsigned int, Real>
-  adjoint_solve (const QoISet& qoi_indices = QoISet());
+  adjoint_solve (const QoISet& qoi_indices = QoISet()) libmesh_override;
 
   /**
    * Assembles & solves the linear system(s)
@@ -213,7 +203,7 @@ public:
   virtual std::pair<unsigned int, Real>
   weighted_sensitivity_adjoint_solve (const ParameterVector& parameters,
                                       const ParameterVector& weights,
-                                      const QoISet& qoi_indices = QoISet());
+                                      const QoISet& qoi_indices = QoISet()) libmesh_override;
 
   /**
    * Solves for the derivative of each of the system's quantities of
@@ -228,7 +218,7 @@ public:
    */
   virtual void adjoint_qoi_parameter_sensitivity (const QoISet& qoi_indices,
                                                   const ParameterVector& parameters,
-                                                  SensitivityData& sensitivities);
+                                                  SensitivityData& sensitivities) libmesh_override;
 
   /**
    * Solves for the derivative of each of the system's quantities of
@@ -243,7 +233,7 @@ public:
    */
   virtual void forward_qoi_parameter_sensitivity (const QoISet& qoi_indices,
                                                   const ParameterVector& parameters,
-                                                  SensitivityData& sensitivities);
+                                                  SensitivityData& sensitivities) libmesh_override;
 
   /**
    * For each of the system's quantities of interest q in
@@ -255,7 +245,7 @@ public:
    */
   virtual void qoi_parameter_hessian(const QoISet& qoi_indices,
                                      const ParameterVector& parameters,
-                                     SensitivityData& hessian);
+                                     SensitivityData& hessian) libmesh_override;
 
   /**
    * For each of the system's quantities of interest q in
@@ -270,7 +260,7 @@ public:
   virtual void qoi_parameter_hessian_vector_product(const QoISet& qoi_indices,
                                                     const ParameterVector& parameters,
                                                     const ParameterVector& vector,
-                                                    SensitivityData& product);
+                                                    SensitivityData& product) libmesh_override;
 
   /**
    * Matrix iterator typedefs.
@@ -327,7 +317,7 @@ public:
   /**
    * @returns the number of matrices handled by this system
    */
-  virtual unsigned int n_matrices () const;
+  virtual unsigned int n_matrices () const libmesh_override;
 
   /**
    * The system matrix.  Implicit systems are characterized by
@@ -344,7 +334,7 @@ protected:
    * Initializes the member data fields associated with
    * the system, so that, e.g., \p assemble() may be used.
    */
-  virtual void init_data ();
+  virtual void init_data () libmesh_override;
 
   /**
    * Initializes the matrices associated with this system.

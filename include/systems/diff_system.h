@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -47,12 +47,9 @@ template <typename T> class NumericVector;
  * which is still experimental.  Users of this framework should
  * beware of bugs and future API changes.
  *
- * @author Roy H. Stogner 2006
+ * \author Roy H. Stogner
+ * \date 2006
  */
-
-// ------------------------------------------------------------
-// DifferentiableSystem class definition
-
 class DifferentiableSystem : public ImplicitSystem,
                              public virtual DifferentiablePhysics,
                              public virtual DifferentiableQoI
@@ -86,25 +83,25 @@ public:
    * Clear all the data structures associated with
    * the system.
    */
-  virtual void clear ();
+  virtual void clear () libmesh_override;
 
   /**
    * Reinitializes the member data fields associated with
    * the system, so that, e.g., \p assemble() may be used.
    */
-  virtual void reinit ();
+  virtual void reinit () libmesh_override;
 
   /**
    * Prepares \p matrix and \p rhs for matrix assembly.
    * Users should not reimplement this
    */
-  virtual void assemble ();
+  virtual void assemble () libmesh_override;
 
   /**
    * Returns a pointer to a linear solver appropriate for use in
    * adjoint and/or sensitivity solves
    */
-  virtual LinearSolver<Number> *get_linear_solver() const;
+  virtual LinearSolver<Number> *get_linear_solver() const libmesh_override;
 
   /**
    * Returns an integer corresponding to the upper iteration count
@@ -112,38 +109,40 @@ public:
    * be used in linear adjoint and/or sensitivity solves
    */
   virtual std::pair<unsigned int, Real>
-  get_linear_solve_parameters() const;
+  get_linear_solve_parameters() const libmesh_override;
 
   /**
    * Releases a pointer to a linear solver acquired by
    * \p this->get_linear_solver()
    */
-  virtual void release_linear_solver(LinearSolver<Number> *) const;
+  virtual void release_linear_solver(LinearSolver<Number> *) const libmesh_override;
 
   /**
    * Assembles a residual in \p rhs and/or a jacobian in \p matrix,
    * as requested.
    */
-  virtual void assembly (bool get_residual, bool get_jacobian,
-                         bool apply_heterogeneous_constraints = false) = 0;
+  virtual void assembly (bool get_residual,
+                         bool get_jacobian,
+                         bool apply_heterogeneous_constraints = false) libmesh_override = 0;
 
   /**
    * Invokes the solver associated with the system.  For steady state
    * solvers, this will find a root x where F(x) = 0.  For transient
    * solvers, this will integrate dx/dt = F(x).
    */
-  virtual void solve ();
+  virtual void solve () libmesh_override;
 
   /**
    * This function sets the _is_adjoint boolean member of TimeSolver to
    * true and then calls the adjoint_solve in implicit system
    */
-  virtual std::pair<unsigned int, Real> adjoint_solve (const QoISet& qoi_indices = QoISet());
+  virtual std::pair<unsigned int, Real>
+  adjoint_solve (const QoISet& qoi_indices = QoISet()) libmesh_override;
 
   /**
    * We don't allow systems to be attached to each other
    */
-  virtual UniquePtr<DifferentiablePhysics> clone_physics()
+  virtual UniquePtr<DifferentiablePhysics> clone_physics() libmesh_override
   {
     libmesh_not_implemented();
     // dummy
@@ -153,7 +152,7 @@ public:
   /**
    * We don't allow systems to be attached to each other
    */
-  virtual UniquePtr<DifferentiableQoI> clone()
+  virtual UniquePtr<DifferentiableQoI> clone() libmesh_override
   {
     libmesh_not_implemented();
     // dummy
@@ -251,7 +250,7 @@ public:
    * Executes a postprocessing loop over all elements, and if
    * \p postprocess_sides is true over all sides.
    */
-  virtual void postprocess (){}
+  virtual void postprocess () {}
 
   /**
    * Does any work that needs to be done on \p elem in a postprocessing loop.
@@ -337,7 +336,7 @@ protected:
    * Initializes the member data fields associated with
    * the system, so that, e.g., \p assemble() may be used.
    */
-  virtual void init_data ();
+  virtual void init_data () libmesh_override;
 };
 
 // --------------------------------------------------------------

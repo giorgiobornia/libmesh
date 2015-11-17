@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -72,7 +72,7 @@ public:
   /**
    * Setting a side node changes the node on the parent
    */
-  virtual Node* & set_node (const unsigned int i)
+  virtual Node* & set_node (const unsigned int i) libmesh_override
   {
     libmesh_assert_less (i, this->n_nodes());
     return this->parent()->set_node (ParentType::side_nodes_map[_side_number][i]);
@@ -81,16 +81,15 @@ public:
   /**
    * Sides effectively do not have sides
    */
-  virtual unsigned int n_sides () const
+  virtual unsigned int n_sides () const libmesh_override
   { return 0; }
 
   virtual bool is_child_on_side(const unsigned int,
-                                const unsigned int) const
+                                const unsigned int) const libmesh_override
   { libmesh_not_implemented(); return false; }
 
 
 private:
-
 
   /**
    * The side on the parent element
@@ -110,9 +109,6 @@ private:
  *
  * \author  Roy H. Stogner
  */
-
-// ------------------------------------------------------------
-//SideEdge class definition
 template <class EdgeType, class ParentType>
 class SideEdge : public EdgeType
 {
@@ -138,7 +134,7 @@ public:
   /**
    * Setting an edge node changes the node on the parent
    */
-  virtual Node* & set_node (const unsigned int i)
+  virtual Node* & set_node (const unsigned int i) libmesh_override
   {
     libmesh_assert_less (i, this->n_nodes());
     return this->parent()->set_node (ParentType::edge_nodes_map[_edge_number][i]);
@@ -148,11 +144,9 @@ public:
    * @returns 0. Edges effectively do not have sides, so
    * don't even ask!
    */
-  virtual unsigned int n_sides () const { return 0; }
-
+  virtual unsigned int n_sides () const libmesh_override { return 0; }
 
 private:
-
 
   /**
    * The side on the parent element

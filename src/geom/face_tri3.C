@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -225,6 +225,15 @@ std::pair<Real, Real> Tri3::min_and_max_angle() const
 
   return std::make_pair(std::min(theta0, std::min(theta1,theta2)),
                         std::max(theta0, std::max(theta1,theta2)));
+}
+
+
+
+dof_id_type Tri3::key () const
+{
+  return this->compute_key(this->node(0),
+                           this->node(1),
+                           this->node(2));
 }
 
 } // namespace libMesh

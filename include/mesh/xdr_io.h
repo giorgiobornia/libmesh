@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -35,19 +35,19 @@ namespace libMesh
 {
 
 // Forward declarations
-class MeshBase;
-class MeshData;
 class Xdr;
 class Elem;
 
-
 /**
+ * MeshIO class used for writing XDR (eXternal Data Representation)
+ * and XDA mesh files.  XDR/XDA is libmesh's internal data format, and
+ * allows the full refinement tree structure of the mesh to be written
+ * to file.
  *
- * @author Benjamin Kirk, John Peterson, 2004.
+ * \author Benjamin Kirk
+ * \author John Peterson
+ * \date 2004
  */
-
-// ------------------------------------------------------------
-// XdrIO class definition
 class XdrIO : public MeshInput<MeshBase>,
               public MeshOutput<MeshBase>,
               public ParallelObject
@@ -67,7 +67,7 @@ public:
    * files.
    */
   explicit
-  XdrIO (MeshBase&,       const bool=false);
+  XdrIO (MeshBase&, const bool=false);
 
   /**
    * Constructor.  Takes a reference to a constant mesh object.
@@ -87,12 +87,12 @@ public:
   /**
    * This method implements reading a mesh from a specified file.
    */
-  virtual void read (const std::string&);
+  virtual void read (const std::string&) libmesh_override;
 
   /**
    * This method implements writing a mesh to a specified file.
    */
-  virtual void write (const std::string&);
+  virtual void write (const std::string&) libmesh_override;
 
   /**
    * Get/Set the flag indicating if we should read/write binary.

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -36,16 +36,15 @@ class MeshBase;
 class MeshData;
 
 /**
+ * The LegacyXdrIO class has been replaced by the XdrIO class.
  *
- * @author Benjamin Kirk, John Peterson, 2004.
+ * \author Benjamin Kirk
+ * \author John Peterson
+ * \date 2004
  */
-
-// ------------------------------------------------------------
-// LegacyXdrIO class definition
 class LegacyXdrIO : public MeshInput<MeshBase>,
                     public MeshOutput<MeshBase>
 {
-
 public:
   /**
    * Enumeration flag for the type of software.
@@ -64,7 +63,7 @@ public:
    * files.
    */
   explicit
-  LegacyXdrIO (MeshBase&,       const bool=false);
+  LegacyXdrIO (MeshBase&, const bool=false);
 
   /**
    * Constructor.  Takes a reference to a constant mesh object.
@@ -84,7 +83,7 @@ public:
   /**
    * This method implements reading a mesh from a specified file.
    */
-  virtual void read (const std::string&);
+  virtual void read (const std::string&) libmesh_override;
 
   /**
    * This method implements reading a mesh in the \p MGF
@@ -95,7 +94,7 @@ public:
   /**
    * This method implements writing a mesh to a specified file.
    */
-  virtual void write (const std::string&);
+  virtual void write (const std::string&) libmesh_override;
 
   /**
    * This method implements writing a mesh in the \p MGF

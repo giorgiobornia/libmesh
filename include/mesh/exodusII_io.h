@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -44,11 +44,10 @@ class System;
  * default, LibMesh expects ExodusII files to have a ".exd"
  * or ".e" file extension.
  *
- * @author Benjamin Kirk, John Peterson, 2004.
+ * \author Benjamin Kirk
+ * \author John Peterson
+ * \date 2004
  */
-
-// ------------------------------------------------------------
-// ExodusII_IO class definition
 class ExodusII_IO : public MeshInput<MeshBase>,
                     public MeshOutput<MeshBase>,
                     public ParallelObject
@@ -75,12 +74,12 @@ public:
    * by cubit.  Works in 2D for \p TRIs, \p TRI6s, \p QUAD s, and \p QUAD9s.
    * Works in 3D for \p TET4s, \p TET10s, \p HEX8s, and \p HEX27s.
    */
-  virtual void read (const std::string& name);
+  virtual void read (const std::string& name) libmesh_override;
 
   /**
    * This method implements writing a mesh to a specified file.
    */
-  virtual void write (const std::string& fname);
+  virtual void write (const std::string& fname) libmesh_override;
 
   /**
    * Set the flag indicating if we should be verbose.
@@ -141,9 +140,9 @@ public:
   /**
    * Write out a nodal solution.
    */
-  void write_nodal_data (const std::string&,
-                         const std::vector<Number>&,
-                         const std::vector<std::string>&);
+  virtual void write_nodal_data (const std::string&,
+                                 const std::vector<Number>&,
+                                 const std::vector<std::string>&) libmesh_override;
 
   /**
    * Write out a discontinuous nodal solution.

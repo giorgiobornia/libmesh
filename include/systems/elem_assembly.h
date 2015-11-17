@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -19,20 +19,20 @@
 #define LIBMESH_ELEM_ASSEMBLY_H
 
 #include "libmesh/reference_counted_object.h"
-#include "libmesh/system.h"
-#include "libmesh/node.h"
-
 
 namespace libMesh
 {
 
 class FEMContext;
+class System;
+class Node;
 
 /**
  * ElemAssembly provides a per-element (interior and boundary) assembly
  * functionality.
  *
- * @author David J. Knezevic, 2011
+ * \author David J. Knezevic
+ * \date 2011
  */
 class ElemAssembly : public ReferenceCountedObject<ElemAssembly>
 {
@@ -71,7 +71,6 @@ public:
     // By default, just clear the values map
     values.clear();
   }
-
 };
 
 }

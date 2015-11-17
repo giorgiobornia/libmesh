@@ -22,7 +22,6 @@
 
 // rbOOmit includes
 #include "libmesh/rb_parametrized.h"
-#include "libmesh/rb_theta_expansion.h"
 
 // libMesh includes
 #include "libmesh/dense_matrix.h"
@@ -37,6 +36,7 @@ namespace libMesh
 
 class System;
 template <typename T> class NumericVector;
+class RBThetaExpansion;
 
 /**
  * This class is part of the rbOOmit framework.
@@ -44,11 +44,9 @@ template <typename T> class NumericVector;
  * RBEvaluation encapsulates the functionality required
  * to _evaluate_ a given reduced basis model.
  *
- * @author David J. Knezevic, 2011
+ * \author David J. Knezevic
+ * \date 2011
  */
-
-// ------------------------------------------------------------
-// RBEvaluation class definition
 class RBEvaluation : public RBParametrized,
                      public ParallelObject
 {
@@ -69,7 +67,7 @@ public:
    * Clear this RBEvaluation object. Delete the basis functions
    * and clear and extra data in subclasses.
    */
-  virtual void clear();
+  virtual void clear() libmesh_override;
 
   /**
    * Set the RBThetaExpansion object.

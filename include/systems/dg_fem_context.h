@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -32,10 +32,6 @@ namespace libMesh
  * required to perform local element residual and Jacobian assembly
  * in the case of a discontinuous Galerkin (DG) discretization.
  */
-
-// ------------------------------------------------------------
-// DGFEMContext class definition
-
 class DGFEMContext : public FEMContext
 {
 public:
@@ -56,7 +52,7 @@ public:
    * default DG terms are assumed to be inactive. DG terms are
    * only active if neighbor_side_fe_reinit is called.
    */
-  virtual void side_fe_reinit ();
+  virtual void side_fe_reinit () libmesh_override;
 
   /**
    * Initialize neighbor side data needed to assemble DG terms.

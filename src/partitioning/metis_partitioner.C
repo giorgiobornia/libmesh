@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -48,7 +48,7 @@ extern "C" {
 
 
 // Hash maps for interior->boundary element lookups
-#include LIBMESH_INCLUDE_UNORDERED_MAP
+#include LIBMESH_INCLUDE_UNORDERED_MULTIMAP
 #include LIBMESH_INCLUDE_HASH
 LIBMESH_DEFINE_HASH_POINTERS
 
@@ -144,7 +144,7 @@ void MetisPartitioner::_do_partition (MeshBase& mesh,
   // interior elements from boundary elements, but we need to build up
   // a lookup map to do the reverse.
 
-  typedef LIBMESH_BEST_UNORDERED_MAP<const Elem *, const Elem *>
+  typedef LIBMESH_BEST_UNORDERED_MULTIMAP<const Elem *, const Elem *>
     map_type;
   map_type interior_to_boundary_map;
 
@@ -173,7 +173,10 @@ void MetisPartitioner::_do_partition (MeshBase& mesh,
             // would be nice
             Elem* neighbor = const_cast<Elem*>(*n_it);
 
-#if defined(LIBMESH_HAVE_UNORDERED_MAP) || defined(LIBMESH_HAVE_TR1_UNORDERED_MAP) || defined(LIBMESH_HAVE_HASH_MAP) || defined(LIBMESH_HAVE_EXT_HASH_MAP)
+#if defined(LIBMESH_HAVE_UNORDERED_MULTIMAP) || \
+    defined(LIBMESH_HAVE_TR1_UNORDERED_MULTIMAP) || \
+    defined(LIBMESH_HAVE_HASH_MULTIMAP) || \
+    defined(LIBMESH_HAVE_EXT_HASH_MULTIMAP)
             interior_to_boundary_map.insert
               (std::make_pair(neighbor, elem));
 #else

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -43,7 +43,8 @@ class Point;
  * for debugging purposes.  It derives from ErrorEstimator
  * just in case someone finds it useful in a DG framework.
  *
- * @author Roy H. Stogner, 2006.
+ * \author Roy H. Stogner
+ * \date 2006
  */
 class DiscontinuityMeasure : public JumpErrorEstimator
 {
@@ -72,7 +73,7 @@ public:
                                                                const Point& p,
                                                                const std::string& var_name));
 
-  virtual ErrorEstimatorType type() const
+  virtual ErrorEstimatorType type() const libmesh_override
   { return DISCONTINUITY_MEASURE;}
 
 protected:
@@ -81,20 +82,20 @@ protected:
    * An initialization function, for requesting specific data from the FE
    * objects
    */
-  virtual void init_context(FEMContext &c);
+  virtual void init_context(FEMContext &c) libmesh_override;
 
   /**
    * The function which calculates a normal derivative jump based error
    * term on an internal side
    */
-  virtual void internal_side_integration();
+  virtual void internal_side_integration() libmesh_override;
 
   /**
    * The function which calculates a normal derivative jump based error
    * term on a boundary side.
    * Returns true if the flux bc function is in fact defined on the current side.
    */
-  virtual bool boundary_side_integration();
+  virtual bool boundary_side_integration() libmesh_override;
 
   /**
    * Pointer to function that returns BC information.

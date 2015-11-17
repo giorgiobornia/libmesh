@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -51,21 +51,18 @@ public:
   /**
    * @returns \p QGAUSS
    */
-  QuadratureType type() const { return QGAUSS_LOBATTO; }
+  virtual QuadratureType type() const libmesh_override { return QGAUSS_LOBATTO; }
 
 private:
 
-  void init_1D (const ElemType _type=INVALID_ELEM,
-                unsigned int p_level=0);
-  void init_2D (const ElemType _type=INVALID_ELEM,
-                unsigned int p_level=0);
-  void init_3D (const ElemType _type=INVALID_ELEM,
-                unsigned int p_level=0);
+  virtual void init_1D (const ElemType _type=INVALID_ELEM,
+                        unsigned int p_level=0) libmesh_override;
+  virtual void init_2D (const ElemType _type=INVALID_ELEM,
+                        unsigned int p_level=0) libmesh_override;
+  virtual void init_3D (const ElemType _type=INVALID_ELEM,
+                        unsigned int p_level=0) libmesh_override;
 };
 
-
 } // namespace libMesh
-
-
 
 #endif // LIBMESH_QUADRATURE_GAUSS_LOBATTO_H

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -464,9 +464,9 @@ public:
     FEMContext &_femcontext = cast_ref<FEMContext&>(*con);
     _diff_qoi.init_context(_femcontext);
 
-    std::vector<bool> have_heterogenous_qoi_bc(_sys.qoi.size(), false);
     bool have_some_heterogenous_qoi_bc = false;
 #ifdef LIBMESH_ENABLE_CONSTRAINTS
+    std::vector<bool> have_heterogenous_qoi_bc(_sys.qoi.size(), false);
     for (unsigned int q=0; q != _sys.qoi.size(); ++q)
       if (_qoi_indices.has_index(q) &&
           _sys.get_dof_map().has_heterogenous_adjoint_constraints(q))
@@ -489,21 +489,21 @@ public:
         // We might have some heterogenous dofs here; let's see for
         // certain
 #ifdef LIBMESH_ENABLE_CONSTRAINTS
+        bool elem_has_some_heterogenous_qoi_bc = false;
+        std::vector<bool> elem_has_heterogenous_qoi_bc(_sys.qoi.size(), false);
         if (have_some_heterogenous_qoi_bc)
           {
-            have_some_heterogenous_qoi_bc = false;
             for (unsigned int q=0; q != _sys.qoi.size(); ++q)
               {
                 if (have_heterogenous_qoi_bc[q])
                   {
-                    have_heterogenous_qoi_bc[q] = false;
                     for (unsigned int d=0;
                          d != _femcontext.get_dof_indices().size(); ++d)
                       if (_sys.get_dof_map().has_heterogenous_adjoint_constraint
                           (q, _femcontext.get_dof_indices()[d]) != Number(0))
                         {
-                          have_some_heterogenous_qoi_bc = true;
-                          have_heterogenous_qoi_bc[q] = true;
+                          elem_has_some_heterogenous_qoi_bc = true;
+                          elem_has_heterogenous_qoi_bc[q] = true;
                           break;
                         }
                   }
@@ -512,7 +512,7 @@ public:
 #endif
 
         if (_diff_qoi.assemble_qoi_elements ||
-            have_some_heterogenous_qoi_bc)
+            elem_has_some_heterogenous_qoi_bc)
           _femcontext.elem_fe_reinit();
 
         if (_diff_qoi.assemble_qoi_elements)
@@ -522,21 +522,21 @@ public:
         // themselves part of a regularized flux QoI which the library
         // handles integrating
 #ifdef LIBMESH_ENABLE_CONSTRAINTS
-        if (have_some_heterogenous_qoi_bc)
+        if (elem_has_some_heterogenous_qoi_bc)
           {
             _sys.time_solver->element_residual(false, _femcontext);
 
             for (unsigned int q=0; q != _sys.qoi.size(); ++q)
               {
-                if (have_heterogenous_qoi_bc[q])
+                if (elem_has_heterogenous_qoi_bc[q])
                   {
                     for (unsigned int d=0;
                          d != _femcontext.get_dof_indices().size(); ++d)
                       this->qoi[q] -= _femcontext.get_elem_residual()(d) *
                         _sys.get_dof_map().has_heterogenous_adjoint_constraint(q, _femcontext.get_dof_indices()[d]);
+
                   }
               }
-
           }
 #endif
 
@@ -654,7 +654,7 @@ public:
         // of a QoI, then we need FE information to assemble the
         // element residual.
         if (_qoi.assemble_qoi_elements ||
-            (_include_liftfunc &&
+            ((_include_liftfunc || _apply_constraints) &&
              elem_has_some_heterogenous_qoi_bc))
           _femcontext.elem_fe_reinit();
 
@@ -769,12 +769,16 @@ public:
 
                     _femcontext.get_dof_indices() = original_dofs;
 
-                    // If we're going to need K to impose a heterogenous
-                    // constraint, we may not have already computed it above.
                     if (has_heterogenous_constraint)
                       {
+                        // Q_u gets used for *adjoint* solves, so we
+                        // need K^T here.
+                        DenseMatrix<Number> elem_jacobian_transpose;
+                        _femcontext.get_elem_jacobian().get_transpose
+                          (elem_jacobian_transpose);
+
                         _sys.get_dof_map().heterogenously_constrain_element_vector
-                          (_femcontext.get_elem_jacobian(),
+                          (elem_jacobian_transpose,
                            _femcontext.get_qoi_derivatives()[i],
                            _femcontext.get_dof_indices(), false, i);
                       }
@@ -1200,82 +1204,89 @@ void FEMSystem::numerical_jacobian (TimeSolverResPtr res,
   if (_mesh_sys == this)
     numerical_point_h = numerical_jacobian_h * context.get_elem().hmin();
 
-  for (unsigned int j = 0; j != context.get_dof_indices().size(); ++j)
+  for (unsigned int v = 0; v != context.n_vars(); ++v)
     {
-      // Take the "minus" side of a central differenced first derivative
-      Number original_solution = context.get_elem_solution()(j);
-      context.get_elem_solution()(j) -= numerical_jacobian_h;
+      const Real my_h = this->numerical_jacobian_h_for_var(v);
 
-      // Make sure to catch any moving mesh terms
-      // FIXME - this could be less ugly
-      Real *coord = NULL;
-      if (_mesh_sys == this)
+      unsigned int j_offset = libMesh::invalid_uint;
+
+      if (!context.get_dof_indices(v).empty())
         {
-          if (_mesh_x_var != libMesh::invalid_uint)
-            for (unsigned int k = 0;
-                 k != context.get_dof_indices( _mesh_x_var ).size(); ++k)
-              if (context.get_dof_indices( _mesh_x_var )[k] ==
-                  context.get_dof_indices()[j])
-                coord = &(context.get_elem().point(k)(0));
-          if (_mesh_y_var != libMesh::invalid_uint)
-            for (unsigned int k = 0;
-                 k != context.get_dof_indices( _mesh_y_var ).size(); ++k)
-              if (context.get_dof_indices( _mesh_y_var )[k] ==
-                  context.get_dof_indices()[j])
-                coord = &(context.get_elem().point(k)(1));
-          if (_mesh_z_var != libMesh::invalid_uint)
-            for (unsigned int k = 0;
-                 k != context.get_dof_indices( _mesh_z_var ).size(); ++k)
-              if (context.get_dof_indices( _mesh_z_var )[k] ==
-                  context.get_dof_indices()[j])
-                coord = &(context.get_elem().point(k)(2));
-        }
-      if (coord)
-        {
-          // We have enough information to scale the perturbations
-          // here appropriately
-          context.get_elem_solution()(j) = original_solution - numerical_point_h;
-          *coord = libmesh_real(context.get_elem_solution()(j));
+          for (unsigned int i = 0;
+               i != context.get_dof_indices().size(); ++i)
+            if (context.get_dof_indices()[i] ==
+                context.get_dof_indices(v)[0])
+              j_offset = i;
+
+          libmesh_assert_not_equal_to(j_offset, libMesh::invalid_uint);
         }
 
-      context.get_elem_residual().zero();
-      ((*time_solver).*(res))(false, context);
-#ifdef DEBUG
-      libmesh_assert_equal_to (old_jacobian, context.get_elem_jacobian());
-#endif
-      backwards_residual = context.get_elem_residual();
-
-      // Take the "plus" side of a central differenced first derivative
-      context.get_elem_solution()(j) = original_solution + numerical_jacobian_h;
-      if (coord)
+      for (unsigned int j = 0; j != context.get_dof_indices(v).size(); ++j)
         {
-          context.get_elem_solution()(j) = original_solution + numerical_point_h;
-          *coord = libmesh_real(context.get_elem_solution()(j));
-        }
-      context.get_elem_residual().zero();
-      ((*time_solver).*(res))(false, context);
-#ifdef DEBUG
-      libmesh_assert_equal_to (old_jacobian, context.get_elem_jacobian());
-#endif
+          const unsigned int total_j = j + j_offset;
 
-      context.get_elem_solution()(j) = original_solution;
-      if (coord)
-        {
-          *coord = libmesh_real(context.get_elem_solution()(j));
-          for (unsigned int i = 0; i != context.get_dof_indices().size(); ++i)
+          // Take the "minus" side of a central differenced first derivative
+          Number original_solution = context.get_elem_solution(v)(j);
+          context.get_elem_solution(v)(j) -= my_h;
+
+          // Make sure to catch any moving mesh terms
+          Real *coord = NULL;
+          if (_mesh_sys == this)
             {
-              numeric_jacobian(i,j) =
-                (context.get_elem_residual()(i) - backwards_residual(i)) /
-                2. / numerical_point_h;
+              if (_mesh_x_var == v)
+                coord = &(context.get_elem().point(j)(0));
+              else if (_mesh_y_var == v)
+                coord = &(context.get_elem().point(j)(1));
+              else if (_mesh_z_var == v)
+                coord = &(context.get_elem().point(j)(2));
             }
-        }
-      else
-        {
-          for (unsigned int i = 0; i != context.get_dof_indices().size(); ++i)
+          if (coord)
             {
-              numeric_jacobian(i,j) =
-                (context.get_elem_residual()(i) - backwards_residual(i)) /
-                2. / numerical_jacobian_h;
+              // We have enough information to scale the perturbations
+              // here appropriately
+              context.get_elem_solution(v)(j) = original_solution - numerical_point_h;
+              *coord = libmesh_real(context.get_elem_solution(v)(j));
+            }
+
+          context.get_elem_residual().zero();
+          ((*time_solver).*(res))(false, context);
+#ifdef DEBUG
+          libmesh_assert_equal_to (old_jacobian, context.get_elem_jacobian());
+#endif
+          backwards_residual = context.get_elem_residual();
+
+          // Take the "plus" side of a central differenced first derivative
+          context.get_elem_solution(v)(j) = original_solution + my_h;
+          if (coord)
+            {
+              context.get_elem_solution()(j) = original_solution + numerical_point_h;
+              *coord = libmesh_real(context.get_elem_solution(v)(j));
+            }
+          context.get_elem_residual().zero();
+          ((*time_solver).*(res))(false, context);
+#ifdef DEBUG
+          libmesh_assert_equal_to (old_jacobian, context.get_elem_jacobian());
+#endif
+
+          context.get_elem_solution(v)(j) = original_solution;
+          if (coord)
+            {
+              *coord = libmesh_real(context.get_elem_solution(v)(j));
+              for (unsigned int i = 0; i != context.get_dof_indices().size(); ++i)
+                {
+                  numeric_jacobian(i,total_j) =
+                    (context.get_elem_residual()(i) - backwards_residual(i)) /
+                    2. / numerical_point_h;
+                }
+            }
+          else
+            {
+              for (unsigned int i = 0; i != context.get_dof_indices().size(); ++i)
+                {
+                  numeric_jacobian(i,total_j) =
+                    (context.get_elem_residual()(i) - backwards_residual(i)) /
+                    2. / my_h;
+                }
             }
         }
     }

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -274,6 +274,16 @@ Real Quad4::volume () const
 
       return 0.25*vol;
     }
+}
+
+
+
+dof_id_type Quad4::key () const
+{
+  return this->compute_key(this->node(0),
+                           this->node(1),
+                           this->node(2),
+                           this->node(3));
 }
 
 } // namespace libMesh

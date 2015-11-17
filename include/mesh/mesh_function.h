@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -43,17 +43,13 @@ template <typename T> class NumericVector;
 class DofMap;
 class PointLocatorBase;
 
-
-
 /**
  * This class provides function-like objects for data
  * distributed over a mesh.
  *
- * @author Daniel Dreyer, 2003
+ * \author Daniel Dreyer
+ * \date 2003
  */
-
-// ------------------------------------------------------------
-// MeshFunction class definition
 class MeshFunction : public FunctionBase<Number>,
                      public ParallelObject
 {
@@ -92,25 +88,23 @@ public:
    */
   ~MeshFunction ();
 
-
-
   /**
-   * The actual initialization process.
-   * specifies the method to use when building a \p PointLocator
+   * Override the FunctionBase::init() member function by calling our
+   * own and specifying the Trees::NODES method.  specifies the method
+   * to use when building a \p PointLocator
    */
-  void init () { this->init(Trees::NODES); }
-
+  virtual void init () libmesh_override { this->init(Trees::NODES); }
 
   /**
    * The actual initialization process.  Takes an optional argument which
    * specifies the method to use when building a \p PointLocator
    */
-  virtual void init (const Trees::BuildType point_locator_build_type);
+  void init (const Trees::BuildType point_locator_build_type);
 
   /**
    * Clears the function.
    */
-  virtual void clear ();
+  virtual void clear () libmesh_override;
 
   /**
    * Returns a new copy of the function.  The new copy uses the
@@ -119,14 +113,14 @@ public:
    * Note that this implies the copy should not be used after the
    * original is destroyed.
    */
-  virtual UniquePtr<FunctionBase<Number> > clone () const;
+  virtual UniquePtr<FunctionBase<Number> > clone () const libmesh_override;
 
   /**
    * @returns the value of variable 0 at point
    * \p p and for \p time, which defaults to zero.
    */
   Number operator() (const Point& p,
-                     const Real time=0.);
+                     const Real time=0.) libmesh_override;
 
   /**
    * @returns the first derivatives of variable 0 at point
@@ -152,7 +146,7 @@ public:
    */
   void operator() (const Point& p,
                    const Real time,
-                   DenseVector<Number>& output);
+                   DenseVector<Number>& output) libmesh_override;
 
   /**
    * Computes values at coordinate \p p and for time \p time,

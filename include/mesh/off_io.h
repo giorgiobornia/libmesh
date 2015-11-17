@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -37,9 +37,6 @@ class MeshBase;
  * triangulated surface in the
  * standard OFF OOGL format.
  */
-
-// ------------------------------------------------------------
-// OFFIO class definition
 class OFFIO : public MeshInput<MeshBase>
 {
 public:
@@ -54,7 +51,7 @@ public:
    * Reads in an OFF OOGL data file based on the string
    * you pass it.
    */
-  virtual void read (const std::string& name);
+  virtual void read (const std::string& name) libmesh_override;
 
 private:
   /**
@@ -62,7 +59,7 @@ private:
    * is called by the public interface function and implements
    * reading the file.
    */
-  virtual void read_stream (std::istream& in);
+  void read_stream (std::istream& in);
 };
 
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -34,16 +34,12 @@ namespace libMesh
 // Forward declarations
 class MeshBase;
 
-
-
 /**
  * This class implements writing meshes in the Tecplot format.
  *
- * @author Benjamin S. Kirk, 2004
+ * \author Benjamin S. Kirk
+ * \date 2004
  */
-
-// ------------------------------------------------------------
-// TecplotIO class definition
 class TecplotIO : public MeshOutput<MeshBase>
 {
 public:
@@ -62,7 +58,7 @@ public:
   /**
    * This method implements writing a mesh to a specified file.
    */
-  virtual void write (const std::string& );
+  virtual void write (const std::string&) libmesh_override;
 
   /**
    * This method implements writing a mesh with nodal data to a
@@ -70,7 +66,7 @@ public:
    */
   virtual void write_nodal_data (const std::string&,
                                  const std::vector<Number>&,
-                                 const std::vector<std::string>&);
+                                 const std::vector<std::string>&) libmesh_override;
 
   /**
    * Flag indicating whether or not to write a binary file

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -43,8 +43,8 @@ class Elem;
 /**
  * This class implements the Patch Recovery error indicator.
  *
- *
- * @author Vikram Garg 2012.
+ * \author Vikram Garg
+ * \date 2012
  */
 class WeightedPatchRecoveryErrorEstimator : public PatchRecoveryErrorEstimator
 {
@@ -73,7 +73,7 @@ public:
   virtual void estimate_error (const System& system,
                                ErrorVector& error_per_cell,
                                const NumericVector<Number>* solution_vector = NULL,
-                               bool estimate_parent_error = false);
+                               bool estimate_parent_error = false) libmesh_override;
 
   /**
      Vector of fem function base pointers, the user will fill this in
@@ -81,7 +81,7 @@ public:
   */
   std::vector<FEMFunctionBase<Number>*> weight_functions;
 
-  virtual ErrorEstimatorType type() const
+  virtual ErrorEstimatorType type() const libmesh_override
   { return WEIGHTED_PATCH_RECOVERY;}
 
 private:

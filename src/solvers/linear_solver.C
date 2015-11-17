@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -30,6 +30,7 @@
 #include "libmesh/preconditioner.h"
 #include "libmesh/sparse_matrix.h"
 #include "libmesh/string_to_enum.h"
+#include "libmesh/solver_configuration.h"
 
 namespace libMesh
 {
@@ -58,7 +59,7 @@ LinearSolver<T>::build(const libMesh::Parallel::Communicator &comm,
 #endif
 
 
-#ifdef LIBMESH_HAVE_TRILINOS
+#if defined(LIBMESH_HAVE_TRILINOS) && (LIBMESH_TRILINOS_HAVE_AZTECOO)
     case TRILINOS_SOLVERS:
       return UniquePtr<LinearSolver<T> >(new AztecLinearSolver<T>(comm));
 #endif
@@ -160,6 +161,12 @@ void LinearSolver<T>::print_converged_reason() const
 {
   LinearConvergenceReason reason = this->get_converged_reason();
   libMesh::out << "Linear solver convergence/divergence reason: " << Utility::enum_to_string(reason) << std::endl;
+}
+
+template <typename T>
+void LinearSolver<T>::set_solver_configuration(SolverConfiguration& solver_configuration)
+{
+  _solver_configuration = &solver_configuration;
 }
 
 //------------------------------------------------------------------

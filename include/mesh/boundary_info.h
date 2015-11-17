@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -50,12 +50,7 @@ class MeshData;
  * element faces and nodes with ids useful for identifying the
  * type of boundary condtion.  It can also build a mesh that
  * just includes boundary elements/faces.
- *
- * TODO[JWP]: Generalize this to work with MeshBase again.
  */
-
-//------------------------------------------------------
-// BoundaryInfo class definition
 class BoundaryInfo : public ParallelObject
 {
 protected:
@@ -112,6 +107,9 @@ public:
    * for algorithms which couple boundary and interior mesh
    * information.  Any pre-existing \p boundary_mesh data is cleared.
    * Only boundary elements with the specified ids are extracted.
+   * Boundary IDs for the nodes on \p requested_boundary_ids
+   * will also be copied over to \p boundary_mesh. We do not
+   * currently copy edge boundary IDs over to \p boundary_mesh.
    *
    * If you are using a MeshData class with this Mesh, you can
    * pass a pointer to both the boundary_mesh's MeshData object,
@@ -122,6 +120,21 @@ public:
              MeshData* boundary_mesh_data=NULL,
              MeshData* this_mesh_data=NULL);
 
+  /**
+   * Suppose we have used sync to create \p boundary_mesh. Then each
+   * element in \p boundary_mesh will have interior_parent defined.
+   * This method gets extra data for us:
+   *  - \p node_id_map stores a map from the node ids on the interior mesh
+   *    to the corresponding node ids of \p boundary_mesh.
+   *  - \p side_id_map stores a map from the element ids of the boundary mesh
+   *    to the side index of the interior_parent that the boundary element
+   *    corresponds to.
+   * \p tolerance is used to identify when we have matching elements.
+   */
+  void get_side_and_node_maps (UnstructuredMesh& boundary_mesh,
+                               std::map<dof_id_type, dof_id_type>& node_id_map,
+                               std::map<dof_id_type, unsigned char>& side_id_map,
+                               Real tolerance=1.e-6);
 
   /**
    * Generates \p elements along the boundary of our _mesh, which
@@ -268,8 +281,20 @@ public:
 
   /**
    * Returns the boundary ids associated with \p Node \p node.
+   *
+   * This function has been deprecated.  Instead, use the version of
+   * this function that fills a std::vector.
    */
   std::vector<boundary_id_type> boundary_ids (const Node* node) const;
+
+  /**
+   * Fills a user-provided std::vector with the boundary ids associated
+   * with \p Node \p node.
+   *
+   * This is the non-deprecated version of the function.
+   */
+  void boundary_ids (const Node* node,
+                     std::vector<boundary_id_type> & vec_to_fill) const;
 
   /**
    * Returns the number of boundary ids associated with \p Node \p node.
@@ -288,9 +313,23 @@ public:
    * Returns the list of boundary ids associated with the \p edge edge of
    * element \p elem.
    * Edge-based boundary IDs should only be used in 3D.
+   *
+   * This function has been deprecated.  Instead, use the version of
+   * this function that fills a std::vector.
    */
   std::vector<boundary_id_type> edge_boundary_ids (const Elem* const elem,
                                                    const unsigned short int edge) const;
+
+  /**
+   * Returns the list of boundary ids associated with the \p edge edge of
+   * element \p elem.
+   * Edge-based boundary IDs should only be used in 3D.
+   *
+   * This is the non-deprecated version of the function.
+   */
+  void edge_boundary_ids (const Elem* const elem,
+                          const unsigned short int edge,
+                          std::vector<boundary_id_type> & vec_to_fill) const;
 
   /**
    * Returns the list of raw boundary ids associated with the \p edge
@@ -298,9 +337,25 @@ public:
    * exclude ids which are implicit, such as a child's inheritance of
    * its ancestors' boundary id.
    * Edge-based boundary IDs should only be used in 3D.
+   *
+   * This function has been deprecated.  Instead, use the version of
+   * this function that fills a std::vector.
    */
   std::vector<boundary_id_type> raw_edge_boundary_ids (const Elem* const elem,
                                                        const unsigned short int edge) const;
+
+  /**
+   * Returns the list of raw boundary ids associated with the \p edge
+   * edge of element \p elem.  These ids are ``raw'' because they
+   * exclude ids which are implicit, such as a child's inheritance of
+   * its ancestors' boundary id.
+   * Edge-based boundary IDs should only be used in 3D.
+   *
+   * This is the non-deprecated version of the function.
+   */
+  void raw_edge_boundary_ids (const Elem* const elem,
+                              const unsigned short int edge,
+                              std::vector<boundary_id_type> & vec_to_fill) const;
 
   /**
    * Returns true iff the given side of the given element is
@@ -330,18 +385,46 @@ public:
   /**
    * Returns the list of boundary ids associated with the \p side side of
    * element \p elem.
+   *
+   * This function has been deprecated.  Instead, use the version of
+   * this function that fills a std::vector.
    */
   std::vector<boundary_id_type> boundary_ids (const Elem* const elem,
                                               const unsigned short int side) const;
+
+  /**
+   * Returns the list of boundary ids associated with the \p side side of
+   * element \p elem.
+   *
+   * This is the non-deprecated version of the function.
+   */
+  void boundary_ids (const Elem* const elem,
+                     const unsigned short int side,
+                     std::vector<boundary_id_type> & vec_to_fill) const;
 
   /**
    * Returns the list of raw boundary ids associated with the \p side
    * side of element \p elem.  These ids are ``raw'' because they
    * exclude ids which are implicit, such as a child's inheritance of
    * its ancestors' boundary id.
+   *
+   * This function has been deprecated.  Instead, use the version of
+   * this function that fills a std::vector.
    */
   std::vector<boundary_id_type> raw_boundary_ids (const Elem* const elem,
                                                   const unsigned short int side) const;
+
+  /**
+   * Returns the list of raw boundary ids associated with the \p side
+   * side of element \p elem.  These ids are ``raw'' because they
+   * exclude ids which are implicit, such as a child's inheritance of
+   * its ancestors' boundary id.
+   *
+   * This is the non-deprecated version of the function.
+   */
+  void raw_boundary_ids (const Elem* const elem,
+                         const unsigned short int side,
+                         std::vector<boundary_id_type> & vec_to_fill) const;
 
   /**
    * Returns a side of element \p elem whose associated boundary id is
@@ -515,12 +598,11 @@ private:
    * dof_object ids.  Either node_id_map or side_id_map can be NULL,
    * in which case it will not be filled.
    */
-  void _find_id_maps
-    (const std::set<boundary_id_type> &requested_boundary_ids,
-     dof_id_type first_free_node_id,
-     std::map<dof_id_type, dof_id_type> * node_id_map,
-     dof_id_type first_free_elem_id,
-     std::map<std::pair<dof_id_type, unsigned char>, dof_id_type> * side_id_map);
+  void _find_id_maps (const std::set<boundary_id_type> &requested_boundary_ids,
+                      dof_id_type first_free_node_id,
+                      std::map<dof_id_type, dof_id_type> * node_id_map,
+                      dof_id_type first_free_elem_id,
+                      std::map<std::pair<dof_id_type, unsigned char>, dof_id_type> * side_id_map);
 
   /**
    * The Mesh this boundary info pertains to.
@@ -535,12 +617,23 @@ private:
                 boundary_id_type> _boundary_node_id;
 
   /**
+   * Typdef for iterators into the _boundary_node_id container.
+   */
+  typedef std::multimap<const Node*, boundary_id_type>::const_iterator boundary_node_iter;
+
+  /**
    * Data structure that maps edges of elements
    * to boundary ids. This is only relevant in 3D.
    */
   std::multimap<const Elem*,
                 std::pair<unsigned short int, boundary_id_type> >
   _boundary_edge_id;
+
+  /**
+   * Typdef for iterators into the _boundary_edge_id container.
+   */
+  typedef std::multimap<const Elem*,
+                        std::pair<unsigned short int, boundary_id_type> >::const_iterator boundary_edge_iter;
 
   /**
    * Data structure that maps sides of elements
@@ -550,6 +643,19 @@ private:
                 std::pair<unsigned short int, boundary_id_type> >
   _boundary_side_id;
 
+  /**
+   * Typdef for iterators into the _boundary_side_id container.
+   */
+  typedef std::multimap<const Elem*,
+                        std::pair<unsigned short int, boundary_id_type> >::const_iterator boundary_side_iter;
+
+  /**
+   * Some older compilers don't support erasing from a map with
+   * const_iterators, so we need to use a non-const iterator in those
+   * situations.
+   */
+  typedef std::multimap<const Elem*,
+                        std::pair<unsigned short int, boundary_id_type> >::iterator erase_iter;
   /**
    * A collection of user-specified boundary ids for sides, edges and nodes.
    * See _side_boundary_ids, _edge_boundary_ids and _node_boundary_ids
@@ -590,44 +696,6 @@ private:
    * this is only implemented for ExodusII
    */
   std::map<boundary_id_type, std::string> _ns_id_to_name;
-
-
-  //   /**
-  //    * Functor class for printing a single node's info
-  //    * To be used with "for_each".
-  //    */
-  //   class PrintNodeInfo
-  //   {
-  //   public:
-  //     inline
-  //     void operator() (const std::pair<const Node*, short int>& np) const
-  //     {
-  //       libMesh::out << "  (" << np.first->id()
-  //      << ", "  << np.second
-  //      << ")"  << std::endl;
-  //     }
-  //   };
-
-
-  //   /**
-  //    * Functor class for printing a single side's info.
-  //    * To be used with "for_each".
-  //    */
-  //   class PrintSideInfo
-  //   {
-  //   public:
-  //     PrintSideInfo() {}
-  //     inline
-  //     void operator() (const std::pair<const Elem*, std::pair<unsigned short int,short int> >& sp) const
-  //     {
-  //       libMesh::out << "  (" << sp.first->id()
-  //      << ", "  << sp.second.first
-  //      << ", "  << sp.second.second
-  //      << ")"   << std::endl;
-  //     }
-  //   };
-
-
 
   /**
    * Functor class for initializing a map.

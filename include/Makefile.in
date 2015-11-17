@@ -70,12 +70,12 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ac_cxx_rtti.m4 \
 	$(top_srcdir)/m4/config_environment.m4 \
 	$(top_srcdir)/m4/config_summary.m4 \
 	$(top_srcdir)/m4/coverage.m4 $(top_srcdir)/m4/cppunit.m4 \
-	$(top_srcdir)/m4/cxx11.m4 $(top_srcdir)/m4/demangle.m4 \
-	$(top_srcdir)/m4/dlopen.m4 $(top_srcdir)/m4/eigen.m4 \
-	$(top_srcdir)/m4/exodus.m4 $(top_srcdir)/m4/feexcept.m4 \
-	$(top_srcdir)/m4/fparser.m4 $(top_srcdir)/m4/glpk.m4 \
-	$(top_srcdir)/m4/gmv.m4 $(top_srcdir)/m4/gz.m4 \
-	$(top_srcdir)/m4/hdf5.m4 \
+	$(top_srcdir)/m4/curl.m4 $(top_srcdir)/m4/cxx11.m4 \
+	$(top_srcdir)/m4/demangle.m4 $(top_srcdir)/m4/dlopen.m4 \
+	$(top_srcdir)/m4/eigen.m4 $(top_srcdir)/m4/exodus.m4 \
+	$(top_srcdir)/m4/feexcept.m4 $(top_srcdir)/m4/fparser.m4 \
+	$(top_srcdir)/m4/glpk.m4 $(top_srcdir)/m4/gmv.m4 \
+	$(top_srcdir)/m4/gz.m4 $(top_srcdir)/m4/hdf5.m4 \
 	$(top_srcdir)/m4/hinnant_unique_ptr.m4 \
 	$(top_srcdir)/m4/laspack.m4 $(top_srcdir)/m4/libhilbert.m4 \
 	$(top_srcdir)/m4/libmesh_compiler_features.m4 \
@@ -91,14 +91,14 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ac_cxx_rtti.m4 \
 	$(top_srcdir)/m4/nlopt.m4 $(top_srcdir)/m4/parmetis.m4 \
 	$(top_srcdir)/m4/petsc.m4 $(top_srcdir)/m4/precision.m4 \
 	$(top_srcdir)/m4/prefix_config.m4 $(top_srcdir)/m4/qhull.m4 \
-	$(top_srcdir)/m4/sanitize.m4 $(top_srcdir)/m4/sfc.m4 \
-	$(top_srcdir)/m4/slepc.m4 $(top_srcdir)/m4/sstream.m4 \
-	$(top_srcdir)/m4/strstream.m4 $(top_srcdir)/m4/tbb.m4 \
-	$(top_srcdir)/m4/tecio.m4 $(top_srcdir)/m4/tecplot.m4 \
-	$(top_srcdir)/m4/tetgen.m4 $(top_srcdir)/m4/threads.m4 \
-	$(top_srcdir)/m4/triangle.m4 $(top_srcdir)/m4/trilinos.m4 \
-	$(top_srcdir)/m4/unordered.m4 $(top_srcdir)/m4/vtk.m4 \
-	$(top_srcdir)/configure.ac
+	$(top_srcdir)/m4/safe_bool.m4 $(top_srcdir)/m4/sanitize.m4 \
+	$(top_srcdir)/m4/sfc.m4 $(top_srcdir)/m4/slepc.m4 \
+	$(top_srcdir)/m4/sstream.m4 $(top_srcdir)/m4/strstream.m4 \
+	$(top_srcdir)/m4/tbb.m4 $(top_srcdir)/m4/tecio.m4 \
+	$(top_srcdir)/m4/tecplot.m4 $(top_srcdir)/m4/tetgen.m4 \
+	$(top_srcdir)/m4/threads.m4 $(top_srcdir)/m4/triangle.m4 \
+	$(top_srcdir)/m4/trilinos.m4 $(top_srcdir)/m4/unordered.m4 \
+	$(top_srcdir)/m4/vtk.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
@@ -236,6 +236,8 @@ CPPFLAGS_PROF = @CPPFLAGS_PROF@
 CPPUNIT_CFLAGS = @CPPUNIT_CFLAGS@
 CPPUNIT_CONFIG = @CPPUNIT_CONFIG@
 CPPUNIT_LIBS = @CPPUNIT_LIBS@
+CURL_INCLUDE = @CURL_INCLUDE@
+CURL_LIBRARY = @CURL_LIBRARY@
 CXX = @CXX@
 CXXCPP = @CXXCPP@
 CXXDEPMODE = @CXXDEPMODE@
@@ -311,6 +313,7 @@ LIBTOOL = @LIBTOOL@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
+LT_SYS_LIBRARY_PATH = @LT_SYS_LIBRARY_PATH@
 MAINT = @MAINT@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
@@ -733,10 +736,13 @@ include_HEADERS = \
         numerics/function_base.h \
         numerics/numeric_vector.h \
         numerics/parsed_fem_function.h \
+        numerics/parsed_fem_function_parameter.h \
         numerics/parsed_function.h \
+        numerics/parsed_function_parameter.h \
         numerics/petsc_macro.h \
         numerics/petsc_matrix.h \
         numerics/petsc_preconditioner.h \
+        numerics/petsc_solver_exception.h \
         numerics/petsc_vector.h \
         numerics/preconditioner.h \
         numerics/raw_accessor.h \
@@ -836,7 +842,6 @@ include_HEADERS = \
         solvers/euler2_solver.h \
         solvers/euler_solver.h \
         solvers/first_order_unsteady_solver.h \
-        solvers/linear.h \
         solvers/linear_solver.h \
         solvers/memory_solution_history.h \
         solvers/newmark_solver.h \
@@ -854,7 +859,7 @@ include_HEADERS = \
         solvers/slepc_eigen_solver.h \
         solvers/slepc_macro.h \
         solvers/solution_history.h \
-        solvers/solver.h \
+        solvers/solver_configuration.h \
         solvers/steady_solver.h \
         solvers/tao_optimization_solver.h \
         solvers/time_solver.h \
@@ -910,6 +915,7 @@ include_HEADERS = \
         utils/point_locator_tree.h \
         utils/pool_allocator.h \
         utils/restore_warnings.h \
+        utils/safe_bool.h \
         utils/statistics.h \
         utils/string_to_enum.h \
         utils/timestamp.h \

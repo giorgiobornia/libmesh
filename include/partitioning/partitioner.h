@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -42,9 +42,6 @@ class ErrorVector;
  * object as input, which it will partition into a number of
  * subdomains.
  */
-
-// ------------------------------------------------------------
-// Partitioner class definition
 class Partitioner
 {
 public:
@@ -73,17 +70,39 @@ public:
    * The partitioner currently does not modify the subdomain_id
    * of each element.  This number is reserved for things like
    * material properties, etc.
+   *
+   * NOTE: If you are implementing a new type of Partitioner, you most
+   * likely do *not* want to override the partition() function, see
+   * instead the protected virtual _do_partition() method below.  The
+   * partition() function is responsible for doing a lot of
+   * libmesh-internals-specific setup and finalization before and
+   * after the _do_partition() function is called.  The only
+   * responsibility of the _do_partition() function, on the other
+   * hand, is to set the processor IDs of the elements according to a
+   * specific partitioning algorithm.  See, e.g.  MetisPartitioner for
+   * an example.
    */
-  void partition (MeshBase& mesh,
-                  const unsigned int n);
+  virtual void partition (MeshBase& mesh,
+                          const unsigned int n);
 
   /**
    * Partition the \p MeshBase into \p mesh.n_processors() parts.
    * The partitioner currently does not modify the subdomain_id
    * of each element.  This number is reserved for things like
    * material properties, etc.
+   *
+   * NOTE: If you are implementing a new type of Partitioner, you most
+   * likely do *not* want to override the partition() function, see
+   * instead the protected virtual _do_partition() method below.  The
+   * partition() function is responsible for doing a lot of
+   * libmesh-internals-specific setup and finalization before and
+   * after the _do_partition() function is called.  The only
+   * responsibility of the _do_partition() function, on the other
+   * hand, is to set the processor IDs of the elements according to a
+   * specific partitioning algorithm.  See, e.g.  MetisPartitioner for
+   * an example.
    */
-  void partition (MeshBase& mesh);
+  virtual void partition (MeshBase& mesh);
 
   /**
    * Repartitions the \p MeshBase into \p n parts.  This

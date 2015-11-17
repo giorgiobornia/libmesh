@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -2165,7 +2165,7 @@ void DofMap::old_dof_indices (const Elem* const elem,
 
   // Clear the DOF indices vector.
   di.clear();
-  
+
   // Determine the nodes contributing to element elem
   std::vector<Node*> elem_nodes;
   if (elem->type() == TRI3SUBDIVISION)
@@ -2651,8 +2651,7 @@ void SparsityPattern::Build::operator()(const ConstElemRange &range)
 
             ConstCouplingRow ccr(vi, *dof_coupling);
             ConstCouplingRow::const_iterator end = ccr.end();
-            for (ConstCouplingRow::const_iterator it =
-                 ccr.begin(); it != end; ++it)
+            for (ConstCouplingRow::const_iterator it = ccr.begin(); it != end; ++it)
               {
                 unsigned int vj = *it;
 
@@ -2781,12 +2780,10 @@ void SparsityPattern::Build::operator()(const ConstElemRange &range)
                                     dof_map.dof_indices
                                       (neighbor, neighbor_dofs_j, vj);
 #ifdef LIBMESH_ENABLE_CONSTRAINTS
-                                    dof_map.find_connected_dofs
-                                      (neighbor_dofs_j);
+                                    dof_map.find_connected_dofs(neighbor_dofs_j);
 #endif
                                     const unsigned int n_dofs_on_neighbor =
-                                      cast_int<unsigned int>
-                                        (neighbor_dofs_j.size());
+                                      cast_int<unsigned int>(neighbor_dofs_j.size());
 
                                     for (unsigned int j=0; j<n_dofs_on_neighbor; j++)
                                       {
@@ -2804,8 +2801,8 @@ void SparsityPattern::Build::operator()(const ConstElemRange &range)
                                       }
                                   }
                               }
-                        }
-                    }
+                      }
+                  }
               } // End vj loop
           } // End vi loop
     } // End explicit DoF coupling case

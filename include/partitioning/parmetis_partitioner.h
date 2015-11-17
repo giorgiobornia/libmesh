@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -57,7 +57,7 @@ public:
    * Creates a new partitioner of this type and returns it in
    * an \p UniquePtr.
    */
-  virtual UniquePtr<Partitioner> clone () const
+  virtual UniquePtr<Partitioner> clone () const libmesh_override
   {
     return UniquePtr<Partitioner>(new ParmetisPartitioner());
   }
@@ -72,13 +72,13 @@ protected:
    * then been adaptively refined) and repartitions it.
    */
   virtual void _do_repartition (MeshBase& mesh,
-                                const unsigned int n);
+                                const unsigned int n) libmesh_override;
 
   /**
    * Partition the \p MeshBase into \p n subdomains.
    */
   virtual void _do_partition (MeshBase& mesh,
-                              const unsigned int n);
+                              const unsigned int n) libmesh_override;
 
 private:
 

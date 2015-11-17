@@ -101,6 +101,12 @@ AC_CONFIG_FILES([contrib/unique_ptr/Makefile])
 # --------------------------------------------------------------
 
 
+# --------------------------------------------------------------
+# Test whether safe_bool<T> works as intended
+CONFIGURE_SAFE_BOOL
+# --------------------------------------------------------------
+
+
 # -------------------------------------------------------------
 # Petsc -- enabled by default
 # -------------------------------------------------------------
@@ -627,6 +633,21 @@ AM_CONDITIONAL(LIBMESH_ENABLE_NANOFLANN, test x$enablenanoflann = xyes)
 AC_CONFIG_FILES([contrib/nanoflann/Makefile])
 # -------------------------------------------------------------
 
+
+
+# -------------------------------------------------------------
+# libcurl -- enabled by default
+# Note: I tried to use the m4 files ax_lib_curl.m4 and
+# ax_path_generic.m4 from the autoconf-archive for this, but they
+# would not work (bootstrap failed!) on either Linux or OSX.
+# -------------------------------------------------------------
+CONFIGURE_CURL
+if (test x$enablecurl = xyes); then
+  libmesh_optional_INCLUDES="$CURL_INCLUDE $libmesh_optional_INCLUDES"
+  libmesh_optional_LIBS="$CURL_LIBRARY $libmesh_optional_LIBS"
+fi
+AM_CONDITIONAL(LIBMESH_ENABLE_CURL, test x$enablecurl = xyes)
+# -------------------------------------------------------------
 
 
 if test "$enableoptional" != no ; then

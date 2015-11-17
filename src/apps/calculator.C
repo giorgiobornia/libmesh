@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -144,7 +144,7 @@ int main(int argc, char** argv)
 
   new_sys.time_solver =
     UniquePtr<TimeSolver>(new SteadySolver(new_sys));
-  
+
   new_sys.fe_family() =
     cl.follow(std::string("LAGRANGE"), "--family");
 
@@ -153,7 +153,7 @@ int main(int argc, char** argv)
 
   const std::string calcfunc =
     assert_argument(cl, "--calc", argv[0], std::string(""));
-  
+
   ParsedFEMFunction<Number> goal_function(old_sys, calcfunc);
 
   new_sys.goal_func.reset(goal_function.clone().release());

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -421,6 +421,7 @@ void EpetraMatrix<T>::add_matrix(const DenseMatrix<T>& dm,
 template <typename T>
 void EpetraMatrix<T>::add (const T a_in, SparseMatrix<T> &X_in)
 {
+#ifdef LIBMESH_TRILINOS_HAVE_EPETRAEXT
   libmesh_assert (this->initialized());
 
   // sanity check. but this cannot avoid
@@ -431,6 +432,9 @@ void EpetraMatrix<T>::add (const T a_in, SparseMatrix<T> &X_in)
   EpetraMatrix<T>* X = cast_ptr<EpetraMatrix<T>*> (&X_in);
 
   EpetraExt::MatrixMatrix::Add (*X->_mat, false, a_in, *_mat, 1.);
+#else
+  libmesh_error_msg("ERROR: EpetraExt is required for EpetraMatrix::add()!");
+#endif
 }
 
 

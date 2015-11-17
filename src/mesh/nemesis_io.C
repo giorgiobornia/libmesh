@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -68,9 +68,14 @@ inline unsigned int to_uint ( const T &t )
 
 // test equality for a.first -> a.second mapping.  since we can only map to one
 // value only test the first entry
+#if defined(LIBMESH_HAVE_EXODUS_API) && defined(LIBMESH_HAVE_NEMESIS_API)
 inline bool global_idx_mapping_equality (const std::pair<unsigned int, unsigned int> &a,
                                          const std::pair<unsigned int, unsigned int> &b)
-{ return a.first == b.first; }
+{
+  return a.first == b.first;
+}
+#endif
+
 }
 
 
@@ -89,8 +94,8 @@ Nemesis_IO::Nemesis_IO (MeshBase& mesh,
   ParallelObject (mesh),
 #if defined(LIBMESH_HAVE_EXODUS_API) && defined(LIBMESH_HAVE_NEMESIS_API)
   nemhelper(new Nemesis_IO_Helper(*this, false, single_precision)),
-#endif
   _timestep(1),
+#endif
   _verbose (false),
   _append(false)
 {
@@ -787,7 +792,7 @@ void Nemesis_IO::read (const std::string& base_filename)
 
   // Instantiate the ElementMaps interface.  This is what translates LibMesh's
   // element numbering scheme to Exodus's.
-  ExodusII_IO_Helper::ElementMaps em;
+  ExodusII_IO_Helper::ElementMaps em(*nemhelper);
 
   // Read in the element connectivity for each block by
   // looping over all the blocks.

@@ -1,6 +1,6 @@
 
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,8 +22,6 @@
 #define LIBMESH_DIFF_QOI_H
 
 // Local Includes
-#include "libmesh/diff_context.h"
-#include "libmesh/qoi_set.h"
 #include "libmesh/auto_ptr.h"
 #include "libmesh/parallel.h"
 
@@ -31,6 +29,10 @@
 
 namespace libMesh
 {
+
+// Forward declarations
+class DiffContext;
+class QoISet;
 
 /**
  * This class provides a specific system class.  It aims
@@ -41,12 +43,9 @@ namespace libMesh
  * which is still experimental.  Users of this framework should
  * beware of bugs and future API changes.
  *
- * @author Roy H. Stogner 2006
+ * \author Roy H. Stogner
+ * \date 2006
  */
-
-// ------------------------------------------------------------
-// DifferentiableQoI class definition
-
 class DifferentiableQoI
 {
 public:

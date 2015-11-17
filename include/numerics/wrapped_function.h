@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -34,17 +34,14 @@
 namespace libMesh
 {
 
-
 /**
  * This class provides a wrapper with which to evaluate a
  * (libMesh-style) function pointer in a FunctionBase-compatible
  * interface.
  *
- * @author Roy Stogner, 2012
+ * \author Roy Stogner
+ * \date 2012
  */
-
-// ------------------------------------------------------------
-// WrappedFunction class definition
 template <typename Output=Number>
 class WrappedFunction : public FunctionBase<Output>
 {
@@ -70,14 +67,14 @@ public:
       _parameters = &sys.get_equation_systems().parameters;
   }
 
-  virtual UniquePtr<FunctionBase<Output> > clone () const;
+  virtual UniquePtr<FunctionBase<Output> > clone () const libmesh_override;
 
   /**
    * @returns the scalar value of variable varnum at coordinate \p p
    * and time \p time.
    */
   virtual Output operator() (const Point& p,
-                             const Real time = 0.);
+                             const Real time = 0.) libmesh_override;
 
   /**
    * Return function for vectors.
@@ -86,7 +83,7 @@ public:
    */
   virtual void operator() (const Point& p,
                            const Real time,
-                           DenseVector<Output>& output);
+                           DenseVector<Output>& output) libmesh_override;
 
   /**
    * @returns the vector component \p i at coordinate
@@ -94,7 +91,7 @@ public:
    */
   virtual Output component (unsigned int i,
                             const Point& p,
-                            Real time=0.);
+                            Real time=0.) libmesh_override;
 
 protected:
 

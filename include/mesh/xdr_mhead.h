@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,7 +20,6 @@
 
 // Local includes
 #include "libmesh/xdr_head.h" // for base class
-#include "libmesh/xdr_mesh.h" // for friend
 #include "libmesh/enum_elem_type.h" // for ElemType
 
 // C++ includes
@@ -29,12 +28,18 @@
 namespace libMesh
 {
 
+// Forward declarations
+class XdrMESH;
+
 /**
  * The \p XdrMHEAD class.
  * This class is responsible
  * for reading/writing \p xdr mesh file headers.
  *
- * @author Bill Barth, Robert McLay.  Modified: John W. Peterson
+ * \author Bill Barth
+ * \author Robert McLay
+ * \author John W. Peterson
+ * \date 2000
  */
 class XdrMHEAD : public XdrHEAD
 {

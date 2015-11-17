@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -38,11 +38,9 @@ class MeshBase;
  * Other I/O classes may have more advanced features that are not
  * accessible via this interface.
  *
- * @author Roy H. Stogner, 2015
+ * \author Roy H. Stogner
+ * \date 2015
  */
-
-// ------------------------------------------------------------
-// NameBasedIO class definition
 class NameBasedIO : public MeshInput<MeshBase>,
                     public MeshOutput<MeshBase>
 {
@@ -65,12 +63,12 @@ public:
   /**
    * This method implements reading a mesh from a specified file.
    */
-  virtual void read (const std::string& mesh_file);
+  virtual void read (const std::string& mesh_file) libmesh_override;
 
   /**
    * This method implements writing a mesh to a specified file.
    */
-  virtual void write (const std::string& mesh_file);
+  virtual void write (const std::string& mesh_file) libmesh_override;
 
   /**
    * This method implements writing a mesh with data to a specified file
@@ -83,7 +81,7 @@ public:
    */
   virtual void write_equation_systems (const std::string& filename,
                                        const EquationSystems& es,
-                                       const std::set<std::string>* system_names=NULL);
+                                       const std::set<std::string>* system_names=NULL) libmesh_override;
 
   /**
    * This method implements writing a mesh with nodal data to a
@@ -91,7 +89,7 @@ public:
    */
   virtual void write_nodal_data (const std::string&,
                                  const std::vector<Number>&,
-                                 const std::vector<std::string>&);
+                                 const std::vector<std::string>&) libmesh_override;
 
   // Certain mesh formats can support parallel I/O, including the
   // "new" Xdr format and the Nemesis format.

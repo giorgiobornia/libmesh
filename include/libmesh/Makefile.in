@@ -86,12 +86,12 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ac_cxx_rtti.m4 \
 	$(top_srcdir)/m4/config_environment.m4 \
 	$(top_srcdir)/m4/config_summary.m4 \
 	$(top_srcdir)/m4/coverage.m4 $(top_srcdir)/m4/cppunit.m4 \
-	$(top_srcdir)/m4/cxx11.m4 $(top_srcdir)/m4/demangle.m4 \
-	$(top_srcdir)/m4/dlopen.m4 $(top_srcdir)/m4/eigen.m4 \
-	$(top_srcdir)/m4/exodus.m4 $(top_srcdir)/m4/feexcept.m4 \
-	$(top_srcdir)/m4/fparser.m4 $(top_srcdir)/m4/glpk.m4 \
-	$(top_srcdir)/m4/gmv.m4 $(top_srcdir)/m4/gz.m4 \
-	$(top_srcdir)/m4/hdf5.m4 \
+	$(top_srcdir)/m4/curl.m4 $(top_srcdir)/m4/cxx11.m4 \
+	$(top_srcdir)/m4/demangle.m4 $(top_srcdir)/m4/dlopen.m4 \
+	$(top_srcdir)/m4/eigen.m4 $(top_srcdir)/m4/exodus.m4 \
+	$(top_srcdir)/m4/feexcept.m4 $(top_srcdir)/m4/fparser.m4 \
+	$(top_srcdir)/m4/glpk.m4 $(top_srcdir)/m4/gmv.m4 \
+	$(top_srcdir)/m4/gz.m4 $(top_srcdir)/m4/hdf5.m4 \
 	$(top_srcdir)/m4/hinnant_unique_ptr.m4 \
 	$(top_srcdir)/m4/laspack.m4 $(top_srcdir)/m4/libhilbert.m4 \
 	$(top_srcdir)/m4/libmesh_compiler_features.m4 \
@@ -107,14 +107,14 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ac_cxx_rtti.m4 \
 	$(top_srcdir)/m4/nlopt.m4 $(top_srcdir)/m4/parmetis.m4 \
 	$(top_srcdir)/m4/petsc.m4 $(top_srcdir)/m4/precision.m4 \
 	$(top_srcdir)/m4/prefix_config.m4 $(top_srcdir)/m4/qhull.m4 \
-	$(top_srcdir)/m4/sanitize.m4 $(top_srcdir)/m4/sfc.m4 \
-	$(top_srcdir)/m4/slepc.m4 $(top_srcdir)/m4/sstream.m4 \
-	$(top_srcdir)/m4/strstream.m4 $(top_srcdir)/m4/tbb.m4 \
-	$(top_srcdir)/m4/tecio.m4 $(top_srcdir)/m4/tecplot.m4 \
-	$(top_srcdir)/m4/tetgen.m4 $(top_srcdir)/m4/threads.m4 \
-	$(top_srcdir)/m4/triangle.m4 $(top_srcdir)/m4/trilinos.m4 \
-	$(top_srcdir)/m4/unordered.m4 $(top_srcdir)/m4/vtk.m4 \
-	$(top_srcdir)/configure.ac
+	$(top_srcdir)/m4/safe_bool.m4 $(top_srcdir)/m4/sanitize.m4 \
+	$(top_srcdir)/m4/sfc.m4 $(top_srcdir)/m4/slepc.m4 \
+	$(top_srcdir)/m4/sstream.m4 $(top_srcdir)/m4/strstream.m4 \
+	$(top_srcdir)/m4/tbb.m4 $(top_srcdir)/m4/tecio.m4 \
+	$(top_srcdir)/m4/tecplot.m4 $(top_srcdir)/m4/tetgen.m4 \
+	$(top_srcdir)/m4/threads.m4 $(top_srcdir)/m4/triangle.m4 \
+	$(top_srcdir)/m4/trilinos.m4 $(top_srcdir)/m4/unordered.m4 \
+	$(top_srcdir)/m4/vtk.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
@@ -183,6 +183,8 @@ CPPFLAGS_PROF = @CPPFLAGS_PROF@
 CPPUNIT_CFLAGS = @CPPUNIT_CFLAGS@
 CPPUNIT_CONFIG = @CPPUNIT_CONFIG@
 CPPUNIT_LIBS = @CPPUNIT_LIBS@
+CURL_INCLUDE = @CURL_INCLUDE@
+CURL_LIBRARY = @CURL_LIBRARY@
 CXX = @CXX@
 CXXCPP = @CXXCPP@
 CXXDEPMODE = @CXXDEPMODE@
@@ -258,6 +260,7 @@ LIBTOOL = @LIBTOOL@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
+LT_SYS_LIBRARY_PATH = @LT_SYS_LIBRARY_PATH@
 MAINT = @MAINT@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
@@ -508,12 +511,13 @@ BUILT_SOURCES = auto_ptr.h dirichlet_boundaries.h dof_map.h \
 	eigen_preconditioner.h eigen_sparse_matrix.h \
 	eigen_sparse_vector.h fem_function_base.h function_base.h \
 	laspack_matrix.h laspack_vector.h numeric_vector.h \
-	parsed_fem_function.h parsed_function.h petsc_macro.h \
-	petsc_matrix.h petsc_preconditioner.h petsc_vector.h \
-	preconditioner.h raw_accessor.h refinement_selector.h \
-	shell_matrix.h sparse_matrix.h sparse_shell_matrix.h \
-	sum_shell_matrix.h tensor_shell_matrix.h tensor_tools.h \
-	tensor_value.h trilinos_epetra_matrix.h \
+	parsed_fem_function.h parsed_fem_function_parameter.h \
+	parsed_function.h parsed_function_parameter.h petsc_macro.h \
+	petsc_matrix.h petsc_preconditioner.h petsc_solver_exception.h \
+	petsc_vector.h preconditioner.h raw_accessor.h \
+	refinement_selector.h shell_matrix.h sparse_matrix.h \
+	sparse_shell_matrix.h sum_shell_matrix.h tensor_shell_matrix.h \
+	tensor_tools.h tensor_value.h trilinos_epetra_matrix.h \
 	trilinos_epetra_vector.h trilinos_preconditioner.h \
 	type_n_tensor.h type_tensor.h type_vector.h vector_value.h \
 	wrapped_function.h wrapped_functor.h zero_function.h \
@@ -548,15 +552,16 @@ BUILT_SOURCES = auto_ptr.h dirichlet_boundaries.h dof_map.h \
 	solution_transfer.h adaptive_time_solver.h diff_solver.h \
 	eigen_solver.h eigen_sparse_linear_solver.h \
 	eigen_time_solver.h euler2_solver.h euler_solver.h \
-	first_order_unsteady_solver.h laspack_linear_solver.h linear.h \
+	first_order_unsteady_solver.h laspack_linear_solver.h \
 	linear_solver.h memory_solution_history.h newmark_solver.h \
 	newton_solver.h nlopt_optimization_solver.h \
 	no_solution_history.h nonlinear_solver.h optimization_solver.h \
 	petsc_auto_fieldsplit.h petsc_diff_solver.h \
 	petsc_linear_solver.h petsc_nonlinear_solver.h \
 	petscdmlibmesh.h second_order_unsteady_solver.h \
-	slepc_eigen_solver.h slepc_macro.h solution_history.h solver.h \
-	steady_solver.h tao_optimization_solver.h time_solver.h \
+	slepc_eigen_solver.h slepc_macro.h solution_history.h \
+	solver_configuration.h steady_solver.h \
+	tao_optimization_solver.h time_solver.h \
 	trilinos_aztec_linear_solver.h trilinos_nox_nonlinear_solver.h \
 	twostep_time_solver.h unsteady_solver.h \
 	condensed_eigen_system.h continuation_system.h \
@@ -575,12 +580,13 @@ BUILT_SOURCES = auto_ptr.h dirichlet_boundaries.h dof_map.h \
 	number_lookups.h ostream_proxy.h parameters.h perf_log.h \
 	perfmon.h plt_loader.h point_locator_base.h \
 	point_locator_list.h point_locator_tree.h pool_allocator.h \
-	restore_warnings.h statistics.h string_to_enum.h timestamp.h \
-	topology_map.h tree.h tree_base.h tree_node.h utility.h \
-	vectormap.h xdr_cxx.h parallel_communicator_specializations \
-	$(am__append_1) $(am__append_3) $(am__append_5) \
-	$(am__append_7) $(am__append_9) $(am__append_11) \
-	$(am__append_13) $(am__append_15) libmesh_config.h
+	restore_warnings.h safe_bool.h statistics.h string_to_enum.h \
+	timestamp.h topology_map.h tree.h tree_base.h tree_node.h \
+	utility.h vectormap.h xdr_cxx.h \
+	parallel_communicator_specializations $(am__append_1) \
+	$(am__append_3) $(am__append_5) $(am__append_7) \
+	$(am__append_9) $(am__append_11) $(am__append_13) \
+	$(am__append_15) libmesh_config.h
 DISTCLEANFILES = $(BUILT_SOURCES) $(am__append_2) $(am__append_4) \
 	$(am__append_6) $(am__append_8) $(am__append_10) \
 	$(am__append_12) $(am__append_14) $(am__append_16) \
@@ -1474,7 +1480,13 @@ numeric_vector.h: $(top_srcdir)/include/numerics/numeric_vector.h
 parsed_fem_function.h: $(top_srcdir)/include/numerics/parsed_fem_function.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
+parsed_fem_function_parameter.h: $(top_srcdir)/include/numerics/parsed_fem_function_parameter.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
 parsed_function.h: $(top_srcdir)/include/numerics/parsed_function.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+parsed_function_parameter.h: $(top_srcdir)/include/numerics/parsed_function_parameter.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 petsc_macro.h: $(top_srcdir)/include/numerics/petsc_macro.h
@@ -1484,6 +1496,9 @@ petsc_matrix.h: $(top_srcdir)/include/numerics/petsc_matrix.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 petsc_preconditioner.h: $(top_srcdir)/include/numerics/petsc_preconditioner.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+petsc_solver_exception.h: $(top_srcdir)/include/numerics/petsc_solver_exception.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 petsc_vector.h: $(top_srcdir)/include/numerics/petsc_vector.h
@@ -1792,9 +1807,6 @@ first_order_unsteady_solver.h: $(top_srcdir)/include/solvers/first_order_unstead
 laspack_linear_solver.h: $(top_srcdir)/include/solvers/laspack_linear_solver.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
-linear.h: $(top_srcdir)/include/solvers/linear.h
-	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
-
 linear_solver.h: $(top_srcdir)/include/solvers/linear_solver.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
@@ -1846,7 +1858,7 @@ slepc_macro.h: $(top_srcdir)/include/solvers/slepc_macro.h
 solution_history.h: $(top_srcdir)/include/solvers/solution_history.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
-solver.h: $(top_srcdir)/include/solvers/solver.h
+solver_configuration.h: $(top_srcdir)/include/solvers/solver_configuration.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 steady_solver.h: $(top_srcdir)/include/solvers/steady_solver.h
@@ -2012,6 +2024,9 @@ pool_allocator.h: $(top_srcdir)/include/utils/pool_allocator.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 restore_warnings.h: $(top_srcdir)/include/utils/restore_warnings.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+safe_bool.h: $(top_srcdir)/include/utils/safe_bool.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 statistics.h: $(top_srcdir)/include/utils/statistics.h

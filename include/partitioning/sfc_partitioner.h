@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -29,15 +29,10 @@
 namespace libMesh
 {
 
-
-
 /**
  * The \p SFCPartitioner uses a Hilbert or Morton-ordered space
  * filling curve to partition the elements.
  */
-
-// ------------------------------------------------------------
-// SFCPartitioner class definition
 class SFCPartitioner : public Partitioner
 {
 public:
@@ -54,7 +49,7 @@ public:
    * Creates a new partitioner of this type and returns it in
    * an \p UniquePtr.
    */
-  virtual UniquePtr<Partitioner> clone () const
+  virtual UniquePtr<Partitioner> clone () const libmesh_override
   {
     return UniquePtr<Partitioner>(new SFCPartitioner());
   }
@@ -72,17 +67,15 @@ protected:
    * Partition the \p MeshBase into \p n subdomains.
    */
   virtual void _do_partition (MeshBase& mesh,
-                              const unsigned int n);
+                              const unsigned int n) libmesh_override;
 
 
 private:
-
 
   /**
    * The type of space-filling curve to use.  Hilbert by default.
    */
   std::string _sfc_type;
-
 };
 
 

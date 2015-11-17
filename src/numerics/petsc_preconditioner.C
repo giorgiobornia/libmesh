@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -50,7 +50,7 @@ void PetscPreconditioner<T>::apply(const NumericVector<T> & x, NumericVector<T> 
   Vec y_vec = y_pvec.vec();
 
   int ierr = PCApply(_pc,x_vec,y_vec);
-  LIBMESH_CHKERRABORT(ierr);
+  LIBMESH_CHKERR(ierr);
 }
 
 
@@ -69,11 +69,11 @@ void PetscPreconditioner<T>::init ()
       if (_pc)
         {
           int ierr = LibMeshPCDestroy(&_pc);
-          LIBMESH_CHKERRABORT(ierr);
+          LIBMESH_CHKERR(ierr);
         }
 
       int ierr = PCCreate(this->comm().get(),&_pc);
-      LIBMESH_CHKERRABORT(ierr);
+      LIBMESH_CHKERR(ierr);
 
       PetscMatrix<T> * pmatrix = cast_ptr<PetscMatrix<T>*, SparseMatrix<T> >(this->_matrix);
 
@@ -85,7 +85,7 @@ void PetscPreconditioner<T>::init ()
 #else
   int ierr = PCSetOperators(_pc,_mat,_mat);
 #endif
-  LIBMESH_CHKERRABORT(ierr);
+  LIBMESH_CHKERR(ierr);
 
   // Set the PCType.  Note: this used to be done *before* the call to
   // PCSetOperators(), and only when !_is_initialized, but
@@ -107,7 +107,7 @@ void PetscPreconditioner<T>::clear()
   if (_pc)
     {
       int ierr = LibMeshPCDestroy(&_pc);
-      LIBMESH_CHKERRABORT(ierr);
+      LIBMESH_CHKERR(ierr);
     }
 }
 

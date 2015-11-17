@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -64,10 +64,6 @@ class MeshInput;
  *
  * \author  Benjamin S. Kirk
  */
-
-
-// ------------------------------------------------------------
-// MeshBase class definition
 class MeshBase : public ParallelObject
 {
 public:
@@ -624,7 +620,8 @@ public:
    * Interfaces for reading/writing a mesh to/from a file.  Must be
    * implemented in derived classes.
    */
-  virtual void read  (const std::string& name, MeshData* mesh_data=NULL,
+  virtual void read  (const std::string& name,
+                      MeshData* mesh_data=NULL,
                       bool skip_renumber_nodes_and_elements=false) = 0;
   virtual void write (const std::string& name, MeshData* mesh_data=NULL) = 0;
 

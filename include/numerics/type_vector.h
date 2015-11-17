@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -46,9 +46,9 @@ template <typename T> class TensorValue;
  * for a real-valued point in LIBMESH_DIM-space, or \p SpaceVector for a real
  * or complex-valued vector in LIBMESH_DIM-space.
  *
- * \author Benjamin S. Kirk, 2003.
+ * \author Benjamin S. Kirk
+ * \date 2003
  */
-
 template <typename T>
 class TypeVector
 {
@@ -90,7 +90,25 @@ protected:
               boostcopy::enable_if_c<ScalarTraits<Scalar3>::value,
               const Scalar3>::type z=0);
 
+
+  /**
+   * Constructor-from-scalar.  Sets higher dimensional entries to 0.
+   * Necessary because for some reason the constructor-from-scalars
+   * alone is insufficient to let the compiler figure out
+   * TypeVector<Complex> v = 0;
+   */
+  template <typename Scalar>
+  TypeVector (const Scalar x,
+              typename
+              boostcopy::enable_if_c<ScalarTraits<Scalar>::value,
+              const Scalar>::type* sfinae = NULL);
+
 public:
+
+  /**
+   * Helper typedef for C++98 generic programming
+   */
+  typedef T value_type;
 
   /**
    * Copy-constructor.
@@ -422,6 +440,27 @@ TypeVector<T>::TypeVector (typename
   _coords[2] = z;
 #else
   libmesh_assert_equal_to (z, 0);
+#endif
+}
+
+
+
+template <typename T>
+template <typename Scalar>
+inline
+TypeVector<T>::TypeVector (const Scalar x,
+                           typename
+                           boostcopy::enable_if_c<ScalarTraits<Scalar>::value,
+                           const Scalar>::type* /*sfinae*/)
+{
+  _coords[0] = x;
+
+#if LIBMESH_DIM > 1
+  _coords[1] = 0;
+#endif
+
+#if LIBMESH_DIM > 2
+  _coords[2] = 0;
 #endif
 }
 
@@ -929,9 +968,9 @@ bool TypeVector<T>::operator == (const TypeVector<T>& rhs) const
 
 
 
-template <>
+template <typename T>
 inline
-bool TypeVector<Real>::operator != (const TypeVector<Real>& rhs) const
+bool TypeVector<T>::operator != (const TypeVector<T>& rhs) const
 {
   return (!(*this == rhs));
 }

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -45,9 +45,6 @@ class MeshData;
  * boundary, instantiate a BoundaryMesh with a reference to
  * this class, and then use that object's functionality.
  */
-
-// ------------------------------------------------------------
-// UnstructuredMesh class definition
 class UnstructuredMesh : public MeshBase
 {
 public:
@@ -88,9 +85,9 @@ public:
    * The skip_renumber_nodes_and_elements argument is now deprecated -
    * to disallow renumbering, set \p MeshBase::allow_renumbering(false)
    */
-  void read (const std::string& name,
-             MeshData* mesh_data=NULL,
-             bool skip_renumber_nodes_and_elements=false);
+  virtual void read (const std::string& name,
+                     MeshData* mesh_data=NULL,
+                     bool skip_renumber_nodes_and_elements=false) libmesh_override;
   /**
    * Write the file specified by \p name.  Attempts to figure out the
    * proper method by the file extension.
@@ -99,8 +96,8 @@ public:
    * also pass a separate pointer to the MeshData object you have been
    * using with this mesh, since these write methods expect it.
    */
-  void write (const std::string& name,
-              MeshData* mesh_data=NULL);
+  virtual void write (const std::string& name,
+                      MeshData* mesh_data=NULL) libmesh_override;
 
   /**
    * Write to the file specified by \p name.  Attempts to figure out the
@@ -116,7 +113,7 @@ public:
    * example, a mesh consisting of \p Tet10 will be converted
    * to a mesh with \p Tet4 etc.
    */
-  virtual void all_first_order ();
+  virtual void all_first_order () libmesh_override;
 
   /**
    * Converts a (conforming, non-refined) mesh with linear
@@ -129,7 +126,7 @@ public:
    * is built.  The same holds obviously for \p Quad4, \p Prism6
    * ...
    */
-  virtual void all_second_order (const bool full_ordered=true);
+  virtual void all_second_order (const bool full_ordered=true) libmesh_override;
 
   /**
    * Generates a new mesh containing all the elements which
@@ -161,7 +158,7 @@ public:
    * Other functions from MeshBase requiring re-definition.
    */
   virtual void find_neighbors (const bool reset_remote_elements = false,
-                               const bool reset_current_list    = true);
+                               const bool reset_current_list    = true) libmesh_override;
 
 #ifdef LIBMESH_ENABLE_AMR
   /**
@@ -169,7 +166,7 @@ public:
    * This removes all elements descended from currently active
    * elements in the mesh.
    */
-  virtual bool contract ();
+  virtual bool contract () libmesh_override;
 #endif // #ifdef LIBMESH_ENABLE_AMR
 
 };

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -856,17 +856,17 @@ void XdrIO::write_serialized_bcs (Xdr &io, const header_id_type n_bcs) const
     it  = mesh.local_level_elements_begin(0),
     end = mesh.local_level_elements_end(0);
 
+  // Container to catch boundary IDs handed back by BoundaryInfo
+  std::vector<boundary_id_type> bc_ids;
+
   dof_id_type n_local_level_0_elem=0;
   for (; it!=end; ++it, n_local_level_0_elem++)
     {
       const Elem *elem = *it;
 
       for (unsigned short s=0; s<elem->n_sides(); s++)
-        // We're supporting boundary ids on internal sides now
-        //if (elem->neighbor(s) == NULL)
         {
-          const std::vector<boundary_id_type>& bc_ids =
-            boundary_info.boundary_ids (elem, s);
+          boundary_info.boundary_ids (elem, s, bc_ids);
           for (std::vector<boundary_id_type>::const_iterator id_it=bc_ids.begin(); id_it!=bc_ids.end(); ++id_it)
             {
               const boundary_id_type bc_id = *id_it;
@@ -939,6 +939,9 @@ void XdrIO::write_serialized_nodesets (Xdr &io, const header_id_type n_nodesets)
   std::vector<xdr_id_type> xfer_bcs, recv_bcs;
   std::vector<std::size_t> bc_sizes(this->n_processors());
 
+  // Container to catch boundary IDs handed back by BoundaryInfo
+  std::vector<boundary_id_type> nodeset_ids;
+
   MeshBase::const_node_iterator
     it  = mesh.local_nodes_begin(),
     end = mesh.local_nodes_end();
@@ -947,8 +950,7 @@ void XdrIO::write_serialized_nodesets (Xdr &io, const header_id_type n_nodesets)
   for (; it!=end; ++it)
     {
       const Node *node = *it;
-      const std::vector<boundary_id_type>& nodeset_ids =
-        boundary_info.boundary_ids (node);
+      boundary_info.boundary_ids (node, nodeset_ids);
       for (std::vector<boundary_id_type>::const_iterator id_it=nodeset_ids.begin(); id_it!=nodeset_ids.end(); ++id_it)
         {
           const boundary_id_type bc_id = *id_it;

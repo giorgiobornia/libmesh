@@ -21,7 +21,6 @@
 #define LIBMESH_RB_ASSEMBLY_EXPANSION_H
 
 // libMesh includes
-#include "libmesh/elem_assembly.h"
 #include "libmesh/reference_counted_object.h"
 
 // C++ includes
@@ -31,15 +30,17 @@
 namespace libMesh
 {
 
+// Forward declarations
+class ElemAssembly;
+class FEMContext;
+
 /**
  * This class stores the set of ElemAssembly functor objects that define
  * the "parameter-independent expansion" of a PDE.
  *
- * @author David J. Knezevic, 2011
+ * \author David J. Knezevic
+ * \date 2011
  */
-
-// ------------------------------------------------------------
-// RBAssemblyExpansion class definition
 class RBAssemblyExpansion : public ReferenceCountedObject<RBAssemblyExpansion>
 {
 public:
@@ -188,7 +189,6 @@ private:
    * routines for the outputs. Element interior part.
    */
   std::vector< std::vector<ElemAssembly*> > _output_assembly_vector;
-
 };
 
 }

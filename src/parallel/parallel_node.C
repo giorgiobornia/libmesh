@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -32,6 +32,7 @@ namespace
 {
 using namespace libMesh;
 
+#ifdef LIBMESH_HAVE_MPI
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
 static const unsigned int header_size = 3;
 #else
@@ -43,6 +44,7 @@ static const unsigned int idtypes_per_Real =
   (sizeof(Real) + sizeof(largest_id_type) - 1) / sizeof(largest_id_type);
 
 static const largest_id_type node_magic_header = 1234567890;
+#endif
 }
 
 
@@ -160,15 +162,16 @@ void pack (const Node* node,
                            data.size() - start_indices);
 
   // Add any nodal boundary condition ids
-  std::vector<boundary_id_type> bcs =
-    mesh->get_boundary_info().boundary_ids(node);
+  std::vector<boundary_id_type> bcs;
+  mesh->get_boundary_info().boundary_ids(node, bcs);
 
   libmesh_assert(bcs.size() < std::numeric_limits<largest_id_type>::max());
 
   data.push_back(bcs.size());
 
-  for (std::size_t bc_it=0; bc_it < bcs.size(); bc_it++)
-    data.push_back(bcs[bc_it]);
+  for (std::vector<boundary_id_type>::iterator bc_it=bcs.begin();
+       bc_it != bcs.end(); ++bc_it)
+    data.push_back(*bc_it);
 }
 
 

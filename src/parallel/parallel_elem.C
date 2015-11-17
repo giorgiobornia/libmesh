@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -33,6 +33,7 @@ namespace
 {
 using namespace libMesh;
 
+#ifdef LIBMESH_HAVE_MPI
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
 static const unsigned int header_size = 12;
 #else
@@ -40,6 +41,7 @@ static const unsigned int header_size = 11;
 #endif
 
 static const largest_id_type elem_magic_header = 987654321;
+#endif
 }
 
 
@@ -264,26 +266,27 @@ void pack (const Elem* elem,
   // Add any element side boundary condition ids
   if (elem->level() == 0)
     {
+      std::vector<boundary_id_type> bcs;
       for (unsigned short s = 0; s != elem->n_sides(); ++s)
         {
-          std::vector<boundary_id_type> bcs =
-            mesh->get_boundary_info().boundary_ids(elem, s);
+          mesh->get_boundary_info().boundary_ids(elem, s, bcs);
 
           data.push_back(bcs.size());
 
-          for(unsigned int bc_it=0; bc_it < bcs.size(); bc_it++)
-            data.push_back(bcs[bc_it]);
+          for (std::vector<boundary_id_type>::iterator bc_it=bcs.begin();
+               bc_it != bcs.end(); ++bc_it)
+            data.push_back(*bc_it);
         }
 
       for (unsigned short e = 0; e != elem->n_edges(); ++e)
         {
-          std::vector<boundary_id_type> bcs =
-            mesh->get_boundary_info().edge_boundary_ids(elem, e);
+          mesh->get_boundary_info().edge_boundary_ids(elem, e, bcs);
 
           data.push_back(bcs.size());
 
-          for(unsigned int bc_it=0; bc_it < bcs.size(); bc_it++)
-            data.push_back(bcs[bc_it]);
+          for (std::vector<boundary_id_type>::iterator bc_it=bcs.begin();
+               bc_it != bcs.end(); ++bc_it)
+            data.push_back(*bc_it);
         }
     }
 }
@@ -333,8 +336,8 @@ void unpack(std::vector<largest_id_type>::const_iterator in,
   const bool has_children = (rflag > invalid_rflag);
 
   const Elem::RefinementState refinement_flag = has_children ?
-      cast_int<Elem::RefinementState>(rflag - invalid_rflag - 1) :
-      cast_int<Elem::RefinementState>(rflag);
+    cast_int<Elem::RefinementState>(rflag - invalid_rflag - 1) :
+    cast_int<Elem::RefinementState>(rflag);
 
   // int 3: p refinement flag
   const int pflag = cast_int<int>(*in++);
@@ -492,58 +495,64 @@ void unpack(std::vector<largest_id_type>::const_iterator in,
       }
 
       // Our neighbor links should be "close to" correct - we may have
-      // to update them, but we can check for some inconsistencies.
-      for (unsigned int n=0; n != elem->n_neighbors(); ++n)
-        {
-          const dof_id_type neighbor_id =
-            cast_int<dof_id_type>(*in++);
+      // to update a remote_elem link, and we can check for possible
+      // inconsistencies along the way.
+      //
+      // For subactive elements, we don't bother keeping neighbor
+      // links in good shape, so there's nothing we need to set or can
+      // safely assert here.
+      if (!elem->subactive())
+        for (unsigned int n=0; n != elem->n_neighbors(); ++n)
+          {
+            const dof_id_type neighbor_id =
+              cast_int<dof_id_type>(*in++);
 
-          // If the sending processor sees a domain boundary here,
-          // we'd better agree.
-          if (neighbor_id == DofObject::invalid_id)
-            {
-              libmesh_assert (!(elem->neighbor(n)));
-              continue;
-            }
+            // If the sending processor sees a domain boundary here,
+            // we'd better agree.
+            if (neighbor_id == DofObject::invalid_id)
+              {
+                libmesh_assert (!(elem->neighbor(n)));
+                continue;
+              }
 
-          // If the sending processor has a remote_elem neighbor here,
-          // then all we know is that we'd better *not* have a domain
-          // boundary.
-          if (neighbor_id == remote_elem->id())
-            {
-              libmesh_assert(elem->neighbor(n));
-              continue;
-            }
+            // If the sending processor has a remote_elem neighbor here,
+            // then all we know is that we'd better *not* have a domain
+            // boundary.
+            if (neighbor_id == remote_elem->id())
+              {
+                libmesh_assert(elem->neighbor(n));
+                continue;
+              }
 
-          Elem *neigh = mesh->query_elem(neighbor_id);
+            Elem *neigh = mesh->query_elem(neighbor_id);
 
-          // The sending processor sees a neighbor here, so if we
-          // don't have that neighboring element, then we'd better
-          // have a remote_elem signifying that fact.
-          if (!neigh)
-            {
-              libmesh_assert_equal_to (elem->neighbor(n), remote_elem);
-              continue;
-            }
+            // The sending processor sees a neighbor here, so if we
+            // don't have that neighboring element, then we'd better
+            // have a remote_elem signifying that fact.
+            if (!neigh)
+              {
+                libmesh_assert_equal_to (elem->neighbor(n), remote_elem);
+                continue;
+              }
 
-          // The sending processor has a neighbor here, and we have
-          // that element, but that does *NOT* mean we're already
-          // linking to it.  Perhaps we initially received both elem
-          // and neigh from processors on which their mutual link was
-          // remote?
-          libmesh_assert(elem->neighbor(n) == neigh ||
-                         elem->neighbor(n) == remote_elem);
+            // The sending processor has a neighbor here, and we have
+            // that element, but that does *NOT* mean we're already
+            // linking to it.  Perhaps we initially received both elem
+            // and neigh from processors on which their mutual link was
+            // remote?
+            libmesh_assert(elem->neighbor(n) == neigh ||
+                           elem->neighbor(n) == remote_elem);
 
-          // If the link was originally remote, we should update it,
-          // and make sure the appropriate parts of its family link
-          // back to us.
-          if (elem->neighbor(n) == remote_elem)
-            {
-              elem->set_neighbor(n, neigh);
+            // If the link was originally remote, we should update it,
+            // and make sure the appropriate parts of its family link
+            // back to us.
+            if (elem->neighbor(n) == remote_elem)
+              {
+                elem->set_neighbor(n, neigh);
 
-              elem->make_links_to_me_local(n);
-            }
-        }
+                elem->make_links_to_me_local(n);
+              }
+          }
 
       // FIXME: We should add some debug mode tests to ensure that the
       // encoded indexing and boundary conditions are consistent.

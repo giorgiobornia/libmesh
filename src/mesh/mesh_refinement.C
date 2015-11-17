@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -1628,11 +1628,11 @@ void MeshRefinement::_smooth_flags(bool refining, bool coarsening)
             smoothing_satisfied = smoothing_satisfied &&
               !this->limit_level_mismatch_at_node (_node_level_mismatch_limit);
 
-          if (_overrefined_boundary_limit)
+          if (_overrefined_boundary_limit>=0)
             smoothing_satisfied = smoothing_satisfied &&
               !this->limit_overrefined_boundary(_overrefined_boundary_limit);
 
-          if (_underrefined_boundary_limit)
+          if (_underrefined_boundary_limit>=0)
             smoothing_satisfied = smoothing_satisfied &&
               !this->limit_underrefined_boundary(_underrefined_boundary_limit);
 

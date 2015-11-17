@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -97,8 +97,9 @@ KellyErrorEstimator::internal_side_integration ()
     {
       // Calculate solution gradients on fine and coarse elements
       // at this quadrature point
-      Gradient grad_fine   =   fine_context->side_gradient(var, qp),
-               grad_coarse = coarse_context->side_gradient(var, qp);
+      Gradient
+        grad_fine   = fine_context->side_gradient(var, qp),
+        grad_coarse = coarse_context->side_gradient(var, qp);
 
       // Find the jump in the normal derivative
       // at this quadrature point

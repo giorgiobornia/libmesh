@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -55,12 +55,9 @@ template <typename T> class NumericVector;
  * which is still experimental.  Users of this framework should
  * beware of bugs and future API changes.
  *
- * @author Roy H. Stogner 2009
+ * \author Roy H. Stogner
+ * \date 2009
  */
-
-// ------------------------------------------------------------
-// FEMContext class definition
-
 class FEMContext : public DiffContext
 {
 public:
@@ -83,8 +80,16 @@ public:
 
   /**
    * Lists the boundary ids found on the current side
+   *
+   * This function is now deprecated. Instead, use the version that
+   * takes a reference to a std::set.
    */
   std::vector<boundary_id_type> side_boundary_ids() const;
+
+  /**
+   * As above, but fills in the std::set provided by the user.
+   */
+  void side_boundary_ids(std::vector<boundary_id_type> & vec_to_fill) const;
 
   /**
    * Returns the value of the solution variable \p var at the quadrature
@@ -338,10 +343,15 @@ public:
   /**
    * Returns the value of the solution variable \p var at the physical
    * point \p p on the current element. This is the preferred API.
+   *
+   * Allows evaluation of points within a relative tolerance outside
+   * the element.
    */
   template<typename OutputType>
-  void point_value(unsigned int var, const Point &p,
-                   OutputType& u) const;
+  void point_value(unsigned int var,
+                   const Point &p,
+                   OutputType& u,
+                   const Real tolerance = TOLERANCE) const;
 
   /**
    * Returns the gradient of the solution variable \p var at the quadrature
@@ -378,10 +388,15 @@ public:
   /**
    * Returns the gradient of the solution variable \p var at the physical
    * point \p p on the current element. This is the preferred API.
+   *
+   * Allows evaluation of points within a relative tolerance outside
+   * the element.
    */
   template<typename OutputType>
-  void point_gradient(unsigned int var, const Point &p,
-                      OutputType& grad_u) const;
+  void point_gradient(unsigned int var,
+                      const Point &p,
+                      OutputType& grad_u,
+                      const Real tolerance = TOLERANCE) const;
 
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
   /**
@@ -421,10 +436,15 @@ public:
   /**
    * Returns the hessian of the solution variable \p var at the physical
    * point \p p on the current element. This is the preferred API.
+   *
+   * Allows evaluation of points within a relative tolerance outside
+   * the element.
    */
   template<typename OutputType>
-  void point_hessian(unsigned int var, const Point &p,
-                     OutputType& hess_u) const;
+  void point_hessian(unsigned int var,
+                     const Point &p,
+                     OutputType& hess_u,
+                     const Real tolerance = TOLERANCE) const;
 
 #endif // LIBMESH_ENABLE_SECOND_DERIVATIVES
 
@@ -497,10 +517,15 @@ public:
   /**
    * Returns the value of the fixed_solution variable \p var at the physical
    * point \p p on the current element. This is the preferred API.
+   *
+   * Allows evaluation of points within a relative tolerance outside
+   * the element.
    */
   template<typename OutputType>
-  void fixed_point_value(unsigned int var, const Point &p,
-                         OutputType& u) const;
+  void fixed_point_value(unsigned int var,
+                         const Point &p,
+                         OutputType& u,
+                         const Real tolerance = TOLERANCE) const;
 
   /**
    * Returns the gradient of the fixed_solution variable \p var at the quadrature
@@ -521,10 +546,15 @@ public:
   /**
    * Returns the gradient of the fixed_solution variable \p var at the physical
    * point \p p on the current element. This is the preferred API.
+   *
+   * Allows evaluation of points within a relative tolerance outside
+   * the element.
    */
   template<typename OutputType>
-  void fixed_point_gradient(unsigned int var, const Point &p,
-                            OutputType& grad_u) const;
+  void fixed_point_gradient(unsigned int var,
+                            const Point &p,
+                            OutputType& grad_u,
+                            const Real tolerance = TOLERANCE) const;
 
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
   /**
@@ -546,10 +576,15 @@ public:
   /**
    * Returns the hessian of the fixed_solution variable \p var at the physical
    * point \p p on the current element. This is the preferred API.
+   *
+   * Allows evaluation of points within a relative tolerance outside
+   * the element.
    */
   template<typename OutputType>
-  void fixed_point_hessian(unsigned int var, const Point &p,
-                           OutputType& hess_u) const;
+  void fixed_point_hessian(unsigned int var,
+                           const Point &p,
+                           OutputType& hess_u,
+                           const Real tolerance = TOLERANCE) const;
 
 #endif // LIBMESH_ENABLE_SECOND_DERIVATIVES
 
@@ -564,10 +599,15 @@ public:
   /**
    * Returns the curl of the solution variable \p var at the physical
    * point \p p on the current element.
+   *
+   * Allows evaluation of points within a relative tolerance outside
+   * the element.
    */
   template<typename OutputType>
-  void point_curl(unsigned int var, const Point &p,
-                  OutputType& curl_u) const;
+  void point_curl(unsigned int var,
+                  const Point &p,
+                  OutputType& curl_u,
+                  const Real tolerance = TOLERANCE) const;
 
   /**
    * Returns the divergence of the solution variable \p var at the physical
@@ -577,39 +617,33 @@ public:
   void interior_div(unsigned int var, unsigned int qp,
                     OutputType& div_u) const;
 
-  /**
-   * Reinitialize all my FEM context data on a given
-   * element for the given system
-   */
-  //  virtual void reinit(const FEMSystem&, Elem*);
-
   // should be protected:
   /**
    * Reinitialize Elem and FE objects if necessary for integration at a new
    * point in time: specifically, handle moving elements in moving mesh
    * schemes.
    */
-  virtual void elem_reinit(Real theta);
+  virtual void elem_reinit(Real theta) libmesh_override;
 
   /**
    * Reinitialize Elem and side FE objects if necessary for integration at a
    * new point in time: specifically, handle moving elements in moving mesh
    * schemes.
    */
-  virtual void elem_side_reinit(Real theta);
+  virtual void elem_side_reinit(Real theta) libmesh_override;
 
   /**
    * Reinitialize Elem and edge FE objects if necessary for
    * integration at a new point in time: specifically, handle moving
    * elements in moving mesh schemes.
    */
-  virtual void elem_edge_reinit(Real theta);
+  virtual void elem_edge_reinit(Real theta) libmesh_override;
 
   /**
    * Gives derived classes the opportunity to reinitialize data needed
    * for nonlocal calculations at a new point within a timestep
    */
-  virtual void nonlocal_reinit(Real theta);
+  virtual void nonlocal_reinit(Real theta) libmesh_override;
 
   /**
    * Reinitializes local data vectors/matrices on the current geometric element
@@ -619,7 +653,7 @@ public:
   /**
    * Reinitializes interior FE objects on the current geometric element
    */
-  void elem_fe_reinit();
+  void elem_fe_reinit(const std::vector<Point>* const pts = NULL);
 
   /**
    * Reinitializes side FE objects on the current geometric element
@@ -798,6 +832,41 @@ public:
   void elem_position_get();
 
   /**
+   * Enum describing what data to use when initializing algebraic
+   * structures on each element.
+   */
+  enum AlgebraicType { NONE = 0,  // Do not reinitialize dof_indices
+                       DOFS_ONLY, // Reinitialize dof_indices, not
+                                  // algebraic structures
+                       CURRENT,   // Use dof_indices, current solution
+                       OLD };     // Use old_dof_indices, custom solution
+
+  /**
+   * Setting which determines whether to initialize algebraic
+   * structures (elem_*) on each element and set their values from
+   * current_local_solution.  Algebraic initialization may be disabled
+   * for efficiency in cases where FEMContext is only used as a
+   * convenient container of FE objects.
+   */
+  void set_algebraic_type(const AlgebraicType atype)
+    { _atype = atype; }
+
+  /*
+   * Get the current AlgebraicType setting
+   */
+  AlgebraicType algebraic_type() { return _atype; }
+
+  /**
+   * Set a NumericVector to be used in place of current_local_solution
+   * for calculating elem_solution.  Set to NULL to restore the
+   * current_local_solution behavior.  Advanced DifferentiableSystem
+   * specific capabilities will only be enabled in the
+   * current_local_solution case.
+   */
+  void set_custom_solution(const NumericVector<Number> * custom_sol)
+    { _custom_solution = custom_sol; }
+
+  /**
    * System from which to acquire moving mesh information
    */
   System *_mesh_sys;
@@ -820,10 +889,22 @@ public:
 protected:
 
   /**
+   * Keep track of what type of algebra reinitialization is to be done
+   */
+  AlgebraicType _atype;
+
+  /**
+   * Data with which to do algebra reinitialization
+   */
+  const NumericVector<Number> * _custom_solution;
+
+  /**
    * Helper function to reduce some code duplication in the *_point_* methods.
    */
   template<typename OutputShape>
-  UniquePtr<FEGenericBase<OutputShape> > build_new_fe( const FEGenericBase<OutputShape>* fe, const Point &p ) const;
+  UniquePtr<FEGenericBase<OutputShape> > build_new_fe( const FEGenericBase<OutputShape>* fe,
+                                                       const Point &p,
+                                                       const Real tolerance = TOLERANCE) const;
 
   /**
    * Helper function to promote accessor usage

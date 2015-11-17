@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -134,6 +134,8 @@ EpetraVector<T>::operator /= (NumericVector<T> & v)
   EpetraVector<T> & v_vec = cast_ref<EpetraVector<T>&>(v);
 
   _vec->ReciprocalMultiply(1.0, *v_vec._vec, *_vec, 0.0);
+
+  return *this;
 }
 
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -36,7 +36,8 @@ class MeshBase;
  * This class defines a tree that may be used for fast point
  * location in space.
  *
- * @author Benjamin S. Kirk, 2002
+ * \author Benjamin S. Kirk
+ * \date 2002
  */
 template <unsigned int N>
 class Tree : public TreeBase
@@ -62,27 +63,27 @@ public:
   /**
    * Prints the nodes.
    */
-  void print_nodes(std::ostream& my_out=libMesh::out) const;
+  virtual void print_nodes(std::ostream& my_out=libMesh::out) const libmesh_override;
 
   /**
    * Prints the nodes.
    */
-  void print_elements(std::ostream& my_out=libMesh::out) const;
+  virtual void print_elements(std::ostream& my_out=libMesh::out) const libmesh_override;
 
   /**
    * @returns the number of active bins.
    */
-  unsigned int n_active_bins() const { return root.n_active_bins(); }
+  virtual unsigned int n_active_bins() const libmesh_override
+  { return root.n_active_bins(); }
 
   /**
    * @returns a pointer to the element containing point p,
    * optionally restricted to a set of allowed subdomains,
    * optionally using a non-zero relative tolerance for searches.
    */
-  const Elem* find_element(const Point& p,
-                           const std::set<subdomain_id_type>
-                           *allowed_subdomains = NULL,
-                           Real relative_tol = TOLERANCE) const;
+  virtual const Elem* find_element(const Point& p,
+                                   const std::set<subdomain_id_type> *allowed_subdomains = NULL,
+                                   Real relative_tol = TOLERANCE) const libmesh_override;
 
   /**
    * @returns a pointer to the element containing point p,

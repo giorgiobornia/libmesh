@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -35,9 +35,6 @@
 namespace libMesh
 {
 
-
-
-
 /**
  * \p FrequencySystem provides a specific system class
  * for frequency-dependent (linear) systems.
@@ -60,12 +57,9 @@ namespace libMesh
  *   of \p EquationSystems<FrequencySystem> named \p current \p frequency.
  *   For this to work, only provide @e one frequency.
  *
- * \author Daniel Dreyer, 2003
+ * \author Daniel Dreyer
+ * \date 2003
  */
-
-// ------------------------------------------------------------
-// FrequencySystem class definition
-
 class FrequencySystem : public LinearImplicitSystem
 {
 public:
@@ -88,7 +82,7 @@ public:
    * The frequencies belong to the \p EquationSystems
    * object.
    */
-  virtual void clear ();
+  virtual void clear () libmesh_override;
 
   /**
    * The full clear method also clears the frequencies
@@ -101,12 +95,12 @@ public:
    * Assemble the linear system.  Does not
    * actually call the solver.
    */
-  virtual void assemble ();
+  virtual void assemble () libmesh_override;
 
   /**
    * Solves the system for all frequencies.
    */
-  virtual void solve ();
+  virtual void solve () libmesh_override;
 
   /**
    * Solves the linear system for the
@@ -123,7 +117,7 @@ public:
    * @returns \p "Frequency".  Helps in identifying
    * the system type in an equation system file.
    */
-  virtual std::string system_type () const { return "Frequency"; }
+  virtual std::string system_type () const libmesh_override { return "Frequency"; }
 
 
   //--------------------------------------------------------
@@ -220,7 +214,7 @@ protected:
    * The frequenices have to be set @e prior to calling
    * \p init().
    */
-  virtual void init_data ();
+  virtual void init_data () libmesh_override;
 
   /**
    * Sets the current frequency to the \p n-th entry in the vector

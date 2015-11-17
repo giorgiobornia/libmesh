@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -24,8 +24,8 @@
 #ifdef LIBMESH_ENABLE_VSMOOTHER
 
 // Local Includes -----------------------------------
+#include "libmesh/libmesh_common.h"
 #include "libmesh/mesh_smoother.h"
-#include "libmesh/unstructured_mesh.h"
 
 // C++ Includes   -----------------------------------
 #include <cstddef>
@@ -35,6 +35,9 @@
 
 namespace libMesh
 {
+
+// Forward declarations
+class UnstructuredMesh;
 
 /**
  * This is an implementation of Larisa Branets' smoothing algorithms.
@@ -119,7 +122,7 @@ public:
    * function in this class which takes an int, using
    * a default value of 1.
    */
-  virtual void smooth() { _distance = this->smooth(1); }
+  virtual void smooth() libmesh_override { _distance = this->smooth(1); }
 
   /**
    * The actual smoothing function, gets called whenever

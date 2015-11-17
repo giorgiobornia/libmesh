@@ -1,6 +1,6 @@
 
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -24,7 +24,6 @@
 // Local Includes
 #include "libmesh/libmesh.h"
 #include "libmesh/auto_ptr.h"
-#include "libmesh/diff_context.h"
 
 // C++ includes
 #include <vector>
@@ -34,9 +33,7 @@ namespace libMesh
 
 // Forward Declarations
 class System;
-class TimeSolver;
-
-template <typename T> class NumericVector;
+class DiffContext;
 
 /**
  * This class provides a specific system class.  It aims
@@ -72,12 +69,9 @@ template <typename T> class NumericVector;
  * DiffContext::get_elem_solution_accel_derivative(). The should be incorporated
  * into the Jacobian evaluations, if the Jacobian is being provided.
  *
- * @author Roy H. Stogner 2006
+ * \author Roy H. Stogner
+ * \date 2006
  */
-
-// ------------------------------------------------------------
-// DifferentiablePhysics class definition
-
 class DifferentiablePhysics
 {
 public:
@@ -353,7 +347,7 @@ public:
    * Otherwise, this must be reimplemented.
    */
   virtual bool damping_residual (bool request_jacobian,
-                              DiffContext &) {
+                                 DiffContext &) {
     return request_jacobian;
   }
 

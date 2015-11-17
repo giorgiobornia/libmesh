@@ -13,6 +13,7 @@ unit_tests_sources = \
         test_comm.h \
 	base/dof_object_test.h \
         base/getpot_test.C \
+        base/auto_ptr_test.C \
 	geom/node_test.C \
 	geom/point_test.C \
 	geom/point_test.h \
@@ -27,14 +28,17 @@ unit_tests_sources = \
 	numerics/laspack_vector_test.C \
 	numerics/numeric_vector_test.h \
 	numerics/parsed_fem_function_test.C \
+	numerics/parsed_function_test.C \
 	numerics/petsc_vector_test.C \
 	numerics/trilinos_epetra_vector_test.C \
 	numerics/type_vector_test.h \
+	numerics/vector_value_test.C \
 	numerics/type_tensor_test.C \
 	parallel/parallel_test.C \
 	parallel/parallel_point_test.C \
 	quadrature/quadrature_test.C \
         systems/equation_systems_test.C \
+        systems/systems_test.C \
 	utils/vectormap_test.C
 
 EXTRA_DIST = base/getpot_test_input.in

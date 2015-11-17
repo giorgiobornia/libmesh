@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -431,14 +431,23 @@ private:
         std::vector<bool> is_boundary_node(elem->n_nodes(), false),
           is_boundary_edge(elem->n_edges(), false),
           is_boundary_side(elem->n_sides(), false);
+
+        // We also maintain a separate list of nodeset-based boundary nodes
+        std::vector<bool> is_boundary_nodeset(elem->n_nodes(), false);
+
+        // Container to catch boundary ids handed back for sides,
+        // nodes, and edges in the loops below.
+        std::vector<boundary_id_type> ids_vec;
+
         for (unsigned char s=0; s != elem->n_sides(); ++s)
           {
             // First see if this side has been requested
-            const std::vector<boundary_id_type>& bc_ids =
-              boundary_info.boundary_ids (elem, s);
+            boundary_info.boundary_ids (elem, s, ids_vec);
+
             bool do_this_side = false;
-            for (std::size_t i=0; i != bc_ids.size(); ++i)
-              if (b.count(bc_ids[i]))
+            for (std::vector<boundary_id_type>::iterator bc_it = ids_vec.begin();
+                 bc_it != ids_vec.end(); ++bc_it)
+              if (b.count(*bc_it))
                 {
                   do_this_side = true;
                   break;
@@ -461,23 +470,26 @@ private:
         // also independently check whether the nodes have been requested
         for (unsigned int n=0; n != elem->n_nodes(); ++n)
           {
-            const std::vector<boundary_id_type>& bc_ids =
-              boundary_info.boundary_ids (elem->get_node(n));
+            boundary_info.boundary_ids (elem->get_node(n), ids_vec);
 
-            for (std::size_t i=0; i != bc_ids.size(); ++i)
-              if (b.count(bc_ids[i]))
-                is_boundary_node[n] = true;
+            for (std::vector<boundary_id_type>::iterator bc_it = ids_vec.begin();
+                 bc_it != ids_vec.end(); ++bc_it)
+              if (b.count(*bc_it))
+                {
+                  is_boundary_node[n] = true;
+                  is_boundary_nodeset[n] = true;
+                }
           }
 
         // We can also impose Dirichlet boundary conditions on edges, so we should
         // also independently check whether the edges have been requested
         for (unsigned short e=0; e != elem->n_edges(); ++e)
           {
-            const std::vector<boundary_id_type>& bc_ids =
-              boundary_info.edge_boundary_ids (elem, e);
+            boundary_info.edge_boundary_ids (elem, e, ids_vec);
 
-            for (std::size_t i=0; i != bc_ids.size(); ++i)
-              if (b.count(bc_ids[i]))
+            for (std::vector<boundary_id_type>::iterator bc_it = ids_vec.begin();
+                 bc_it != ids_vec.end(); ++bc_it)
+              if (b.count(*bc_it))
                 is_boundary_edge[e] = true;
           }
 
@@ -508,7 +520,10 @@ private:
         // hold those fixed and project boundary edges, then hold
         // those fixed and project boundary faces,
 
-        // Interpolate node values first
+        // Interpolate node values first. Note that we have a special
+        // case for nodes that have a boundary nodeset, since we do
+        // need to interpolate them directly, even if they're non-vertex
+        // nodes.
         unsigned int current_dof = 0;
         for (unsigned int n=0; n!= n_nodes; ++n)
           {
@@ -517,7 +532,8 @@ private:
             const unsigned int nc =
               FEInterface::n_dofs_at_node (dim, fe_type, elem_type,
                                            n);
-            if (!elem->is_vertex(n) || !is_boundary_node[n])
+            if ( (!elem->is_vertex(n) || !is_boundary_node[n]) &&
+                 !is_boundary_nodeset[n] )
               {
                 current_dof += nc;
                 continue;

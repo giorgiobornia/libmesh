@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -30,6 +30,8 @@ namespace libMesh
 
 std::string ElementTypes::basic_name (const ElemType t)
 {
+  libmesh_deprecated();
+
   std::string its_name;
   switch (t)
     {
@@ -131,6 +133,8 @@ std::string ElementTypes::basic_name (const ElemType t)
 
 std::string ElementTypes::name(const ElemType t)
 {
+  libmesh_deprecated();
+
   std::string its_name;
   switch (t)
     {

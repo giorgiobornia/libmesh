@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -554,6 +554,16 @@ inline Tnew libmesh_cast_int (Told oldvar)
 
 // build a integer representation of version
 #define LIBMESH_VERSION_ID(major,minor,patch) (((major) << 16) | ((minor) << 8) | ((patch) & 0xFF))
+
+
+// Allow for marking functions with "override" if the compiler supports it.
+// Note: override ensures that the function is virtual and is
+// overriding a virtual function from the base class.
+#ifdef LIBMESH_HAVE_CXX11_OVERRIDE
+#define libmesh_override override
+#else
+#define libmesh_override
+#endif
 
 } // namespace libMesh
 

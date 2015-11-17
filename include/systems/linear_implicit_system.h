@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2014 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -41,11 +41,10 @@ template <typename T> class ShellMatrix;
  * the essentials needed to solve a system.  Note
  * that still additional vectors/matrices may be added,
  * as offered in the parent class \p ExplicitSystem.
+ *
+ * \author Benjamin Kirk
+ * \date 2005
  */
-
-// ------------------------------------------------------------
-// LinearImplicitSystem class definition
-
 class LinearImplicitSystem : public ImplicitSystem
 {
 public:
@@ -82,18 +81,18 @@ public:
    * Clear all the data structures associated with
    * the system.
    */
-  virtual void clear ();
+  virtual void clear () libmesh_override;
 
   /**
    * Initializes new data members of the system
    */
-  virtual void init_data ();
+  virtual void init_data () libmesh_override;
 
   /**
    * Reinitializes the member data fields associated with
    * the system, so that, e.g., \p assemble() may be used.
    */
-  virtual void reinit ();
+  virtual void reinit () libmesh_override;
 
   /**
    * Prepares \p matrix and \p _dof_map for matrix assembly.
@@ -101,7 +100,7 @@ public:
    * use the \p assemble() in derived classes.
    * @e Should be overloaded in derived classes.
    */
-  virtual void assemble () { ImplicitSystem::assemble(); }
+  virtual void assemble () libmesh_override { ImplicitSystem::assemble(); }
 
   /**
    * After calling this method, any solve will be limited to the given
@@ -109,37 +108,38 @@ public:
    * being a \p NULL pointer.
    */
   virtual void restrict_solve_to (const SystemSubset* subset,
-                                  const SubsetSolveMode subset_solve_mode=SUBSET_ZERO);
+                                  const SubsetSolveMode subset_solve_mode=SUBSET_ZERO) libmesh_override;
 
   /**
    * Assembles & solves the linear system A*x=b.
    */
-  virtual void solve ();
+  virtual void solve () libmesh_override;
 
   /**
    * Returns a pointer to a linear solver appropriate for use in
    * adjoint and/or sensitivity solves
    */
-  virtual LinearSolver<Number> *get_linear_solver() const;
+  virtual LinearSolver<Number> *get_linear_solver() const libmesh_override;
 
   /**
    * Releases a pointer to a linear solver acquired by
    * \p this->get_linear_solver()
    */
-  virtual void release_linear_solver(LinearSolver<Number> *) const;
+  virtual void release_linear_solver(LinearSolver<Number> *) const libmesh_override;
 
   /**
    * Assembles a residual in \p rhs and/or a jacobian in \p matrix,
    * as requested.
    */
-  virtual void assembly(bool get_residual, bool get_jacobian,
-                        bool apply_heterogeneous_constraints = false);
+  virtual void assembly(bool get_residual,
+                        bool get_jacobian,
+                        bool apply_heterogeneous_constraints = false) libmesh_override;
 
   /**
    * @returns \p "LinearImplicit".  Helps in identifying
    * the system type in an equation system file.
    */
-  virtual std::string system_type () const { return "LinearImplicit"; }
+  virtual std::string system_type () const libmesh_override { return "LinearImplicit"; }
 
   /**
    * The \p LinearSolver defines the interface used to
@@ -174,13 +174,13 @@ public:
   /**
    * Detaches a shell matrix.  Same as \p attach_shell_matrix(NULL).
    */
-  void detach_shell_matrix (void) { attach_shell_matrix(NULL); }
+  void detach_shell_matrix () { attach_shell_matrix(NULL); }
 
   /**
    * Returns a pointer to the currently attached shell matrix, if any,
    * or \p NULL else.
    */
-  ShellMatrix<Number>* get_shell_matrix(void) { return _shell_matrix; }
+  ShellMatrix<Number>* get_shell_matrix() { return _shell_matrix; }
 
 protected:
 
@@ -212,12 +212,6 @@ protected:
   SubsetSolveMode _subset_solve_mode;
 };
 
-
 } // namespace libMesh
-
-
-// ------------------------------------------------------------
-// LinearImplicitSystem inline methods
-
 
 #endif // LIBMESH_LINEAR_IMPLICIT_SYSTEM_H

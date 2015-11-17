@@ -40,7 +40,8 @@ class RBParameters;
  * for the PDE decomposition employed by the Reduced
  * Basis method.
  *
- * @author David J. Knezevic, 2011
+ * \author David J. Knezevic
+ * \date 2011
  */
 class RBTheta : public ReferenceCountedObject<RBTheta>
 {
@@ -63,7 +64,6 @@ public:
    * to provide problem dependent behavior.
    */
   virtual Number evaluate(const RBParameters& ) { return 1.; }
-
 };
 
 }
