@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -82,7 +82,7 @@ public:
    * points which comprise the hole.  The points will all lie
    * on a circle of radius r.
    */
-  PolygonHole(const Point& center, Real radius, unsigned int n_points);
+  PolygonHole(const Point & center, Real radius, unsigned int n_points);
 
   virtual unsigned int n_points() const libmesh_override;
 
@@ -126,8 +126,8 @@ public:
    * The constructor requires a point which lies in the interior of the hole
    * and a reference to a vector of Points defining the hole.
    */
-  ArbitraryHole(const Point& center,
-                const std::vector<Point>& points);
+  ArbitraryHole(const Point & center,
+                const std::vector<Point> & points);
 
   virtual unsigned int n_points() const libmesh_override;
 
@@ -145,7 +145,7 @@ private:
    * Reference to the vector of points which makes up
    * the hole.
    */
-  const std::vector<Point>& _points;
+  const std::vector<Point> & _points;
 };
 
 } // namespace libMesh

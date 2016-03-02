@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -50,7 +50,7 @@ template <typename T> class EigenSparseLinearSolver;
  * \date 2013
  */
 template <typename T>
-class EigenSparseMatrix : public SparseMatrix<T>
+class EigenSparseMatrix libmesh_final : public SparseMatrix<T>
 {
 
 public:
@@ -69,7 +69,7 @@ public:
    * the matrix before usage with
    * \p init(...).
    */
-  EigenSparseMatrix (const Parallel::Communicator &comm
+  EigenSparseMatrix (const Parallel::Communicator & comm
                      LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
 
   /**
@@ -126,7 +126,7 @@ public:
    * this method \p closed() is true and the matrix can
    * be used in computations.
    */
-  virtual void close () const libmesh_override { const_cast<EigenSparseMatrix<T>*>(this)->_closed = true; }
+  virtual void close () const libmesh_override { const_cast<EigenSparseMatrix<T> *>(this)->_closed = true; }
 
   /**
    * @returns \p m, the row-dimension of
@@ -180,16 +180,16 @@ public:
    * for adding an element matrix
    * at assembly time
    */
-  virtual void add_matrix (const DenseMatrix<T> &dm,
-                           const std::vector<numeric_index_type> &rows,
-                           const std::vector<numeric_index_type> &cols) libmesh_override;
+  virtual void add_matrix (const DenseMatrix<T> & dm,
+                           const std::vector<numeric_index_type> & rows,
+                           const std::vector<numeric_index_type> & cols) libmesh_override;
 
   /**
    * Same, but assumes the row and column maps are the same.
    * Thus the matrix \p dm must be square.
    */
-  virtual void add_matrix (const DenseMatrix<T> &dm,
-                           const std::vector<numeric_index_type> &dof_indices) libmesh_override;
+  virtual void add_matrix (const DenseMatrix<T> & dm,
+                           const std::vector<numeric_index_type> & dof_indices) libmesh_override;
 
   /**
    * Add a Sparse matrix \p X, scaled with \p a, to \p this,
@@ -198,7 +198,7 @@ public:
    * so a hand-coded version with hopefully acceptable performance
    * is provided.
    */
-  virtual void add (const T a, SparseMatrix<T> &X) libmesh_override;
+  virtual void add (const T a, SparseMatrix<T> & X) libmesh_override;
 
   /**
    * Return the value of the entry
@@ -220,7 +220,7 @@ public:
    * to the l1-norm for vectors, i.e.
    * \f$|Mv|_1\leq |M|_1 |v|_1\f$.
    */
-  virtual Real l1_norm () const libmesh_override { libmesh_not_implemented(); return 0.; }
+  virtual Real l1_norm () const libmesh_override;
 
   /**
    * Return the linfty-norm of the
@@ -233,7 +233,7 @@ public:
    * to the linfty-norm of vectors, i.e.
    * \f$|Mv|_\infty \leq |M|_\infty |v|_\infty\f$.
    */
-  virtual Real linfty_norm () const libmesh_override { libmesh_not_implemented(); return 0.; }
+  virtual Real linfty_norm () const libmesh_override;
 
   /**
    * see if Eigen matrix has been closed
@@ -245,18 +245,18 @@ public:
    * Print the contents of the matrix, by default to libMesh::out.
    * Currently identical to \p print().
    */
-  virtual void print_personal(std::ostream& os=libMesh::out) const libmesh_override { this->print(os); }
+  virtual void print_personal(std::ostream & os=libMesh::out) const libmesh_override { this->print(os); }
 
   /**
    * Copies the diagonal part of the matrix into \p dest.
    */
-  virtual void get_diagonal (NumericVector<T>& dest) const libmesh_override;
+  virtual void get_diagonal (NumericVector<T> & dest) const libmesh_override;
 
   /**
    * Copies the transpose of the matrix into \p dest, which may be
    * *this.
    */
-  virtual void get_transpose (SparseMatrix<T>& dest) const libmesh_override;
+  virtual void get_transpose (SparseMatrix<T> & dest) const libmesh_override;
 
 private:
 

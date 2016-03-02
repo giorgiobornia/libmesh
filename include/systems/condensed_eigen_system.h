@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -49,8 +49,8 @@ public:
    * Constructor.  Optionally initializes required
    * data structures.
    */
-  CondensedEigenSystem (EquationSystems& es,
-                        const std::string& name_in,
+  CondensedEigenSystem (EquationSystems & es,
+                        const std::string & name_in,
                         const unsigned int number_in);
 
   /**
@@ -73,7 +73,7 @@ public:
    * of non-condensed dofs. These are the dofs in the system that
    * are not contained in \p global_dirichlet_dofs_set.
    */
-  void initialize_condensed_dofs(std::set<unsigned int>& global_dirichlet_dofs_set);
+  void initialize_condensed_dofs(std::set<unsigned int> & global_dirichlet_dofs_set);
 
   /**
    * @return the global number of non-condensed dofs in the system.

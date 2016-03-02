@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -27,7 +27,7 @@
 namespace libMesh
 {
 
-MeshFunctionSolutionTransfer::MeshFunctionSolutionTransfer(const libMesh::Parallel::Communicator &comm_in) :
+MeshFunctionSolutionTransfer::MeshFunctionSolutionTransfer(const libMesh::Parallel::Communicator & comm_in) :
   SolutionTransfer(comm_in)
 {}
 
@@ -35,7 +35,8 @@ MeshFunctionSolutionTransfer::~MeshFunctionSolutionTransfer()
 {}
 
 void
-MeshFunctionSolutionTransfer::transfer(const Variable & from_var, const Variable & to_var)
+MeshFunctionSolutionTransfer::transfer(const Variable & from_var,
+                                       const Variable & to_var)
 {
   // This only works when transferring to a Lagrange variable
   libmesh_assert(to_var.type().family == LAGRANGE);

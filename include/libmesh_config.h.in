@@ -9,6 +9,9 @@
 /* definition of the final detected unordered_multimap type */
 #undef BEST_UNORDERED_MULTIMAP
 
+/* definition of the final detected unordered_multiset type */
+#undef BEST_UNORDERED_MULTISET
+
 /* definition of the final detected unordered_set type */
 #undef BEST_UNORDERED_SET
 
@@ -35,6 +38,9 @@
 
 /* SVN revision */
 #undef BUILD_VERSION
+
+/* define if the compiler has a broken errno_t */
+#undef COMPILER_HAS_BROKEN_ERRNO_T
 
 /* Configuration information. */
 #undef CONFIGURE_INFO
@@ -78,6 +84,12 @@
 
 /* PETSc's subminor version number, as detected by petsc.m4 */
 #undef DETECTED_PETSC_VERSION_SUBMINOR
+
+/* TBB's major version number, as detected by tbb.m4 */
+#undef DETECTED_TBB_VERSION_MAJOR
+
+/* TBB's minor version number, as detected by tbb.m4 */
+#undef DETECTED_TBB_VERSION_MINOR
 
 /* VTK's major version number, as detected by vtk.m4 */
 #undef DETECTED_VTK_VERSION_MAJOR
@@ -195,11 +207,41 @@
 /* define if the compiler supports basic C++11 syntax */
 #undef HAVE_CXX11
 
+/* Flag indicating whether compiler supports f() = delete; */
+#undef HAVE_CXX11_DELETED_FUNCTIONS
+
+/* Flag indicating whether compiler supports f() final; */
+#undef HAVE_CXX11_FINAL
+
 /* Flag indicating whether compiler supports initializer lists */
 #undef HAVE_CXX11_INITIALIZER_LIST
 
+/* Flag indicating whether compiler supports std::acosh */
+#undef HAVE_CXX11_INVERSE_HYPERBOLIC_COSINE
+
+/* Flag indicating whether compiler supports std::asinh */
+#undef HAVE_CXX11_INVERSE_HYPERBOLIC_COSINE_COMPLEX
+
+/* Flag indicating whether compiler supports std::asinh */
+#undef HAVE_CXX11_INVERSE_HYPERBOLIC_SINE
+
+/* Flag indicating whether compiler supports std::asinh */
+#undef HAVE_CXX11_INVERSE_HYPERBOLIC_SINE_COMPLEX
+
+/* Flag indicating whether compiler supports std::atanh */
+#undef HAVE_CXX11_INVERSE_HYPERBOLIC_TANGENT
+
+/* Flag indicating whether compiler supports std::asinh */
+#undef HAVE_CXX11_INVERSE_HYPERBOLIC_TANGENT_COMPLEX
+
 /* Flag indicating whether compiler supports std::move */
 #undef HAVE_CXX11_MOVE
+
+/* Flag indicating whether compiler supports nullptr */
+#undef HAVE_CXX11_NULLPTR
+
+/* Flag indicating whether C++03 compatible nullptr workaround works */
+#undef HAVE_CXX11_NULLPTR_WORKAROUND
 
 /* Flag indicating whether compiler supports the override keyword */
 #undef HAVE_CXX11_OVERRIDE
@@ -248,6 +290,9 @@
 
 /* define if the compiler supports __gnu_cxx::hash_multimap */
 #undef HAVE_EXT_HASH_MULTIMAP
+
+/* define if the compiler supports __gnu_cxx::hash_multiset */
+#undef HAVE_EXT_HASH_MULTISET
 
 /* define if the compiler supports __gnu_cxx::hash_set */
 #undef HAVE_EXT_HASH_SET
@@ -298,6 +343,9 @@
 
 /* define if the compiler supports std::hash_multimap */
 #undef HAVE_HASH_MULTIMAP
+
+/* define if the compiler supports std::hash_multiset */
+#undef HAVE_HASH_MULTISET
 
 /* define if the compiler supports std::hash_set */
 #undef HAVE_HASH_SET
@@ -411,6 +459,9 @@
 /* define if the compiler supports std::unordered_multimap */
 #undef HAVE_STD_UNORDERED_MULTIMAP
 
+/* define if the compiler supports std::unordered_multiset */
+#undef HAVE_STD_UNORDERED_MULTISET
+
 /* define if the compiler supports std::unordered_set */
 #undef HAVE_STD_UNORDERED_SET
 
@@ -461,6 +512,9 @@
 /* define if the compiler supports std::tr1::unordered_multimap */
 #undef HAVE_TR1_UNORDERED_MULTIMAP
 
+/* define if the compiler supports std::tr1::unordered_multiset */
+#undef HAVE_TR1_UNORDERED_MULTISET
+
 /* define if the compiler supports std::tr1::unordered_set */
 #undef HAVE_TR1_UNORDERED_SET
 
@@ -499,6 +553,9 @@
 /* header file for the final detected unordered_multimap type */
 #undef INCLUDE_UNORDERED_MULTIMAP
 
+/* header file for the final detected unordered_multiset type */
+#undef INCLUDE_UNORDERED_MULTISET
+
 /* header file for the final detected unordered_set type */
 #undef INCLUDE_UNORDERED_SET
 
@@ -523,9 +580,6 @@
 /* libMesh minor version number */
 #undef MINOR_VERSION
 
-/* Define to 1 if your C compiler doesn't accept -c and -o together. */
-#undef NO_MINUS_C_MINUS_O
-
 /* Name of package */
 #undef PACKAGE
 
@@ -546,6 +600,13 @@
 
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
+
+/* Flag indicating whether or not PETSc was configured with MUMPS support */
+#undef PETSC_HAVE_MUMPS
+
+/* Flag indicating whether or not PETSc was configured with SuperLU_dist
+   support */
+#undef PETSC_HAVE_SUPERLU_DIST
 
 /* Flag indicating whether or not PETSc was configured with debugging enabled
    */

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -25,7 +25,7 @@
 // Local includes
 #include "libmesh/parallel_object.h"
 #include "libmesh/point.h"
-#include "libmesh/elem_type.h"
+#include "libmesh/enum_elem_type.h"
 
 // C++ includes
 #include <iostream>
@@ -49,17 +49,30 @@
 
 
 
-namespace libMesh
-{
-
-// Forward declarations
-class MeshBase;
-
 namespace exII {
 extern "C" {
 #include "exodusII.h" // defines MAX_LINE_LENGTH, MAX_STR_LENGTH used later
 }
 }
+
+// Through several subsequent levels of includes, the exodusII.h
+// header includes <errno.h>.  If <cstring> is subsequently included
+// in the same translation unit, there is an issue with GCC 5.2.0+ on
+// OSX which somehow causes errno_t to then be undefined.  This
+// typedef, which is controlled by an autoconf test, seems to fix the
+// issue and should be safe, since errno_t should have the same type as
+// errno, which according to the C99 standard is a "macro that expands
+// to a modifiable lvalue that has type int".
+#ifdef LIBMESH_COMPILER_HAS_BROKEN_ERRNO_T
+typedef int errno_t;
+#endif
+
+
+namespace libMesh
+{
+
+// Forward declarations
+class MeshBase;
 
 /**
  * This is the \p ExodusII_IO_Helper class.  This class hides the
@@ -79,7 +92,7 @@ public:
    * perform its actions if running on processor zero.  If you initialize this
    * to false, the writing methods will run on all processors instead.
    */
-  ExodusII_IO_Helper(const ParallelObject &parent,
+  ExodusII_IO_Helper(const ParallelObject & parent,
                      bool v=false,
                      bool run_only_on_proc0=true,
                      bool single_precision=false);
@@ -92,14 +105,14 @@ public:
    * @returns the current element type.  Note: the default behavior is
    * for this value to be in all capital letters, e.g. \p HEX27.
    */
-  const char* get_elem_type() const;
+  const char * get_elem_type() const;
 
   /**
    * Opens an \p ExodusII mesh file named \p filename.  If
    * read_only==true, the file will be opened with the EX_READ flag,
    * otherwise it will be opened with the EX_WRITE flag.
    */
-  void open(const char* filename, bool read_only);
+  void open(const char * filename, bool read_only);
 
   /**
    * Reads an \p ExodusII mesh file header.
@@ -135,7 +148,7 @@ public:
   /**
    * Prints the nodal information, by default to \p libMesh::out.
    */
-  void print_nodes(std::ostream &out = libMesh::out);
+  void print_nodes(std::ostream & out = libMesh::out);
 
   /**
    * Reads information for all of the blocks in the \p ExodusII mesh
@@ -329,6 +342,20 @@ public:
   void use_mesh_dimension_instead_of_spatial_dimension(bool val);
 
   /**
+   * Sets the value of _write_as_dimension.
+   *
+   * This directly controls the num_dim which is written to the Exodus
+   * file.  If non-zero, this value supersedes all other dimensions,
+   * including:
+   * 1.) MeshBase::spatial_dimension()
+   * 2.) MeshBase::mesh_dimension()
+   * 3.) Any value passed to use_mesh_dimension_instead_of_spatial_dimension()
+   * This is useful/necessary for working around a bug in Paraview which
+   * prevents the "Plot Over Line" filter from working on 1D meshes.
+   */
+  void write_as_dimension(unsigned dim);
+
+  /**
    * Allows you to set a vector that is added to the coordinates of all
    * of the nodes.  Effectively, this "moves" the mesh to a particular position
    */
@@ -338,7 +365,7 @@ public:
    * Returns a vector with three copies of each element in the provided name vector,
    * starting with r_, i_ and a_ respectively.
    */
-  std::vector<std::string> get_complex_names(const std::vector<std::string>& names) const;
+  std::vector<std::string> get_complex_names(const std::vector<std::string> & names) const;
 
   /**
    * This is the \p ExodusII_IO_Helper Conversion class.  It provides
@@ -366,14 +393,14 @@ public:
    * Prints the message defined in \p msg. Can be turned off if
    * verbosity is set to 0.
    */
-  void message(const std::string& msg);
+  void message(const std::string & msg);
 
   /**
    * Prints the message defined in \p msg, and appends the number \p i
    * to the end of the message.  Useful for printing messages in
    * loops.  Can be turned off if verbosity is set to 0.
    */
-  void message(const std::string& msg, int i);
+  void message(const std::string & msg, int i);
 
   // File identification flag
   int ex_id;
@@ -465,7 +492,7 @@ public:
   // z locations of node points
   std::vector<Real> z;
 
-  //  Problem title (Use vector<char> to emulate a char*)
+  //  Problem title (Use vector<char> to emulate a char *)
   std::vector<char> title;
 
   // Type of element in a given block
@@ -572,6 +599,10 @@ protected:
   // spatial dimension, when writing.  By default this is false.
   bool _use_mesh_dimension_instead_of_spatial_dimension;
 
+  // Use this for num_dim when writing the Exodus file.  If non-zero, supersedes
+  // any value set in _use_mesh_dimension_instead_of_spatial_dimension.
+  unsigned _write_as_dimension;
+
   // On output, shift every point by _coordinate_offset
   Point _coordinate_offset;
 
@@ -585,23 +616,27 @@ private:
    * The enumeration controls whether nodal, elemental, or global
    * variable names are read and which class members are filled in.
    */
-  void write_var_names(ExodusVarType type, std::vector<std::string>& names);
+  void write_var_names(ExodusVarType type, std::vector<std::string> & names);
 
   /**
    * When appending: during initialization, check that variable names
    * in the file match those you attempt to initialize with.
    */
-  void check_existing_vars(ExodusVarType type, std::vector<std::string>& names, std::vector<std::string>& names_from_file);
+  void check_existing_vars(ExodusVarType type, std::vector<std::string> & names, std::vector<std::string> & names_from_file);
 
   /**
    * read_var_names() dispatches to this function.
    */
-  void read_var_names_impl(const char* var_type, int& count, std::vector<std::string>& result);
+  void read_var_names_impl(const char * var_type,
+                           int & count,
+                           std::vector<std::string> & result);
 
   /**
    * write_var_names() dispatches to this function.
    */
-  void write_var_names_impl(const char* var_type, int& count, std::vector<std::string>& names);
+  void write_var_names_impl(const char * var_type,
+                            int & count,
+                            std::vector<std::string> & names);
 };
 
 
@@ -619,13 +654,13 @@ public:
    * Constructor.  Initializes the const private member
    * variables.
    */
-  Conversion(const int* nm,       // node_map
+  Conversion(const int * nm,       // node_map
              size_t nm_size,
-             const int* inm,      // inverse_node_map
+             const int * inm,      // inverse_node_map
              size_t inm_size,
-             const int* sm,       // side_map
+             const int * sm,       // side_map
              size_t sm_size,
-             const int* ism,      // inverse_side_map
+             const int * ism,      // inverse_side_map
              size_t ism_size,
              const ElemType ct,   // "canonical" aka libmesh element type
              std::string ex_type) // string representing the Exodus element type
@@ -704,7 +739,7 @@ private:
   /**
    * Pointer to the node map for this element.
    */
-  const int* node_map;
+  const int * node_map;
 
   /**
    * The size of the node map array, this helps with bounds checking...
@@ -716,7 +751,7 @@ private:
    * For all elements except for the Hex27, this is the same
    * as the node map.
    */
-  const int* inverse_node_map;
+  const int * inverse_node_map;
 
   /**
    * The size of the inverse node map array, this helps with bounds checking...
@@ -726,7 +761,7 @@ private:
   /**
    * Pointer to the side map for this element.
    */
-  const int* side_map;
+  const int * side_map;
 
   /**
    * The size of the side map array, this helps with bounds checking...
@@ -736,7 +771,7 @@ private:
   /**
    * Pointer to the inverse side map for this element.
    */
-  const int* inverse_side_map;
+  const int * inverse_side_map;
 
   /**
    * The size of the inverse side map array, this helps with bounds checking...
@@ -782,6 +817,16 @@ private:
   const ExodusII_IO_Helper & _helper;
 
 public:
+
+  /**
+   * 0D node maps.  These define mappings from ExodusII-formatted
+   * element numberings.
+   */
+
+  /**
+   * The NodeElem node map.
+   */
+  static const int nodeelem_node_map[1];
 
   /**
    * 1D node maps.  These define mappings from ExodusII-formatted
@@ -1038,7 +1083,7 @@ public:
 
 
 /**
- * This class is useful for managing anything that requires a char**
+ * This class is useful for managing anything that requires a char **
  * input/output in ExodusII file.  You must know the number of strings
  * and the length of each one at the time you create it.
  */
@@ -1061,17 +1106,17 @@ public:
   /**
    * Provide access to the underlying C data table
    */
-  char** get_char_star_star();
+  char ** get_char_star_star();
 
   /**
-   * Provide access to the i'th underlying char*
+   * Provide access to the i'th underlying char *
    */
-  char* get_char_star(int i);
+  char * get_char_star(int i);
 
 private:
   // C++ data structures for managing string memory
   std::vector<std::vector<char> > data_table;
-  std::vector<char*> data_table_pointers;
+  std::vector<char *> data_table_pointers;
 
   size_t counter;
   size_t table_size;

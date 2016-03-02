@@ -5,7 +5,7 @@
 
 
 AC_INIT([libmesh], [1.0.0-pre], [libmesh-users@lists.sourceforge.net], [libmesh], [http://libmesh.github.io])
-AC_PREREQ([2.61]) # require autoconf 2.61 - I havent tried anything older
+AC_PREREQ([2.69])
 
 # by default CFLAGS and CXXFLAGS are set to '-g -O2' on systems that support them.
 # this causes a problem if we then declare a different optimization level. So
@@ -21,8 +21,6 @@ top_srcdir=`dirname $0`
 AC_MSG_RESULT(---------------------------------------------)
 AC_MSG_RESULT(----------- Configuring libMesh -------------)
 AC_MSG_RESULT(---------------------------------------------)
-
-AC_REVISION($Revision$)
 
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
@@ -40,7 +38,6 @@ AC_CONFIG_FILES([Makefile
                  contrib/utils/Makefile
                  contrib/utils/Make.common
                  tests/Makefile
-                 tests/base/getpot_test.C
                  contrib/utils/libmesh.pc:contrib/utils/libmesh-opt.pc.in
                  contrib/utils/libmesh-opt.pc
                  contrib/utils/libmesh-dbg.pc
@@ -69,15 +66,38 @@ AX_PREFIX_CONFIG_H(include/libmesh_config.h,LIBMESH,include/libmesh_config.h.tmp
 AC_DEFINE_UNQUOTED(CONFIGURE_INFO, ["$0 $ac_configure_args"], [Configuration information.])
 
 # require automake 1.11 - color tests
-AM_INIT_AUTOMAKE([dist-xz dist-bzip2 tar-ustar color-tests 1.11])
+AM_INIT_AUTOMAKE([dist-xz dist-bzip2 tar-ustar color-tests serial-tests 1.12])
 
 # use silent rules - automake 1.11
 AM_SILENT_RULES(yes)
 
-# by default we want 'maintainer mode', which means automake will generate rules to recreate e.g. Makefile.in from
-# Makefile.am. But this adds support for --disable-maintainer-mode, which may be useful for forcing configure to
-# work on systems with no autotools
-AM_MAINTAINER_MODE([enable])
+# We originally passed [enable] to AM_MAINTAINER_MODE, but this caused
+# ordinary users to have to configure with --disable-maintainer-mode,
+# which is easy to forget unless you are closely following the
+# instructions, or are aware of the issue and have run the provided
+# ./bootstrap script.
+#
+# We've now switched this to simply AM_MAINTAINER_MODE with no
+# arguments, which is equivalent to AM_MAINTAINER_MODE([disable]).  In
+# this configuration, developers who modify Makefile.am files (or
+# other build system files) *must* configure with
+# --enable-maintainer-mode in order for dependent files (Makefile.in,
+# etc) to be properly rebuilt whenever changes to the build system are
+# made.
+#
+# Note that this approach is not without its drawbacks and detractors:
+# https://blogs.gnome.org/desrt/2011/09/08/am_maintainer_mode-is-not-cool
+# https://www.gnu.org/software/automake/manual/html_node/maintainer_002dmode.html
+# but the benefit is that casual and first-time users are not
+# surprised by the default behavior of simply running ./configure.
+#
+# Note that we also do things a bit differently than most other
+# projects regarding the number of auto-generated build files
+# (Makefile.in) that are checked in, and it seems like the new
+# approach makes more sense for the way our project works --
+# rebuilding the build files are not part of a normal build for most
+# users.
+AM_MAINTAINER_MODE
 
 
 # --------------------------------------------------------------
@@ -169,6 +189,10 @@ LIBMESH_TEST_CXX11_INITIALIZER_LIST
 LIBMESH_TEST_CXX11_VARIADIC_TEMPLATES
 LIBMESH_TEST_CXX11_THREAD
 LIBMESH_TEST_CXX11_TYPE_TRAITS
+LIBMESH_TEST_CXX11_INVERSE_HYPERBOLIC_FUNCS
+LIBMESH_TEST_CXX11_DELETED_FUNCTIONS
+LIBMESH_TEST_CXX11_FINAL
+LIBMESH_TEST_CXX11_NULLPTR
 
 #-----------------------------------------------------
 # Initialize libtool.  By default, we will build
@@ -353,6 +377,7 @@ if (test "x$enableexamples" = "xyes"); then
                 examples/miscellaneous/miscellaneous_ex9/Makefile
                 examples/miscellaneous/miscellaneous_ex10/Makefile
                 examples/miscellaneous/miscellaneous_ex11/Makefile
+                examples/miscellaneous/miscellaneous_ex12/Makefile
                 examples/optimization/optimization_ex1/Makefile
                 examples/optimization/optimization_ex2/Makefile
                 examples/subdomains/subdomains_ex1/Makefile

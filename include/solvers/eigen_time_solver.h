@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -81,7 +81,7 @@ public:
    * to be solved.
    */
   explicit
-  EigenTimeSolver (sys_type& s);
+  EigenTimeSolver (sys_type & s);
 
   /**
    * Destructor.
@@ -122,26 +122,26 @@ public:
    * operator, depending on which is requested.
    */
   virtual bool element_residual (bool get_jacobian,
-                                 DiffContext&) libmesh_override;
+                                 DiffContext &) libmesh_override;
 
   /**
    * Forms the jacobian of the boundary terms.
    */
   virtual bool side_residual (bool get_jacobian,
-                              DiffContext&) libmesh_override;
+                              DiffContext &) libmesh_override;
 
   /**
    * Forms the jacobian of the nonlocal terms.
    */
   virtual bool nonlocal_residual (bool get_jacobian,
-                                  DiffContext&) libmesh_override;
+                                  DiffContext &) libmesh_override;
 
   /**
    * Nominally computes the size of the difference between
    * successive solution iterates ||u^{n+1} - u^{n}|| in some norm,
    * but for this class just returns 0.
    */
-  virtual Real du (const SystemNorm&) const libmesh_override { return 0.; }
+  virtual Real du (const SystemNorm &) const libmesh_override { return 0.; }
 
   /**
    * This is effectively a steady-state solver.

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -50,7 +50,7 @@ public:
    * Constructor.  By default this element has no parent.
    */
   explicit
-  Edge3 (Elem* p=NULL) :
+  Edge3 (Elem * p=libmesh_nullptr) :
     Edge(Edge3::n_nodes(), p, _nodelinks_data) {}
 
   /**
@@ -122,7 +122,7 @@ public:
 
   virtual void connectivity(const unsigned int sc,
                             const IOPackage iop,
-                            std::vector<dof_id_type>& conn) const libmesh_override;
+                            std::vector<dof_id_type> & conn) const libmesh_override;
 
   /**
    * @returns 2 for all \p n
@@ -170,9 +170,10 @@ public:
   using Edge::key;
 
   /**
-   * @returns an id associated with the global node ids of this
-   * element.  The id is not necessariy unique, but should be
-   * close.
+   * Compute a unique key for this element which is suitable for
+   * hashing (not necessarily unique, but close).  The key is based
+   * solely on the mid-edge node's global id, to be consistent with 2D
+   * elements that have Edge3 sides (Quad9, Quad8, etc.).
    */
   virtual dof_id_type key () const libmesh_override;
 
@@ -182,7 +183,7 @@ protected:
   /**
    * Data for links to nodes
    */
-  Node* _nodelinks_data[3];
+  Node * _nodelinks_data[3];
 
 
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -55,7 +55,7 @@ namespace libMesh
  *
  * \endverbatim
  */
-class InfHex8 : public InfHex
+class InfHex8 libmesh_final : public InfHex
 {
 public:
 
@@ -63,7 +63,7 @@ public:
    * Constructor.  By default this element has no parent.
    */
   explicit
-  InfHex8 (Elem* p=NULL) :
+  InfHex8 (Elem * p=libmesh_nullptr) :
     InfHex(InfHex8::n_nodes(), p, _nodelinks_data)
   {}
 
@@ -133,7 +133,7 @@ public:
 
   virtual void connectivity(const unsigned int sc,
                             const IOPackage iop,
-                            std::vector<dof_id_type>& conn) const libmesh_override;
+                            std::vector<dof_id_type> & conn) const libmesh_override;
 
   unsigned int vtk_element_type (const unsigned int) const
   { return 12; }
@@ -143,7 +143,7 @@ public:
    * \p p.  Customized for infinite elements, since knowledge
    * about the envelope can be helpful.
    */
-  virtual bool contains_point (const Point& p, Real tol=TOLERANCE) const libmesh_override;
+  virtual bool contains_point (const Point & p, Real tol=TOLERANCE) const libmesh_override;
 
   /**
    * This maps the \f$ j^{th} \f$ node of the \f$ i^{th} \f$ side to
@@ -163,7 +163,7 @@ protected:
   /**
    * Data for links to nodes
    */
-  Node* _nodelinks_data[8];
+  Node * _nodelinks_data[8];
 
 
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -158,7 +158,7 @@ void QConical::conical_product_tet(unsigned int p)
 // Builds and scales a Gauss rule and a Jacobi rule.
 // Then combines them to compute points and weights
 // of a 3D conical product rule for the Pyramid.  The integral
-// over the reference Tet can be written (in LaTeX notation) as:
+// over the reference Pyramid can be written (in LaTeX notation) as:
 //
 // If := \int_0^1 dz \int_{-(1-z)}^{(1-z)} dy \int_{-(1-z)}^{(1-z)} f(x,y,z) dx (1)
 //
@@ -211,8 +211,6 @@ void QConical::conical_product_pyramid(unsigned int p)
           _points[q](2) = zk;
           _weights[q]   = gauss1D.w(i) * gauss1D.w(j) * jac1D.w(k);
         }
-
-
 }
 
 } // namespace libMesh

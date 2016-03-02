@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -83,7 +83,7 @@ protected:
   /**
    * Also, increment the counter if the copy-constructor is called.
    */
-  ReferenceCountedObject (const ReferenceCountedObject& other)
+  ReferenceCountedObject (const ReferenceCountedObject & other)
     : ReferenceCounter(other)
   {
 #if defined(LIBMESH_ENABLE_REFERENCE_COUNTING) && defined(DEBUG)

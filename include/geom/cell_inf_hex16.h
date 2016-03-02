@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -69,7 +69,7 @@ namespace libMesh
  *   0              8              1
  * \endverbatim
  */
-class InfHex16 : public InfHex
+class InfHex16 libmesh_final : public InfHex
 {
 public:
 
@@ -77,7 +77,7 @@ public:
    * Constructor.  By default this element has no parent.
    */
   explicit
-  InfHex16 (Elem* p=NULL) :
+  InfHex16 (Elem * p=libmesh_nullptr) :
     InfHex(InfHex16::n_nodes(), p, _nodelinks_data)
   {}
 
@@ -147,7 +147,7 @@ public:
 
   virtual void connectivity(const unsigned int sc,
                             const IOPackage iop,
-                            std::vector<dof_id_type>& conn) const libmesh_override;
+                            std::vector<dof_id_type> & conn) const libmesh_override;
 
   unsigned int vtk_element_type (const unsigned int) const
   { return 12; }
@@ -198,7 +198,7 @@ protected:
   /**
    * Data for links to nodes
    */
-  Node* _nodelinks_data[16];
+  Node * _nodelinks_data[16];
 
 
 #ifdef LIBMESH_ENABLE_AMR

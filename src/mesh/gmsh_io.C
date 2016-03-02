@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -28,6 +28,7 @@
 #include "libmesh/elem.h"
 #include "libmesh/gmsh_io.h"
 #include "libmesh/mesh_base.h"
+#include LIBMESH_INCLUDE_UNORDERED_MAP
 
 namespace libMesh
 {
@@ -100,7 +101,7 @@ GmshIO::ElementMaps GmshIO::build_element_maps()
 
 
 
-GmshIO::GmshIO (const MeshBase& mesh) :
+GmshIO::GmshIO (const MeshBase & mesh) :
   MeshOutput<MeshBase>(mesh),
   _binary(false),
   _write_lower_dimensional_elements(true)
@@ -109,7 +110,7 @@ GmshIO::GmshIO (const MeshBase& mesh) :
 
 
 
-GmshIO::GmshIO (MeshBase& mesh) :
+GmshIO::GmshIO (MeshBase & mesh) :
   MeshInput<MeshBase>  (mesh),
   MeshOutput<MeshBase> (mesh),
   _binary (false),
@@ -133,7 +134,7 @@ bool & GmshIO::write_lower_dimensional_elements ()
 
 
 
-void GmshIO::read (const std::string& name)
+void GmshIO::read (const std::string & name)
 {
   std::ifstream in (name.c_str());
   this->read_mesh (in);
@@ -141,7 +142,7 @@ void GmshIO::read (const std::string& name)
 
 
 
-void GmshIO::read_mesh(std::istream& in)
+void GmshIO::read_mesh(std::istream & in)
 {
   // This is a serial-only process for now;
   // the Mesh should be read on processor 0 and
@@ -151,7 +152,7 @@ void GmshIO::read_mesh(std::istream& in)
   libmesh_assert(in.good());
 
   // clear any data in the mesh
-  MeshBase& mesh = MeshInput<MeshBase>::mesh();
+  MeshBase & mesh = MeshInput<MeshBase>::mesh();
   mesh.clear();
 
   // some variables
@@ -363,7 +364,7 @@ void GmshIO::read_mesh(std::istream& in)
                     libmesh_error_msg("Element type " << type << " not found!");
 
                   // Get a reference to the ElementDefinition
-                  const GmshIO::ElementDefinition& eletype = eletypes_it->second;
+                  const GmshIO::ElementDefinition & eletype = eletypes_it->second;
 
                   // If we read nnodes, make sure it matches the number in eletype.nnodes
                   if (nnodes != 0 && nnodes != eletype.nnodes)
@@ -386,7 +387,7 @@ void GmshIO::read_mesh(std::istream& in)
 
                       // Add the element to the mesh
                       {
-                        Elem* elem = Elem::build(eletype.type).release();
+                        Elem * elem = Elem::build(eletype.type).release();
                         elem->set_id(iel);
                         elem = mesh.add_elem(elem);
 
@@ -512,7 +513,7 @@ void GmshIO::read_mesh(std::istream& in)
                   // by Elem::key().  Bob Jenkins' hash functions are
                   // very good, but it's not possible for them to be
                   // perfect... so we use a multimap.
-                  typedef std::multimap<dof_id_type, Elem*> provide_container_t;
+                  typedef LIBMESH_BEST_UNORDERED_MULTIMAP<dof_id_type, Elem *> provide_container_t;
                   provide_container_t provide_bcs;
 
                   // 1st loop over active elements - get info about lower-dimensional elements.
@@ -521,7 +522,7 @@ void GmshIO::read_mesh(std::istream& in)
                     const MeshBase::element_iterator end = mesh.active_elements_end();
                     for ( ; it != end; ++it)
                       {
-                        Elem* elem = *it;
+                        Elem * elem = *it;
 
                         if (elem->dim() < max_elem_dimension_seen &&
                             !lower_dimensional_blocks.count(elem->subdomain_id()))
@@ -551,7 +552,7 @@ void GmshIO::read_mesh(std::istream& in)
 
                     for ( ; it != end; ++it)
                       {
-                        Elem* elem = *it;
+                        Elem * elem = *it;
 
                         if (elem->dim() == max_elem_dimension_seen)
                           {
@@ -565,8 +566,6 @@ void GmshIO::read_mesh(std::istream& in)
                             // elem->neighbor(sn) in this algorithm...
                             for (unsigned short sn=0; sn<elem->n_sides(); sn++)
                               {
-                                UniquePtr<Elem> side (elem->build_side(sn));
-
                                 // Look for the current side in the provide_bcs multimap.
                                 std::pair<provide_container_t::iterator,
                                           provide_container_t::iterator>
@@ -575,7 +574,11 @@ void GmshIO::read_mesh(std::istream& in)
                                 for (provide_container_t::iterator iter = rng.first;
                                      iter != rng.second; ++iter)
                                   {
-                                    Elem* lower_dim_elem = iter->second;
+                                    // Construct the side for hash verification.
+                                    UniquePtr<Elem> side (elem->build_side(sn));
+
+                                    // Construct the lower-dimensional element to compare to the side.
+                                    Elem * lower_dim_elem = iter->second;
 
                                     // This was a hash, so it might not be perfect.  Let's verify...
                                     if (*lower_dim_elem == *side)
@@ -602,7 +605,7 @@ void GmshIO::read_mesh(std::istream& in)
                     const MeshBase::element_iterator end = mesh.active_elements_end();
                     for ( ; it != end; ++it)
                       {
-                        Elem* elem = *it;
+                        Elem * elem = *it;
 
                         if (elem->dim() < max_elem_dimension_seen &&
                             !lower_dimensional_blocks.count(elem->subdomain_id()))
@@ -629,7 +632,7 @@ void GmshIO::read_mesh(std::istream& in)
 
 
 
-void GmshIO::write (const std::string& name)
+void GmshIO::write (const std::string & name)
 {
   if (MeshOutput<MeshBase>::mesh().processor_id() == 0)
     {
@@ -646,9 +649,9 @@ void GmshIO::write (const std::string& name)
 
 
 
-void GmshIO::write_nodal_data (const std::string& fname,
-                               const std::vector<Number>& soln,
-                               const std::vector<std::string>& names)
+void GmshIO::write_nodal_data (const std::string & fname,
+                               const std::vector<Number> & soln,
+                               const std::vector<std::string> & names)
 {
   START_LOG("write_nodal_data()", "GmshIO");
 
@@ -661,13 +664,13 @@ void GmshIO::write_nodal_data (const std::string& fname,
 
 
 
-void GmshIO::write_mesh (std::ostream& out_stream)
+void GmshIO::write_mesh (std::ostream & out_stream)
 {
   // Be sure that the stream is valid.
   libmesh_assert (out_stream.good());
 
   // Get a const reference to the mesh
-  const MeshBase& mesh = MeshOutput<MeshBase>::mesh();
+  const MeshBase & mesh = MeshOutput<MeshBase>::mesh();
 
   // If requested, write out lower-dimensional elements for
   // element-side-based boundary conditions.
@@ -704,7 +707,7 @@ void GmshIO::write_mesh (std::ostream& out_stream)
     // loop over the elements
     for ( ; it != end; ++it)
       {
-        const Elem* elem = *it;
+        const Elem * elem = *it;
 
         // Make sure we have a valid entry for
         // the current element type.
@@ -719,7 +722,7 @@ void GmshIO::write_mesh (std::ostream& out_stream)
           libmesh_error_msg("Element type " << elem->type() << " not found in _element_maps.");
 
         // Get a reference to the ElementDefinition object
-        const ElementDefinition& eletype = def_it->second;
+        const ElementDefinition & eletype = def_it->second;
 
         // The element mapper better not require any more nodes
         // than are present in the current element!
@@ -794,7 +797,7 @@ void GmshIO::write_mesh (std::ostream& out_stream)
               libmesh_error_msg("Element type " << side->type() << " not found in _element_maps.");
 
             // consult the export element table
-            const GmshIO::ElementDefinition& eletype = def_it->second;
+            const GmshIO::ElementDefinition & eletype = def_it->second;
 
             // The element mapper better not require any more nodes
             // than are present in the current element!
@@ -840,9 +843,9 @@ void GmshIO::write_mesh (std::ostream& out_stream)
 
 
 
-void GmshIO::write_post (const std::string& fname,
-                         const std::vector<Number>* v,
-                         const std::vector<std::string>* solution_names)
+void GmshIO::write_post (const std::string & fname,
+                         const std::vector<Number> * v,
+                         const std::vector<std::string> * solution_names)
 {
 
   // Should only do this on processor 0!
@@ -859,10 +862,10 @@ void GmshIO::write_post (const std::string& fname,
   char buf[80];
 
   // Get a constant reference to the mesh.
-  const MeshBase& mesh = MeshOutput<MeshBase>::mesh();
+  const MeshBase & mesh = MeshOutput<MeshBase>::mesh();
 
   //  write the data
-  if ((solution_names != NULL) && (v != NULL))
+  if ((solution_names != libmesh_nullptr) && (v != libmesh_nullptr))
     {
       const unsigned int n_vars =
         cast_int<unsigned int>(solution_names->size());
@@ -1019,14 +1022,14 @@ void GmshIO::write_post (const std::string& fname,
 
           for ( ; it != end; ++it)
             {
-              const Elem* elem = *it;
+              const Elem * elem = *it;
 
               // this is quite crappy, but I did not invent that file format!
               for (unsigned int d=0; d<3; d++)  // loop over the dimensions
                 {
                   for (unsigned int n=0; n < elem->n_vertices(); n++)   // loop over vertices
                     {
-                      const Point& vertex = elem->point(n);
+                      const Point & vertex = elem->point(n);
                       if (this->binary())
                         {
                           double tmp = vertex(d);

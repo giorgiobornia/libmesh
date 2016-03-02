@@ -742,7 +742,7 @@ AC_DEFUN([LIBMESH_SET_CXX_FLAGS],
     # GCC 4.6.3 warns about variadic macros but supports them just
     # fine, so let's turn off that warning.
     case "$GXX_VERSION" in
-      gcc4.6)
+      gcc4.6 | gcc5)
         CXXFLAGS_OPT="$CXXFLAGS_OPT -Wno-variadic-macros"
         CXXFLAGS_DEVEL="$CXXFLAGS_DEVEL -Wno-variadic-macros"
         CXXFLAGS_DBG="$CXXFLAGS_DBG -Wno-variadic-macros"
@@ -1123,8 +1123,8 @@ AC_DEFUN([LIBMESH_SET_CXX_FLAGS],
 
       clang)
           CXXFLAGS_OPT="$CXXFLAGS_OPT -O2 -felide-constructors -Qunused-arguments"
-          CXXFLAGS_DEVEL="$CXXFLAGS_DEVEL -O2 -felide-constructors -g -pedantic -W -Wall -Wextra -Wno-long-long -Wunused -Wpointer-arith -Wformat -Wparentheses -Wuninitialized -Qunused-arguments"
-          CXXFLAGS_DBG="$CXXFLAGS_DBG -O0 -felide-constructors -g -pedantic -W -Wall -Wextra -Wno-long-long -Wunused -Wpointer-arith -Wformat -Wparentheses -Qunused-arguments"
+          CXXFLAGS_DEVEL="$CXXFLAGS_DEVEL -O2 -felide-constructors -g -pedantic -W -Wall -Wextra -Wno-long-long -Wunused -Wpointer-arith -Wformat -Wparentheses -Wuninitialized -Qunused-arguments -Woverloaded-virtual"
+          CXXFLAGS_DBG="$CXXFLAGS_DBG -O0 -felide-constructors -g -pedantic -W -Wall -Wextra -Wno-long-long -Wunused -Wpointer-arith -Wformat -Wparentheses -Qunused-arguments -Woverloaded-virtual"
           NODEPRECATEDFLAG="-Wno-deprecated"
 
           CFLAGS_OPT="-O2 -Qunused-arguments"

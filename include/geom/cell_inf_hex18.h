@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -69,7 +69,7 @@ namespace libMesh
  *   0              8              1
  * \endverbatim
  */
-class InfHex18 : public InfHex
+class InfHex18 libmesh_final : public InfHex
 {
 public:
 
@@ -77,7 +77,7 @@ public:
    * Constructor.  By default this element has no parent.
    */
   explicit
-  InfHex18 (Elem* p=NULL) :
+  InfHex18 (Elem * p=libmesh_nullptr) :
     InfHex(InfHex18::n_nodes(), p, _nodelinks_data)
   {}
 
@@ -146,8 +146,13 @@ public:
   virtual UniquePtr<Elem> build_edge (const unsigned int i) const libmesh_override;
 
   /**
+   * Don't hide Elem::key() defined in the base class.
+   */
+  using Elem::key;
+
+  /**
    * @returns an id associated with the \p s side of this element.
-   * The id is not necessariy unique, but should be close.  This is
+   * The id is not necessarily unique, but should be close.  This is
    * particularly useful in the \p MeshBase::find_neighbors() routine.
    *
    * We reimplemenet this method here for the \p InfHex18 since we can
@@ -158,7 +163,7 @@ public:
 
   virtual void connectivity(const unsigned int sc,
                             const IOPackage iop,
-                            std::vector<dof_id_type>& conn) const libmesh_override;
+                            std::vector<dof_id_type> & conn) const libmesh_override;
 
   unsigned int vtk_element_type (const unsigned int) const
   { return 12; }
@@ -206,7 +211,7 @@ protected:
   /**
    * Data for links to nodes
    */
-  Node* _nodelinks_data[18];
+  Node * _nodelinks_data[18];
 
 
 

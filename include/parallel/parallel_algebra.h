@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -55,9 +55,9 @@ class StandardType<TypeVector<T> > : public DataType
 {
 public:
   explicit
-  StandardType(const TypeVector<T> *example=NULL) {
+  StandardType(const TypeVector<T> * example=libmesh_nullptr) {
     // We need an example for MPI_Address to use
-    TypeVector<T> *ex;
+    TypeVector<T> * ex;
     UniquePtr<TypeVector<T> > temp;
     if (example)
       ex = const_cast<TypeVector<T> *>(example);
@@ -139,9 +139,9 @@ class StandardType<VectorValue<T> > : public DataType
 {
 public:
   explicit
-  StandardType(const VectorValue<T> *example=NULL) {
+  StandardType(const VectorValue<T> * example=libmesh_nullptr) {
     // We need an example for MPI_Address to use
-    VectorValue<T> *ex;
+    VectorValue<T> * ex;
     UniquePtr<VectorValue<T> > temp;
     if (example)
       ex = const_cast<VectorValue<T> *>(example);
@@ -224,7 +224,7 @@ class StandardType<Point> : public DataType
 {
 public:
   explicit
-  StandardType(const Point *example=NULL)
+  StandardType(const Point * example=libmesh_nullptr)
   {
     // Prevent unused variable warnings when !LIBMESH_HAVE_MPI
     libmesh_ignore(example);
@@ -238,7 +238,7 @@ public:
 #ifdef LIBMESH_HAVE_MPI
 
         // We need an example for MPI_Address to use
-        Point *ex;
+        Point * ex;
 
         UniquePtr<Point> temp;
         if (example)
@@ -318,8 +318,8 @@ class StandardType<TypeTensor<T> > : public DataType
 {
 public:
   explicit
-  StandardType(const TypeTensor<T> *example=NULL) :
-    DataType(StandardType<T>(example ?  &((*example)(0,0)) : NULL), LIBMESH_DIM*LIBMESH_DIM) {}
+  StandardType(const TypeTensor<T> * example=libmesh_nullptr) :
+    DataType(StandardType<T>(example ?  &((*example)(0,0)) : libmesh_nullptr), LIBMESH_DIM*LIBMESH_DIM) {}
 
   inline ~StandardType() { this->free(); }
 };
@@ -329,8 +329,8 @@ class StandardType<TensorValue<T> > : public DataType
 {
 public:
   explicit
-  StandardType(const TensorValue<T> *example=NULL) :
-    DataType(StandardType<T>(example ?  &((*example)(0,0)) : NULL), LIBMESH_DIM*LIBMESH_DIM) {}
+  StandardType(const TensorValue<T> * example=libmesh_nullptr) :
+    DataType(StandardType<T>(example ?  &((*example)(0,0)) : libmesh_nullptr), LIBMESH_DIM*LIBMESH_DIM) {}
 
   inline ~StandardType() { this->free(); }
 };

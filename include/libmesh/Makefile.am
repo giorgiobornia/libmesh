@@ -115,9 +115,9 @@ BUILT_SOURCES = \
         edge_inf_edge2.h \
         elem.h \
         elem_cutter.h \
+        elem_hash.h \
         elem_quality.h \
         elem_range.h \
-        elem_type.h \
         face.h \
         face_inf_quad.h \
         face_inf_quad4.h \
@@ -288,7 +288,6 @@ BUILT_SOURCES = \
         quadrature_grid.h \
         quadrature_jacobi.h \
         quadrature_monomial.h \
-        quadrature_rules.h \
         quadrature_simpson.h \
         quadrature_trap.h \
         rb_assembly_expansion.h \
@@ -391,6 +390,7 @@ BUILT_SOURCES = \
         error_vector.h \
         hashword.h \
         ignore_warnings.h \
+        libmesh_nullptr.h \
         location_maps.h \
         mapvector.h \
         null_output_iterator.h \
@@ -849,13 +849,13 @@ elem.h: $(top_srcdir)/include/geom/elem.h
 elem_cutter.h: $(top_srcdir)/include/geom/elem_cutter.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
+elem_hash.h: $(top_srcdir)/include/geom/elem_hash.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
 elem_quality.h: $(top_srcdir)/include/geom/elem_quality.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 elem_range.h: $(top_srcdir)/include/geom/elem_range.h
-	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
-
-elem_type.h: $(top_srcdir)/include/geom/elem_type.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 face.h: $(top_srcdir)/include/geom/face.h
@@ -1368,9 +1368,6 @@ quadrature_jacobi.h: $(top_srcdir)/include/quadrature/quadrature_jacobi.h
 quadrature_monomial.h: $(top_srcdir)/include/quadrature/quadrature_monomial.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
-quadrature_rules.h: $(top_srcdir)/include/quadrature/quadrature_rules.h
-	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
-
 quadrature_simpson.h: $(top_srcdir)/include/quadrature/quadrature_simpson.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
@@ -1675,6 +1672,9 @@ hashword.h: $(top_srcdir)/include/utils/hashword.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 ignore_warnings.h: $(top_srcdir)/include/utils/ignore_warnings.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+libmesh_nullptr.h: $(top_srcdir)/include/utils/libmesh_nullptr.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 location_maps.h: $(top_srcdir)/include/utils/location_maps.h

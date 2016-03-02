@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -34,6 +34,10 @@ namespace libMesh
 
 /**
  * The \p Prism18 is an element in 3D composed of 18 nodes.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2003
+ *
  * It is numbered like this:
  * \verbatim
  * PRISM18:
@@ -67,7 +71,7 @@ namespace libMesh
  *
  * \endverbatim
  */
-class Prism18 : public Prism
+class Prism18 libmesh_final : public Prism
 {
 public:
 
@@ -75,7 +79,7 @@ public:
    * Constructor.  By default this element has no parent.
    */
   explicit
-  Prism18 (Elem* p=NULL) :
+  Prism18 (Elem * p=libmesh_nullptr) :
     Prism(Prism18::n_nodes(), p, _nodelinks_data)
   {}
 
@@ -135,8 +139,13 @@ public:
   virtual Order default_order() const libmesh_override { return SECOND; }
 
   /**
+   * Don't hide Elem::key() defined in the base class.
+   */
+  using Elem::key;
+
+  /**
    * @returns an id associated with the \p s side of this element.
-   * The id is not necessariy unique, but should be close.  This is
+   * The id is not necessarily unique, but should be close.  This is
    * particularly useful in the \p MeshBase::find_neighbors() routine.
    *
    * We reimplemenet this method here for the \p Prism18 since we can
@@ -160,7 +169,7 @@ public:
 
   virtual void connectivity(const unsigned int sc,
                             const IOPackage iop,
-                            std::vector<dof_id_type>& conn) const libmesh_override;
+                            std::vector<dof_id_type> & conn) const libmesh_override;
 
   /**
    * @returns 2 for all edge nodes and 4 for face nodes
@@ -199,14 +208,17 @@ public:
    */
   static const unsigned int edge_nodes_map[9][3];
 
-
+  /**
+   * A specialization for computing the volume of a Prism18.
+   */
+  virtual Real volume () const libmesh_override;
 
 protected:
 
   /**
    * Data for links to nodes
    */
-  Node* _nodelinks_data[18];
+  Node * _nodelinks_data[18];
 
 
 

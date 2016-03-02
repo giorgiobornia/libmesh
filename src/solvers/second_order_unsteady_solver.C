@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,7 +22,7 @@
 
 namespace libMesh
 {
-SecondOrderUnsteadySolver::SecondOrderUnsteadySolver (sys_type& s)
+SecondOrderUnsteadySolver::SecondOrderUnsteadySolver (sys_type & s)
   : UnsteadySolver(s),
     _old_local_solution_rate(NumericVector<Number>::build(s.comm())),
     _old_local_solution_accel(NumericVector<Number>::build(s.comm()))
@@ -75,10 +75,10 @@ void SecondOrderUnsteadySolver::reinit ()
 #endif
 
   // localize the old solutions
-  NumericVector<Number> &old_solution_rate =
+  NumericVector<Number> & old_solution_rate =
     _system.get_vector("_old_solution_rate");
 
-  NumericVector<Number> &old_solution_accel =
+  NumericVector<Number> & old_solution_accel =
     _system.get_vector("_old_solution_accel");
 
   old_solution_rate.localize
@@ -95,9 +95,10 @@ void SecondOrderUnsteadySolver::retrieve_timestep()
   libmesh_not_implemented();
 }
 
-void SecondOrderUnsteadySolver::project_initial_rate( FunctionBase<Number> *f, FunctionBase<Gradient> *g )
+void SecondOrderUnsteadySolver::project_initial_rate(FunctionBase<Number> * f,
+                                                     FunctionBase<Gradient> * g)
 {
-  NumericVector<Number> &old_solution_rate =
+  NumericVector<Number> & old_solution_rate =
     _system.get_vector("_old_solution_rate");
 
   _system.project_vector( old_solution_rate, f, g );

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -45,13 +45,13 @@ public:
    * Constructor.  By default this element has no parent.
    */
   explicit
-  NodeElem (Elem* p=NULL) :
+  NodeElem (Elem * p=libmesh_nullptr) :
     Elem(NodeElem::n_nodes(), NodeElem::n_sides(), p, _elemlinks_data,
          _nodelinks_data)
   {
     // Make sure the interior parent isn't undefined
     if (LIBMESH_DIM > 0)
-      this->set_interior_parent(NULL);
+      this->set_interior_parent(libmesh_nullptr);
   }
 
   /**
@@ -98,6 +98,11 @@ public:
    * @returns 1
    */
   virtual unsigned int n_children() const libmesh_override { return 1; }
+
+  /**
+   * Don't hide Elem::key() defined in the base class.
+   */
+  using Elem::key;
 
   /**
    * @returns an id associated with the \p s side of this element.
@@ -180,7 +185,7 @@ public:
 
   virtual void connectivity(const unsigned int sc,
                             const IOPackage iop,
-                            std::vector<dof_id_type>& conn) const libmesh_override;
+                            std::vector<dof_id_type> & conn) const libmesh_override;
 
 
 #ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
@@ -198,12 +203,12 @@ protected:
   /**
    * Data for links to parent/neighbor/interior_parent elements.
    */
-  Elem* _elemlinks_data[1+(LIBMESH_DIM>0)];
+  Elem * _elemlinks_data[1+(LIBMESH_DIM>0)];
 
   /**
    * Data for links to nodes
    */
-  Node* _nodelinks_data[1];
+  Node * _nodelinks_data[1];
 
 
 #ifdef LIBMESH_ENABLE_AMR

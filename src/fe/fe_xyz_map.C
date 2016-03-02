@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -21,7 +21,7 @@
 namespace libMesh
 {
 
-void FEXYZMap::compute_face_map(int dim, const std::vector<Real>& qw, const Elem* side)
+void FEXYZMap::compute_face_map(int dim, const std::vector<Real> & qw, const Elem * side)
 {
   libmesh_assert(side);
 
@@ -60,7 +60,7 @@ void FEXYZMap::compute_face_map(int dim, const std::vector<Real>& qw, const Elem
         // compute x, dxdxi at the quadrature points
         for (unsigned int i=0; i<this->psi_map.size(); i++) // sum over the nodes
           {
-            const Point& side_point = side->point(i);
+            const Point & side_point = side->point(i);
 
             for (unsigned int p=0; p<n_qp; p++) // for each quadrature point...
               {
@@ -90,7 +90,7 @@ void FEXYZMap::compute_face_map(int dim, const std::vector<Real>& qw, const Elem
             // curvature.  Concave-downward curves (frowns) have a
             // negative curvature.  Be sure to take that into account!
             const Real numerator   = this->d2xyzdxi2_map[p] * this->normals[p];
-            const Real denominator = this->dxyzdxi_map[p].size_sq();
+            const Real denominator = this->dxyzdxi_map[p].norm_sq();
             libmesh_assert_not_equal_to (denominator, 0);
             this->curvatures[p] = numerator / denominator;
           }
@@ -141,7 +141,7 @@ void FEXYZMap::compute_face_map(int dim, const std::vector<Real>& qw, const Elem
         // compute x, dxdxi at the quadrature points
         for (unsigned int i=0; i<this->psi_map.size(); i++) // sum over the nodes
           {
-            const Point& side_point = side->point(i);
+            const Point & side_point = side->point(i);
 
             for (unsigned int p=0; p<n_qp; p++) // for each quadrature point...
               {
@@ -171,9 +171,9 @@ void FEXYZMap::compute_face_map(int dim, const std::vector<Real>& qw, const Elem
             const Real L  = -this->d2xyzdxi2_map[p]    * this->normals[p];
             const Real M  = -this->d2xyzdxideta_map[p] * this->normals[p];
             const Real N  = -this->d2xyzdeta2_map[p]   * this->normals[p];
-            const Real E  =  this->dxyzdxi_map[p].size_sq();
+            const Real E  =  this->dxyzdxi_map[p].norm_sq();
             const Real F  =  this->dxyzdxi_map[p]      * this->dxyzdeta_map[p];
-            const Real G  =  this->dxyzdeta_map[p].size_sq();
+            const Real G  =  this->dxyzdeta_map[p].norm_sq();
 
             const Real numerator   = E*N -2.*F*M + G*L;
             const Real denominator = E*G - F*F;

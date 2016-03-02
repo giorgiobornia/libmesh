@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -43,7 +43,7 @@ public:
    * to be solved.
    */
   explicit
-  SecondOrderUnsteadySolver (sys_type& s);
+  SecondOrderUnsteadySolver (sys_type & s);
 
   /**
    * Destructor.
@@ -84,7 +84,8 @@ public:
    * A gradient g is only required/used for projecting onto finite element spaces
    * with continuous derivatives.
    */
-  void project_initial_rate( FunctionBase<Number> *f, FunctionBase<Gradient> *g = NULL );
+  void project_initial_rate(FunctionBase<Number> * f,
+                            FunctionBase<Gradient> * g = libmesh_nullptr);
 
   /**
    * @returns the solution rate at the previous time step, \f$\dot{u}_n\f$,

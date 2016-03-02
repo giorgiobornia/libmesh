@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -30,11 +30,7 @@
 #include "libmesh/petsc_macro.h"
 
 // PETSc includes
-EXTERN_C_FOR_PETSC_BEGIN
 # include <petscsnes.h>
-EXTERN_C_FOR_PETSC_END
-
-// C++ includes
 
 namespace libMesh
 {
@@ -43,18 +39,18 @@ namespace libMesh
 extern "C"
 {
   PetscErrorCode __libmesh_petsc_snes_monitor (SNES, PetscInt its, PetscReal fnorm, void *);
-  PetscErrorCode __libmesh_petsc_snes_residual (SNES, Vec x, Vec r, void *ctx);
+  PetscErrorCode __libmesh_petsc_snes_residual (SNES, Vec x, Vec r, void * ctx);
 #if PETSC_RELEASE_LESS_THAN(3,5,0)
-  PetscErrorCode __libmesh_petsc_snes_jacobian (SNES, Vec x, Mat *jac, Mat *pc, MatStructure *msflag, void *ctx);
+  PetscErrorCode __libmesh_petsc_snes_jacobian (SNES, Vec x, Mat * jac, Mat * pc, MatStructure * msflag, void * ctx);
 #else
-  PetscErrorCode __libmesh_petsc_snes_jacobian (SNES, Vec x, Mat jac, Mat pc, void *ctx);
+  PetscErrorCode __libmesh_petsc_snes_jacobian (SNES, Vec x, Mat jac, Mat pc, void * ctx);
 #endif
 
   PetscErrorCode __libmesh_petsc_snes_postcheck(
 #if PETSC_VERSION_LESS_THAN(3,3,0)
-                                                SNES, Vec x, Vec y, Vec w, void *context, PetscBool *changed_y, PetscBool *changed_w
+                                                SNES, Vec x, Vec y, Vec w, void * context, PetscBool * changed_y, PetscBool * changed_w
 #else
-                                                SNESLineSearch, Vec x, Vec y, Vec w, PetscBool *changed_y, PetscBool *changed_w, void *context
+                                                SNESLineSearch, Vec x, Vec y, Vec w, PetscBool * changed_y, PetscBool * changed_w, void * context
 #endif
                                                 );
 }
@@ -80,7 +76,7 @@ public:
    *  Constructor. Initializes Petsc data structures
    */
   explicit
-  PetscNonlinearSolver (sys_type& system);
+  PetscNonlinearSolver (sys_type & system);
 
   /**
    * Destructor.
@@ -96,7 +92,7 @@ public:
    * Initialize data structures if not done so already.
    * May assign a name to the solver in some implementations
    */
-  virtual void init (const char* name = NULL) libmesh_override;
+  virtual void init (const char * name = libmesh_nullptr) libmesh_override;
 
   /**
    * Returns the raw PETSc snes context pointer.
@@ -108,9 +104,9 @@ public:
    * same matrix for the system and preconditioner matrices.
    */
   virtual std::pair<unsigned int, Real>
-  solve (SparseMatrix<T>&,                     // System Jacobian Matrix
-         NumericVector<T>&,                    // Solution vector
-         NumericVector<T>&,                    // Residual vector
+  solve (SparseMatrix<T> &,                     // System Jacobian Matrix
+         NumericVector<T> &,                    // Solution vector
+         NumericVector<T> &,                    // Residual vector
          const double,                         // Stopping tolerance
          const unsigned int) libmesh_override; // N. Iterations
 
@@ -196,16 +192,16 @@ protected:
   bool _default_monitor;
 
 #if !PETSC_VERSION_LESS_THAN(3,3,0)
-  void build_mat_null_space(NonlinearImplicitSystem::ComputeVectorSubspace* computeSubspaceObject,
-                            void (*)(std::vector<NumericVector<Number>*>&, sys_type&),
-                            MatNullSpace*);
+  void build_mat_null_space(NonlinearImplicitSystem::ComputeVectorSubspace * computeSubspaceObject,
+                            void (*)(std::vector<NumericVector<Number> *> &, sys_type &),
+                            MatNullSpace *);
 #endif
 private:
-  friend PetscErrorCode __libmesh_petsc_snes_residual (SNES snes, Vec x, Vec r, void *ctx);
+  friend PetscErrorCode __libmesh_petsc_snes_residual (SNES snes, Vec x, Vec r, void * ctx);
 #if PETSC_RELEASE_LESS_THAN(3,5,0)
-  friend PetscErrorCode __libmesh_petsc_snes_jacobian (SNES snes, Vec x, Mat *jac, Mat *pc, MatStructure *msflag, void *ctx);
+  friend PetscErrorCode __libmesh_petsc_snes_jacobian (SNES snes, Vec x, Mat * jac, Mat * pc, MatStructure * msflag, void * ctx);
 #else
-  friend PetscErrorCode __libmesh_petsc_snes_jacobian (SNES snes, Vec x, Mat jac, Mat pc, void *ctx);
+  friend PetscErrorCode __libmesh_petsc_snes_jacobian (SNES snes, Vec x, Mat jac, Mat pc, void * ctx);
 #endif
 };
 

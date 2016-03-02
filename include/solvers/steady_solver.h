@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -62,7 +62,7 @@ public:
    * to be solved.
    */
   explicit
-  SteadySolver (sys_type& s) : Parent(s) {}
+  SteadySolver (sys_type & s) : Parent(s) {}
 
   /**
    * Destructor.
@@ -104,7 +104,7 @@ public:
    * successive solution iterates ||u^{n+1} - u^{n}|| in some norm,
    * but for this class just returns 0.
    */
-  virtual Real du(const SystemNorm&) const libmesh_override { return 0; }
+  virtual Real du(const SystemNorm &) const libmesh_override { return 0; }
 
   /**
    * This is a steady-state solver.
@@ -118,7 +118,7 @@ protected:
    * residual methods.
    */
   virtual bool _general_residual (bool request_jacobian,
-                                  DiffContext&,
+                                  DiffContext &,
                                   ResFuncType time_deriv,
                                   ResFuncType constraint);
 };

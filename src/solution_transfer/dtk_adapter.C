@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -151,10 +151,15 @@ DTKAdapter::DTKAdapter(Teuchos::RCP<const Teuchos::Comm<int> > in_comm, Equation
     }
 
   */
-  Teuchos::RCP<MeshContainerType> mesh_container = Teuchos::rcp(
-                                                                new MeshContainerType(dim, vertices, coordinates,
-                                                                                      element_topology, n_nodes_per_elem,
-                                                                                      elements, connectivity, permutation_list) );
+  Teuchos::RCP<MeshContainerType>
+    mesh_container = Teuchos::rcp(new MeshContainerType(dim,
+                                                        vertices,
+                                                        coordinates,
+                                                        element_topology,
+                                                        n_nodes_per_elem,
+                                                        elements,
+                                                        connectivity,
+                                                        permutation_list));
 
   // We only have 1 element topology in this grid so we make just one mesh block
   Teuchos::ArrayRCP<Teuchos::RCP<MeshContainerType> > mesh_blocks(1);
@@ -231,7 +236,7 @@ DTKAdapter::update_variable_values(std::string var_name)
 System *
 DTKAdapter::find_sys(std::string var_name)
 {
-  System * sys = NULL;
+  System * sys = libmesh_nullptr;
 
   // Find the system this variable is from
   for(unsigned int i=0; i<es.n_systems(); i++)

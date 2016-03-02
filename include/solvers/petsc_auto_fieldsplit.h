@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -26,28 +26,19 @@
 
 #include "libmesh/petsc_macro.h"
 
-/**
- * Petsc include files.
- */
+// Petsc include files.
 
 // PCFieldSplitSetIs seems to have appeared late in the PETSc 3.1
 // releases; we'll support it in 3.2 onward so we don't have to worry
 // about compilation errors
-
-EXTERN_C_FOR_PETSC_BEGIN
-#  include <petscksp.h>
-EXTERN_C_FOR_PETSC_END
-
-// Local includes
-
-// C++ includes
+#include <petscksp.h>
 
 namespace libMesh
 {
 // Forward declarations
 class System;
 
-void petsc_auto_fieldsplit (PC my_pc, const System &sys);
+void petsc_auto_fieldsplit (PC my_pc, const System & sys);
 
 } // namespace libMesh
 

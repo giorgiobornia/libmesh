@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -59,7 +59,7 @@ public:
    * Constructor.  By default this element has no parent.
    */
   explicit
-  InfQuad6 (Elem* p=NULL):
+  InfQuad6 (Elem * p=libmesh_nullptr):
     InfQuad(InfQuad6::n_nodes(), p, _nodelinks_data) {}
 
   /**
@@ -113,6 +113,21 @@ public:
   virtual Order default_order() const libmesh_override { return SECOND; }
 
   /**
+   * Don't hide Elem::key() defined in the base class.
+   */
+  using Elem::key;
+
+  /**
+   * @returns an id associated with the \p s side of this element.
+   * The id is not necessarily unique, but should be close.  This is
+   * particularly useful in the \p MeshBase::find_neighbors() routine.
+   *
+   * We override this function to return a key for the Edge3 side
+   * which is consistent which Edge3::key().
+   */
+  virtual dof_id_type key (const unsigned int s) const libmesh_override;
+
+  /**
    * Creates and returns an \p Edge3 for the base (0) side, and an \p InfEdge2 for
    * the sides 1, 2.
    */
@@ -121,7 +136,7 @@ public:
 
   virtual void connectivity(const unsigned int sf,
                             const IOPackage iop,
-                            std::vector<dof_id_type>& conn) const libmesh_override;
+                            std::vector<dof_id_type> & conn) const libmesh_override;
 
   /**
    * @returns 2 for all \p n
@@ -162,7 +177,7 @@ protected:
   /**
    * Data for links to nodes
    */
-  Node* _nodelinks_data[6];
+  Node * _nodelinks_data[6];
 
 
 

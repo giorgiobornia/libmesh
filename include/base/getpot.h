@@ -68,8 +68,10 @@ extern "C" {
 #if !defined(GETPOT_DISABLE_MUTEX)
 #include "libmesh/threads.h"
 #define SCOPED_MUTEX  libMesh::Threads::spin_mutex::scoped_lock lock(_getpot_mtx)
+#define GETPOT_MUTEX_DECLARE mutable libMesh::Threads::spin_mutex _getpot_mtx
 #else
 #define SCOPED_MUTEX
+#define GETPOT_MUTEX_DECLARE
 #endif
 
 #define getpot_cerr libMesh::err
@@ -77,17 +79,31 @@ extern "C" {
 #define getpot_file_error(filename) libmesh_file_error(filename)
 #define getpot_cast_int libMesh::cast_int
 
-#else // USE_LIBMESH
+// If libmesh detected the inverse hyperbolic trig functions, set
+// special #defines for getpot.h
+#ifdef LIBMESH_HAVE_CXX11_INVERSE_HYPERBOLIC_SINE
+#define HAVE_INVERSE_HYPERBOLIC_SINE
+#endif
+
+#ifdef LIBMESH_HAVE_CXX11_INVERSE_HYPERBOLIC_COSINE
+#define HAVE_INVERSE_HYPERBOLIC_COSINE
+#endif
+
+#ifdef LIBMESH_HAVE_CXX11_INVERSE_HYPERBOLIC_TANGENT
+#define HAVE_INVERSE_HYPERBOLIC_TANGENT
+#endif
+
+#else // !USE_LIBMESH
 
 // Currently threaded GetPot use is only supported via libMesh Threads
+#define GETPOT_DISABLE_MUTEX
 #define SCOPED_MUTEX
+#define GETPOT_MUTEX_DECLARE
 
 #define getpot_cerr std::cerr
 #define getpot_error() throw std::runtime_error(std::string("GetPot Error"))
 #define getpot_file_error(filename) getpot_error()
 #define getpot_cast_int static_cast
-
-#endif
 
 // Clang provides the __has_builtin macro, we define it for compilers
 // that don't...
@@ -109,6 +125,9 @@ extern "C" {
 #if __cplusplus > 199711L && (!defined(__clang__) || __has_builtin(atanh))
 #define HAVE_INVERSE_HYPERBOLIC_TANGENT
 #endif
+
+#endif // #ifdef USE_LIBMESH
+
 
 typedef  std::vector<std::string>  STRING_VECTOR;
 
@@ -150,6 +169,15 @@ public:
                 const std::string& CommentStart   = std::string("#"),
                 const std::string& CommentEnd     = std::string("\n"),
                 const std::string& FieldSeparator = std::string(" \t\n"));
+
+  /**
+   * This constructor is mainly for testing. The std::string based constructor
+   * should be preferred.
+   */
+  inline GetPot(std::istream& FileStream,
+                const std::string& CommentStart   = std::string("#"),
+                const std::string& CommentEnd     = std::string("\n"),
+                const std::string& FieldSeparator = std::string(" \t\n"));
   inline ~GetPot();
   inline GetPot& operator=(const GetPot&);
 
@@ -162,6 +190,12 @@ public:
                                const std::string& CommentStart=std::string("#"),
                                const std::string& CommentEnd=std::string("\n"),
                                const std::string& FieldSeparator=std::string(" \t\n"));
+
+  inline void parse_input_stream(std::istream& FileStream,
+                                 const std::string& FileName=std::string("ParsedFromStream"),
+                                 const std::string& CommentStart=std::string("#"),
+                                 const std::string& CommentEnd=std::string("\n"),
+                                 const std::string& FieldSeparator=std::string(" \t\n"));
 
   /**
    * absorbing contents of another GetPot object
@@ -499,9 +533,7 @@ private:
    * multiple threads at once, so we'll wrap access to
    * mutable objects in a mutex.
    */
-#if !defined(GETPOT_DISABLE_MUTEX)
-  mutable libMesh::Threads::spin_mutex _getpot_mtx;
-#endif
+  GETPOT_MUTEX_DECLARE;
 
   /**
    * some functions return a char pointer to a string created on the fly.
@@ -622,7 +654,6 @@ private:
   inline const std::string _get_until_closing_square_bracket(std::istream& istr);
 
   inline STRING_VECTOR _read_in_stream(std::istream& istr);
-  inline STRING_VECTOR _read_in_file(const std::string& FileName);
   inline std::string _process_section_label(const std::string& Section,
                                             STRING_VECTOR& section_stack);
 
@@ -841,13 +872,60 @@ GetPot::GetPot(const std::string& FileName,
   this->parse_input_file(FileName, CommentStart, CommentEnd, FieldSeparator);
 }
 
-
-
 inline void
 GetPot::parse_input_file(const std::string& FileName,
                          const std::string& CommentStart,
                          const std::string& CommentEnd,
                          const std::string& FieldSeparator)
+{
+  std::ifstream input(FileName.c_str());
+
+  if (!input)
+    getpot_file_error(FileName);
+
+  this->parse_input_stream(input,FileName,CommentStart,CommentEnd,FieldSeparator);
+}
+
+
+inline
+GetPot::GetPot(std::istream& FileStream,
+               const std::string& CommentStart,
+               const std::string& CommentEnd,
+               const std::string& FieldSeparator) :
+  prefix(),
+  section(),
+  section_list(),
+  argv(),
+  cursor(),
+  search_loop_f(),
+  search_failed_f(),
+  nominus_cursor(),
+  idx_nominus(),
+  variables(),
+  _comment_start(),
+  _comment_end(),
+  _field_separator(),
+#if !defined(GETPOT_DISABLE_MUTEX)
+  _getpot_mtx(),
+#endif
+  _internal_string_container(),
+  _requested_arguments(),
+  _requested_variables(),
+  _requested_sections(),
+  request_recording_f()
+{
+  this->parse_input_stream(FileStream,
+                           std::string("ParsedFromStream"),// We don't have a filename here
+                           CommentStart, CommentEnd, FieldSeparator);
+}
+
+
+inline void
+GetPot::parse_input_stream(std::istream& FileStream,
+                           const std::string& FileName,
+                           const std::string& CommentStart,
+                           const std::string& CommentEnd,
+                           const std::string& FieldSeparator)
 {
   _basic_initialization();
 
@@ -862,10 +940,11 @@ GetPot::parse_input_file(const std::string& FileName,
   //    parsed for variable assignments or nominuses.
   //
   //    Regardless, we don't add more than one name to the argument
-  //    vector.
+  //    vector. In this case, we're parsing from a stream, so we'll
+  //    hardcode the "filename" to "ParsedFromStream"
   _apriori_argv.push_back(FileName);
 
-  STRING_VECTOR args = _read_in_file(FileName);
+  STRING_VECTOR args = _read_in_stream(FileStream);
   _apriori_argv.insert(_apriori_argv.begin()+1, args.begin(), args.end());
   _parse_argument_vector(_apriori_argv);
 }
@@ -1124,22 +1203,6 @@ GetPot::_parse_argument_vector(const STRING_VECTOR& ARGV)
                         arg.substr(equals_pos+1), false);
         }
     }
-}
-
-
-
-inline STRING_VECTOR
-GetPot::_read_in_file(const std::string& FileName)
-{
-  std::ifstream  i(FileName.c_str());
-
-  // if (!i) return STRING_VECTOR();
-
-  if (!i)
-    libmesh_file_error(FileName);
-
-  // argv[0] == the filename of the file that was read in
-  return _read_in_stream(i);
 }
 
 
@@ -1514,7 +1577,7 @@ GetPot::_convert_to_type(const std::string& String, const char*) const
 // be more liberal than std C++ in what we interpret as a boolean
 template<>
 inline bool
-GetPot::_convert_to_type<bool>(const std::string& String, const bool& Default) const
+GetPot::_convert_to_type<bool>(const std::string& String, const bool & Default) const
 {
   std::string newstring(String);
   //std::transform(newstring.begin(), newstring.end(), newstring.begin(), std::toupper);
@@ -1583,7 +1646,7 @@ GetPot::_convert_to_type_no_default(const char*, const std::string& String, cons
 // be more liberal than std C++ in what we interpret as a boolean
 template<>
 inline bool
-GetPot::_convert_to_type_no_default<bool>(const char* VarName, const std::string& String, const bool&) const
+GetPot::_convert_to_type_no_default<bool>(const char* VarName, const std::string& String, const bool &) const
 {
   std::string newstring(String);
   //std::transform(newstring.begin(), newstring.end(), newstring.begin(), std::toupper);

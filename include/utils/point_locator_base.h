@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -60,8 +60,8 @@ protected:
    * cannot be explicitly instantiated.  Takes a master
    * PointLocator that helps in saving memory.
    */
-  PointLocatorBase (const MeshBase& mesh,
-                    const PointLocatorBase* master);
+  PointLocatorBase (const MeshBase & mesh,
+                    const PointLocatorBase * master);
 
 public:
   /**
@@ -76,8 +76,8 @@ public:
    * This way the user need not remember to delete the object.
    */
   static UniquePtr<PointLocatorBase> build (PointLocatorType t,
-                                            const MeshBase& mesh,
-                                            const PointLocatorBase* master = NULL);
+                                            const MeshBase & mesh,
+                                            const PointLocatorBase * master = libmesh_nullptr);
 
   /**
    * Clears the \p PointLocator.
@@ -95,7 +95,8 @@ public:
    * \p p is located.  Pure virtual. Optionally allows the user to restrict
    * the subdomains searched.
    */
-  virtual const Elem* operator() (const Point& p, const std::set<subdomain_id_type> *allowed_subdomains = NULL) const = 0;
+  virtual const Elem * operator() (const Point & p,
+                                   const std::set<subdomain_id_type> * allowed_subdomains = libmesh_nullptr) const = 0;
 
   /**
    * @returns \p true when this object is properly initialized
@@ -141,12 +142,12 @@ protected:
    * given.  When using multiple PointLocators, one can be assigned
    * master and be in charge of something that all can have access to.
    */
-  const PointLocatorBase* _master;
+  const PointLocatorBase * _master;
 
   /**
    * constant reference to the mesh in which the point is looked for.
    */
-  const MeshBase& _mesh;
+  const MeshBase & _mesh;
 
   /**
    * \p true when properly initialized, \p false otherwise.

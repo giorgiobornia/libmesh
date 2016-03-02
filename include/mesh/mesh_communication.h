@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -118,7 +118,7 @@ public:
    * will be serialized on each processor.  Since this method is
    * collective it must be called by all processors.
    */
-  void allgather (ParallelMesh &mesh) const
+  void allgather (ParallelMesh & mesh) const
   { MeshCommunication::gather(DofObject::invalid_processor_id, mesh); }
 
   /**
@@ -160,7 +160,7 @@ public:
    * index for each object in the input range.
    */
   template <typename ForwardIterator>
-  void find_global_indices (const Parallel::Communicator &communicator,
+  void find_global_indices (const Parallel::Communicator & communicator,
                             const MeshTools::BoundingBox &,
                             const ForwardIterator &,
                             const ForwardIterator &,
@@ -177,6 +177,13 @@ public:
    * all other ids parallel consistent.
    */
   void make_node_ids_parallel_consistent (MeshBase &);
+
+ /**
+   * Assuming all unique_ids on local nodes are globally unique, and
+   * assuming all processor ids are parallel consistent, this function makes
+   * all ghost unique_ids parallel consistent.
+   */
+  void make_node_unique_ids_parallel_consistent (MeshBase &);
 
   /**
    * Assuming all processor ids on nodes touching local elements

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -40,7 +40,7 @@ namespace libMesh
 double __libmesh_nlopt_objective(unsigned n,
                                  const double * x,
                                  double * gradient,
-                                 void *data);
+                                 void * data);
 
 // NLopt callback to set equality constraints.
 void __libmesh_nlopt_equality_constraints(unsigned m,
@@ -48,7 +48,7 @@ void __libmesh_nlopt_equality_constraints(unsigned m,
                                           unsigned n,
                                           const double * x,
                                           double * gradient,
-                                          void* data);
+                                          void * data);
 
 // NLopt callback to set inequality constraints.
 void __libmesh_nlopt_inequality_constraints(unsigned m,
@@ -56,7 +56,7 @@ void __libmesh_nlopt_inequality_constraints(unsigned m,
                                             unsigned n,
                                             const double * x,
                                             double * gradient,
-                                            void* data);
+                                            void * data);
 
 /**
  * This class provides an interface to the NLopt optimization solvers.
@@ -80,7 +80,7 @@ public:
    * Constructor.
    */
   explicit
-  NloptOptimizationSolver (sys_type& system);
+  NloptOptimizationSolver (sys_type & system);
 
   /**
    * Destructor.
@@ -154,7 +154,7 @@ private:
   friend double __libmesh_nlopt_objective (unsigned n,
                                            const double * x,
                                            double * gradient,
-                                           void *data);
+                                           void * data);
 
   friend void __libmesh_nlopt_equality_constraints(unsigned m,
                                                    double * result,

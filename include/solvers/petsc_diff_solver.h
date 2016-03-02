@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -29,11 +29,7 @@
 #include "libmesh/petsc_macro.h"
 
 // PETSc includes
-EXTERN_C_FOR_PETSC_BEGIN
 # include <petscsnes.h>
-EXTERN_C_FOR_PETSC_END
-
-// C++ includes
 
 namespace libMesh
 {
@@ -57,7 +53,7 @@ public:
    * to be solved.
    */
   explicit
-  PetscDiffSolver (sys_type& system);
+  PetscDiffSolver (sys_type & system);
 
   /**
    * Destructor.

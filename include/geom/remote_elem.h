@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -55,7 +55,11 @@ public:
    * Constructor. Private to force use of the \p create() member.
    */
 private:
-  RemoteElem () : Elem(0,0,NULL,_elemlinks_data,NULL)
+  RemoteElem () : Elem(0,
+                       0,
+                       libmesh_nullptr,
+                       _elemlinks_data,
+                       libmesh_nullptr)
   { this->set_id(remote_elem_id); }
 
 public:
@@ -73,8 +77,13 @@ public:
   virtual Point master_point (const unsigned int /*i*/) const libmesh_override
   { libmesh_not_implemented(); return Point(); }
 
-  virtual Node* & set_node (const unsigned int i) libmesh_override
+  virtual Node * & set_node (const unsigned int i) libmesh_override
   { libmesh_not_implemented(); return Elem::set_node(i); }
+
+  /**
+   * Don't hide Elem::key() defined in the base class.
+   */
+  using Elem::key;
 
   virtual dof_id_type key (const unsigned int) const libmesh_override
   { libmesh_not_implemented(); return 0; }
@@ -84,7 +93,7 @@ public:
 
   virtual void connectivity(const unsigned int,
                             const IOPackage,
-                            std::vector<dof_id_type>&) const libmesh_override
+                            std::vector<dof_id_type> &) const libmesh_override
   { libmesh_not_implemented(); }
 
   virtual ElemType type () const libmesh_override
@@ -180,11 +189,11 @@ protected:
   /**
    * Data for link to (NULL!) parent
    */
-  Elem* _elemlinks_data[1];
+  Elem * _elemlinks_data[1];
 };
 
 // Singleton RemoteElem
-extern const RemoteElem* remote_elem;
+extern const RemoteElem * remote_elem;
 
 } // namespace libMesh
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -212,93 +212,11 @@ UniquePtr<Elem> Hex27::build_side (const unsigned int i,
 
   else
     {
-      Elem* face = new Quad9;
+      Elem * face = new Quad9;
       face->subdomain_id() = this->subdomain_id();
 
-      // Think of a unit cube: (-1,1) x (-1,1) x (1,1)
-      switch (i)
-        {
-        case 0:  // the face at z=0
-          {
-            face->set_node(0) = this->get_node(0);
-            face->set_node(1) = this->get_node(3);
-            face->set_node(2) = this->get_node(2);
-            face->set_node(3) = this->get_node(1);
-            face->set_node(4) = this->get_node(11);
-            face->set_node(5) = this->get_node(10);
-            face->set_node(6) = this->get_node(9);
-            face->set_node(7) = this->get_node(8);
-            face->set_node(8) = this->get_node(20);
-            break;
-          }
-        case 1:  // the face at y = 0
-          {
-            face->set_node(0) = this->get_node(0);
-            face->set_node(1) = this->get_node(1);
-            face->set_node(2) = this->get_node(5);
-            face->set_node(3) = this->get_node(4);
-            face->set_node(4) = this->get_node(8);
-            face->set_node(5) = this->get_node(13);
-            face->set_node(6) = this->get_node(16);
-            face->set_node(7) = this->get_node(12);
-            face->set_node(8) = this->get_node(21);
-            break;
-          }
-        case 2:  // the face at x=1
-          {
-            face->set_node(0) = this->get_node(1);
-            face->set_node(1) = this->get_node(2);
-            face->set_node(2) = this->get_node(6);
-            face->set_node(3) = this->get_node(5);
-            face->set_node(4) = this->get_node(9);
-            face->set_node(5) = this->get_node(14);
-            face->set_node(6) = this->get_node(17);
-            face->set_node(7) = this->get_node(13);
-            face->set_node(8) = this->get_node(22);
-            break;
-          }
-        case 3: // the face at y=1
-          {
-            face->set_node(0) = this->get_node(2);
-            face->set_node(1) = this->get_node(3);
-            face->set_node(2) = this->get_node(7);
-            face->set_node(3) = this->get_node(6);
-            face->set_node(4) = this->get_node(10);
-            face->set_node(5) = this->get_node(15);
-            face->set_node(6) = this->get_node(18);
-            face->set_node(7) = this->get_node(14);
-            face->set_node(8) = this->get_node(23);
-            break;
-          }
-        case 4: // the face at x=0
-          {
-            face->set_node(0) = this->get_node(3);
-            face->set_node(1) = this->get_node(0);
-            face->set_node(2) = this->get_node(4);
-            face->set_node(3) = this->get_node(7);
-            face->set_node(4) = this->get_node(11);
-            face->set_node(5) = this->get_node(12);
-            face->set_node(6) = this->get_node(19);
-            face->set_node(7) = this->get_node(15);
-            face->set_node(8) = this->get_node(24);
-            break;
-          }
-        case 5: // the face at z=1
-          {
-            face->set_node(0) = this->get_node(4);
-            face->set_node(1) = this->get_node(5);
-            face->set_node(2) = this->get_node(6);
-            face->set_node(3) = this->get_node(7);
-            face->set_node(4) = this->get_node(16);
-            face->set_node(5) = this->get_node(17);
-            face->set_node(6) = this->get_node(18);
-            face->set_node(7) = this->get_node(19);
-            face->set_node(8) = this->get_node(25);
-            break;
-          }
-        default:
-          libmesh_error_msg("Invalid side i = " << i);
-        }
+      for (unsigned n=0; n<face->n_nodes(); ++n)
+        face->set_node(n) = this->get_node(Hex27::side_nodes_map[i][n]);
 
       return UniquePtr<Elem>(face);
     }
@@ -320,7 +238,7 @@ UniquePtr<Elem> Hex27::build_edge (const unsigned int i) const
 
 void Hex27::connectivity(const unsigned int sc,
                          const IOPackage iop,
-                         std::vector<dof_id_type>& conn) const
+                         std::vector<dof_id_type> & conn) const
 {
   libmesh_assert(_nodes);
   libmesh_assert_less (sc, this->n_sub_elem());
@@ -716,6 +634,230 @@ Hex27::second_order_child_vertex (const unsigned int n) const
   return std::pair<unsigned short int, unsigned short int>
     (_second_order_vertex_child_number[n],
      _second_order_vertex_child_index[n]);
+}
+
+
+
+Real Hex27::volume () const
+{
+  // Make copies of our points.  It makes the subsequent calculations a bit
+  // shorter and avoids dereferencing the same pointer multiple times.
+  Point
+    x0 = point(0),   x1 = point(1),   x2 = point(2),   x3 = point(3),   x4 = point(4),   x5 = point(5),   x6 = point(6),   x7 = point(7),   x8 = point(8),
+    x9 = point(9),   x10 = point(10), x11 = point(11), x12 = point(12), x13 = point(13), x14 = point(14), x15 = point(15), x16 = point(16), x17 = point(17),
+    x18 = point(18), x19 = point(19), x20 = point(20), x21 = point(21), x22 = point(22), x23 = point(23), x24 = point(24), x25 = point(25), x26 = point(26);
+
+  // The constant components of the dx/dxi vector,
+  // dx/dxi = \vec{a000} + \vec{a001}*zeta + \vec{a002}*zeta^2 + ...
+  // All of the xi^2 terms are zero.
+  // These were copied directly from the output of a Python script.
+  Point dx_dxi[3][3][3] =
+    {
+      {
+        {
+          x22/2 - x24/2, // 0, 0, 0
+          x11/4 + x17/4 - x19/4 - x9/4, // 0, 0, 1
+          -x11/4 + x17/4 - x19/4 - x22/2 + x24/2 + x9/4 // 0, 0, 2
+        },
+
+        {
+          x12/4 - x13/4 + x14/4 - x15/4, // 0, 1, 0
+          -x0/8 + x1/8 - x2/8 + x3/8 + x4/8 - x5/8 + x6/8 - x7/8, // 0, 1, 1
+          x0/8 - x1/8 - x12/4 + x13/4 - x14/4 + x15/4 + x2/8 - x3/8 + x4/8 - x5/8 + x6/8 - x7/8 // 0, 1, 2
+        },
+
+        {
+          -x12/4 + x13/4 + x14/4 - x15/4 - x22/2 + x24/2, // 0, 2, 0
+          x0/8 - x1/8 - x11/4 - x17/4 + x19/4 - x2/8 + x3/8 - x4/8 + x5/8 + x6/8 - x7/8 + x9/4, // 0, 2, 1
+          -x0/8 + x1/8 + x11/4 + x12/4 - x13/4 - x14/4 + x15/4 - x17/4 + x19/4 + x2/8 + x22/2 - x24/2 - x3/8 - x4/8 + x5/8 + x6/8 - x7/8 - x9/4 // 0, 2, 2
+        }
+      },
+      {
+        {
+          x22 + x24 - 2*x26, // 1, 0, 0
+          -x11/2 + x17/2 + x19/2 + x20 - x25 - x9/2, // 1, 0, 1
+          x11/2 + x17/2 + x19/2 - x20 - x22 - x24 - x25 + 2*x26 + x9/2 // 1, 0, 2
+        },
+
+        {
+          -x12/2 - x13/2 + x14/2 + x15/2 + x21 - x23, // 1, 1, 0
+          x0/4 + x1/4 + x10/2 + x16/2 - x18/2 - x2/4 - x3/4 - x4/4 - x5/4 + x6/4 + x7/4 - x8/2, // 1, 1, 1
+          -x0/4 - x1/4 - x10/2 + x12/2 + x13/2 - x14/2 - x15/2 + x16/2 - x18/2 + x2/4 - x21 + x23 + x3/4 - x4/4 - x5/4 + x6/4 + x7/4 + x8/2 // 1, 1, 2
+        },
+
+        {
+          x12/2 + x13/2 + x14/2 + x15/2 - x21 - x22 - x23 - x24 + 2*x26, // 1, 2, 0
+          -x0/4 - x1/4 + x10/2 + x11/2 - x16/2 - x17/2 - x18/2 - x19/2 - x2/4 - x20 + x25 - x3/4 + x4/4 + x5/4 + x6/4 + x7/4 + x8/2 + x9/2, // 1, 2, 1
+          x0/4 + x1/4 - x10/2 - x11/2 - x12/2 - x13/2 - x14/2 - x15/2 - x16/2 - x17/2 - x18/2 - x19/2 + x2/4 + x20 + x21 + x22 + x23 + x24 + x25 - 2*x26 + x3/4 + x4/4 + x5/4 + x6/4 + x7/4 - x8/2 - x9/2 // 1, 2, 2
+        }
+      },
+      {
+        {Point(0,0,0), Point(0,0,0), Point(0,0,0)},
+        {Point(0,0,0), Point(0,0,0), Point(0,0,0)},
+        {Point(0,0,0), Point(0,0,0), Point(0,0,0)}
+      }
+    };
+
+
+
+  // The constant components of the dx/deta vector, all of the eta^2
+  // terms are zero. These were copied directly from the output of a
+  // Python script.
+  Point dx_deta[3][3][3] =
+    {
+      {
+        {
+          -x21/2 + x23/2, // 0, 0, 0
+          -x10/4 - x16/4 + x18/4 + x8/4, // 0, 0, 1
+          x10/4 - x16/4 + x18/4 + x21/2 - x23/2 - x8/4 // 0, 0, 2
+        },
+        {
+          x21 + x23 - 2*x26, // 0, 1, 0
+          -x10/2 + x16/2 + x18/2 + x20 - x25 - x8/2, // 0, 1, 1
+          x10/2 + x16/2 + x18/2 - x20 - x21 - x23 - x25 + 2*x26 + x8/2 // 0, 1, 2
+        },
+        {
+          Point(0,0,0), // 0, 2, 0
+          Point(0,0,0), // 0, 2, 1
+          Point(0,0,0)  // 0, 2, 2
+        }
+      },
+
+      {
+        {
+          x12/4 - x13/4 + x14/4 - x15/4, // 1, 0, 0
+          -x0/8 + x1/8 - x2/8 + x3/8 + x4/8 - x5/8 + x6/8 - x7/8, // 1, 0, 1
+          x0/8 - x1/8 - x12/4 + x13/4 - x14/4 + x15/4 + x2/8 - x3/8 + x4/8 - x5/8 + x6/8 - x7/8 // 1, 0, 2
+        },
+        {
+          -x12/2 + x13/2 + x14/2 - x15/2 - x22 + x24, // 1, 1, 0
+          x0/4 - x1/4 - x11/2 - x17/2 + x19/2 - x2/4 + x3/4 - x4/4 + x5/4 + x6/4 - x7/4 + x9/2, // 1, 1, 1
+          -x0/4 + x1/4 + x11/2 + x12/2 - x13/2 - x14/2 + x15/2 - x17/2 + x19/2 + x2/4 + x22 - x24 - x3/4 - x4/4 + x5/4 + x6/4 - x7/4 - x9/2 // 1, 1, 2
+        },
+        {
+          Point(0,0,0), // 1, 2, 0
+          Point(0,0,0), // 1, 2, 1
+          Point(0,0,0)  // 1, 2, 2
+        }
+      },
+
+      {
+        {
+          -x12/4 - x13/4 + x14/4 + x15/4 + x21/2 - x23/2, // 2, 0, 0
+          x0/8 + x1/8 + x10/4 + x16/4 - x18/4 - x2/8 - x3/8 - x4/8 - x5/8 + x6/8 + x7/8 - x8/4, // 2, 0, 1
+          -x0/8 - x1/8 - x10/4 + x12/4 + x13/4 - x14/4 - x15/4 + x16/4 - x18/4 + x2/8 - x21/2 + x23/2 + x3/8 - x4/8 - x5/8 + x6/8 + x7/8 + x8/4, // 2, 0, 2
+        },
+        {
+          x12/2 + x13/2 + x14/2 + x15/2 - x21 - x22 - x23 - x24 + 2*x26, // 2, 1, 0
+          -x0/4 - x1/4 + x10/2 + x11/2 - x16/2 - x17/2 - x18/2 - x19/2 - x2/4 - x20 + x25 - x3/4 + x4/4 + x5/4 + x6/4 + x7/4 + x8/2 + x9/2, // 2, 1, 1
+          x0/4 + x1/4 - x10/2 - x11/2 - x12/2 - x13/2 - x14/2 - x15/2 - x16/2 - x17/2 - x18/2 - x19/2 + x2/4 + x20 + x21 + x22 + x23 + x24 + x25 - 2*x26 + x3/4 + x4/4 + x5/4 + x6/4 + x7/4 - x8/2 - x9/2 // 2, 1, 2
+        },
+        {
+          Point(0,0,0), // 2, 2, 0
+          Point(0,0,0), // 2, 2, 1
+          Point(0,0,0)  // 2, 2, 2
+        }
+      }
+    };
+
+
+
+  // The constant components of the dx/dzeta vector, all of the zeta^2
+  // terms are zero. These were copied directly from the output of a
+  // Python script.
+  Point dx_dzeta[3][3][3] =
+    {
+      {
+        {
+          -x20/2 + x25/2, // 0, 0, 0
+          x20 + x25 - 2*x26, // 0, 0, 1
+          Point(0,0,0) // 0, 0, 2
+        },
+        {
+          -x10/4 - x16/4 + x18/4 + x8/4, // 0, 1, 0
+          x10/2 - x16/2 + x18/2 + x21 - x23 - x8/2, // 0, 1, 1
+          Point(0,0,0) // 0, 1, 2
+        },
+        {
+          -x10/4 + x16/4 + x18/4 + x20/2 - x25/2 - x8/4, // 0, 2, 0
+          x10/2 + x16/2 + x18/2 - x20 - x21 - x23 - x25 + 2*x26 + x8/2, // 0, 2, 1
+          Point(0,0,0) // 0, 2, 2
+        }
+      },
+      {
+        {
+          x11/4 + x17/4 - x19/4 - x9/4, // 1, 0, 0
+          -x11/2 + x17/2 - x19/2 - x22 + x24 + x9/2, // 1, 0, 1
+          Point(0,0,0) // 1, 0, 2
+        },
+        {
+          -x0/8 + x1/8 - x2/8 + x3/8 + x4/8 - x5/8 + x6/8 - x7/8, // 1, 1, 0
+          x0/4 - x1/4 - x12/2 + x13/2 - x14/2 + x15/2 + x2/4 - x3/4 + x4/4 - x5/4 + x6/4 - x7/4, // 1, 1, 1
+          Point(0,0,0) // 1, 1, 2
+        },
+        {
+          x0/8 - x1/8 - x11/4 - x17/4 + x19/4 - x2/8 + x3/8 - x4/8 + x5/8 + x6/8 - x7/8 + x9/4, // 1, 2, 0
+          -x0/4 + x1/4 + x11/2 + x12/2 - x13/2 - x14/2 + x15/2 - x17/2 + x19/2 + x2/4 + x22 - x24 - x3/4 - x4/4 + x5/4 + x6/4 - x7/4 - x9/2, // 1, 2, 1
+          Point(0,0,0) // 1, 2, 2
+        }
+      },
+      {
+        {
+          -x11/4 + x17/4 + x19/4 + x20/2 - x25/2 - x9/4, // 2, 0, 0
+          x11/2 + x17/2 + x19/2 - x20 - x22 - x24 - x25 + 2*x26 + x9/2, // 2, 0, 1
+          Point(0,0,0) // 2, 0, 2
+        },
+        {
+          x0/8 + x1/8 + x10/4 + x16/4 - x18/4 - x2/8 - x3/8 - x4/8 - x5/8 + x6/8 + x7/8 - x8/4, // 2, 1, 0
+          -x0/4 - x1/4 - x10/2 + x12/2 + x13/2 - x14/2 - x15/2 + x16/2 - x18/2 + x2/4 - x21 + x23 + x3/4 - x4/4 - x5/4 + x6/4 + x7/4 + x8/2, // 2, 1, 1
+          Point(0,0,0)  // 2, 1, 2
+        },
+        {
+          -x0/8 - x1/8 + x10/4 + x11/4 - x16/4 - x17/4 - x18/4 - x19/4 - x2/8 - x20/2 + x25/2 - x3/8 + x4/8 + x5/8 + x6/8 + x7/8 + x8/4 + x9/4, // 2, 2, 0
+          x0/4 + x1/4 - x10/2 - x11/2 - x12/2 - x13/2 - x14/2 - x15/2 - x16/2 - x17/2 - x18/2 - x19/2 + x2/4 + x20 + x21 + x22 + x23 + x24 + x25 - 2*x26 + x3/4 + x4/4 + x5/4 + x6/4 + x7/4 - x8/2 - x9/2, // 2, 2, 1
+          Point(0,0,0) // 2, 2, 2
+        }
+      }
+    };
+
+  // 3x3 quadrature, exact for bi-quintics
+  const int N = 3;
+  const Real w[N] = {5./9, 8./9, 5./9};
+
+  // Quadrature point locations raised to powers.  q[0][2] is
+  // quadrature point 0, squared, q[1][1] is quadrature point 1 to the
+  // first power, etc.
+  const Real q[N][N] =
+    {
+      //^0   ^1                 ^2
+      {  1., -std::sqrt(15)/5., 15./25},
+      {  1., 0.,                0.},
+      {  1., std::sqrt(15)/5.,  15./25}
+    };
+
+  Real vol = 0.;
+  for (int i=0; i<N; ++i)
+    for (int j=0; j<N; ++j)
+      for (int k=0; k<N; ++k)
+        {
+          // Compute dx_dxi, dx_deta, dx_dzeta at the current quadrature point.
+          Point dx_dxi_q, dx_deta_q, dx_dzeta_q;
+          for (int ii=0; ii<N; ++ii)
+            for (int jj=0; jj<N; ++jj)
+              for (int kk=0; kk<N; ++kk)
+                {
+                  Real coeff = q[i][ii] * q[j][jj] * q[k][kk];
+
+                  dx_dxi_q   += coeff * dx_dxi[ii][jj][kk];
+                  dx_deta_q  += coeff * dx_deta[ii][jj][kk];
+                  dx_dzeta_q += coeff * dx_dzeta[ii][jj][kk];
+                }
+
+          // Compute scalar triple product, multiply by weight, and accumulate volume.
+          vol += w[i] * w[j] * w[k] * triple_product(dx_dxi_q, dx_deta_q, dx_dzeta_q);
+        }
+
+  return vol;
 }
 
 

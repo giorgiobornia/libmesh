@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -40,13 +40,13 @@ public:
    * Default tetrahedral element, takes number of nodes and
    * parent. Derived classes implement 'true' elements.
    */
-  Tet (const unsigned int nn, Elem* p, Node** nodelinkdata) :
+  Tet (const unsigned int nn, Elem * p, Node ** nodelinkdata) :
     Cell(nn, Tet::n_sides(), p, _elemlinks_data, nodelinkdata),
     _diagonal_selection(INVALID_DIAG)
   {
     // Make sure the interior parent isn't undefined
     if (LIBMESH_DIM > 3)
-      this->set_interior_parent(NULL);
+      this->set_interior_parent(libmesh_nullptr);
   }
 
   /**
@@ -93,8 +93,13 @@ public:
                                const unsigned int s) const libmesh_override;
 
   /**
+   * Don't hide Elem::key() defined in the base class.
+   */
+  using Elem::key;
+
+  /**
    * @returns an id associated with the \p s side of this element.
-   * The id is not necessariy unique, but should be close.  This is
+   * The id is not necessarily unique, but should be close.  This is
    * particularly useful in the \p MeshBase::find_neighbors() routine.
    */
   virtual dof_id_type key (const unsigned int s) const libmesh_override;
@@ -169,7 +174,7 @@ protected:
   /**
    * Data for links to parent/neighbor/interior_parent elements.
    */
-  Elem* _elemlinks_data[5+(LIBMESH_DIM>3)];
+  Elem * _elemlinks_data[5+(LIBMESH_DIM>3)];
 
   /**
    * Master element node locations

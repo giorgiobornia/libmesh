@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -25,37 +25,33 @@
 
 using namespace libMesh;
 
-#ifndef __laplace_system_h__
-#define __laplace_system_h__
+#ifndef LAPLACE_SYSTEM_H
+#define LAPLACE_SYSTEM_H
 
 // FEMSystem, TimeSolver and  NewtonSolver will handle most tasks,
 // but we must specify element residuals
 class LaplaceSystem : public FEMSystem
 {
-
 public:
-
   // Constructor
-  LaplaceSystem( EquationSystems& es,
-                 const std::string& name,
-                 const unsigned int number);
+  LaplaceSystem(EquationSystems & es,
+                const std::string & name,
+                const unsigned int number);
 
   // System initialization
   virtual void init_data ();
 
   // Context initialization
-  virtual void init_context(DiffContext &context);
+  virtual void init_context(DiffContext & context);
 
   // Element residual and jacobian calculations
   // Time dependent parts
   virtual bool element_time_derivative (bool request_jacobian,
-                                        DiffContext& context);
+                                        DiffContext & context);
 
   // Constraint part
-  /*
-    virtual bool side_constraint (bool request_jacobian,
-    DiffContext& context);
-  */
+  // virtual bool side_constraint (bool request_jacobian,
+  //                               DiffContext & context);
 
 protected:
   // Indices for each variable;
@@ -64,9 +60,9 @@ protected:
   void init_dirichlet_bcs();
 
   // Returns the value of a forcing function at point p.
-  RealGradient forcing(const Point& p);
+  RealGradient forcing(const Point & p);
 
   LaplaceExactSolution exact_solution;
 };
 
-#endif //__laplace_system_h__
+#endif // LAPLACE_SYSTEM_H

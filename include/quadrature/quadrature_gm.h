@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -95,7 +95,7 @@ namespace libMesh
  * \author John W. Peterson
  * \date 2008
  */
-class QGrundmann_Moller : public QBase
+class QGrundmann_Moller libmesh_final : public QBase
 {
 public:
 
@@ -151,7 +151,7 @@ private:
    */
   void compose_all(unsigned int s, // number to be compositioned
                    unsigned int p, // # of partitions
-                   std::vector<std::vector<unsigned int> >& result);
+                   std::vector<std::vector<unsigned int> > & result);
 };
 
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -27,17 +27,8 @@
 #include "libmesh/petsc_macro.h"
 #include "libmesh/petsc_solver_exception.h"
 
-/**
- * Petsc include files.
- */
-
-EXTERN_C_FOR_PETSC_BEGIN
-#if PETSC_VERSION_LESS_THAN(2,2,0)
-#  include <petscsles.h>
-#else
-#  include <petscksp.h>
-#endif
-EXTERN_C_FOR_PETSC_END
+// Petsc include files.
+#include <petscksp.h>
 
 // Local includes
 #include "libmesh/linear_solver.h"
@@ -54,14 +45,6 @@ EXTERN_C_FOR_PETSC_END
 // Give them an obscure name to avoid namespace pollution.
 extern "C"
 {
-  // Older versions of PETSc do not have the different int typedefs.
-  // On 64-bit machines, PetscInt may actually be a long long int.
-  // This change occurred in Petsc-2.2.1.
-#if PETSC_VERSION_LESS_THAN(2,2,1)
-  typedef int PetscErrorCode;
-  typedef int PetscInt;
-#endif
-
 #if PETSC_RELEASE_LESS_THAN(3,0,1)
   /**
    * This function is called by PETSc to initialize the preconditioner.
@@ -73,7 +56,7 @@ extern "C"
    * This function is called by PETSc to acctually apply the preconditioner.
    * ctx will hold the Preconditioner.
    */
-  PetscErrorCode __libmesh_petsc_preconditioner_apply(void *ctx, Vec x, Vec y);
+  PetscErrorCode __libmesh_petsc_preconditioner_apply(void * ctx, Vec x, Vec y);
 #else
   PetscErrorCode __libmesh_petsc_preconditioner_setup (PC);
   PetscErrorCode __libmesh_petsc_preconditioner_apply(PC, Vec x, Vec y);
@@ -102,7 +85,7 @@ public:
   /**
    *  Constructor. Initializes Petsc data structures
    */
-  PetscLinearSolver (const libMesh::Parallel::Communicator &comm_in
+  PetscLinearSolver (const libMesh::Parallel::Communicator & comm_in
                      LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
 
   /**
@@ -120,12 +103,13 @@ public:
    * Assigns a name, which is turned into an underscore-separated
    * prefix for the underlying KSP object.
    */
-  virtual void init (const char *name = NULL) libmesh_override;
+  virtual void init (const char * name = libmesh_nullptr) libmesh_override;
 
   /**
    * Initialize data structures if not done so already plus much more
    */
-  void init (PetscMatrix<T>* matrix, const char *name = NULL);
+  void init (PetscMatrix<T> * matrix,
+             const char * name = libmesh_nullptr);
 
   /**
    * Apply names to the system to be solved.  This sets an option
@@ -135,7 +119,7 @@ public:
    * Since field names are applied to DoF numberings, this method must
    * be called again after any System reinit.
    */
-  virtual void init_names (const System&) libmesh_override;
+  virtual void init_names (const System &) libmesh_override;
 
   /**
    * After calling this method, all successive solves will be
@@ -144,7 +128,7 @@ public:
    * mode can be disabled by calling this method with \p dofs being a
    * \p NULL pointer.
    */
-  virtual void restrict_solve_to (const std::vector<unsigned int>* const dofs,
+  virtual void restrict_solve_to (const std::vector<unsigned int> * const dofs,
                                   const SubsetSolveMode subset_solve_mode=SUBSET_ZERO) libmesh_override;
 
   /**
@@ -152,9 +136,9 @@ public:
    * same matrix for the system and preconditioner matrices.
    */
   virtual std::pair<unsigned int, Real>
-  solve (SparseMatrix<T>  &matrix_in,
-         NumericVector<T> &solution_in,
-         NumericVector<T> &rhs_in,
+  solve (SparseMatrix<T> & matrix_in,
+         NumericVector<T> & solution_in,
+         NumericVector<T> & rhs_in,
          const double tol,
          const unsigned int m_its) libmesh_override
   {
@@ -167,9 +151,9 @@ public:
    * same matrix for the system and preconditioner matrices.
    */
   virtual std::pair<unsigned int, Real>
-  adjoint_solve (SparseMatrix<T>  &matrix_in,
-                 NumericVector<T> &solution_in,
-                 NumericVector<T> &rhs_in,
+  adjoint_solve (SparseMatrix<T> & matrix_in,
+                 NumericVector<T> & solution_in,
+                 NumericVector<T> & rhs_in,
                  const double tol,
                  const unsigned int m_its) libmesh_override;
 
@@ -189,10 +173,10 @@ public:
    * if you wanted.
    */
   virtual std::pair<unsigned int, Real>
-  solve (SparseMatrix<T>  &matrix,
-         SparseMatrix<T>  &preconditioner,
-         NumericVector<T> &solution,
-         NumericVector<T> &rhs,
+  solve (SparseMatrix<T> & matrix,
+         SparseMatrix<T> & preconditioner,
+         NumericVector<T> & solution,
+         NumericVector<T> & rhs,
          const double tol,
          const unsigned int m_its) libmesh_override;
 
@@ -200,9 +184,9 @@ public:
    * This function solves a system whose matrix is a shell matrix.
    */
   virtual std::pair<unsigned int, Real>
-  solve (const ShellMatrix<T>& shell_matrix,
-         NumericVector<T>& solution_in,
-         NumericVector<T>& rhs_in,
+  solve (const ShellMatrix<T> & shell_matrix,
+         NumericVector<T> & solution_in,
+         NumericVector<T> & rhs_in,
          const double tol,
          const unsigned int m_its) libmesh_override;
 
@@ -212,10 +196,10 @@ public:
    * other preconditioners than JACOBI.
    */
   virtual std::pair<unsigned int, Real>
-  solve (const ShellMatrix<T>& shell_matrix,
-         const SparseMatrix<T>& precond_matrix,
-         NumericVector<T>& solution_in,
-         NumericVector<T>& rhs_in,
+  solve (const ShellMatrix<T> & shell_matrix,
+         const SparseMatrix<T> & precond_matrix,
+         NumericVector<T> & solution_in,
+         NumericVector<T> & rhs_in,
          const double tol,
          const unsigned int m_its) libmesh_override;
 
@@ -237,7 +221,7 @@ public:
    * Fills the input vector with the sequence of residual norms
    * from the latest iterative solve.
    */
-  void get_residual_history(std::vector<double>& hist);
+  void get_residual_history(std::vector<double> & hist);
 
   /**
    * Returns just the initial residual for the solve just
@@ -275,16 +259,6 @@ private:
    */
   static PetscErrorCode _petsc_shell_matrix_get_diagonal(Mat mat, Vec dest);
 
-  // SLES removed from >= PETSc 2.2.0
-#if PETSC_VERSION_LESS_THAN(2,2,0)
-
-  /**
-   * Linear solver context
-   */
-  SLES _sles;
-
-#endif
-
   /**
    * Preconditioner context
    */
@@ -312,14 +286,14 @@ private:
    * Internal method that returns the local size of \p
    * _restrict_solve_to_is.
    */
-  PetscInt _restrict_solve_to_is_local_size(void)const;
+  PetscInt _restrict_solve_to_is_local_size() const;
 
   /**
    * Creates \p _restrict_solve_to_is_complement to contain all
    * indices that are local in \p vec_in, except those that are
    * contained in \p _restrict_solve_to_is.
    */
-  void _create_complement_is (const NumericVector<T> &vec_in);
+  void _create_complement_is (const NumericVector<T> & vec_in);
 
   /**
    * If restrict-solve-to-subset mode is active, this member decides
@@ -332,10 +306,10 @@ private:
 /*----------------------- functions ----------------------------------*/
 template <typename T>
 inline
-PetscLinearSolver<T>::PetscLinearSolver(const libMesh::Parallel::Communicator &comm_in) :
+PetscLinearSolver<T>::PetscLinearSolver(const libMesh::Parallel::Communicator & comm_in) :
   LinearSolver<T>(comm_in),
-  _restrict_solve_to_is(NULL),
-  _restrict_solve_to_is_complement(NULL),
+  _restrict_solve_to_is(libmesh_nullptr),
+  _restrict_solve_to_is_complement(libmesh_nullptr),
   _subset_solve_mode(SUBSET_ZERO)
 {
   if (this->n_processors() == 1)
@@ -357,13 +331,12 @@ PetscLinearSolver<T>::~PetscLinearSolver ()
 
 template <typename T>
 inline PetscInt
-PetscLinearSolver<T>::
-_restrict_solve_to_is_local_size(void)const
+PetscLinearSolver<T>::_restrict_solve_to_is_local_size() const
 {
   libmesh_assert(_restrict_solve_to_is);
 
   PetscInt s;
-  int ierr = ISGetLocalSize(_restrict_solve_to_is,&s);
+  int ierr = ISGetLocalSize(_restrict_solve_to_is, &s);
   LIBMESH_CHKERR(ierr);
 
   return s;
@@ -386,7 +359,7 @@ PetscLinearSolver<T>::_create_complement_is (const NumericVector<T> &
   // No ISComplement in PETSc 2.3.3
   libmesh_not_implemented();
 #else
-  if(_restrict_solve_to_is_complement==NULL)
+  if(_restrict_solve_to_is_complement==libmesh_nullptr)
     {
       int ierr = ISComplement(_restrict_solve_to_is,
                               vec_in.first_local_index(),

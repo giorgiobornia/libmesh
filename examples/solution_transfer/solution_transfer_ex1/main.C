@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -41,23 +41,23 @@
 using namespace libMesh;
 
 
-Number initial_value(const Point& p,
-                     const Parameters& /* parameters */,
-                     const std::string&,
-                     const std::string&)
+Number initial_value(const Point & p,
+                     const Parameters & /* parameters */,
+                     const std::string &,
+                     const std::string &)
 {
   return p(0)*p(0) + 1; // x^2 + 1
 }
 
-void initialize(EquationSystems& es,
-                const std::string& system_name)
+void initialize(EquationSystems & es,
+                const std::string & system_name)
 {
   ExplicitSystem & system = es.get_system<ExplicitSystem>(system_name);
   es.parameters.set<Real> ("time") = system.time = 0;
-  system.project_solution(initial_value, NULL, es.parameters);
+  system.project_solution(initial_value, libmesh_nullptr, es.parameters);
 }
 
-int main(int argc, char* argv[])
+int main(int argc, char * argv[])
 {
   LibMeshInit init (argc, argv);
 

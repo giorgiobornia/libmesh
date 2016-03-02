@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -62,7 +62,7 @@ void TrilinosPreconditioner<T>::init ()
   // Clear the preconditioner in case it has been created in the past
   if (!this->_is_initialized)
     {
-      EpetraMatrix<T> * matrix = cast_ptr<EpetraMatrix<T>*, SparseMatrix<T> >(this->_matrix);
+      EpetraMatrix<T> * matrix = cast_ptr<EpetraMatrix<T> *, SparseMatrix<T> >(this->_matrix);
       _mat = matrix->mat();
     }
 
@@ -85,11 +85,11 @@ void
 TrilinosPreconditioner<T>::compute()
 {
 #ifdef LIBMESH_TRILINOS_HAVE_IFPACK
-  Ifpack_Preconditioner * ifpack = NULL;
+  Ifpack_Preconditioner * ifpack = libmesh_nullptr;
 #endif
 
 #ifdef LIBMESH_TRILINOS_HAVE_ML
-  ML_Epetra::MultiLevelPreconditioner * ml = NULL;
+  ML_Epetra::MultiLevelPreconditioner * ml = libmesh_nullptr;
 #endif
 
   switch (this->_preconditioner_type)
@@ -125,11 +125,11 @@ void
 TrilinosPreconditioner<T>::set_preconditioner_type (const PreconditionerType & preconditioner_type)
 {
 #ifdef LIBMESH_TRILINOS_HAVE_IFPACK
-  Ifpack_Preconditioner * pc = NULL;
+  Ifpack_Preconditioner * pc = libmesh_nullptr;
 #endif
 
 #ifdef LIBMESH_TRILINOS_HAVE_ML
-  ML_Epetra::MultiLevelPreconditioner * ml = NULL;
+  ML_Epetra::MultiLevelPreconditioner * ml = libmesh_nullptr;
 #endif
 
   switch (preconditioner_type)
@@ -194,14 +194,14 @@ TrilinosPreconditioner<T>::SetUseTranspose(bool UseTranspose)
 
 template <typename T>
 int
-TrilinosPreconditioner<T>::Apply(const Epetra_MultiVector &X, Epetra_MultiVector &Y) const
+TrilinosPreconditioner<T>::Apply(const Epetra_MultiVector & X, Epetra_MultiVector & Y) const
 {
   return _prec->Apply(X, Y);
 }
 
 template <typename T>
 int
-TrilinosPreconditioner<T>::ApplyInverse(const Epetra_MultiVector &r, Epetra_MultiVector &z) const
+TrilinosPreconditioner<T>::ApplyInverse(const Epetra_MultiVector & r, Epetra_MultiVector & z) const
 {
   return _prec->ApplyInverse(r, z);
 }

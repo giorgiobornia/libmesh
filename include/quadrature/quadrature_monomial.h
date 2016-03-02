@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -58,7 +58,7 @@ namespace libMesh
  * \author John W. Peterson
  * \date 2008
  */
-class QMonomial : public QBase
+class QMonomial libmesh_final : public QBase
 {
 public:
 
@@ -137,7 +137,7 @@ private:
    * quadrature rules and later authors certainly built upon his work.
    */
   void stroud_rule(const Real rule_data[][3],
-                   const unsigned int* rule_symmetry,
+                   const unsigned int * rule_symmetry,
                    const unsigned int n_pts);
 
   /**
@@ -178,7 +178,7 @@ private:
    * the unique permutations of G^{rot} were computed by me [JWP] using Maple.
    */
   void kim_rule(const Real rule_data[][4],
-                const unsigned int* rule_id,
+                const unsigned int * rule_id,
                 const unsigned int n_pts);
 };
 

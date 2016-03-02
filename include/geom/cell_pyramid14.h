@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -42,6 +42,9 @@ namespace libMesh
  * element works in libmesh, we are curently limited in what we can do
  * with it outside the library...
  *
+ * \author John W. Peterson
+ * \date 2013
+ *
  * The node numbering for the pyramid14 is given below:
  * \verbatim
  * PYRAMID14:
@@ -69,7 +72,7 @@ namespace libMesh
  *
  * \endverbatim
  */
-class Pyramid14 : public Pyramid
+class Pyramid14 libmesh_final : public Pyramid
 {
 public:
 
@@ -77,7 +80,7 @@ public:
    * Constructor.  By default this element has no parent.
    */
   explicit
-  Pyramid14 (Elem* p=NULL) :
+  Pyramid14 (Elem * p=libmesh_nullptr) :
     Pyramid(Pyramid14::n_nodes(), p, _nodelinks_data)
   {}
 
@@ -138,6 +141,22 @@ public:
   virtual Order default_order() const libmesh_override { return SECOND; }
 
   /**
+   * Don't hide Pyramid::key() defined in the base class.
+   */
+  using Pyramid::key;
+
+  /**
+   * @returns an id associated with the \p s side of this element.
+   * The id is not necessarily unique, but should be close.  This is
+   * particularly useful in the \p MeshBase::find_neighbors() routine.
+   *
+   * We reimplemenet this method here for the \p Pyramid14 since we can
+   * use the center node of the base face to provide a perfect (unique)
+   * key.
+   */
+  virtual dof_id_type key (const unsigned int s) const libmesh_override;
+
+  /**
    * Builds a \p QUAD9 or \p TRI6 coincident with face i.
    * The \p UniquePtr<Elem> handles the memory aspect.
    */
@@ -152,7 +171,7 @@ public:
 
   virtual void connectivity(const unsigned int sc,
                             const IOPackage iop,
-                            std::vector<dof_id_type>& conn) const libmesh_override;
+                            std::vector<dof_id_type> & conn) const libmesh_override;
 
   /**
    * @returns 2 for all edge nodes and 4 for face nodes
@@ -178,12 +197,17 @@ public:
    */
   static const unsigned int edge_nodes_map[8][3];
 
+  /**
+   * Specialization for computing the volume of a Pyramid14.
+   */
+  virtual Real volume () const libmesh_override;
+
 protected:
 
   /**
    * Data for links to nodes
    */
-  Node* _nodelinks_data[14];
+  Node * _nodelinks_data[14];
 
 
 

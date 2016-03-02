@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -39,8 +39,11 @@ namespace libMesh
  *
  * Stroud, A.H. "Approximate Calculation of
  * Multiple Integrals.", 1972
+ *
+ * \author John W. Peterson
+ * \date 2008
  */
-class QConical : public QBase
+class QConical libmesh_final : public QBase
 {
 public:
 

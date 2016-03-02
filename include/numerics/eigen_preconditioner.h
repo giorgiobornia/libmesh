@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -55,7 +55,7 @@ public:
   /**
    *  Constructor. Initializes EigenPreconditioner data structures
    */
-  EigenPreconditioner (const libMesh::Parallel::Communicator &comm_in
+  EigenPreconditioner (const libMesh::Parallel::Communicator & comm_in
                        LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
 
   /**
@@ -86,7 +86,7 @@ public:
 /*----------------------- inline functions ----------------------------------*/
 template <typename T>
 inline
-EigenPreconditioner<T>::EigenPreconditioner(const libMesh::Parallel::Communicator &comm_in) :
+EigenPreconditioner<T>::EigenPreconditioner(const libMesh::Parallel::Communicator & comm_in) :
   Preconditioner<T>(comm_in)
 {
 }

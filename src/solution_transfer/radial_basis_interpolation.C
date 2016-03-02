@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -70,7 +70,7 @@ void RadialBasisInterpolation<KDDim,RBF>::prepare_for_use()
 
     for (std::size_t p=0; p<n_src_pts; p++)
       {
-        const Point &p_src(_src_pts[p]);
+        const Point & p_src(_src_pts[p]);
 
         for (unsigned int d=0; d<LIBMESH_DIM; d++)
           {
@@ -87,7 +87,7 @@ void RadialBasisInterpolation<KDDim,RBF>::prepare_for_use()
 
   // Construct the Radial Basis Function, giving it the size of the domain
   if(_r_override < 0)
-    _r_bbox = (_src_bbox.max() - _src_bbox.min()).size();
+    _r_bbox = (_src_bbox.max() - _src_bbox.min()).norm();
   else
     _r_bbox = _r_override;
 
@@ -108,16 +108,16 @@ void RadialBasisInterpolation<KDDim,RBF>::prepare_for_use()
 
   for (std::size_t i=0; i<n_src_pts; i++)
     {
-      const Point &x_i (_src_pts[i]);
+      const Point & x_i (_src_pts[i]);
 
       // Diagonal
       A(i,i) = rbf(0.);
 
       for (std::size_t j=i+1; j<n_src_pts; j++)
         {
-          const Point &x_j (_src_pts[j]);
+          const Point & x_j (_src_pts[j]);
 
-          const Real r_ij = (x_j - x_i).size();
+          const Real r_ij = (x_j - x_i).norm();
 
           A(i,j) = A(j,i) = rbf(r_ij);
         }
@@ -148,9 +148,9 @@ void RadialBasisInterpolation<KDDim,RBF>::prepare_for_use()
 
 
 template <unsigned int KDDim, class RBF>
-void RadialBasisInterpolation<KDDim,RBF>::interpolate_field_data (const std::vector<std::string> &field_names,
-                                                                  const std::vector<Point>  &tgt_pts,
-                                                                  std::vector<Number> &tgt_vals) const
+void RadialBasisInterpolation<KDDim,RBF>::interpolate_field_data (const std::vector<std::string> & field_names,
+                                                                  const std::vector<Point> & tgt_pts,
+                                                                  std::vector<Number> & tgt_vals) const
 {
   START_LOG ("interpolate_field_data()", "RadialBasisInterpolation<>");
 
@@ -182,13 +182,13 @@ void RadialBasisInterpolation<KDDim,RBF>::interpolate_field_data (const std::vec
 
   for (std::size_t tgt=0; tgt<n_tgt_pts; tgt++)
     {
-      const Point &p (tgt_pts[tgt]);
+      const Point & p (tgt_pts[tgt]);
 
       for (std::size_t i=0; i<n_src_pts; i++)
         {
-          const Point &x_i(_src_pts[i]);
+          const Point & x_i(_src_pts[i]);
           const Real
-            r_i   = (p - x_i).size(),
+            r_i   = (p - x_i).norm(),
             phi_i = rbf(r_i);
 
           for (unsigned int var=0; var<n_vars; var++)

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -58,7 +58,7 @@ public:
    * Constructor.  By default this element has no parent.
    */
   explicit
-  InfEdge2 (Elem* p=NULL) :
+  InfEdge2 (Elem * p=libmesh_nullptr) :
     Edge(InfEdge2::n_nodes(), p, _nodelinks_data) {}
 
   /**
@@ -117,7 +117,7 @@ public:
 
   virtual void connectivity(const unsigned int se,
                             const IOPackage iop,
-                            std::vector<dof_id_type>& conn) const libmesh_override;
+                            std::vector<dof_id_type> & conn) const libmesh_override;
 
 #ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
 
@@ -139,7 +139,7 @@ protected:
   /**
    * Data for links to nodes
    */
-  Node* _nodelinks_data[2];
+  Node * _nodelinks_data[2];
 
 
 

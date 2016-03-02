@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -49,12 +49,12 @@ public:
    */
   //TODO:[JWP] figure out how to implement a const write method!
   explicit
-  DivaIO (const MeshBase&);
+  DivaIO (const MeshBase &);
 
   /**
    * This method implements writing a mesh to a specified file.
    */
-  virtual void write (const std::string&) libmesh_override;
+  virtual void write (const std::string &) libmesh_override;
 
 private:
 
@@ -63,7 +63,7 @@ private:
    * file is called by the public interface file after it
    * constructs an ofstream.
    */
-  void write_stream(std::ostream& out);
+  void write_stream(std::ostream & out);
 };
 
 
@@ -72,7 +72,7 @@ private:
 // ------------------------------------------------------------
 // DivaIO inline members
 inline
-DivaIO::DivaIO (const MeshBase& mesh_in) :
+DivaIO::DivaIO (const MeshBase & mesh_in) :
   MeshOutput<MeshBase>  (mesh_in)
 {}
 

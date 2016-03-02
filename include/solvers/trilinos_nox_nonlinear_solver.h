@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -65,7 +65,7 @@ public:
    *  Constructor. Initializes Nox data structures
    */
   explicit
-  NoxNonlinearSolver (sys_type& system);
+  NoxNonlinearSolver (sys_type & system);
 
   /**
    * Destructor.
@@ -80,7 +80,7 @@ public:
   /**
    * Initialize data structures if not done so already.
    */
-  virtual void init (const char* name = NULL) libmesh_override;
+  virtual void init (const char * name = libmesh_nullptr) libmesh_override;
 
   /**
    * Call the Nox solver.  It calls the method below, using the
@@ -127,10 +127,10 @@ private:
 /*----------------------- functions ----------------------------------*/
 template <typename T>
 inline
-NoxNonlinearSolver<T>::NoxNonlinearSolver (sys_type& system) :
+NoxNonlinearSolver<T>::NoxNonlinearSolver (sys_type & system) :
   NonlinearSolver<T>(system),
-  _solver(NULL),
-  _interface(NULL),
+  _solver(libmesh_nullptr),
+  _interface(libmesh_nullptr),
   _n_linear_iterations(0)
 {
 }

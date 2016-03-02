@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -31,15 +31,19 @@ namespace libMesh
 {
 
 /**
- * The \p Edge4 is an element in 1D composed of 4 nodes. It is numbered
- * like this:
+ * The \p Edge4 is an element in 1D composed of 4 nodes.
+ *
+ * \author David Knezevic
+ * \date 2005
+ *
+ * It is numbered like this:
  *
  * \verbatim
  *  EGDE4: o----o----o----o
  *         0    2    3    1
  * \endverbatim
  */
-class Edge4 : public Edge
+class Edge4 libmesh_final : public Edge
 {
 public:
 
@@ -47,7 +51,7 @@ public:
    * Constructor. By default this element has no parent.
    */
   explicit
-  Edge4 (Elem* p=NULL) :
+  Edge4 (Elem * p=libmesh_nullptr) :
     Edge(Edge4::n_nodes(), p, _nodelinks_data) {}
 
   /**
@@ -119,7 +123,7 @@ public:
 
   virtual void connectivity(const unsigned int sc,
                             const IOPackage iop,
-                            std::vector<dof_id_type>& conn) const libmesh_override;
+                            std::vector<dof_id_type> & conn) const libmesh_override;
 
   /**
    * FIXME: This function could be generalized to work for Edges.
@@ -151,17 +155,23 @@ public:
 
   /**
    * @returns an id associated with the global node ids of this
-   * element.  The id is not necessariy unique, but should be
+   * element.  The id is not necessarily unique, but should be
    * close.
    */
   virtual dof_id_type key () const libmesh_override;
+
+  /**
+   * An optimized method for approximating the length of an
+   * EDGE4 using quadrature.
+   */
+  virtual Real volume () const libmesh_override;
 
 protected:
 
   /**
    * Data for links to nodes
    */
-  Node* _nodelinks_data[4];
+  Node * _nodelinks_data[4];
 
 
 

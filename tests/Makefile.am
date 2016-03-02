@@ -17,10 +17,14 @@ unit_tests_sources = \
 	geom/node_test.C \
 	geom/point_test.C \
 	geom/point_test.h \
+	mesh/all_tri.C \
 	mesh/boundary_mesh.C \
+	mesh/boundary_info.C \
 	mesh/mixed_dim_mesh_test.C \
 	mesh/nodal_neighbors.C \
 	mesh/mesh_extruder.C \
+	mesh/slit_mesh_test.C \
+	mesh/spatial_dimension_test.C \
 	numerics/composite_function_test.C \
 	numerics/coupling_matrix_test.C \
 	numerics/distributed_vector_test.C \
@@ -34,6 +38,8 @@ unit_tests_sources = \
 	numerics/type_vector_test.h \
 	numerics/vector_value_test.C \
 	numerics/type_tensor_test.C \
+	numerics/dense_matrix_test.C \
+	parallel/packed_range_test.C \
 	parallel/parallel_test.C \
 	parallel/parallel_point_test.C \
 	quadrature/quadrature_test.C \
@@ -41,7 +47,7 @@ unit_tests_sources = \
         systems/systems_test.C \
 	utils/vectormap_test.C
 
-EXTRA_DIST = base/getpot_test_input.in
+#EXTRA_DIST = base/getpot_test_input.in
 
 if LIBMESH_ENABLE_FPARSER
   unit_tests_sources += \

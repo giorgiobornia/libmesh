@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -58,7 +58,7 @@ public:
    * \param fn const char pointer to a file name
    * \param icnt Number to be appended to file e.g. \p name.soln.0000
    */
-  void init(XdrIO_TYPE type, const char* fn, int icnt)
+  void init(XdrIO_TYPE type, const char * fn, int icnt)
   {XdrMGF::init (type, fn, "soln",icnt);}
 
   /**
@@ -74,7 +74,7 @@ public:
    * \param hd Pointer to an \p xdr solution header object
    * @return 1 on success
    */
-  int header(XdrSHEAD *hd);
+  int header(XdrSHEAD * hd);
 
   /**
    * Read/Write solution values.
@@ -83,7 +83,7 @@ public:
    * \param size Size of individual variables to be written
    * @return m_wrtVar*size
    */
-  int values(Real* array, int size) { return dataBlk(array, m_wrtVar, size);}
+  int values(Real * array, int size) { return dataBlk(array, m_wrtVar, size);}
 
 private:
   int m_wrtVar;

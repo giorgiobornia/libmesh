@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -187,7 +187,7 @@ public:
    * order.
    * Source: GNU Scientific Library
    */
-  virtual void histogram (std::vector<dof_id_type>& bin_members,
+  virtual void histogram (std::vector<dof_id_type> & bin_members,
                           unsigned int n_bins=10);
 
   /**
@@ -198,13 +198,13 @@ public:
    * the order of the vector.
    */
   void plot_histogram(const processor_id_type my_procid,
-                      const std::string& filename,
+                      const std::string & filename,
                       unsigned int n_bins);
 
   /**
    * A const version of the histogram function.
    */
-  virtual void histogram (std::vector<dof_id_type>& bin_members,
+  virtual void histogram (std::vector<dof_id_type> & bin_members,
                           unsigned int n_bins=10) const;
 
   /**

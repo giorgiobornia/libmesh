@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -40,8 +40,8 @@ Sphere::Sphere () :
 
 
 
-Sphere::Sphere (const Point& c,
-                const Real   r)
+Sphere::Sphere (const Point & c,
+                const Real r)
 {
   libmesh_assert_greater (r, 0.);
 
@@ -50,7 +50,7 @@ Sphere::Sphere (const Point& c,
 
 
 
-Sphere::Sphere (const Sphere& other_sphere) :
+Sphere::Sphere (const Sphere & other_sphere) :
   Surface()
 {
   this->create_from_center_radius (other_sphere.center(),
@@ -59,10 +59,10 @@ Sphere::Sphere (const Sphere& other_sphere) :
 
 
 
-Sphere::Sphere(const Point& pa,
-               const Point& pb,
-               const Point& pc,
-               const Point& pd)
+Sphere::Sphere(const Point & pa,
+               const Point & pb,
+               const Point & pc,
+               const Point & pd)
 {
   Point pad = pa - pd;
   Point pbd = pb - pd;
@@ -75,9 +75,9 @@ Sphere::Sphere(const Point& pa,
   // The points had better not be coplanar
   libmesh_assert_greater (std::abs(D), 1e-12);
 
-  Real e = 0.5*(pa.size_sq() - pd.size_sq());
-  Real f = 0.5*(pb.size_sq() - pd.size_sq());
-  Real g = 0.5*(pc.size_sq() - pd.size_sq());
+  Real e = 0.5*(pa.norm_sq() - pd.norm_sq());
+  Real f = 0.5*(pb.norm_sq() - pd.norm_sq());
+  Real g = 0.5*(pc.norm_sq() - pd.norm_sq());
 
   TensorValue<Real> T1(e,pad(1),pad(2),
                        f,pbd(1),pbd(2),
@@ -95,7 +95,7 @@ Sphere::Sphere(const Point& pa,
   Real sz = T3.det()/D;
 
   Point c(sx,sy,sz);
-  Real r = (c-pa).size();
+  Real r = (c-pa).norm();
 
   this->create_from_center_radius(c,r);
 }
@@ -108,7 +108,7 @@ Sphere::~Sphere ()
 
 
 
-void Sphere::create_from_center_radius (const Point& c, const Real r)
+void Sphere::create_from_center_radius (const Point & c, const Real r)
 {
   this->center() = c;
   this->radius() = r;
@@ -118,33 +118,33 @@ void Sphere::create_from_center_radius (const Point& c, const Real r)
 
 
 
-bool Sphere::intersects (const Sphere& other_sphere) const
+bool Sphere::intersects (const Sphere & other_sphere) const
 {
   return distance(other_sphere) < 0 ? true : false;
 }
 
 
 
-Real Sphere::distance (const Sphere& other_sphere) const
+Real Sphere::distance (const Sphere & other_sphere) const
 {
   libmesh_assert_greater ( this->radius(), 0. );
   libmesh_assert_greater ( other_sphere.radius(), 0. );
 
-  const Real the_distance = (this->center() - other_sphere.center()).size();
+  const Real the_distance = (this->center() - other_sphere.center()).norm();
 
   return the_distance - (this->radius() + other_sphere.radius());
 }
 
 
 
-bool Sphere::above_surface (const Point& p) const
+bool Sphere::above_surface (const Point & p) const
 {
   libmesh_assert_greater (this->radius(), 0.);
 
   // create a vector from the center to the point.
   const Point w = p - this->center();
 
-  if (w.size() > this->radius())
+  if (w.norm() > this->radius())
     return true;
 
   return false;
@@ -152,7 +152,7 @@ bool Sphere::above_surface (const Point& p) const
 
 
 
-bool Sphere::below_surface (const Point& p) const
+bool Sphere::below_surface (const Point & p) const
 {
   libmesh_assert_greater (this->radius(), 0.);
 
@@ -161,7 +161,7 @@ bool Sphere::below_surface (const Point& p) const
 
 
 
-bool Sphere::on_surface (const Point& p) const
+bool Sphere::on_surface (const Point & p) const
 {
   libmesh_assert_greater (this->radius(), 0.);
 
@@ -170,7 +170,7 @@ bool Sphere::on_surface (const Point& p) const
 
   // if the size of that vector is the same as the radius() then
   // the point is on the surface.
-  if (std::abs(w.size() - this->radius()) < 1.e-10)
+  if (std::abs(w.norm() - this->radius()) < 1.e-10)
     return true;
 
   return false;
@@ -178,7 +178,7 @@ bool Sphere::on_surface (const Point& p) const
 
 
 
-Point Sphere::closest_point (const Point& p) const
+Point Sphere::closest_point (const Point & p) const
 {
   libmesh_assert_greater (this->radius(), 0.);
 
@@ -195,7 +195,7 @@ Point Sphere::closest_point (const Point& p) const
 
 
 
-Point Sphere::unit_normal (const Point& p) const
+Point Sphere::unit_normal (const Point & p) const
 {
   libmesh_assert_greater (this->radius(), 0.);
 

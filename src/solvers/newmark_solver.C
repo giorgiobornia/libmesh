@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,7 +22,7 @@
 
 namespace libMesh
 {
-NewmarkSolver::NewmarkSolver (sys_type& s)
+NewmarkSolver::NewmarkSolver (sys_type & s)
   : SecondOrderUnsteadySolver(s),
     _beta(0.25),
     _gamma(0.5),
@@ -46,18 +46,18 @@ void NewmarkSolver::advance_timestep ()
   // we update the nonlinear solution (displacement) and
   // delta_t
 
-  NumericVector<Number> &old_solution_rate =
+  NumericVector<Number> & old_solution_rate =
     _system.get_vector("_old_solution_rate");
 
-  NumericVector<Number> &old_solution_accel =
+  NumericVector<Number> & old_solution_accel =
     _system.get_vector("_old_solution_accel");
 
   if( !first_solve )
     {
-      NumericVector<Number> &old_nonlinear_soln =
+      NumericVector<Number> & old_nonlinear_soln =
         _system.get_vector("_old_nonlinear_solution");
 
-      NumericVector<Number> &nonlinear_solution =
+      NumericVector<Number> & nonlinear_solution =
         *(_system.solution);
 
       // We need to cache the new solution_rate before updating the old_solution_rate
@@ -129,9 +129,10 @@ void NewmarkSolver::compute_initial_accel()
   this->set_initial_accel_avail(true);
 }
 
-void NewmarkSolver::project_initial_accel( FunctionBase<Number> *f, FunctionBase<Gradient> *g )
+void NewmarkSolver::project_initial_accel(FunctionBase<Number> * f,
+                                          FunctionBase<Gradient> * g)
 {
-  NumericVector<Number> &old_solution_accel =
+  NumericVector<Number> & old_solution_accel =
     _system.get_vector("_old_solution_accel");
 
   _system.project_vector( old_solution_accel, f, g );
@@ -160,7 +161,7 @@ void NewmarkSolver::solve ()
 }
 
 bool NewmarkSolver::element_residual (bool request_jacobian,
-                                      DiffContext &context)
+                                      DiffContext & context)
 {
   return this->_general_residual(request_jacobian,
                                  context,
@@ -173,7 +174,7 @@ bool NewmarkSolver::element_residual (bool request_jacobian,
 
 
 bool NewmarkSolver::side_residual (bool request_jacobian,
-                                   DiffContext &context)
+                                   DiffContext & context)
 {
   return this->_general_residual(request_jacobian,
                                  context,
@@ -186,7 +187,7 @@ bool NewmarkSolver::side_residual (bool request_jacobian,
 
 
 bool NewmarkSolver::nonlocal_residual (bool request_jacobian,
-                                       DiffContext &context)
+                                       DiffContext & context)
 {
   return this->_general_residual(request_jacobian,
                                  context,
@@ -199,7 +200,7 @@ bool NewmarkSolver::nonlocal_residual (bool request_jacobian,
 
 
 bool NewmarkSolver::_general_residual (bool request_jacobian,
-                                       DiffContext &context,
+                                       DiffContext & context,
                                        ResFuncType mass,
                                        ResFuncType damping,
                                        ResFuncType time_deriv,
@@ -210,8 +211,6 @@ bool NewmarkSolver::_general_residual (bool request_jacobian,
   // We might need to save the old jacobian in case one of our physics
   // terms later is unable to update it analytically.
   DenseMatrix<Number> old_elem_jacobian(n_dofs, n_dofs);
-  if (request_jacobian)
-    old_elem_jacobian.swap(context.get_elem_jacobian());
 
   // Local velocity at old time step
   DenseVector<Number> old_elem_solution_rate(n_dofs);
@@ -259,6 +258,9 @@ bool NewmarkSolver::_general_residual (bool request_jacobian,
   // foward and is what you think it is
   else
     {
+      if (request_jacobian)
+        old_elem_jacobian.swap(context.get_elem_jacobian());
+
       // Local displacement at old timestep
       DenseVector<Number> old_elem_solution(n_dofs);
       for (unsigned int i=0; i != n_dofs; ++i)

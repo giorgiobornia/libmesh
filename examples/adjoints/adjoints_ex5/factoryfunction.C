@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -28,15 +28,15 @@ using namespace libMesh;
 
 class ExampleOneFunction : public FunctionBase<Number>
 {
-  virtual Number operator() (const Point&  /*p*/,
+  virtual Number operator() (const Point & /*p*/,
                              const Real /*time*/)
   {
     return 1;
   }
 
-  virtual void operator() (const Point&  /*p*/,
+  virtual void operator() (const Point & /*p*/,
                            const Real /*time*/,
-                           DenseVector<Number>& output)
+                           DenseVector<Number> & output)
   {
     for (unsigned int i=0; i != output.size(); ++i)
       output(i) = 1;
@@ -44,9 +44,9 @@ class ExampleOneFunction : public FunctionBase<Number>
 
   virtual void init() {}
   virtual void clear() {}
-  virtual UniquePtr<FunctionBase<Number> > clone() const {
-    return UniquePtr<FunctionBase<Number> >
-      (new ExampleOneFunction());
+  virtual UniquePtr<FunctionBase<Number> > clone() const
+  {
+    return UniquePtr<FunctionBase<Number> >(new ExampleOneFunction());
   }
 };
 
@@ -58,10 +58,10 @@ namespace libMesh {
 // Full specialization for the Factory<FunctionBase<Number> >
 // So we can look up hand-coded functions by name string
 template<>
-std::map<std::string, Factory<FunctionBase<Number> >*>&
+std::map<std::string, Factory<FunctionBase<Number> >*> &
 Factory<FunctionBase<Number> >::factory_map()
 {
-  static std::map<std::string, Factory<FunctionBase<Number> >*> _map;
+  static std::map<std::string, Factory<FunctionBase<Number> > *> _map;
   return _map;
 }
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -51,7 +51,7 @@ namespace libMesh
  *
  * \endverbatim
  */
-class Hex8 : public Hex
+class Hex8 libmesh_final : public Hex
 {
 public:
 
@@ -59,7 +59,7 @@ public:
    * Constructor.  By default this element has no parent.
    */
   explicit
-  Hex8 (Elem* p=NULL) :
+  Hex8 (Elem * p=libmesh_nullptr) :
     Hex(Hex8::n_nodes(), p, _nodelinks_data)
   {}
 
@@ -133,7 +133,7 @@ public:
 
   virtual void connectivity(const unsigned int sc,
                             const IOPackage iop,
-                            std::vector<dof_id_type>& conn) const libmesh_override;
+                            std::vector<dof_id_type> & conn) const libmesh_override;
 
   /**
    * This maps the \f$ j^{th} \f$ node of the \f$ i^{th} \f$ side to
@@ -158,7 +158,7 @@ protected:
   /**
    * Data for links to nodes
    */
-  Node* _nodelinks_data[8];
+  Node * _nodelinks_data[8];
 
 
 

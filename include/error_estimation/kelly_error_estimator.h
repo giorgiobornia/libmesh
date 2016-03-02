@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -66,12 +66,12 @@ public:
 
   /**
    * Constructor.  Responsible for initializing the _bc_function function
-   * pointer to NULL.  Defaults to H1 seminorm; changes to system norm
+   * pointer to libmesh_nullptr.  Defaults to H1 seminorm; changes to system norm
    * are ignored.
    */
   KellyErrorEstimator() :
     JumpErrorEstimator(),
-    _bc_function(NULL)
+    _bc_function(libmesh_nullptr)
   { error_norm = H1_SEMINORM; }
 
   /**
@@ -83,9 +83,9 @@ public:
    * Register a user function to use in computing the flux BCs.
    * The return value is std::pair<bool, Real>
    */
-  void attach_flux_bc_function (std::pair<bool,Real> fptr(const System& system,
-                                                          const Point& p,
-                                                          const std::string& var_name));
+  void attach_flux_bc_function (std::pair<bool,Real> fptr(const System & system,
+                                                          const Point & p,
+                                                          const std::string & var_name));
 
   virtual ErrorEstimatorType type() const libmesh_override
   { return KELLY;}
@@ -96,7 +96,7 @@ protected:
    * An initialization function, for requesting specific data from the FE
    * objects
    */
-  virtual void init_context(FEMContext &c) libmesh_override;
+  virtual void init_context(FEMContext & c) libmesh_override;
 
   /**
    * The function which calculates a normal derivative jump based error
@@ -114,9 +114,9 @@ protected:
   /**
    * Pointer to function that returns BC information.
    */
-  std::pair<bool,Real> (* _bc_function) (const System& system,
-                                         const Point& p,
-                                         const std::string& var_name);
+  std::pair<bool,Real> (* _bc_function) (const System & system,
+                                         const Point & p,
+                                         const std::string & var_name);
 };
 
 

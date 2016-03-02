@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -51,7 +51,7 @@ public:
    * to be solved.
    */
   explicit
-  NewtonSolver (sys_type& system);
+  NewtonSolver (sys_type & system);
 
   /**
    * Destructor.
@@ -148,9 +148,11 @@ protected:
    * newton_iterate is moved to the end of the quasiNewton step, and
    * the return value is the substep size.
    */
-  Real line_search(Real tol, Real last_residual, Real& current_residual,
-                   NumericVector<Number> &newton_iterate,
-                   const NumericVector<Number> &linear_solution);
+  Real line_search(Real tol,
+                   Real last_residual,
+                   Real & current_residual,
+                   NumericVector<Number> & newton_iterate,
+                   const NumericVector<Number> & linear_solution);
 
   /**
    * This prints output for the convergence criteria based on

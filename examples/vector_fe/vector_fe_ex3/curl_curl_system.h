@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -25,34 +25,34 @@
 
 using namespace libMesh;
 
-#ifndef __curl_curl_system_h__
-#define __curl_curl_system_h__
+#ifndef CURL_CURL_SYSTEM_H
+#define CURL_CURL_SYSTEM_H
 
-// FEMSystem, TimeSolver and  NewtonSolver will handle most tasks,
-// but we must specify element residuals
+/**
+ * FEMSystem, TimeSolver and  NewtonSolver will handle most tasks,
+ * but we must specify element residuals.
+ */
 class CurlCurlSystem : public FEMSystem
 {
-
 public:
-
   // Constructor
-  CurlCurlSystem( EquationSystems& es,
-                  const std::string& name,
-                  const unsigned int number );
+  CurlCurlSystem(EquationSystems & es,
+                 const std::string & name,
+                 const unsigned int number);
 
   // System initialization
   virtual void init_data ();
 
   // Context initialization
-  virtual void init_context(DiffContext &context);
+  virtual void init_context(DiffContext & context);
 
   // Element residual and jacobian calculations
   // Time dependent parts
   virtual bool element_time_derivative (bool request_jacobian,
-                                        DiffContext& context);
+                                        DiffContext & context);
 
   virtual bool side_time_derivative(bool request_jacobian,
-                                    DiffContext& context);
+                                    DiffContext & context);
 
 protected:
   // Indices for each variable;
@@ -61,13 +61,12 @@ protected:
   void init_dirichlet_bcs();
 
   // Returns the value of a forcing function at point p.
-  RealGradient forcing(const Point& p);
+  RealGradient forcing(const Point & p);
 
   // Returns the value of the exact solution for this model problem.
-  RealGradient exact_solution( const Point& p );
+  RealGradient exact_solution(const Point & p);
 
   CurlCurlExactSolution soln;
-
 };
 
-#endif //__curl_curl_system_h__
+#endif // CURL_CURL_SYSTEM_H

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -65,7 +65,7 @@ namespace libMesh
  *     0              8              1
  *   \endverbatim
  */
-class Hex20 : public Hex
+class Hex20 libmesh_final : public Hex
 {
 public:
 
@@ -73,7 +73,7 @@ public:
    * Constructor.  By default this element has no parent.
    */
   explicit
-  Hex20 (Elem* p=NULL) :
+  Hex20 (Elem * p=libmesh_nullptr) :
     Hex(Hex20::n_nodes(), p, _nodelinks_data)
   {}
 
@@ -147,7 +147,7 @@ public:
 
   virtual void connectivity(const unsigned int sc,
                             const IOPackage iop,
-                            std::vector<dof_id_type>& conn) const libmesh_override;
+                            std::vector<dof_id_type> & conn) const libmesh_override;
 
   /**
    * @returns 2 for all \p n
@@ -187,13 +187,17 @@ public:
    */
   static const unsigned int edge_nodes_map[12][3];
 
+  /**
+   * A specialization for computing the volume of a Hex20.
+   */
+  virtual Real volume () const libmesh_override;
 
 protected:
 
   /**
    * Data for links to nodes
    */
-  Node* _nodelinks_data[20];
+  Node * _nodelinks_data[20];
 
 
 

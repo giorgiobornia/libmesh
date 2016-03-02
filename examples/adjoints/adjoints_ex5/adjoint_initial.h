@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -27,12 +27,12 @@ using namespace libMesh;
 void adjoint_read_initial_parameters();
 void adjoint_finish_initialization();
 
-Number adjoint_initial_value(const Point& p,
-                             const Parameters&,
-                             const std::string&,
-                             const std::string&);
+Number adjoint_initial_value(const Point & p,
+                             const Parameters &,
+                             const std::string &,
+                             const std::string &);
 
-Gradient adjoint_initial_grad(const Point& p,
-                              const Parameters&,
-                              const std::string&,
-                              const std::string&);
+Gradient adjoint_initial_grad(const Point & p,
+                              const Parameters &,
+                              const std::string &,
+                              const std::string &);

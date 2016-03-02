@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -53,8 +53,8 @@ public:
    * Constructor.  Optionally initializes required
    * data structures.
    */
-  EigenSystem (EquationSystems& es,
-               const std::string& name_in,
+  EigenSystem (EquationSystems & es,
+               const std::string & name_in,
                const unsigned int number_in);
 
   /**
@@ -145,12 +145,12 @@ public:
   /**
    * The system matrix for standard eigenvalue problems.
    */
-  SparseMatrix<Number> *matrix_A;
+  SparseMatrix<Number> * matrix_A;
 
   /**
    * A second system matrix for generalized eigenvalue problems.
    */
-  SparseMatrix<Number> *matrix_B;
+  SparseMatrix<Number> * matrix_B;
 
   /**
    * The EigenSolver, definig which interface, i.e solver

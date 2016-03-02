@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -51,7 +51,7 @@ public:
   /**
    * Constructor; does nothing.
    */
-  ShellMatrix (const Parallel::Communicator &comm_in
+  ShellMatrix (const Parallel::Communicator & comm_in
                LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
 
   /**
@@ -75,19 +75,19 @@ public:
    * Multiplies the matrix with \p arg and stores the result in \p
    * dest.
    */
-  virtual void vector_mult (NumericVector<T>& dest,
-                            const NumericVector<T>& arg) const = 0;
+  virtual void vector_mult (NumericVector<T> & dest,
+                            const NumericVector<T> & arg) const = 0;
 
   /**
    * Multiplies the matrix with \p arg and adds the result to \p dest.
    */
-  virtual void vector_mult_add (NumericVector<T>& dest,
-                                const NumericVector<T>& arg) const = 0;
+  virtual void vector_mult_add (NumericVector<T> & dest,
+                                const NumericVector<T> & arg) const = 0;
 
   /**
    * Copies the diagonal part of the matrix into \p dest.
    */
-  virtual void get_diagonal (NumericVector<T>& dest) const = 0;
+  virtual void get_diagonal (NumericVector<T> & dest) const = 0;
 };
 
 
@@ -96,7 +96,7 @@ public:
 // ShellMatrix inline members
 template <typename T>
 inline
-ShellMatrix<T>::ShellMatrix (const Parallel::Communicator &comm_in) :
+ShellMatrix<T>::ShellMatrix (const Parallel::Communicator & comm_in) :
   ParallelObject(comm_in)
 {}
 

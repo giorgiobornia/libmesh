@@ -39,6 +39,9 @@ namespace libMesh
  * with linear pyramids, but as of version 14 will not export
  * quadratic pyramids.  Paraview should support 13-node pyramids...
  *
+ * \author John W. Peterson
+ * \date 2014
+ *
  * The node numbering for the pyramid13 is given below:
  * \verbatim
  * PYRAMID13:
@@ -66,7 +69,7 @@ namespace libMesh
  *
  * \endverbatim
  */
-class Pyramid13 : public Pyramid
+class Pyramid13 libmesh_final : public Pyramid
 {
 public:
 
@@ -74,7 +77,7 @@ public:
    * Constructor.  By default this element has no parent.
    */
   explicit
-  Pyramid13 (Elem* p=NULL) :
+  Pyramid13 (Elem * p=libmesh_nullptr) :
     Pyramid(Pyramid13::n_nodes(), p, _nodelinks_data)
   {}
 
@@ -149,7 +152,7 @@ public:
 
   virtual void connectivity(const unsigned int sc,
                             const IOPackage iop,
-                            std::vector<dof_id_type>& conn) const libmesh_override;
+                            std::vector<dof_id_type> & conn) const libmesh_override;
 
   /**
    * @returns 2 for all edge nodes
@@ -175,12 +178,17 @@ public:
    */
   static const unsigned int edge_nodes_map[8][3];
 
+  /**
+   * Specialization for computing the volume of a Pyramid13.
+   */
+  virtual Real volume () const libmesh_override;
+
 protected:
 
   /**
    * Data for links to nodes
    */
-  Node* _nodelinks_data[13];
+  Node * _nodelinks_data[13];
 
 
 

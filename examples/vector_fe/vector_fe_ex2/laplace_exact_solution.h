@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -19,8 +19,8 @@
 
 using namespace libMesh;
 
-#ifndef __laplace_exact_solution_h__
-#define __laplace_exact_solution_h__
+#ifndef LAPLACE_EXACT_SOLUTION_H
+#define LAPLACE_EXACT_SOLUTION_H
 
 class LaplaceExactSolution
 {
@@ -29,8 +29,10 @@ public:
 
   ~LaplaceExactSolution(){}
 
-  Real operator()( unsigned int component,
-                   Real x, Real y, Real z = 0.0)
+  Real operator() (unsigned int component,
+                   Real x,
+                   Real y,
+                   Real z = 0.0)
   {
     const Real hp = 0.5*pi;
 
@@ -59,27 +61,29 @@ public:
 
   ~LaplaceExactGradient(){}
 
-  RealGradient operator()( unsigned int component,
-                           Real x, Real y, Real z = 0.0)
+  RealGradient operator() (unsigned int component,
+                           Real x,
+                           Real y,
+                           Real z = 0.0)
   {
     const Real hp = 0.5*pi;
 
     switch(component)
       {
       case 0:
-        return RealGradient( -hp*sin(hp*x)*sin(hp*y)*cos(hp*z),
-                             cos(hp*x)*(hp)*cos(hp*y)*cos(hp*z),
-                             cos(hp*x)*sin(hp*y)*(-hp)*sin(hp*z) );
+        return RealGradient(-hp*sin(hp*x)*sin(hp*y)*cos(hp*z),
+                            cos(hp*x)*(hp)*cos(hp*y)*cos(hp*z),
+                            cos(hp*x)*sin(hp*y)*(-hp)*sin(hp*z));
 
       case 1:
-        return RealGradient( hp*cos(hp*x)*cos(hp*y)*cos(hp*z),
-                             sin(hp*x)*(-hp)*sin(hp*y)*cos(hp*z),
-                             sin(hp*x)*cos(hp*y)*(-hp)*sin(hp*z) );
+        return RealGradient(hp*cos(hp*x)*cos(hp*y)*cos(hp*z),
+                            sin(hp*x)*(-hp)*sin(hp*y)*cos(hp*z),
+                            sin(hp*x)*cos(hp*y)*(-hp)*sin(hp*z));
 
       case 2:
-        return RealGradient( hp*cos(hp*x)*cos(hp*y)*sin(hp*z),
-                             sin(hp*x)*(-hp)*sin(hp*y)*sin(hp*z),
-                             sin(hp*x)*cos(hp*y)*(hp)*cos(hp*z) );
+        return RealGradient(hp*cos(hp*x)*cos(hp*y)*sin(hp*z),
+                            sin(hp*x)*(-hp)*sin(hp*y)*sin(hp*z),
+                            sin(hp*x)*cos(hp*y)*(hp)*cos(hp*z));
 
       default:
         libmesh_error_msg("Invalid component = " << component);
@@ -87,4 +91,4 @@ public:
   }
 };
 
-#endif // __laplace_exact_solution_h__
+#endif // LAPLACE_EXACT_SOLUTION_H

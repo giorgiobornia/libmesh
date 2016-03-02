@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -33,7 +33,8 @@
 namespace libMesh
 {
 
-DTKEvaluator::DTKEvaluator(System & in_sys, std::string var_name):
+DTKEvaluator::DTKEvaluator(System & in_sys,
+                           std::string var_name):
   sys(in_sys),
   current_local_solution(*sys.current_local_solution),
   es(in_sys.get_equation_systems()),
@@ -45,7 +46,8 @@ DTKEvaluator::DTKEvaluator(System & in_sys, std::string var_name):
 {}
 
 DTKEvaluator::FieldContainerType
-DTKEvaluator::evaluate(const Teuchos::ArrayRCP<int>& elements, const Teuchos::ArrayRCP<double>& coords)
+DTKEvaluator::evaluate(const Teuchos::ArrayRCP<int> & elements,
+                       const Teuchos::ArrayRCP<double> & coords)
 {
   unsigned int num_values = elements.size();
 

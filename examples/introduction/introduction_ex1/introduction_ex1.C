@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -36,7 +36,7 @@
 // Bring in everything from the libMesh namespace
 using namespace libMesh;
 
-int main (int argc, char** argv)
+int main (int argc, char ** argv)
 {
   // Initialize the library.  This is necessary because the library
   // may depend on a number of other libraries (i.e. MPI and PETSc)
@@ -71,7 +71,7 @@ int main (int argc, char** argv)
   std::string input_filename = argv[3];
 #ifndef LIBMESH_HAVE_XDR
   libmesh_example_requires(input_filename.rfind(".xdr") >=
-                         input_filename.size(), "XDR support");
+                           input_filename.size(), "XDR support");
 #endif
 
   // Read the input mesh.
@@ -88,7 +88,7 @@ int main (int argc, char** argv)
       std::string output_filename = argv[5];
 #ifndef LIBMESH_HAVE_XDR
       libmesh_example_requires(output_filename.rfind(".xdr") >=
-                             output_filename.size(), "XDR support");
+                               output_filename.size(), "XDR support");
 #endif
 
       mesh.write (argv[5]);

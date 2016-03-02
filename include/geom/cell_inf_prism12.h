@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -60,7 +60,7 @@ namespace libMesh
  *  0       6       1
  * \endverbatim
  */
-class InfPrism12 : public InfPrism
+class InfPrism12 libmesh_final : public InfPrism
 {
 public:
 
@@ -68,7 +68,7 @@ public:
    * Constructor.  By default this element has no parent.
    */
   explicit
-  InfPrism12 (Elem* p=NULL) :
+  InfPrism12 (Elem * p=libmesh_nullptr) :
     InfPrism(InfPrism12::n_nodes(), p, _nodelinks_data)
   {}
 
@@ -138,7 +138,7 @@ public:
 
   virtual void connectivity(const unsigned int sc,
                             const IOPackage iop,
-                            std::vector<dof_id_type>& conn) const libmesh_override;
+                            std::vector<dof_id_type> & conn) const libmesh_override;
 
   /**
    * @returns 2 for all \p n
@@ -185,7 +185,7 @@ protected:
   /**
    * Data for links to nodes
    */
-  Node* _nodelinks_data[12];
+  Node * _nodelinks_data[12];
 
 
 #ifdef LIBMESH_ENABLE_AMR

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -34,6 +34,10 @@ namespace libMesh
 
 /**
  * The \p Prism15 is an element in 3D composed of 15 nodes.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2003
+ *
  * It is numbered like this:
  * \verbatim
  * PRISM15:
@@ -67,7 +71,7 @@ namespace libMesh
  *
  * \endverbatim
  */
-class Prism15 : public Prism
+class Prism15 libmesh_final : public Prism
 {
 public:
 
@@ -75,7 +79,7 @@ public:
    * Constructor.  By default this element has no parent.
    */
   explicit
-  Prism15 (Elem* p=NULL) :
+  Prism15 (Elem * p=libmesh_nullptr) :
     Prism(Prism15::n_nodes(), p, _nodelinks_data)
   {}
 
@@ -149,7 +153,7 @@ public:
 
   virtual void connectivity(const unsigned int sc,
                             const IOPackage iop,
-                            std::vector<dof_id_type>& conn) const libmesh_override;
+                            std::vector<dof_id_type> & conn) const libmesh_override;
   /**
    * @returns 2 for all \p n
    */
@@ -188,13 +192,17 @@ public:
    */
   static const unsigned int edge_nodes_map[9][3];
 
+  /**
+   * A specialization for computing the volume of a Prism15.
+   */
+  virtual Real volume () const libmesh_override;
 
 protected:
 
   /**
    * Data for links to nodes
    */
-  Node* _nodelinks_data[15];
+  Node * _nodelinks_data[15];
 
 
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -35,16 +35,16 @@ typedef std::vector<Point>::const_iterator   const_list_iterator;
 
 //------------------------------------------------------------------
 // PointLocator methods
-PointLocatorList::PointLocatorList (const MeshBase& mesh,
-                                    const PointLocatorBase* master) :
+PointLocatorList::PointLocatorList (const MeshBase & mesh,
+                                    const PointLocatorBase * master) :
   PointLocatorBase (mesh,master),
-  _list            (NULL)
+  _list            (libmesh_nullptr)
 {
-  // This code will only work if your mesh is the Voroni mesh of it's
+  // This code will only work if your mesh is the Voronoi mesh of its
   // own elements' centroids.  If your mesh is that regular you might
   // as well hand-code an O(1) algorithm for locating points within
   // it. - RHS
-  libmesh_experimental();
+  libmesh_deprecated();
 
   this->init();
 }
@@ -61,9 +61,9 @@ PointLocatorList::~PointLocatorList ()
 void PointLocatorList::clear ()
 {
   // only delete the list when we are the master
-  if (this->_list != NULL)
+  if (this->_list != libmesh_nullptr)
     {
-      if (this->_master == NULL)
+      if (this->_master == libmesh_nullptr)
         {
           // we own the list
           this->_list->clear();
@@ -71,7 +71,7 @@ void PointLocatorList::clear ()
         }
       else
         // someone else owns and therefore deletes the list
-        this->_list = NULL;
+        this->_list = libmesh_nullptr;
     }
 }
 
@@ -86,7 +86,7 @@ void PointLocatorList::init ()
 
   else
     {
-      if (this->_master == NULL)
+      if (this->_master == libmesh_nullptr)
         {
           START_LOG("init(no master)", "PointLocatorList");
 
@@ -94,7 +94,7 @@ void PointLocatorList::init ()
           // First create it, then get a handy reference, and
           // then try to speed up by reserving space...
           this->_list = new std::vector<std::pair<Point, const Elem *> >;
-          std::vector<std::pair<Point, const Elem *> >& my_list = *(this->_list);
+          std::vector<std::pair<Point, const Elem *> > & my_list = *(this->_list);
 
           my_list.clear();
           my_list.reserve(this->_mesh.n_active_elem());
@@ -118,8 +118,8 @@ void PointLocatorList::init ()
           // the master in a state for which we are friends
           // (this should also beware of a bad master pointer?).
           // And make sure the master @e has a list!
-          const PointLocatorList* my_master =
-            cast_ptr<const PointLocatorList*>(this->_master);
+          const PointLocatorList * my_master =
+            cast_ptr<const PointLocatorList *>(this->_master);
 
           if (my_master->initialized())
             this->_list = my_master->_list;
@@ -134,7 +134,8 @@ void PointLocatorList::init ()
 
 
 
-const Elem* PointLocatorList::operator() (const Point& p, const std::set<subdomain_id_type> *allowed_subdomains) const
+const Elem * PointLocatorList::operator() (const Point & p,
+                                           const std::set<subdomain_id_type> * allowed_subdomains) const
 {
   libmesh_assert (this->_initialized);
 
@@ -155,14 +156,14 @@ const Elem* PointLocatorList::operator() (const Point& p, const std::set<subdoma
   // element is closer, but we simply don't consider
   // it!
   //
-  // We _can_, however, use size_sq() instead of size()
+  // We _can_, however, use norm_sq() instead of norm()
   // here to avoid repeated calls to std::sqrt(), which is
   // pretty expensive.
   {
-    std::vector<std::pair<Point, const Elem *> >& my_list = *(this->_list);
+    std::vector<std::pair<Point, const Elem *> > & my_list = *(this->_list);
 
     Real              last_distance_sq = std::numeric_limits<Real>::max();
-    const Elem *      last_elem        = NULL;
+    const Elem *      last_elem        = libmesh_nullptr;
     const std::size_t max_index        = my_list.size();
 
     for (std::size_t n=0; n<max_index; n++)
@@ -171,7 +172,7 @@ const Elem* PointLocatorList::operator() (const Point& p, const std::set<subdoma
         if (!allowed_subdomains ||
             allowed_subdomains->count(my_list[n].second->subdomain_id()))
           {
-            const Real current_distance_sq = Point(my_list[n].first -p).size_sq();
+            const Real current_distance_sq = Point(my_list[n].first -p).norm_sq();
 
             if (current_distance_sq < last_distance_sq)
               {

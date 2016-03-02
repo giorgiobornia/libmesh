@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -136,42 +136,11 @@ UniquePtr<Elem> Tet4::build_side (const unsigned int i,
 
   else
     {
-      Elem* face = new Tri3;
+      Elem * face = new Tri3;
       face->subdomain_id() = this->subdomain_id();
 
-      switch (i)
-        {
-        case 0:
-          {
-            face->set_node(0) = this->get_node(0);
-            face->set_node(1) = this->get_node(2);
-            face->set_node(2) = this->get_node(1);
-            break;
-          }
-        case 1:
-          {
-            face->set_node(0) = this->get_node(0);
-            face->set_node(1) = this->get_node(1);
-            face->set_node(2) = this->get_node(3);
-            break;
-          }
-        case 2:
-          {
-            face->set_node(0) = this->get_node(1);
-            face->set_node(1) = this->get_node(2);
-            face->set_node(2) = this->get_node(3);
-            break;
-          }
-        case 3:
-          {
-            face->set_node(0) = this->get_node(2);
-            face->set_node(1) = this->get_node(0);
-            face->set_node(2) = this->get_node(3);
-            break;
-          }
-        default:
-          libmesh_error_msg("Invalid side i = " << i);
-        }
+      for (unsigned n=0; n<face->n_nodes(); ++n)
+        face->set_node(n) = this->get_node(Tet4::side_nodes_map[i][n]);
 
       return UniquePtr<Elem>(face);
     }
@@ -191,7 +160,7 @@ UniquePtr<Elem> Tet4::build_edge (const unsigned int i) const
 
 void Tet4::connectivity(const unsigned int libmesh_dbg_var(sc),
                         const IOPackage iop,
-                        std::vector<dof_id_type>& conn) const
+                        std::vector<dof_id_type> & conn) const
 {
   libmesh_assert(_nodes);
   libmesh_assert_less (sc, this->n_sub_elem());
@@ -318,15 +287,15 @@ Real Tet4::volume () const
 {
   // The volume of a tetrahedron is 1/6 the box product formed
   // by its base and apex vectors
-  Point a ( *this->get_node(3) - *this->get_node(0) );
+  Point a = point(3) - point(0);
 
   // b is the vector pointing from 0 to 1
-  Point b ( *this->get_node(1) - *this->get_node(0) );
+  Point b = point(1) - point(0);
 
   // c is the vector pointing from 0 to 2
-  Point c ( *this->get_node(2) - *this->get_node(0) );
+  Point c = point(2) - point(0);
 
-  return (1.0 / 6.0) * (a * (b.cross(c)));
+  return triple_product(a, b, c) / 6.;
 }
 
 
@@ -347,7 +316,7 @@ std::pair<Real, Real> Tet4::min_and_max_angle() const
   // Compute dihedral angles
   for (unsigned int k=0,i=0; i<4; ++i)
     for (unsigned int j=i+1; j<4; ++j,k+=1)
-      dihedral_angles[k] = std::acos(n[i]*n[j] / n[i].size() / n[j].size()); // return value is between 0 and PI
+      dihedral_angles[k] = std::acos(n[i]*n[j] / n[i].norm() / n[j].norm()); // return value is between 0 and PI
 
   // Return max/min dihedral angles
   return std::make_pair(*std::min_element(dihedral_angles, dihedral_angles+6),
@@ -437,11 +406,11 @@ dof_id_type Tet4::key () const
 //  available.  */
 //       for (unsigned int c=4; c<this->n_children(); c++)
 // {
-//   Elem *child = this->child(c);
+//   Elem * child = this->child(c);
 //   for (unsigned int nc=0; nc<child->n_nodes(); nc++)
 //     {
 //       /* Unassign the current node.  */
-//       child->set_node(nc) = NULL;
+//       child->set_node(nc) = libmesh_nullptr;
 //
 //       /* We have to find the correct new node now.  We know
 //  that it exists somewhere.  We make use of the fact
@@ -486,9 +455,9 @@ dof_id_type Tet4::key () const
 
 // void Tet4::reselect_optimal_diagonal (const Diagonal exclude_this)
 // {
-//   Real diag_01_23 = (this->point(0)+this->point(1)-this->point(2)-this->point(3)).size_sq();
-//   Real diag_02_13 = (this->point(0)-this->point(1)+this->point(2)-this->point(3)).size_sq();
-//   Real diag_03_12 = (this->point(0)-this->point(1)-this->point(2)+this->point(3)).size_sq();
+//   Real diag_01_23 = (this->point(0)+this->point(1)-this->point(2)-this->point(3)).norm_sq();
+//   Real diag_02_13 = (this->point(0)-this->point(1)+this->point(2)-this->point(3)).norm_sq();
+//   Real diag_03_12 = (this->point(0)-this->point(1)-this->point(2)+this->point(3)).norm_sq();
 //
 //   Diagonal use_this = INVALID_DIAG;
 //   switch (exclude_this)

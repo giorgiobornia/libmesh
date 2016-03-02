@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -66,7 +66,7 @@ class QueryElemSubdomainIDBase;
  * Boundary ids are set to be equal to the side indexing on a
  * master hex
  */
-void build_cube (UnstructuredMesh& mesh,
+void build_cube (UnstructuredMesh & mesh,
                  const unsigned int nx=0,
                  const unsigned int ny=0,
                  const unsigned int nz=0,
@@ -80,7 +80,7 @@ void build_cube (UnstructuredMesh& mesh,
  * A specialized \p build_cube() for 0D meshes.  The resulting
  * mesh is a single NodeElem suitable for ODE tests
  */
-void build_point (UnstructuredMesh& mesh,
+void build_point (UnstructuredMesh & mesh,
                   const ElemType type=INVALID_ELEM,
                   const bool gauss_lobatto_grid=false);
 
@@ -90,7 +90,7 @@ void build_point (UnstructuredMesh& mesh,
  * Boundary ids are set to be equal to the side indexing on a
  * master edge
  */
-void build_line (UnstructuredMesh& mesh,
+void build_line (UnstructuredMesh & mesh,
                  const unsigned int nx,
                  const Real xmin=0., const Real xmax=1.,
                  const ElemType type=INVALID_ELEM,
@@ -102,7 +102,7 @@ void build_line (UnstructuredMesh& mesh,
  * Boundary ids are set to be equal to the side indexing on a
  * master quad
  */
-void build_square (UnstructuredMesh& mesh,
+void build_square (UnstructuredMesh & mesh,
                    const unsigned int nx,
                    const unsigned int ny,
                    const Real xmin=0., const Real xmax=1.,
@@ -113,7 +113,7 @@ void build_square (UnstructuredMesh& mesh,
 /**
  * Meshes a spherical or mapped-spherical domain.
  */
-void build_sphere (UnstructuredMesh& mesh,
+void build_sphere (UnstructuredMesh & mesh,
                    const Real rad=1,
                    const unsigned int nr=2,
                    const ElemType type=INVALID_ELEM,
@@ -123,11 +123,11 @@ void build_sphere (UnstructuredMesh& mesh,
 /**
  * Meshes the tensor product of a 1D and a 1D-or-2D domain.
  */
-void build_extrusion (UnstructuredMesh& mesh,
-                      const MeshBase& cross_section,
+void build_extrusion (UnstructuredMesh & mesh,
+                      const MeshBase & cross_section,
                       const unsigned int nz,
                       RealVectorValue extrusion_vector,
-                      QueryElemSubdomainIDBase * elem_subdomain = NULL);
+                      QueryElemSubdomainIDBase * elem_subdomain = libmesh_nullptr);
 
 #ifdef LIBMESH_HAVE_TRIANGLE
 /**
@@ -135,13 +135,13 @@ void build_extrusion (UnstructuredMesh& mesh,
  * Delaunay triangulation.  This function internally calls the
  * triangle library written by J.R. Shewchuk.
  */
-void build_delaunay_square(UnstructuredMesh& mesh,
+void build_delaunay_square(UnstructuredMesh & mesh,
                            const unsigned int nx, // num. of elements in x-dir
                            const unsigned int ny, // num. of elements in y-dir
                            const Real xmin, const Real xmax,
                            const Real ymin, const Real ymax,
                            const ElemType type,
-                           const std::vector<TriangleInterface::Hole*>* holes=NULL);
+                           const std::vector<TriangleInterface::Hole*> * holes=libmesh_nullptr);
 #endif // #define LIBMESH_HAVE_TRIANGLE
 
 /**

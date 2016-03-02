@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -65,7 +65,7 @@ namespace libMesh
  *    0              8              1
  *  \endverbatim
  */
-class Hex27 : public Hex
+class Hex27 libmesh_final : public Hex
 {
 public:
 
@@ -73,7 +73,7 @@ public:
    * Constructor.  By default this element has no parent.
    */
   explicit
-  Hex27 (Elem* p=NULL) :
+  Hex27 (Elem * p=libmesh_nullptr) :
     Hex(Hex27::n_nodes(), p, _nodelinks_data)
   {}
 
@@ -133,8 +133,13 @@ public:
   virtual Order default_order() const libmesh_override { return SECOND; }
 
   /**
+   * Don't hide Elem::key() defined in the base class.
+   */
+  using Elem::key;
+
+  /**
    * @returns an id associated with the \p s side of this element.
-   * The id is not necessariy unique, but should be close.  This is
+   * The id is not necessarily unique, but should be close.  This is
    * particularly useful in the \p MeshBase::find_neighbors() routine.
    *
    * We reimplemenet this method here for the \p Hex27 since we can
@@ -158,7 +163,7 @@ public:
 
   virtual void connectivity(const unsigned int sc,
                             const IOPackage iop,
-                            std::vector<dof_id_type>& conn) const libmesh_override;
+                            std::vector<dof_id_type> & conn) const libmesh_override;
 
   /**
    * @returns 2 for all edge nodes, 4 for all face nodes, and
@@ -198,6 +203,10 @@ public:
    */
   static const unsigned int edge_nodes_map[12][3];
 
+  /**
+   * A specialization for computing the volume of a Hex27.
+   */
+  virtual Real volume () const libmesh_override;
 
 protected:
 
@@ -205,7 +214,7 @@ protected:
   /**
    * Data for links to nodes
    */
-  Node* _nodelinks_data[27];
+  Node * _nodelinks_data[27];
 
 
 #ifdef LIBMESH_ENABLE_AMR

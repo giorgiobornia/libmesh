@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -58,7 +58,7 @@ public:
    * Constructor.  By default this element has no parent.
    */
   explicit
-  Tri3 (Elem* p=NULL) :
+  Tri3 (Elem * p=libmesh_nullptr) :
     Tri(Tri3::n_nodes(), p, _nodelinks_data) {}
 
   /**
@@ -123,7 +123,7 @@ public:
 
   virtual void connectivity(const unsigned int sf,
                             const IOPackage iop,
-                            std::vector<dof_id_type>& conn) const libmesh_override;
+                            std::vector<dof_id_type> & conn) const libmesh_override;
 
   /**
    * This maps the \f$ j^{th} \f$ node of the \f$ i^{th} \f$ side to
@@ -144,24 +144,12 @@ public:
    */
   std::pair<Real, Real> min_and_max_angle() const;
 
-  /**
-   * Don't hide Tri::key(side) defined in the base class.
-   */
-  using Tri::key;
-
-  /**
-   * @returns an id associated with the global node ids of this
-   * element.  The id is not necessariy unique, but should be
-   * close.
-   */
-  virtual dof_id_type key () const libmesh_override;
-
 protected:
 
   /**
    * Data for links to nodes
    */
-  Node* _nodelinks_data[3];
+  Node * _nodelinks_data[3];
 
 
 

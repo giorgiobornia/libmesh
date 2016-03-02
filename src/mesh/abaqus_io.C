@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -28,6 +28,7 @@
 #include "libmesh/string_to_enum.h"
 #include "libmesh/boundary_info.h"
 #include "libmesh/utility.h"
+#include LIBMESH_INCLUDE_UNORDERED_MAP
 
 // Anonymous namespace to hold mapping Data for Abaqus/libMesh element types
 namespace
@@ -56,13 +57,13 @@ std::map<ElemType, ElementDefinition> eletypes;
  * Helper function to fill up eletypes map
  */
 void add_eletype_entry(ElemType libmesh_elem_type,
-                       const unsigned* node_map,
+                       const unsigned * node_map,
                        unsigned node_map_size,
-                       const unsigned short* side_map,
+                       const unsigned short * side_map,
                        unsigned side_map_size)
 {
   // If map entry does not exist, this will create it
-  ElementDefinition& map_entry = eletypes[libmesh_elem_type];
+  ElementDefinition & map_entry = eletypes[libmesh_elem_type];
 
 
   // Use the "swap trick" from Scott Meyer's "Effective STL" to swap
@@ -184,7 +185,7 @@ void init_eletypes ()
 namespace libMesh
 {
 
-AbaqusIO::AbaqusIO (MeshBase& mesh_in) :
+AbaqusIO::AbaqusIO (MeshBase & mesh_in) :
   MeshInput<MeshBase> (mesh_in),
   build_sidesets_from_nodesets(false),
   _already_seen_part(false)
@@ -201,10 +202,10 @@ AbaqusIO::~AbaqusIO ()
 
 
 
-void AbaqusIO::read (const std::string& fname)
+void AbaqusIO::read (const std::string & fname)
 {
   // Get a reference to the mesh we are reading
-  MeshBase& the_mesh = MeshInput<MeshBase>::mesh();
+  MeshBase & the_mesh = MeshInput<MeshBase>::mesh();
 
   // Clear any existing mesh data
   the_mesh.clear();
@@ -393,7 +394,7 @@ void AbaqusIO::read (const std::string& fname)
 
     for (; el != end_el; ++el)
       {
-        Elem* elem = *el;
+        Elem * elem = *el;
 
         if (elem->dim() < max_dim)
           the_mesh.delete_elem(elem);
@@ -410,7 +411,7 @@ void AbaqusIO::read (const std::string& fname)
 void AbaqusIO::read_nodes(std::string nset_name)
 {
   // Get a reference to the mesh we are reading
-  MeshBase& the_mesh = MeshInput<MeshBase>::mesh();
+  MeshBase & the_mesh = MeshInput<MeshBase>::mesh();
 
   // In the input files I have, Abaqus neither tells what
   // the mesh dimension is nor how many nodes it has...
@@ -433,7 +434,7 @@ void AbaqusIO::read_nodes(std::string nset_name)
   // We need to duplicate some of the read_ids code if this *NODE
   // section also defines an NSET.  We'll set up the id_storage
   // pointer and push back IDs into this vector in the loop below...
-  std::vector<dof_id_type>* id_storage = NULL;
+  std::vector<dof_id_type> * id_storage = libmesh_nullptr;
   if (nset_name != "")
     id_storage = &(_nodeset_ids[nset_name]);
 
@@ -481,7 +482,7 @@ void AbaqusIO::read_nodes(std::string nset_name)
 void AbaqusIO::read_elements(std::string upper, std::string elset_name)
 {
   // Get a reference to the mesh we are reading
-  MeshBase& the_mesh = MeshInput<MeshBase>::mesh();
+  MeshBase & the_mesh = MeshInput<MeshBase>::mesh();
 
   // initialize the eletypes map (eletypes is a file-global variable)
   init_eletypes();
@@ -553,7 +554,7 @@ void AbaqusIO::read_elements(std::string upper, std::string elset_name)
   _elem_types.insert(elem_type);
 
   // Grab a reference to the element definition for this element type
-  const ElementDefinition& eledef = eletypes[elem_type];
+  const ElementDefinition & eledef = eletypes[elem_type];
 
   // If the element definition was not found, the call above would have
   // created one with an uninitialized struct.  Check for that here...
@@ -574,7 +575,7 @@ void AbaqusIO::read_elements(std::string upper, std::string elset_name)
       _in >> abaqus_elem_id >> c;
 
       // Add an element of the appropriate type to the Mesh.
-      Elem* elem = the_mesh.add_elem(Elem::build(elem_type).release());
+      Elem * elem = the_mesh.add_elem(Elem::build(elem_type).release());
 
       // Associate the ID returned from libmesh with the abaqus element ID
       //_libmesh_to_abaqus_elem_mapping[elem->id()] = abaqus_elem_id;
@@ -598,7 +599,7 @@ void AbaqusIO::read_elements(std::string upper, std::string elset_name)
           while (std::getline(line_stream, cell, ','))
             {
               // FIXME: factor out this strtol stuff into a utility function.
-              char* endptr;
+              char * endptr;
               dof_id_type abaqus_global_node_id = cast_int<dof_id_type>
                 (std::strtol(cell.c_str(), &endptr, /*base=*/10));
 
@@ -608,11 +609,11 @@ void AbaqusIO::read_elements(std::string upper, std::string elset_name)
                   dof_id_type libmesh_global_node_id = _abaqus_to_libmesh_node_mapping[abaqus_global_node_id];
 
                   // Grab the node pointer from the mesh for this ID
-                  Node* node = the_mesh.node_ptr(libmesh_global_node_id);
+                  Node * node = the_mesh.node_ptr(libmesh_global_node_id);
 
                   // If node_ptr() returns NULL, it may mean we have not yet read the
                   // *Nodes section, though I assumed that always came before the *Elements section...
-                  if (node == NULL)
+                  if (node == libmesh_nullptr)
                     libmesh_error_msg("Error!  Mesh returned NULL Node pointer.  Either no node exists with ID " \
                                       << libmesh_global_node_id         \
                                       << " or perhaps this input file has *Elements defined before *Nodes?");
@@ -694,10 +695,10 @@ std::string AbaqusIO::parse_label(std::string line, std::string label_name)
 
 
 
-void AbaqusIO::read_ids(std::string set_name, container_t& container)
+void AbaqusIO::read_ids(std::string set_name, container_t & container)
 {
   // Grab a reference to a vector that will hold all the IDs
-  std::vector<dof_id_type>& id_storage = container[set_name];
+  std::vector<dof_id_type> & id_storage = container[set_name];
 
   // Read until the start of another section is detected, or EOF is encountered
   while (_in.peek() != '*' && _in.peek() != EOF)
@@ -718,7 +719,7 @@ void AbaqusIO::read_ids(std::string set_name, container_t& container)
           // first invalid character in *endptr.  If there were no
           // digits at all, however, strtol() stores the original
           // value of str in *endptr.
-          char* endptr;
+          char * endptr;
 
           // FIXME - this needs to be updated for 64-bit inputs
           dof_id_type id = cast_int<dof_id_type>
@@ -739,10 +740,10 @@ void AbaqusIO::read_ids(std::string set_name, container_t& container)
 
 
 
-void AbaqusIO::read_sideset(std::string sideset_name, sideset_container_t& container)
+void AbaqusIO::read_sideset(std::string sideset_name, sideset_container_t & container)
 {
   // Grab a reference to a vector that will hold all the IDs
-  std::vector<std::pair<dof_id_type, unsigned> >& id_storage = container[sideset_name];
+  std::vector<std::pair<dof_id_type, unsigned> > & id_storage = container[sideset_name];
 
   // Variables for storing values read in from file
   dof_id_type elem_id=0;
@@ -775,7 +776,7 @@ void AbaqusIO::read_sideset(std::string sideset_name, sideset_container_t& conta
 void AbaqusIO::assign_subdomain_ids()
 {
   // Get a reference to the mesh we are reading
-  MeshBase& the_mesh = MeshInput<MeshBase>::mesh();
+  MeshBase & the_mesh = MeshInput<MeshBase>::mesh();
 
   // The number of elemsets we've found while reading
   std::size_t n_elemsets = _elemset_ids.size();
@@ -799,7 +800,7 @@ void AbaqusIO::assign_subdomain_ids()
     for (unsigned elemset_id=0; it != _elemset_ids.end(); ++it, ++elemset_id)
       {
         // Grab a reference to the vector of IDs
-        std::vector<dof_id_type>& id_vector = it->second;
+        std::vector<dof_id_type> & id_vector = it->second;
 
         // Loop over this vector
         for (std::size_t i=0; i<id_vector.size(); ++i)
@@ -808,9 +809,9 @@ void AbaqusIO::assign_subdomain_ids()
             dof_id_type libmesh_elem_id = _abaqus_to_libmesh_elem_mapping[ id_vector[i] ];
 
             // Get pointer to that element
-            Elem* elem = the_mesh.elem(libmesh_elem_id);
+            Elem * elem = the_mesh.elem(libmesh_elem_id);
 
-            if (elem == NULL)
+            if (elem == libmesh_nullptr)
               libmesh_error_msg("Mesh returned NULL pointer for Elem " << libmesh_elem_id);
 
             // We won't assign subdomain ids to lower-dimensional
@@ -847,7 +848,7 @@ void AbaqusIO::assign_subdomain_ids()
 void AbaqusIO::assign_boundary_node_ids()
 {
   // Get a reference to the mesh we are reading
-  MeshBase& the_mesh = MeshInput<MeshBase>::mesh();
+  MeshBase & the_mesh = MeshInput<MeshBase>::mesh();
 
   // Iterate over the container of nodesets
   container_t::iterator it = _nodeset_ids.begin();
@@ -857,7 +858,7 @@ void AbaqusIO::assign_boundary_node_ids()
       the_mesh.get_boundary_info().nodeset_name(current_id) = it->first;
 
       // Get a reference to the current vector of nodeset ID values
-      std::vector<dof_id_type>& nodeset_ids = it->second;
+      std::vector<dof_id_type> & nodeset_ids = it->second;
 
       for (std::size_t i=0; i<nodeset_ids.size(); ++i)
         {
@@ -865,9 +866,9 @@ void AbaqusIO::assign_boundary_node_ids()
           dof_id_type libmesh_global_node_id = _abaqus_to_libmesh_node_mapping[nodeset_ids[i]];
 
           // Get node pointer from the mesh
-          Node* node = the_mesh.node_ptr(libmesh_global_node_id);
+          Node * node = the_mesh.node_ptr(libmesh_global_node_id);
 
-          if (node == NULL)
+          if (node == libmesh_nullptr)
             libmesh_error_msg("Error! Mesh returned NULL node pointer!");
 
           // Add this node with the current_id (which is determined by the
@@ -883,7 +884,7 @@ void AbaqusIO::assign_boundary_node_ids()
 void AbaqusIO::assign_sideset_ids()
 {
   // Get a reference to the mesh we are reading
-  MeshBase& the_mesh = MeshInput<MeshBase>::mesh();
+  MeshBase & the_mesh = MeshInput<MeshBase>::mesh();
 
   // initialize the eletypes map (eletypes is a file-global variable)
   init_eletypes();
@@ -897,7 +898,7 @@ void AbaqusIO::assign_sideset_ids()
         the_mesh.get_boundary_info().sideset_name(current_id) = it->first;
 
         // Get a reference to the current vector of nodeset ID values
-        std::vector<std::pair<dof_id_type,unsigned> >& sideset_ids = it->second;
+        std::vector<std::pair<dof_id_type,unsigned> > & sideset_ids = it->second;
 
         for (std::size_t i=0; i<sideset_ids.size(); ++i)
           {
@@ -910,14 +911,14 @@ void AbaqusIO::assign_sideset_ids()
             dof_id_type libmesh_elem_id = _abaqus_to_libmesh_elem_mapping[ abaqus_elem_id ];
 
             // Get pointer to that element
-            Elem* elem = the_mesh.elem(libmesh_elem_id);
+            Elem * elem = the_mesh.elem(libmesh_elem_id);
 
             // Check that the pointer returned from the Mesh is non-NULL
-            if (elem == NULL)
+            if (elem == libmesh_nullptr)
               libmesh_error_msg("Mesh returned NULL pointer for Elem " << libmesh_elem_id);
 
             // Grab a reference to the element definition for this element type
-            const ElementDefinition& eledef = eletypes[elem->type()];
+            const ElementDefinition & eledef = eletypes[elem->type()];
 
             // If the element definition was not found, the call above would have
             // created one with an uninitialized struct.  Check for that here...
@@ -953,8 +954,8 @@ void AbaqusIO::assign_sideset_ids()
     // because the lower-dimensional elements can belong to more than
     // 1 sideset, and multiple lower-dimensional elements can hash to
     // the same value, but this is very rare.
-    typedef std::multimap<dof_id_type,
-                          std::pair<Elem*, boundary_id_type> > provide_bcs_t;
+    typedef LIBMESH_BEST_UNORDERED_MULTIMAP<dof_id_type,
+                                            std::pair<Elem *, boundary_id_type> > provide_bcs_t;
     provide_bcs_t provide_bcs;
 
     // The elemset_id counter assigns a logical numbering to the
@@ -964,7 +965,7 @@ void AbaqusIO::assign_sideset_ids()
     for (boundary_id_type elemset_id=0; it != _elemset_ids.end(); ++it, ++elemset_id)
       {
         // Grab a reference to the vector of IDs
-        std::vector<dof_id_type>& id_vector = it->second;
+        std::vector<dof_id_type> & id_vector = it->second;
 
         // Loop over this vector
         for (std::size_t i=0; i<id_vector.size(); ++i)
@@ -973,9 +974,9 @@ void AbaqusIO::assign_sideset_ids()
             dof_id_type libmesh_elem_id = _abaqus_to_libmesh_elem_mapping[ id_vector[i] ];
 
             // Get pointer to that element
-            Elem* elem = the_mesh.elem(libmesh_elem_id);
+            Elem * elem = the_mesh.elem(libmesh_elem_id);
 
-            if (elem == NULL)
+            if (elem == libmesh_nullptr)
               libmesh_error_msg("Mesh returned NULL pointer for Elem " << libmesh_elem_id);
 
             // If the element dimension is equal to the maximum
@@ -1010,7 +1011,7 @@ void AbaqusIO::assign_sideset_ids()
       const MeshBase::element_iterator end = the_mesh.active_elements_end();
       for ( ; e_it != end; ++e_it)
         {
-          Elem* elem = *e_it;
+          Elem * elem = *e_it;
 
           if (elem->dim() == max_dim)
             {
@@ -1034,10 +1035,10 @@ void AbaqusIO::assign_sideset_ids()
                       UniquePtr<Elem> side (elem->build_side(sn));
 
                       // Get the value mapped by the iterator.
-                      std::pair<Elem*, boundary_id_type> p = s_it->second;
+                      std::pair<Elem *, boundary_id_type> p = s_it->second;
 
                       // Extract the relevant data from the iterator.
-                      Elem* lower_dim_elem = p.first;
+                      Elem * lower_dim_elem = p.first;
                       boundary_id_type bid = p.second;
 
                       // This was a hash, so it might not be perfect.  Let's verify...

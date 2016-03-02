@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2015 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -61,7 +61,7 @@ public:
    * Constructor.  By default this element has no parent.
    */
   explicit
-  Tri6 (Elem* p=NULL) :
+  Tri6 (Elem * p=libmesh_nullptr) :
     Tri(Tri6::n_nodes(), p, _nodelinks_data) {}
 
   /**
@@ -121,8 +121,13 @@ public:
   virtual Order default_order() const libmesh_override { return SECOND; }
 
   /**
+   * Don't hide Elem::key() defined in the base class.
+   */
+  using Elem::key;
+
+  /**
    * @returns an id associated with the \p s side of this element.
-   * The id is not necessariy unique, but should be close.  This is
+   * The id is not necessarily unique, but should be close.  This is
    * particularly useful in the \p MeshBase::find_neighbors() routine.
    *
    * We reimplemenet this method here for the \p Quad8 since we can
@@ -136,7 +141,7 @@ public:
 
   virtual void connectivity(const unsigned int sf,
                             const IOPackage iop,
-                            std::vector<dof_id_type>& conn) const libmesh_override;
+                            std::vector<dof_id_type> & conn) const libmesh_override;
 
   /**
    * @returns 2 for all \p n
@@ -170,13 +175,18 @@ public:
    */
   static const unsigned int side_nodes_map[3][3];
 
+  /**
+   * An optimized method for approximating the area of a
+   * TRI6 using quadrature.
+   */
+  virtual Real volume () const libmesh_override;
 
 protected:
 
   /**
    * Data for links to nodes
    */
-  Node* _nodelinks_data[6];
+  Node * _nodelinks_data[6];
 
 
 
