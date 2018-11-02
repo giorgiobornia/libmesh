@@ -1,3 +1,20 @@
+// The libMesh Finite Element Library.
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+
+// This library is free software; you can redistribute it and/or
+// modify it under the terms of the GNU Lesser General Public
+// License as published by the Free Software Foundation; either
+// version 2.1 of the License, or (at your option) any later version.
+
+// This library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+// Lesser General Public License for more details.
+
+// You should have received a copy of the GNU Lesser General Public
+// License along with this library; if not, write to the Free Software
+// Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
 #include "L2system.h"
 
 #include "libmesh/fe_base.h"
@@ -12,13 +29,8 @@ using namespace libMesh;
 
 L2System::~L2System ()
 {
-  for (std::map<FEMContext *, FEMContext *>::const_iterator
-         it = input_contexts.begin();
-       it != input_contexts.end(); ++it)
-    {
-      FEMContext * c = it->second;
-      delete c;
-    }
+  for (auto & pr : input_contexts)
+    delete pr.second;
 }
 
 void L2System::init_data ()
@@ -34,7 +46,7 @@ void L2System::init_data ()
 
 void L2System::init_context(DiffContext & context)
 {
-  FEMContext & c = libmesh_cast_ref<FEMContext &>(context);
+  FEMContext & c = cast_ref<FEMContext &>(context);
 
   // Now make sure we have requested all the data
   // we need to build the L2 system.
@@ -61,7 +73,7 @@ void L2System::init_context(DiffContext & context)
 bool L2System::element_time_derivative (bool request_jacobian,
                                         DiffContext & context)
 {
-  FEMContext & c = libmesh_cast_ref<FEMContext &>(context);
+  FEMContext & c = cast_ref<FEMContext &>(context);
 
   // First we get some references to cell-specific data that
   // will be used to assemble the linear system.
@@ -69,12 +81,12 @@ bool L2System::element_time_derivative (bool request_jacobian,
   // Element Jacobian * quadrature weights for interior integration
   const std::vector<Real> & JxW = c.get_element_fe(0)->get_JxW();
 
-  const std::vector<std::vector<Real> > & phi = c.get_element_fe(0)->get_phi();
+  const std::vector<std::vector<Real>> & phi = c.get_element_fe(0)->get_phi();
 
   const std::vector<Point> & xyz = c.get_element_fe(0)->get_xyz();
 
   // The number of local degrees of freedom in each variable
-  const unsigned int n_u_dofs = c.get_dof_indices(0).size();
+  const unsigned int n_u_dofs = c.n_dof_indices(0);
 
   // The subvectors and submatrices we need to fill:
   DenseSubMatrix<Number> & K = c.get_elem_jacobian(0, 0);

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -59,7 +59,7 @@ void LaspackMatrix<T>::update_sparsity_pattern (const SparsityPattern::Graph & s
   }
 
 
-  // Initize the _csr data structure.
+  // Initialize the _csr data structure.
   {
     std::vector<numeric_index_type>::iterator position = _csr.begin();
 
@@ -68,11 +68,10 @@ void LaspackMatrix<T>::update_sparsity_pattern (const SparsityPattern::Graph & s
     for (numeric_index_type row=0; row<n_rows; row++)
       {
         // insert the row indices
-        for (SparsityPattern::Row::const_iterator col = sparsity_pattern[row].begin();
-             col != sparsity_pattern[row].end(); ++col)
+        for (const auto & col : sparsity_pattern[row])
           {
             libmesh_assert (position != _csr.end());
-            *position = *col;
+            *position = col;
             ++position;
           }
 
@@ -155,7 +154,7 @@ void LaspackMatrix<T>::init ()
   // We need the DofMap for this!
   libmesh_assert(this->_dof_map);
 
-  // Clear intialized matrices
+  // Clear initialized matrices
   if (this->initialized())
     this->clear();
 
@@ -379,14 +378,21 @@ void LaspackMatrix<T>::add_matrix(const DenseMatrix<T> & dm,
 
 
 template <typename T>
-void LaspackMatrix<T>::add (const T a_in, SparseMatrix<T> & X_in)
+void LaspackMatrix<T>::add (const T a_in, const SparseMatrix<T> & X_in)
 {
   libmesh_assert (this->initialized());
   libmesh_assert_equal_to (this->m(), X_in.m());
   libmesh_assert_equal_to (this->n(), X_in.n());
 
-  LaspackMatrix<T> * X = cast_ptr<LaspackMatrix<T> *> (&X_in);
-  _LPNumber         a = static_cast<_LPNumber>          (a_in);
+  const LaspackMatrix<T> * const_X =
+    cast_ptr<const LaspackMatrix<T> *> (&X_in);
+
+  // The Laspack APIs expect non-const pointers; I don't think
+  // X_in should actually be changed by any of the code below.
+  LaspackMatrix<T> * X =
+    const_cast<LaspackMatrix<T> *>(const_X);
+
+  _LPNumber a = static_cast<_LPNumber> (a_in);
 
   libmesh_assert(X);
 

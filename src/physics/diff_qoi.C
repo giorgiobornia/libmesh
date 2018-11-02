@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -32,10 +32,8 @@ void DifferentiableQoI::thread_join( std::vector<Number> & qoi,
                                      const std::vector<Number> & other_qoi,
                                      const QoISet &)
 {
-  for (unsigned int i=0; i != qoi.size(); ++i)
+  for (std::size_t i=0; i != qoi.size(); ++i)
     qoi[i] += other_qoi[i];
-
-  return;
 }
 
 void DifferentiableQoI::parallel_op(const Parallel::Communicator & communicator,
@@ -48,8 +46,11 @@ void DifferentiableQoI::parallel_op(const Parallel::Communicator & communicator,
 
   // Now put into system qoi
   sys_qoi = local_qoi;
+}
 
-  return;
+void DifferentiableQoI::finalize_derivative(NumericVector<Number> &, std::size_t)
+{
+  // by default, do nothing
 }
 
 } // namespace libMesh

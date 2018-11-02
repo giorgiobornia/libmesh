@@ -16,6 +16,16 @@
 
 #include "test_comm.h"
 
+// THE CPPUNIT_TEST_SUITE_END macro expands to code that involves
+// std::auto_ptr, which in turn produces -Wdeprecated-declarations
+// warnings.  These can be ignored in GCC as long as we wrap the
+// offending code in appropriate pragmas.  We can't get away with a
+// single ignore_warnings.h inclusion at the beginning of this file,
+// since the libmesh headers pull in a restore_warnings.h at some
+// point.  We also don't bother restoring warnings at the end of this
+// file since it's not a header.
+#include <libmesh/ignore_warnings.h>
+
 using namespace libMesh;
 
 class SlitFunc : public FEMFunctionBase<Number>
@@ -26,18 +36,17 @@ public:
 
   ~SlitFunc () {}
 
-  virtual void init_context (const FEMContext &) libmesh_override {}
+  virtual void init_context (const FEMContext &) override {}
 
-  virtual UniquePtr<FEMFunctionBase<Number> >
-  clone () const libmesh_override
+  virtual std::unique_ptr<FEMFunctionBase<Number>>
+  clone () const override
   {
-    return UniquePtr<FEMFunctionBase<Number> > (new SlitFunc());
+    return libmesh_make_unique<SlitFunc>();
   }
 
   virtual Number operator() (const FEMContext & c,
                              const Point & p,
-                             const Real /*time*/ = 0.)
-  libmesh_override
+                             const Real /*time*/ = 0.) override
   {
     const Real & x = p(0);
     const Real & y = p(1);
@@ -50,8 +59,7 @@ public:
   virtual void operator() (const FEMContext & c,
                            const Point & p,
                            const Real time,
-                           DenseVector<Number> & output)
-  libmesh_override
+                           DenseVector<Number> & output) override
   {
     for (unsigned int i=0; i != output.size(); ++i)
       output(i) = (*this)(c, p, time);
@@ -67,12 +75,14 @@ public:
 class SlitMeshTest : public CppUnit::TestCase {
   /**
    * The goal of this test is to ensure that a 2D mesh with nodes overlapping
-   * on opposite sides of an internal, "slit" edge is useable.
+   * on opposite sides of an internal, "slit" edge is usable.
    */
 public:
   CPPUNIT_TEST_SUITE( SlitMeshTest );
 
+#if LIBMESH_DIM > 1
   CPPUNIT_TEST( testMesh );
+#endif
 
   CPPUNIT_TEST_SUITE_END();
 
@@ -84,23 +94,21 @@ protected:
   {
     _mesh = new Mesh(*TestCommWorld);
 
-    /*
-      (0,1)           (1,1)           (2,1)
-        x---------------x---------------x
-        |               |               |
-        |               |               |
-        |               |               |
-        |               |               |
-        |               |               |
-        x---------------x---------------x
-       (0,0)           (1,0)          (2,0)
-        |               |               |
-        |               |               |
-        |               |               |
-        |               |               |
-        x---------------x---------------x
-       (0,-1)          (1,-1)         (2,-1)
-     */
+    // (0,1)           (1,1)           (2,1)
+    // x---------------x---------------x
+    // |               |               |
+    // |               |               |
+    // |               |               |
+    // |               |               |
+    // |               |               |
+    // x---------------x---------------x
+    // (0,0)           (1,0)          (2,0)
+    // |               |               |
+    // |               |               |
+    // |               |               |
+    // |               |               |
+    // x---------------x---------------x
+    // (0,-1)          (1,-1)         (2,-1)
 
     _mesh->set_mesh_dimension(2);
 
@@ -159,7 +167,9 @@ protected:
 public:
   void setUp()
   {
+#if LIBMESH_DIM > 1
     this->build_mesh();
+#endif
   }
 
   void tearDown()
@@ -177,17 +187,19 @@ public:
 
     /* The middle nodes should still be distinct between the top and
      * bottom elements */
-    if (_mesh->query_elem(0) && _mesh->query_elem(1))
-      CPPUNIT_ASSERT( _mesh->elem(0)->node(1) != _mesh->elem(1)->node(2) );
-    if (_mesh->query_elem(2) && _mesh->query_elem(3))
-      CPPUNIT_ASSERT( _mesh->elem(2)->node(0) != _mesh->elem(3)->node(3) );
+    if (_mesh->query_elem_ptr(0) && _mesh->query_elem_ptr(1))
+      CPPUNIT_ASSERT( _mesh->elem_ref(0).node_id(1) != _mesh->elem_ref(1).node_id(2) );
+    if (_mesh->query_elem_ptr(2) && _mesh->query_elem_ptr(3))
+      CPPUNIT_ASSERT( _mesh->elem_ref(2).node_id(0) != _mesh->elem_ref(3).node_id(3) );
 
     /* The middle nodes should still be shared between left and right
      * elements on top and bottom */
-    if (_mesh->query_elem(0) && _mesh->query_elem(2))
-      CPPUNIT_ASSERT_EQUAL( _mesh->elem(0)->node(1), _mesh->elem(2)->node(0) );
-    if (_mesh->query_elem(1) && _mesh->query_elem(3))
-      CPPUNIT_ASSERT_EQUAL( _mesh->elem(1)->node(2), _mesh->elem(3)->node(3) );
+    if (_mesh->query_elem_ptr(0) && _mesh->query_elem_ptr(2))
+      CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(0).node_id(1),
+                            _mesh->elem_ref(2).node_id(0) );
+    if (_mesh->query_elem_ptr(1) && _mesh->query_elem_ptr(3))
+      CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(1).node_id(2),
+                            _mesh->elem_ref(3).node_id(3) );
   }
 
 };
@@ -202,7 +214,9 @@ class SlitMeshRefinedMeshTest : public SlitMeshTest {
 public:
   CPPUNIT_TEST_SUITE( SlitMeshRefinedMeshTest );
 
+#if LIBMESH_DIM > 1
   CPPUNIT_TEST( testMesh );
+#endif
 
   CPPUNIT_TEST_SUITE_END();
 
@@ -211,10 +225,12 @@ public:
 
   void setUp()
   {
+#if LIBMESH_DIM > 1
     this->build_mesh();
 
 #ifdef LIBMESH_ENABLE_AMR
     MeshRefinement(*_mesh).uniformly_refine(1);
+#endif
 #endif
   }
 
@@ -240,12 +256,14 @@ class SlitMeshRefinedSystemTest : public SlitMeshTest {
 public:
   CPPUNIT_TEST_SUITE( SlitMeshRefinedSystemTest );
 
+#if LIBMESH_DIM > 1
   CPPUNIT_TEST( testMesh );
 
   CPPUNIT_TEST( testSystem );
 
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
   CPPUNIT_TEST( testRestart );
+#endif
 #endif
 
   CPPUNIT_TEST_SUITE_END();
@@ -259,10 +277,11 @@ public:
 
   void setUp()
   {
+#if LIBMESH_DIM > 1
     this->build_mesh();
 
-    // libMesh *should* renumber now, or a ParallelMesh might not have
-    // contiguous ids, which is a requirement to write xda files.
+    // libMesh *should* renumber now, or a DistributedMesh might not
+    // have contiguous ids, which is a requirement to write xda files.
     _mesh->allow_renumbering(true);
 
     _es = new EquationSystems(*_mesh);
@@ -278,6 +297,7 @@ public:
     _es->reinit();
     MeshRefinement(*_mesh).uniformly_refine(1);
     _es->reinit();
+#endif
 #endif
   }
 
@@ -314,14 +334,8 @@ public:
     const std::vector<Point> & xyz = fe->get_xyz();
     fe->get_phi();
 
-    MeshBase::const_element_iterator       el     =
-      _mesh->active_local_elements_begin();
-    const MeshBase::const_element_iterator end_el =
-      _mesh->active_local_elements_end();
-
-    for (; el != end_el; ++el)
+    for (const auto & elem : _mesh->active_local_element_ptr_range())
       {
-        const Elem * elem = *el;
         context.pre_fe_reinit(*_sys, elem);
         context.elem_fe_reinit();
 
@@ -366,14 +380,30 @@ public:
     const std::vector<Point> & xyz = fe->get_xyz();
     fe->get_phi();
 
-    MeshBase::const_element_iterator       el     =
-      mesh2.active_local_elements_begin();
-    const MeshBase::const_element_iterator end_el =
-      mesh2.active_local_elements_end();
+    // While we're in the middle of a unique id based test case, let's
+    // make sure our unique ids were all read in correctly too.
+    std::unique_ptr<PointLocatorBase> locator = _mesh->sub_point_locator();
 
-    for (; el != end_el; ++el)
+    if (!_mesh->is_serial())
+      locator->enable_out_of_mesh_mode();
+
+    for (const auto & elem : mesh2.active_local_element_ptr_range())
       {
-        const Elem * elem = *el;
+        const Elem * mesh1_elem = (*locator)(elem->centroid());
+        if (mesh1_elem)
+          {
+            CPPUNIT_ASSERT_EQUAL( elem->unique_id(),
+                                  mesh1_elem->unique_id() );
+
+            for (unsigned int n=0; n != elem->n_nodes(); ++n)
+              {
+                const Node & node       = elem->node_ref(n);
+                const Node & mesh1_node = mesh1_elem->node_ref(n);
+                CPPUNIT_ASSERT_EQUAL( node.unique_id(),
+                                      mesh1_node.unique_id() );
+              }
+          }
+
         context.pre_fe_reinit(sys2, elem);
         context.elem_fe_reinit();
 

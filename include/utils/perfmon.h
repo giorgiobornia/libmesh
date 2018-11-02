@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -40,6 +40,15 @@ namespace libMesh
 
 
 
+/**
+ * PAPI stands for Performance Application Programming Interface.
+ * This class was supposed to provide an interface to the hardware
+ * timers that PAPI exposes, but it never really got developed.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2002
+ * \brief A class for interfacing with hardware timers.
+ */
 class PerfMon
 {
 public:
@@ -73,7 +82,7 @@ inline
 void
 PerfMon::reset ()
 {
-  gettimeofday (&the_time_start, libmesh_nullptr);
+  gettimeofday (&the_time_start, nullptr);
 
 #ifdef HAVE_PAPI_H
   Papi::PAPI_flops (&rtime, & ptime, &flpins, &mflops);
@@ -84,9 +93,9 @@ PerfMon::reset ()
 
 inline
 double
-PerfMon::print (std::string msg, std::ostream &my_out)
+PerfMon::print (std::string msg, std::ostream & my_out)
 {
-  gettimeofday (&the_time_stop, libmesh_nullptr);
+  gettimeofday (&the_time_stop, nullptr);
 
 #ifdef HAVE_PAPI_H
   Papi::PAPI_flops (&rtime, & ptime, &flpins, &mflops);

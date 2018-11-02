@@ -91,14 +91,14 @@ struct AcousticsInnerProduct : ElemAssembly
   {
     const unsigned int p_var = 0;
 
-    FEBase * elem_fe = libmesh_nullptr;
+    FEBase * elem_fe = nullptr;
     c.get_element_fe(p_var, elem_fe);
 
     const std::vector<Real> & JxW = elem_fe->get_JxW();
 
-    const std::vector<std::vector<Real> > & phi = elem_fe->get_phi();
+    const std::vector<std::vector<Real>> & phi = elem_fe->get_phi();
 
-    const std::vector<std::vector<RealGradient> > & dphi = elem_fe->get_dphi();
+    const std::vector<std::vector<RealGradient>> & dphi = elem_fe->get_dphi();
 
     // The number of local degrees of freedom in each variable
     const unsigned int n_p_dofs = c.get_dof_indices(p_var).size();
@@ -106,7 +106,7 @@ struct AcousticsInnerProduct : ElemAssembly
     // Now we will build the affine operator
     unsigned int n_qpoints = c.get_element_qrule().n_points();
 
-    // We don't need to conjudate phi or dphi, since basis functions are real-valued
+    // We don't need to conjugate phi or dphi, since basis functions are real-valued
     for (unsigned int qp=0; qp != n_qpoints; qp++)
       for (unsigned int i=0; i != n_p_dofs; i++)
         for (unsigned int j=0; j != n_p_dofs; j++)
@@ -121,14 +121,14 @@ struct A0 : ElemAssembly
   {
     const unsigned int p_var = 0;
 
-    FEBase * elem_fe = libmesh_nullptr;
+    FEBase * elem_fe = nullptr;
     c.get_element_fe(p_var, elem_fe);
 
     const std::vector<Real> & JxW = elem_fe->get_JxW();
 
     // The velocity shape function gradients at interior
     // quadrature points.
-    const std::vector<std::vector<RealGradient> > & dphi = elem_fe->get_dphi();
+    const std::vector<std::vector<RealGradient>> & dphi = elem_fe->get_dphi();
 
     // The number of local degrees of freedom in each variable
     const unsigned int n_p_dofs = c.get_dof_indices(p_var).size();
@@ -150,12 +150,12 @@ struct A1 : ElemAssembly
   {
     const unsigned int p_var = 0;
 
-    FEBase * elem_fe = libmesh_nullptr;
+    FEBase * elem_fe = nullptr;
     c.get_element_fe(p_var, elem_fe);
 
     const std::vector<Real> & JxW = elem_fe->get_JxW();
 
-    const std::vector<std::vector<Real> > & phi = elem_fe->get_phi();
+    const std::vector<std::vector<Real>> & phi = elem_fe->get_phi();
 
     // The number of local degrees of freedom in each variable
     const unsigned int n_p_dofs = c.get_dof_indices(p_var).size();
@@ -178,12 +178,12 @@ struct A2 : ElemAssembly
       {
         const unsigned int p_var = 0;
 
-        FEBase * side_fe = libmesh_nullptr;
+        FEBase * side_fe = nullptr;
         c.get_side_fe(p_var, side_fe);
 
         const std::vector<Real> & JxW_face = side_fe->get_JxW();
 
-        const std::vector<std::vector<Real> > & phi_face = side_fe->get_phi();
+        const std::vector<std::vector<Real>> & phi_face = side_fe->get_phi();
 
         // The number of local degrees of freedom in each variable
         const unsigned int n_p_dofs = c.get_dof_indices(p_var).size();
@@ -207,12 +207,12 @@ struct A3 : ElemAssembly
       {
         const unsigned int p_var = 0;
 
-        FEBase * side_fe = libmesh_nullptr;
+        FEBase * side_fe = nullptr;
         c.get_side_fe(p_var, side_fe);
 
         const std::vector<Real> & JxW_face = side_fe->get_JxW();
 
-        const std::vector<std::vector<Real> > & phi_face = side_fe->get_phi();
+        const std::vector<std::vector<Real>> & phi_face = side_fe->get_phi();
 
         // The number of local degrees of freedom in each variable
         const unsigned int n_p_dofs = c.get_dof_indices(p_var).size();
@@ -236,12 +236,12 @@ struct F0 : ElemAssembly
       {
         const unsigned int p_var = 0;
 
-        FEBase * side_fe = libmesh_nullptr;
+        FEBase * side_fe = nullptr;
         c.get_side_fe(p_var, side_fe);
 
         const std::vector<Real> & JxW_face = side_fe->get_JxW();
 
-        const std::vector<std::vector<Real> > & phi_face = side_fe->get_phi();
+        const std::vector<std::vector<Real>> & phi_face = side_fe->get_phi();
 
         // The number of local degrees of freedom in each variable
         const unsigned int n_p_dofs = c.get_dof_indices(p_var).size();
@@ -264,12 +264,12 @@ struct Output0 : ElemAssembly
       {
         const unsigned int p_var = 0;
 
-        FEBase * side_fe = libmesh_nullptr;
+        FEBase * side_fe = nullptr;
         c.get_side_fe(p_var, side_fe);
 
         const std::vector<Real> & JxW_face = side_fe->get_JxW();
 
-        const std::vector<std::vector<Real> > & phi_face = side_fe->get_phi();
+        const std::vector<std::vector<Real>> & phi_face = side_fe->get_phi();
 
         // The number of local degrees of freedom in each variable
         const unsigned int n_p_dofs = c.get_dof_indices(p_var).size();

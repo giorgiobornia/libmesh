@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -37,9 +37,14 @@ template<typename T> class NonlinearSolver;
 /**
  * This class provides a specific system class.  It aims
  * at implicit systems, offering nothing more than just
- * the essentials needed to solve a system.  Note
- * that still additional vectors/matrices may be added,
- * as offered in the parent class \p ExplicitSystem.
+ * the essentials needed to solve a system.
+ *
+ * \note Additional vectors/matrices can be added via parent class
+ * interfaces.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2005
+ * \brief Used for solving nonlinear implicit systems of equations.
  */
 class NonlinearImplicitSystem : public ImplicitSystem
 {
@@ -145,7 +150,7 @@ public:
      * It must be implemented by the user in a derived class.
      */
     virtual void operator()(std::vector<NumericVector<Number> *> & sp,
-                            sys_type & s);
+                            sys_type & s) = 0;
   };
 
   /**
@@ -198,7 +203,7 @@ public:
   };
 
   /**
-   * @returns a clever pointer to the system.
+   * \returns A reference to *this.
    */
   sys_type & system () { return *this; }
 
@@ -206,26 +211,26 @@ public:
    * Clear all the data structures associated with
    * the system.
    */
-  virtual void clear () libmesh_override;
+  virtual void clear () override;
 
   /**
    * Reinitializes the member data fields associated with
    * the system, so that, e.g., \p assemble() may be used.
    */
-  virtual void reinit () libmesh_override;
+  virtual void reinit () override;
 
   /**
    * Assembles & solves the nonlinear system R(x) = 0.
    */
-  virtual void solve () libmesh_override;
+  virtual void solve () override;
 
   /**
-   * Returns an integer corresponding to the upper iteration count
+   * \returns An integer corresponding to the upper iteration count
    * limit and a Real corresponding to the convergence tolerance to
    * be used in linear adjoint and/or sensitivity solves
    */
   virtual std::pair<unsigned int, Real>
-  get_linear_solve_parameters() const libmesh_override;
+  get_linear_solve_parameters() const override;
 
   /**
    * Assembles a residual in \p rhs and/or a jacobian in \p matrix,
@@ -233,13 +238,14 @@ public:
    */
   virtual void assembly(bool get_residual,
                         bool get_jacobian,
-                        bool apply_heterogeneous_constraints = false) libmesh_override;
+                        bool apply_heterogeneous_constraints = false,
+                        bool apply_no_constraints = false) override;
 
   /**
-   * @returns \p "NonlinearImplicit".  Helps in identifying
+   * \returns \p "NonlinearImplicit".  Helps in identifying
    * the system type in an equation system file.
    */
-  virtual std::string system_type () const libmesh_override { return "NonlinearImplicit"; }
+  virtual std::string system_type () const override { return "NonlinearImplicit"; }
 
   /**
    * The \p NonlinearSolver defines the default interface used to
@@ -247,22 +253,22 @@ public:
    * details of interfacing with various nonlinear algebra packages
    * like PETSc or LASPACK.
    */
-  UniquePtr<NonlinearSolver<Number> > nonlinear_solver;
+  std::unique_ptr<NonlinearSolver<Number>> nonlinear_solver;
 
   /**
    * The \p DiffSolver defines an optional interface used to
    * solve the nonlinear_implicit system.
    */
-  UniquePtr<DiffSolver> diff_solver;
+  std::unique_ptr<DiffSolver> diff_solver;
 
   /**
-   * Returns  the number of iterations
+   * \returns The number of iterations
    * taken for the most recent nonlinear solve.
    */
   unsigned int n_nonlinear_iterations() const { return _n_nonlinear_iterations; }
 
   /**
-   * Returns the final residual for the nonlinear system solve.
+   * \returns The final residual for the nonlinear system solve.
    */
   Real final_nonlinear_residual() const { return _final_nonlinear_residual; }
 

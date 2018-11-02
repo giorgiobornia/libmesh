@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -60,7 +60,7 @@ int main(int argc, char ** argv)
 
   Mesh mesh(init.comm(), dim);
 
-  if(!cl.search("--input"))
+  if (!cl.search("--input"))
     {
       libMesh::err << "No --input argument found!" << std::endl;
       usage_error(argv[0]);
@@ -70,7 +70,7 @@ int main(int argc, char ** argv)
   mesh.read(meshname);
   libMesh::out << "Loaded mesh " << meshname << std::endl;
 
-  if(!cl.search("--newbcid"))
+  if (!cl.search("--newbcid"))
     {
       libMesh::err << "No --bcid argument found!" << std::endl;
       usage_error(argv[0]);
@@ -134,21 +134,22 @@ int main(int argc, char ** argv)
         oldbcid = BoundaryInfo::invalid_id;
     }
 
-  UniquePtr<FEBase> fe = FEBase::build(dim, FEType(FIRST,LAGRANGE));
+  std::unique_ptr<FEBase> fe = FEBase::build(dim, FEType(FIRST,LAGRANGE));
   QGauss qface(dim-1, CONSTANT);
   fe->attach_quadrature_rule(&qface);
   const std::vector<Point> & face_points = fe->get_xyz();
   const std::vector<Point> & face_normals = fe->get_normals();
 
-  MeshBase::element_iterator           el = mesh.elements_begin();
-  const MeshBase::element_iterator end_el = mesh.elements_end();
-  for (; el != end_el; ++el)
+  for (auto & elem : mesh.element_ptr_range())
     {
-      Elem * elem = *el;
       unsigned int n_sides = elem->n_sides();
+
+      // Container to catch ids handed back from BoundaryInfo
+      std::vector<boundary_id_type> ids;
+
       for (unsigned short s=0; s != n_sides; ++s)
         {
-          if (elem->neighbor(s))
+          if (elem->neighbor_ptr(s))
             continue;
 
           fe->reinit(elem,s);
@@ -167,9 +168,19 @@ int main(int argc, char ** argv)
               n(1) > minnormal(1) && n(1) < maxnormal(1) &&
               n(2) > minnormal(2) && n(2) < maxnormal(2))
             {
-              if (matcholdbcid &&
-                  mesh.get_boundary_info().boundary_id(elem, s) != oldbcid)
+              // Get the list of boundary ids for this side
+              mesh.get_boundary_info().boundary_ids(elem, s, ids);
+
+              // There should be at most one value present, otherwise the
+              // logic here won't work.
+              libmesh_assert(ids.size() <= 1);
+
+              // A convenient name for the side's ID.
+              boundary_id_type b_id = ids.empty() ? BoundaryInfo::invalid_id : ids[0];
+
+              if (matcholdbcid && b_id != oldbcid)
                 continue;
+
               mesh.get_boundary_info().remove_side(elem, s);
               mesh.get_boundary_info().add_side(elem, s, bcid);
               //libMesh::out << "Set element " << elem->id() << " side " << s <<
@@ -178,8 +189,13 @@ int main(int argc, char ** argv)
         }
     }
 
+  // We might have removed *every* instance of a given id, and if that
+  // happened then we should make sure that file formats which write
+  // out id sets do not write out the removed id.
+  mesh.get_boundary_info().regenerate_id_sets();
+
   std::string outputname;
-  if(cl.search("--output"))
+  if (cl.search("--output"))
     {
       outputname = cl.next("mesh.xda");
     }

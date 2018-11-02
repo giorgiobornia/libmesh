@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -30,7 +30,7 @@ namespace libMesh
 {
 
 /**
- * The \p StoredRange class defined a contiguous, divisible set of objects
+ * The \p StoredRange class defines a contiguous, divisible set of objects.
  * This class is used primarily as the argument to function objects.  The
  * range can then be subdivided into a number of "tasks" which can be executed
  * in parallel.  This concept is central to the Threading Building Blocks
@@ -46,6 +46,7 @@ namespace libMesh
  *
  * \author Benjamin S. Kirk
  * \date 2008
+ * \brief Utility class for defining generic ranges for threading.
  */
 template <typename iterator_type, typename object_type>
 class StoredRange
@@ -67,7 +68,8 @@ public:
     _last(),
     _first(),
     _grainsize(new_grainsize),
-    _objs()
+    _objs(new std::vector<object_type>()),
+    _should_release(true)
   {}
 
   /**
@@ -84,9 +86,33 @@ public:
     _last(),
     _first(),
     _grainsize(new_grainsize),
-    _objs()
+    _objs(new std::vector<object_type>()),
+    _should_release(true)
   {
     this->reset(first, last);
+  }
+
+  /**
+   * Constructor.  Takes a std::vector of objects.
+   * Optionally takes the \p grainsize parameter, which is the
+   * smallest chunk the range may be broken into for parallel
+   * execution.
+   *
+   * \note The std::vector passed in here MUST live for the
+   * lifetime of this StoredRange!
+   *
+   * \todo This should be a std::shared_ptr in the future!
+   */
+  StoredRange (std::vector<object_type> * objs,
+               const unsigned int new_grainsize = 1000) :
+    _end(objs->end()),
+    _begin(objs->begin()),
+    _last(objs->size()),
+    _first(0),
+    _grainsize(new_grainsize),
+    _objs(objs),
+    _should_release(false)
+  {
   }
 
   /**
@@ -108,7 +134,8 @@ public:
     _last(er._last),
     _first(er._first),
     _grainsize(er._grainsize),
-    _objs()
+    _objs(nullptr),
+    _should_release(false)
   {
     // specifically, do *not* copy the vector
   }
@@ -138,7 +165,8 @@ public:
     _last(0), // Initialize these in a moment
     _first(0),
     _grainsize(er._grainsize),
-    _objs()
+    _objs(nullptr),
+    _should_release(false)
   {
     // specifically, do *not* copy the vector
 
@@ -157,7 +185,8 @@ public:
     _last(r._last),
     _first(r._first),
     _grainsize(r._grainsize),
-    _objs()
+    _objs(nullptr),
+    _should_release(false)
   {
     const_iterator
       beginning = r._begin,
@@ -175,24 +204,34 @@ public:
   }
 
   /**
-   * Resets the \p StoredRange to contain [first,last).  Returns
-   * a reference to itself for convenience, so functions
-   * expecting a StoredRange<> can be passed e.g. foo.reset(begin,end).
+   * Destructor.  Releases the object array if we created it.
+   */
+  ~StoredRange ()
+  {
+    if (_should_release)
+      delete _objs;
+  }
+
+  /**
+   * Resets the \p StoredRange to contain [first,last).
+   *
+   * \returns A reference to itself for convenience, so functions
+   * expecting a \p StoredRange<> can be passed e.g. foo.reset(begin,end).
    */
   StoredRange<iterator_type, object_type> &
   reset (const iterator_type & first,
          const iterator_type & last)
   {
-    _objs.clear();
+    _objs->clear();
 
     for (iterator_type it=first; it!=last; ++it)
-      _objs.push_back(*it);
+      _objs->push_back(*it);
 
-    _begin = _objs.begin();
-    _end   = _objs.end();
+    _begin = _objs->begin();
+    _end   = _objs->end();
 
     _first = 0;
-    _last  = _objs.size();
+    _last  = _objs->size();
 
     return *this;
   }
@@ -200,17 +239,18 @@ public:
   /**
    * Resets the range to the last specified range.  This method only exists
    * for efficiency -- it is more efficient to set the range to its previous
-   * value without rebuilding the underlying vector.  Returns
-   * a reference to itself for convenience, so functions
+   * value without rebuilding the underlying vector.
+   *
+   * \returns A reference to itself for convenience, so functions
    * expecting a StoredRange<> can be passed e.g. foo.reset().
    */
   StoredRange<iterator_type, object_type> & reset ()
   {
-    _begin = _objs.begin();
-    _end   = _objs.end();
+    _begin = _objs->begin();
+    _end   = _objs->end();
 
     _first = 0;
-    _last  = _objs.size();
+    _last  = _objs->size();
 
     return *this;
   }
@@ -247,7 +287,7 @@ public:
   void grainsize (const unsigned int & gs) {_grainsize = gs;}
 
   /**
-   * \return the size of the range.
+   * \returns The size of the range.
    */
   std::size_t size () const { return std::distance(_begin, _end); }
 
@@ -256,12 +296,12 @@ public:
   //------------------------------------------------------------------------
 
   /**
-   * Returns true if the range is empty.
+   * \returns \p true if the range is empty.
    */
   bool empty() const { return (_begin == _end); }
 
   /**
-   * Returns true if the range can be subdivided.
+   * \returns \p true if the range can be subdivided.
    */
   bool is_divisible() const { return this->grainsize() < static_cast<unsigned int>(std::distance(_begin, _end)); }
 
@@ -272,7 +312,10 @@ private:
   std::size_t _last;
   std::size_t _first;
   std::size_t _grainsize;
-  std::vector<object_type> _objs;
+
+  // TODO: Make this a std::shared_ptr in the future!
+  std::vector<object_type> * _objs;
+  bool _should_release;
 };
 
 } // namespace libMesh

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -53,7 +53,8 @@ void HeatSystem::init_data ()
   // Set equation system parameters _k and theta, so they can be read by the exact solution
   this->get_equation_systems().parameters.set<Real>("_k") = _k;
 
-  this->time_evolving(T_var);
+  // The temperature is evolving, with a first order time derivative
+  this->time_evolving(T_var, 1);
 
   const boundary_id_type all_ids[4] = {0, 1, 2, 3};
   std::set<boundary_id_type> all_bdys(all_ids, all_ids+(2*2));
@@ -62,8 +63,11 @@ void HeatSystem::init_data ()
 
   ZeroFunction<Number> zero;
 
+  // Most DirichletBoundary users will want to supply a "locally
+  // indexed" functor
   this->get_dof_map().add_dirichlet_boundary
-    (DirichletBoundary (all_bdys, T_only, &zero));
+    (DirichletBoundary (all_bdys, T_only, zero,
+                        LOCAL_VARIABLE_ORDER));
 
   FEMSystem::init_data();
 }
@@ -74,7 +78,7 @@ void HeatSystem::init_context(DiffContext & context)
 {
   FEMContext & c = cast_ref<FEMContext &>(context);
 
-  FEBase * elem_fe = libmesh_nullptr;
+  FEBase * elem_fe = nullptr;
   c.get_element_fe(0, elem_fe);
 
   // Now make sure we have requested all the data
@@ -112,20 +116,17 @@ bool HeatSystem::element_time_derivative (bool request_jacobian,
 
   // First we get some references to cell-specific data that
   // will be used to assemble the linear system.
-  FEBase * elem_fe = libmesh_nullptr;
+  FEBase * elem_fe = nullptr;
   c.get_element_fe(0, elem_fe);
 
   // Element Jacobian * quadrature weights for interior integration
   const std::vector<Real> & JxW = elem_fe->get_JxW();
 
   // Element basis functions
-  const std::vector<std::vector<RealGradient> > & dphi = elem_fe->get_dphi();
-
-  // Workaround for weird FC6 bug
-  optassert(c.get_dof_indices().size() > 0);
+  const std::vector<std::vector<RealGradient>> & dphi = elem_fe->get_dphi();
 
   // The number of local degrees of freedom in each variable
-  const unsigned int n_u_dofs = c.get_dof_indices(0).size();
+  const unsigned int n_u_dofs = c.n_dof_indices(0);
 
   // The subvectors and submatrices we need to fill:
   DenseSubMatrix<Number> & K = c.get_elem_jacobian(0, 0);
@@ -158,9 +159,9 @@ bool HeatSystem::element_time_derivative (bool request_jacobian,
 // Perturb and accumulate dual weighted residuals
 void HeatSystem::perturb_accumulate_residuals(ParameterVector & parameters_in)
 {
-  const unsigned int Np = parameters_in.size();
+  this->update();
 
-  for (unsigned int j=0; j != Np; ++j)
+  for (std::size_t j=0, Np = parameters_in.size(); j != Np; ++j)
     {
       Number old_parameter = *parameters_in[j];
 
@@ -170,7 +171,7 @@ void HeatSystem::perturb_accumulate_residuals(ParameterVector & parameters_in)
 
       this->rhs->close();
 
-      UniquePtr<NumericVector<Number> > R_minus = this->rhs->clone();
+      std::unique_ptr<NumericVector<Number>> R_minus = this->rhs->clone();
 
       // The contribution at a single time step would be [f(z;p+dp) - <partialu/partialt, z>(p+dp) - <g(u),z>(p+dp)] * dt
       // But since we compute the residual already scaled by dt, there is no need for the * dt
@@ -182,7 +183,7 @@ void HeatSystem::perturb_accumulate_residuals(ParameterVector & parameters_in)
 
       this->rhs->close();
 
-      UniquePtr<NumericVector<Number> > R_plus = this->rhs->clone();
+      std::unique_ptr<NumericVector<Number>> R_plus = this->rhs->clone();
 
       R_plus_dp += -R_plus->dot(this->get_adjoint_solution(0));
 

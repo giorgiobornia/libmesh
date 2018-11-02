@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -16,14 +16,14 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-// C++ includes
-
 // Local includes
 #include "libmesh/side.h"
 #include "libmesh/cell_pyramid5.h"
 #include "libmesh/edge_edge2.h"
 #include "libmesh/face_tri3.h"
 #include "libmesh/face_quad4.h"
+#include "libmesh/enum_io_package.h"
+#include "libmesh/enum_order.h"
 
 namespace libMesh
 {
@@ -33,7 +33,14 @@ namespace libMesh
 
 // ------------------------------------------------------------
 // Pyramid5 class static member initializations
-const unsigned int Pyramid5::side_nodes_map[5][4] =
+const int Pyramid5::num_nodes;
+const int Pyramid5::num_sides;
+const int Pyramid5::num_edges;
+const int Pyramid5::num_children;
+const int Pyramid5::nodes_per_side;
+const int Pyramid5::nodes_per_edge;
+
+const unsigned int Pyramid5::side_nodes_map[Pyramid5::num_sides][Pyramid5::nodes_per_side] =
   {
     {0, 1, 4, 99}, // Side 0
     {1, 2, 4, 99}, // Side 1
@@ -42,16 +49,16 @@ const unsigned int Pyramid5::side_nodes_map[5][4] =
     {0, 3, 2,  1}  // Side 4
   };
 
-const unsigned int Pyramid5::edge_nodes_map[8][2] =
+const unsigned int Pyramid5::edge_nodes_map[Pyramid5::num_edges][Pyramid5::nodes_per_edge] =
   {
-    {0, 1}, // Side 0
-    {1, 2}, // Side 1
-    {2, 3}, // Side 2
-    {0, 3}, // Side 3
-    {0, 4}, // Side 4
-    {1, 4}, // Side 5
-    {2, 4}, // Side 6
-    {3, 4}  // Side 7
+    {0, 1}, // Edge 0
+    {1, 2}, // Edge 1
+    {2, 3}, // Edge 2
+    {0, 3}, // Edge 3
+    {0, 4}, // Edge 4
+    {1, 4}, // Edge 5
+    {2, 4}, // Edge 6
+    {3, 4}  // Edge 7
   };
 
 
@@ -78,20 +85,26 @@ bool Pyramid5::is_node_on_side(const unsigned int n,
                                const unsigned int s) const
 {
   libmesh_assert_less (s, n_sides());
-  for (unsigned int i = 0; i != 4; ++i)
-    if (side_nodes_map[s][i] == n)
-      return true;
-  return false;
+  return std::find(std::begin(side_nodes_map[s]),
+                   std::end(side_nodes_map[s]),
+                   n) != std::end(side_nodes_map[s]);
+}
+
+std::vector<unsigned>
+Pyramid5::nodes_on_side(const unsigned int s) const
+{
+  libmesh_assert_less(s, n_sides());
+  auto trim = (s == 4) ? 0 : 1;
+  return {std::begin(side_nodes_map[s]), std::end(side_nodes_map[s]) - trim};
 }
 
 bool Pyramid5::is_node_on_edge(const unsigned int n,
                                const unsigned int e) const
 {
   libmesh_assert_less (e, n_edges());
-  for (unsigned int i = 0; i != 2; ++i)
-    if (edge_nodes_map[e][i] == n)
-      return true;
-  return false;
+  return std::find(std::begin(edge_nodes_map[e]),
+                   std::end(edge_nodes_map[e]),
+                   n) != std::end(edge_nodes_map[e]);
 }
 
 
@@ -105,8 +118,15 @@ bool Pyramid5::has_affine_map() const
 
 
 
-UniquePtr<Elem> Pyramid5::build_side (const unsigned int i,
-                                      bool proxy) const
+Order Pyramid5::default_order() const
+{
+  return FIRST;
+}
+
+
+
+std::unique_ptr<Elem> Pyramid5::build_side_ptr (const unsigned int i,
+                                                bool proxy)
 {
   libmesh_assert_less (i, this->n_sides());
 
@@ -118,10 +138,10 @@ UniquePtr<Elem> Pyramid5::build_side (const unsigned int i,
         case 1:
         case 2:
         case 3:
-          return UniquePtr<Elem>(new Side<Tri3,Pyramid5>(this,i));
+          return libmesh_make_unique<Side<Tri3,Pyramid5>>(this,i);
 
         case 4:
-          return UniquePtr<Elem>(new Side<Quad4,Pyramid5>(this,i));
+          return libmesh_make_unique<Side<Quad4,Pyramid5>>(this,i);
 
         default:
           libmesh_error_msg("Invalid side i = " << i);
@@ -130,8 +150,8 @@ UniquePtr<Elem> Pyramid5::build_side (const unsigned int i,
 
   else
     {
-      // Create NULL pointer to be initialized, returned later.
-      Elem * face = libmesh_nullptr;
+      // Return value
+      std::unique_ptr<Elem> face;
 
       switch (i)
         {
@@ -140,12 +160,12 @@ UniquePtr<Elem> Pyramid5::build_side (const unsigned int i,
         case 2: // triangular face 3
         case 3: // triangular face 4
           {
-            face = new Tri3;
+            face = libmesh_make_unique<Tri3>();
             break;
           }
         case 4: // the quad face at z=0
           {
-            face = new Quad4;
+            face = libmesh_make_unique<Quad4>();
             break;
           }
         default:
@@ -156,22 +176,19 @@ UniquePtr<Elem> Pyramid5::build_side (const unsigned int i,
 
       // Set the nodes
       for (unsigned n=0; n<face->n_nodes(); ++n)
-        face->set_node(n) = this->get_node(Pyramid5::side_nodes_map[i][n]);
+        face->set_node(n) = this->node_ptr(Pyramid5::side_nodes_map[i][n]);
 
-      return UniquePtr<Elem>(face);
+      return face;
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return UniquePtr<Elem>();
 }
 
 
 
-UniquePtr<Elem> Pyramid5::build_edge (const unsigned int i) const
+std::unique_ptr<Elem> Pyramid5::build_edge_ptr (const unsigned int i)
 {
   libmesh_assert_less (i, this->n_edges());
 
-  return UniquePtr<Elem>(new SideEdge<Edge2,Pyramid5>(this,i));
+  return libmesh_make_unique<SideEdge<Edge2,Pyramid5>>(this,i);
 }
 
 
@@ -189,25 +206,25 @@ void Pyramid5::connectivity(const unsigned int libmesh_dbg_var(sc),
     case TECPLOT:
       {
         conn.resize(8);
-        conn[0] = this->node(0)+1;
-        conn[1] = this->node(1)+1;
-        conn[2] = this->node(2)+1;
-        conn[3] = this->node(3)+1;
-        conn[4] = this->node(4)+1;
-        conn[5] = this->node(4)+1;
-        conn[6] = this->node(4)+1;
-        conn[7] = this->node(4)+1;
+        conn[0] = this->node_id(0)+1;
+        conn[1] = this->node_id(1)+1;
+        conn[2] = this->node_id(2)+1;
+        conn[3] = this->node_id(3)+1;
+        conn[4] = this->node_id(4)+1;
+        conn[5] = this->node_id(4)+1;
+        conn[6] = this->node_id(4)+1;
+        conn[7] = this->node_id(4)+1;
         return;
       }
 
     case VTK:
       {
         conn.resize(5);
-        conn[0] = this->node(3);
-        conn[1] = this->node(2);
-        conn[2] = this->node(1);
-        conn[3] = this->node(0);
-        conn[4] = this->node(4);
+        conn[0] = this->node_id(3);
+        conn[1] = this->node_id(2);
+        conn[2] = this->node_id(1);
+        conn[3] = this->node_id(0);
+        conn[4] = this->node_id(4);
         return;
       }
 
@@ -237,6 +254,12 @@ Real Pyramid5::volume () const
   return
     triple_product(v40, v13, v02) / 6. +
     triple_product(v02, v01, v03) / 12.;
+}
+
+BoundingBox
+Pyramid5::loose_bounding_box () const
+{
+  return Elem::loose_bounding_box();
 }
 
 } // namespace libMesh

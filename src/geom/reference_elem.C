@@ -23,6 +23,8 @@
 #include "libmesh/reference_elem.h"
 #include "libmesh/libmesh_singleton.h"
 #include "libmesh/threads.h"
+#include "libmesh/string_to_enum.h"
+#include "libmesh/enum_elem_type.h"
 
 // C++ includes
 #include <map>
@@ -62,18 +64,18 @@ class SingletonCache : public libMesh::Singleton
 public:
   ~SingletonCache()
   {
-    for (unsigned int e=0; e<elem_list.size(); e++)
+    for (std::size_t e=0; e<elem_list.size(); e++)
       {
         delete elem_list[e];
-        elem_list[e] = libmesh_nullptr;
+        elem_list[e] = nullptr;
       }
 
     elem_list.clear();
 
-    for (unsigned int n=0; n<node_list.size(); n++)
+    for (std::size_t n=0; n<node_list.size(); n++)
       {
         delete node_list[n];
-        node_list[n] = libmesh_nullptr;
+        node_list[n] = nullptr;
       }
 
     node_list.clear();
@@ -85,41 +87,38 @@ public:
 
 // singleton object, dynamically created and then
 // removed at program exit
-SingletonCache * singleton_cache = libmesh_nullptr;
+SingletonCache * singleton_cache = nullptr;
 
 
 
-Elem * read_ref_elem (const ElemType Type,
-                      std::istream & in)
+void read_ref_elem (const ElemType type_in,
+                    std::istream & in)
 {
-  libmesh_assert (singleton_cache != libmesh_nullptr);
+  libmesh_assert (singleton_cache != nullptr);
 
-  static const unsigned int comm_len = 1024;
-  char comm[comm_len];
-
-  std::string foo;
-  unsigned int n_elem, n_nodes, elem_type, nn;
+  std::string dummy;
+  unsigned int n_elem, n_nodes, elem_type_read, nn;
   double x, y, z;
 
-  in >> foo;
-  in >> n_elem;  /**/ in.getline (comm, comm_len); libmesh_assert_equal_to (n_elem, 1);
-  in >> n_nodes; /**/ in.getline (comm, comm_len);
-  in >> foo;     /**/ in.getline (comm, comm_len);
-  in >> foo;     /**/ in.getline (comm, comm_len);
-  in >> foo;     /**/ in.getline (comm, comm_len);
-  in >> foo;     /**/ in.getline (comm, comm_len);
-  in >> n_elem;  /**/ in.getline (comm, comm_len); libmesh_assert_equal_to (n_elem, 1);
+  in >> dummy;
+  in >> n_elem;  /**/ std::getline (in, dummy); libmesh_assert_equal_to (n_elem, 1);
+  in >> n_nodes; /**/ std::getline (in, dummy);
+  in >> dummy;   /**/ std::getline (in, dummy);
+  in >> dummy;   /**/ std::getline (in, dummy);
+  in >> dummy;   /**/ std::getline (in, dummy);
+  in >> dummy;   /**/ std::getline (in, dummy);
+  in >> n_elem;  /**/ std::getline (in, dummy); libmesh_assert_equal_to (n_elem, 1);
 
-  in >> elem_type;
+  in >> elem_type_read;
 
-  libmesh_assert_less (elem_type, INVALID_ELEM);
-  libmesh_assert_equal_to (elem_type, static_cast<unsigned int>(Type));
-  libmesh_assert_equal_to (n_nodes, Elem::type_to_n_nodes_map[elem_type]);
+  libmesh_assert_less (elem_type_read, INVALID_ELEM);
+  libmesh_assert_equal_to (elem_type_read, static_cast<unsigned int>(type_in));
+  libmesh_assert_equal_to (n_nodes, Elem::type_to_n_nodes_map[elem_type_read]);
 
-  // Construct the elem
-  Elem * elem = Elem::build(static_cast<ElemType>(elem_type)).release();
+  // Construct elem of appropriate type
+  std::unique_ptr<Elem> uelem = Elem::build(type_in);
 
-  // We are expecing an identity map, so assert it!
+  // We are expecting an identity map, so assert it!
   for (unsigned int n=0; n<n_nodes; n++)
     {
       in >> nn;
@@ -133,33 +132,28 @@ Elem * read_ref_elem (const ElemType Type,
       Node * node = new Node(x,y,z,n);
       singleton_cache->node_list.push_back(node);
 
-      elem->set_node(n) = node;
+      uelem->set_node(n) = node;
     }
-
 
   // it is entirely possible we ran out of file or encountered
-  // another error.  If so, cleanly abort.
+  // another error.  If so, throw an error.
   if (!in)
-    {
-      delete elem;
-      elem = libmesh_nullptr;
-      libmesh_error_msg("ERROR while creating element singleton!");
-    }
+    libmesh_error_msg("ERROR while creating element singleton!");
 
+  // Release the pointer into the care of the singleton_cache
   else
-    singleton_cache->elem_list.push_back (elem);
+    singleton_cache->elem_list.push_back (uelem.release());
 
-  ref_elem_map[Type] = elem;
-
-  return elem;
+  // Also store it in the array.
+  ref_elem_map[type_in] = singleton_cache->elem_list.back();
 }
 
 
 
 void init_ref_elem_table()
 {
-  // ouside mutex - if this pointer is set, we can trust it.
-  if (singleton_cache != libmesh_nullptr)
+  // outside mutex - if this pointer is set, we can trust it.
+  if (singleton_cache != nullptr)
     return;
 
   // playing with fire here - lock before touching shared
@@ -168,7 +162,7 @@ void init_ref_elem_table()
 
   // inside mutex - pointer may have changed while waiting
   // for the lock to acquire, check it again.
-  if (singleton_cache != libmesh_nullptr)
+  if (singleton_cache != nullptr)
     return;
 
   // OK, if we get here we have the lock and we are not
@@ -179,7 +173,7 @@ void init_ref_elem_table()
   {
     ref_elem_file.clear();
 
-    // // 1D elements
+    // 1D elements
     ref_elem_file[EDGE2]    = ElemDataStrings::one_edge;
     ref_elem_file[EDGE3]    = ElemDataStrings::one_edge3;
     ref_elem_file[EDGE4]    = ElemDataStrings::one_edge4;
@@ -210,13 +204,10 @@ void init_ref_elem_table()
   }
 
   // Read'em
-  for (FileMapType::const_iterator it=ref_elem_file.begin();
-       it != ref_elem_file.end(); ++it)
+  for (const auto & pr : ref_elem_file)
     {
-      std::istringstream stream(it->second);
-
-      read_ref_elem(it->first,
-                    stream);
+      std::istringstream stream(pr.second);
+      read_ref_elem(pr.first, stream);
     }
 }
 
@@ -243,15 +234,28 @@ namespace libMesh
 {
 namespace ReferenceElem
 {
-const Elem & get (const ElemType Type)
+const Elem & get (const ElemType type_in)
 {
-  libmesh_assert_less (Type, INVALID_ELEM);
+  ElemType base_type = type_in;
+
+  // For shell elements, use non shell type as the base type
+  if (type_in == TRISHELL3)
+    base_type = TRI3;
+
+  if (type_in == QUADSHELL4)
+    base_type = QUAD4;
+
+  if (type_in == QUADSHELL8)
+    base_type = QUAD8;
 
   init_ref_elem_table();
 
-  libmesh_assert (ref_elem_map[Type] != libmesh_nullptr);
+  // Throw an error if the user asked for an ElemType that we don't
+  // have a reference element for.
+  if (ref_elem_map[base_type] == nullptr || type_in == INVALID_ELEM)
+    libmesh_error_msg("No reference elem data available for ElemType " << type_in << " = " << Utility::enum_to_string(type_in) << ".");
 
-  return *ref_elem_map[Type];
+  return *ref_elem_map[base_type];
 }
 } // namespace ReferenceElem
 } // namespace libMesh

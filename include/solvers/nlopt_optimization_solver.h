@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -90,38 +90,38 @@ public:
   /**
    * Release all memory and clear data structures.
    */
-  virtual void clear () libmesh_override;
+  virtual void clear () override;
 
   /**
    * Initialize data structures if not done so already.
    */
-  virtual void init () libmesh_override;
+  virtual void init () override;
 
   /**
-   * Returns the raw NLopt object.
+   * \returns The raw NLopt object.
    */
   nlopt_opt get_nlopt_object() { this->init(); return _opt; }
 
   /**
    * Call the NLopt solver.
    */
-  virtual void solve () libmesh_override;
+  virtual void solve () override;
 
   /**
    * Prints a useful message about why the latest optimization solve
    * con(di)verged.
    */
-  virtual void print_converged_reason() libmesh_override;
+  virtual void print_converged_reason() override;
 
   /**
-   * Returns the currently-available (or most recently obtained, if the NLopt object has
+   * \returns The currently-available (or most recently obtained, if the NLopt object has
    * been destroyed) convergence reason.  Refer to NLopt docs for the meaning of different
    * the value.
    */
-  virtual int get_converged_reason() libmesh_override;
+  virtual int get_converged_reason() override;
 
   /**
-   * Returns a writeable reference to the current iteration count
+   * \returns A writable reference to the current iteration count
    * which can be incremented in the objective function.
    */
   unsigned & get_iteration_count() { return _iteration_count; }

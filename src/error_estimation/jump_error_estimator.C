@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -55,43 +55,46 @@ void JumpErrorEstimator::estimate_error (const System & system,
                                          const NumericVector<Number> * solution_vector,
                                          bool estimate_parent_error)
 {
-  START_LOG("estimate_error()", "JumpErrorEstimator");
-  /*
+  LOG_SCOPE("estimate_error()", "JumpErrorEstimator");
 
-    Conventions for assigning the direction of the normal:
+  /**
+   * Conventions for assigning the direction of the normal:
+   *
+   * - e & f are global element ids
+   *
+   * Case (1.) Elements are at the same level, e<f
+   * Compute the flux jump on the face and
+   * add it as a contribution to error_per_cell[e]
+   * and error_per_cell[f]
+   *
+   *  ----------------------
+   * |           |          |
+   * |           |    f     |
+   * |           |          |
+   * |    e      |---> n    |
+   * |           |          |
+   * |           |          |
+   *  ----------------------
+   *
+   *
+   * Case (2.) The neighbor is at a higher level.
+   * Compute the flux jump on e's face and
+   * add it as a contribution to error_per_cell[e]
+   * and error_per_cell[f]
+   *
+   *  ----------------------
+   * |     |     |          |
+   * |     |  e  |---> n    |
+   * |     |     |          |
+   * |-----------|    f     |
+   * |     |     |          |
+   * |     |     |          |
+   * |     |     |          |
+   *  ----------------------
+   */
 
-    - e & f are global element ids
-
-    Case (1.) Elements are at the same level, e<f
-    Compute the flux jump on the face and
-    add it as a contribution to error_per_cell[e]
-    and error_per_cell[f]
-
-    ----------------------
-    |           |          |
-    |           |    f     |
-    |           |          |
-    |    e      |---> n    |
-    |           |          |
-    |           |          |
-    ----------------------
-
-
-    Case (2.) The neighbor is at a higher level.
-    Compute the flux jump on e's face and
-    add it as a contribution to error_per_cell[e]
-    and error_per_cell[f]
-
-    ----------------------
-    |     |     |          |
-    |     |  e  |---> n    |
-    |     |     |          |
-    |-----------|    f     |
-    |     |     |          |
-    |     |     |          |
-    |     |     |          |
-    ----------------------
-  */
+  // This parameter is not used when !LIBMESH_ENABLE_AMR.
+  libmesh_ignore(estimate_parent_error);
 
   // The current mesh
   const MeshBase & mesh = system.get_mesh();
@@ -100,7 +103,9 @@ void JumpErrorEstimator::estimate_error (const System & system,
   const unsigned int n_vars = system.n_vars();
 
   // The DofMap for this system
+#ifdef LIBMESH_ENABLE_AMR
   const DofMap & dof_map = system.get_dof_map();
+#endif
 
   // Resize the error_per_cell vector to be
   // the number of elements, initialize it to 0.
@@ -141,23 +146,21 @@ void JumpErrorEstimator::estimate_error (const System & system,
   // pre-request
   for (var=0; var<n_vars; var++)
     {
-      // Possibly skip this variable
-      if (error_norm.weight(var) == 0.0) continue;
+      // Skip variables which aren't part of our norm,
+      // as well as SCALAR variables, which have no jumps
+      if (error_norm.weight(var) == 0.0 ||
+          system.variable_type(var).family == SCALAR)
+        continue;
 
       // FIXME: Need to generalize this to vector-valued elements. [PB]
-      FEBase * side_fe = libmesh_nullptr;
+      FEBase * side_fe = nullptr;
 
       const std::set<unsigned char> & elem_dims =
         fine_context->elem_dimensions();
 
-      for (std::set<unsigned char>::const_iterator dim_it =
-             elem_dims.begin(); dim_it != elem_dims.end(); ++dim_it)
+      for (const auto & dim : elem_dims)
         {
-          const unsigned char dim = *dim_it;
-
           fine_context->get_side_fe( var, side_fe, dim );
-
-          libmesh_assert_not_equal_to(side_fe->get_fe_type().family, SCALAR);
 
           side_fe->get_xyz();
         }
@@ -168,13 +171,8 @@ void JumpErrorEstimator::estimate_error (const System & system,
 
   // Iterate over all the active elements in the mesh
   // that live on this processor.
-  MeshBase::const_element_iterator       elem_it  = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator elem_end = mesh.active_local_elements_end();
-
-  for (; elem_it != elem_end; ++elem_it)
+  for (const auto & e : mesh.active_local_element_ptr_range())
     {
-      // e is necessarily an active element on the local processor
-      const Elem * e = *elem_it;
       const dof_id_type e_id = e->id();
 
 #ifdef LIBMESH_ENABLE_AMR
@@ -188,8 +186,8 @@ void JumpErrorEstimator::estimate_error (const System & system,
       if (!parent || !estimate_parent_error)
         compute_on_parent = false;
       else
-        for (unsigned int c=0; c != parent->n_children(); ++c)
-          if (!parent->child(c)->active())
+        for (auto & child : parent->child_ref_range())
+          if (!child.active())
             compute_on_parent = false;
 
       if (compute_on_parent &&
@@ -201,18 +199,19 @@ void JumpErrorEstimator::estimate_error (const System & system,
             (*(system.solution), dof_map, parent, Uparent, false);
 
           // Loop over the neighbors of the parent
-          for (unsigned int n_p=0; n_p<parent->n_neighbors(); n_p++)
+          for (auto n_p : parent->side_index_range())
             {
-              if (parent->neighbor(n_p) != libmesh_nullptr) // parent has a neighbor here
+              if (parent->neighbor_ptr(n_p) != nullptr) // parent has a neighbor here
                 {
                   // Find the active neighbors in this direction
                   std::vector<const Elem *> active_neighbors;
-                  parent->neighbor(n_p)->
+                  parent->neighbor_ptr(n_p)->
                     active_family_tree_by_neighbor(active_neighbors,
                                                    parent);
                   // Compute the flux to each active neighbor
-                  for (unsigned int a=0;
-                       a != active_neighbors.size(); ++a)
+                  for (std::size_t a=0,
+                        n_active_neighbors = active_neighbors.size();
+                       a != n_active_neighbors; ++a)
                     {
                       const Elem * f = active_neighbors[a];
                       // FIXME - what about when f->level <
@@ -230,7 +229,8 @@ void JumpErrorEstimator::estimate_error (const System & system,
 
                           // Loop over all significant variables in the system
                           for (var=0; var<n_vars; var++)
-                            if (error_norm.weight(var) != 0.0)
+                            if (error_norm.weight(var) != 0.0 &&
+                                system.variable_type(var).family != SCALAR)
                               {
                                 this->internal_side_integration();
 
@@ -258,7 +258,7 @@ void JumpErrorEstimator::estimate_error (const System & system,
                     (fine_context->get_elem_solution().size(),
                      Uparent.size());
                   fine_context->get_elem_solution() = Uparent;
-                  fine_context->side = n_p;
+                  fine_context->side = cast_int<unsigned char>(n_p);
                   fine_context->side_fe_reinit();
 
                   // If we find a boundary flux for any variable,
@@ -269,7 +269,8 @@ void JumpErrorEstimator::estimate_error (const System & system,
                   bool found_boundary_flux = false;
 
                   for (var=0; var<n_vars; var++)
-                    if (error_norm.weight(var) != 0.0)
+                    if (error_norm.weight(var) != 0.0 &&
+                        system.variable_type(var).family != SCALAR)
                       {
                         if (this->boundary_side_integration())
                           {
@@ -290,18 +291,18 @@ void JumpErrorEstimator::estimate_error (const System & system,
       fine_context->pre_fe_reinit(system, e);
 
       // Loop over the neighbors of element e
-      for (unsigned int n_e=0; n_e<e->n_neighbors(); n_e++)
+      for (auto n_e : e->side_index_range())
         {
-          if ((e->neighbor(n_e) != libmesh_nullptr) ||
+          if ((e->neighbor_ptr(n_e) != nullptr) ||
               integrate_boundary_sides)
             {
-              fine_context->side = n_e;
+              fine_context->side = cast_int<unsigned char>(n_e);
               fine_context->side_fe_reinit();
             }
 
-          if (e->neighbor(n_e) != libmesh_nullptr) // e is not on the boundary
+          if (e->neighbor_ptr(n_e) != nullptr) // e is not on the boundary
             {
-              const Elem * f           = e->neighbor(n_e);
+              const Elem * f           = e->neighbor_ptr(n_e);
               const dof_id_type f_id = f->id();
 
               // Compute flux jumps if we are in case 1 or case 2.
@@ -315,7 +316,8 @@ void JumpErrorEstimator::estimate_error (const System & system,
 
                   // Loop over all significant variables in the system
                   for (var=0; var<n_vars; var++)
-                    if (error_norm.weight(var) != 0.0)
+                    if (error_norm.weight(var) != 0.0 &&
+                        system.variable_type(var).family != SCALAR)
                       {
                         this->internal_side_integration();
 
@@ -334,7 +336,7 @@ void JumpErrorEstimator::estimate_error (const System & system,
                         this->coarse_n_flux_faces_increment();
                     }
                 } // end if (case1 || case2)
-            } // if (e->neigbor(n_e) != libmesh_nullptr)
+            } // if (e->neighbor(n_e) != nullptr)
 
           // Otherwise, e is on the boundary.  If it happens to
           // be on a Dirichlet boundary, we need not do anything.
@@ -349,7 +351,8 @@ void JumpErrorEstimator::estimate_error (const System & system,
               bool found_boundary_flux = false;
 
               for (var=0; var<n_vars; var++)
-                if (error_norm.weight(var) != 0.0)
+                if (error_norm.weight(var) != 0.0 &&
+                    system.variable_type(var).family != SCALAR)
                   if (this->boundary_side_integration())
                     {
                       error_per_cell[fine_context->get_elem().id()] +=
@@ -359,12 +362,12 @@ void JumpErrorEstimator::estimate_error (const System & system,
 
               if (scale_by_n_flux_faces && found_boundary_flux)
                 n_flux_faces[fine_context->get_elem().id()]++;
-            } // end if (e->neighbor(n_e) == libmesh_nullptr)
+            } // end if (e->neighbor_ptr(n_e) == nullptr)
         } // end loop over neighbors
     } // End loop over active local elements
 
 
-  // Each processor has now computed the error contribuions
+  // Each processor has now computed the error contributions
   // for its local elements.  We need to sum the vector
   // and then take the square-root of each component.  Note
   // that we only need to sum if we are running on multiple
@@ -389,12 +392,12 @@ void JumpErrorEstimator::estimate_error (const System & system,
       // Sanity check: Make sure the number of flux faces is
       // always an integer value
 #ifdef DEBUG
-      for (unsigned int i=0; i<n_flux_faces.size(); ++i)
+      for (std::size_t i=0; i<n_flux_faces.size(); ++i)
         libmesh_assert_equal_to (n_flux_faces[i], static_cast<float>(static_cast<unsigned int>(n_flux_faces[i])) );
 #endif
 
       // Scale the error by the number of flux faces for each element
-      for (unsigned int i=0; i<n_flux_faces.size(); ++i)
+      for (std::size_t i=0; i<n_flux_faces.size(); ++i)
         {
           if (n_flux_faces[i] == 0.0) // inactive or non-local element
             continue;
@@ -414,8 +417,6 @@ void JumpErrorEstimator::estimate_error (const System & system,
       newsol->swap(*sys.solution);
       sys.update();
     }
-
-  STOP_LOG("estimate_error()", "JumpErrorEstimator");
 }
 
 
@@ -425,17 +426,17 @@ JumpErrorEstimator::reinit_sides ()
 {
   fine_context->side_fe_reinit();
 
-  unsigned int dim = fine_context->get_elem().dim();
+  unsigned short dim = fine_context->get_elem().dim();
   libmesh_assert_equal_to(dim, coarse_context->get_elem().dim());
 
-  FEBase * fe_fine = libmesh_nullptr;
+  FEBase * fe_fine = nullptr;
   fine_context->get_side_fe( 0, fe_fine, dim );
 
   // Get the physical locations of the fine element quadrature points
   std::vector<Point> qface_point = fe_fine->get_xyz();
 
   // Find the master quadrature point locations on the coarse element
-  FEBase * fe_coarse = libmesh_nullptr;
+  FEBase * fe_coarse = nullptr;
   coarse_context->get_side_fe( 0, fe_coarse, dim );
 
   std::vector<Point> qp_coarse;
@@ -449,7 +450,8 @@ JumpErrorEstimator::reinit_sides ()
 
   // Calculate all coarse element shape functions at those locations
   for (unsigned int v=0; v<n_vars; v++)
-    if (error_norm.weight(v) != 0.0)
+    if (error_norm.weight(v) != 0.0 &&
+        fine_context->get_system().variable_type(v).family != SCALAR)
       {
         coarse_context->get_side_fe( v, fe_coarse, dim );
         fe_coarse->reinit (&coarse_context->get_elem(), &qp_coarse);
@@ -462,7 +464,7 @@ float JumpErrorEstimator::coarse_n_flux_faces_increment ()
 {
   // Keep track of the number of internal flux sides found on each
   // element
-  unsigned int dim = coarse_context->get_elem().dim();
+  unsigned short dim = coarse_context->get_elem().dim();
 
   const unsigned int divisor =
     1 << (dim-1)*(fine_context->get_elem().level() -

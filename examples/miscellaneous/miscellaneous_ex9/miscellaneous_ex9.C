@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -46,9 +46,7 @@
 //
 // In order to implement the interface condition, we need to augment
 // the matrix sparsity pattern, which is handled by the class
-// AugmentSparsityPatternOnInterface. (We do not need to augment the
-// send-list in this case since the PDE is linear and hence there is
-// no need to broadcast non-local solution values).
+// AugmentSparsityPatternOnInterface.
 
 
 // C++ include files that we need
@@ -57,7 +55,7 @@
 
 // libMesh includes
 #include "libmesh/libmesh.h"
-#include "libmesh/serial_mesh.h"
+#include "libmesh/mesh.h"
 #include "libmesh/mesh_generation.h"
 #include "libmesh/mesh_refinement.h"
 #include "libmesh/exodusII_io.h"
@@ -76,8 +74,9 @@
 #include "libmesh/linear_implicit_system.h"
 #include "libmesh/zero_function.h"
 #include "libmesh/dirichlet_boundaries.h"
+#include "libmesh/enum_solver_package.h"
 
-// local includes
+// example includes
 #include "augment_sparsity_on_interface.h"
 
 // define the boundary IDs in the mesh
@@ -93,7 +92,7 @@ using namespace libMesh;
  * Assemble the system matrix and rhs vector.
  */
 void assemble_poisson(EquationSystems & es,
-                      const ElementIdMap & lower_to_upper);
+                      const ElementSideMap & lower_to_upper);
 
 // The main program.
 int main (int argc, char ** argv)
@@ -118,10 +117,7 @@ int main (int argc, char ** argv)
   if (command_line.search(1, "-R"))
     R = command_line.next(R);
 
-  // Maintaining the right ghost elements on a ParallelMesh is
-  // trickier.
-  SerialMesh mesh(init.comm());
-  mesh.read("miscellaneous_ex9.exo");
+  Mesh mesh(init.comm());
 
   EquationSystems equation_systems (mesh);
 
@@ -139,17 +135,24 @@ int main (int argc, char ** argv)
   std::vector<unsigned int> variables;
   variables.push_back(0);
   ZeroFunction<> zf;
-  DirichletBoundary dirichlet_bc(boundary_ids,
-                                 variables,
-                                 &zf);
+
+  // Most DirichletBoundary users will want to supply a "locally
+  // indexed" functor
+  DirichletBoundary dirichlet_bc(boundary_ids, variables, zf,
+                                 LOCAL_VARIABLE_ORDER);
   system.get_dof_map().add_dirichlet_boundary(dirichlet_bc);
 
   // Attach an object to the DofMap that will augment the sparsity pattern
   // due to the degrees-of-freedom on the "crack"
-  AugmentSparsityOnInterface augment_sparsity(equation_systems,
-                                              CRACK_BOUNDARY_LOWER,
-                                              CRACK_BOUNDARY_UPPER);
-  system.get_dof_map().attach_extra_sparsity_object(augment_sparsity);
+  //
+  // By attaching this object *before* reading our mesh, we also
+  // ensure that the connected elements will not be deleted on a
+  // distributed mesh.
+  AugmentSparsityOnInterface augment_sparsity
+    (mesh, CRACK_BOUNDARY_LOWER, CRACK_BOUNDARY_UPPER);
+  system.get_dof_map().add_coupling_functor(augment_sparsity);
+
+  mesh.read("miscellaneous_ex9.exo");
 
   equation_systems.init();
   equation_systems.print_info();
@@ -168,11 +171,41 @@ int main (int argc, char ** argv)
                                              equation_systems);
 #endif
 
+#ifdef LIBMESH_ENABLE_AMR
+  // Possibly solve on a refined mesh next.
+  MeshRefinement mesh_refinement (mesh);
+  unsigned int n_refinements = 0;
+  if (command_line.search("-n_refinements"))
+    n_refinements = command_line.next(0);
+
+  for (unsigned int r = 0; r != n_refinements; ++r)
+    {
+      std::cout << "Refining the mesh" << std::endl;
+
+      mesh_refinement.uniformly_refine ();
+      equation_systems.reinit();
+
+      assemble_poisson(equation_systems,
+                       augment_sparsity.get_lower_to_upper());
+      system.solve();
+
+#ifdef LIBMESH_HAVE_EXODUS_API
+      // Plot the refined solution
+      std::ostringstream out;
+      out << "solution_" << r << ".exo";
+      ExodusII_IO (mesh).write_equation_systems (out.str(),
+                                                 equation_systems);
+#endif
+
+    }
+
+#endif
+
   return 0;
 }
 
 void assemble_poisson(EquationSystems & es,
-                      const ElementIdMap & lower_to_upper)
+                      const ElementSideMap & lower_to_upper)
 {
   const MeshBase & mesh = es.get_mesh();
   const unsigned int dim = mesh.mesh_dimension();
@@ -185,9 +218,9 @@ void assemble_poisson(EquationSystems & es,
 
   FEType fe_type = dof_map.variable_type(0);
 
-  UniquePtr<FEBase> fe (FEBase::build(dim, fe_type));
-  UniquePtr<FEBase> fe_elem_face (FEBase::build(dim, fe_type));
-  UniquePtr<FEBase> fe_neighbor_face (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe_elem_face (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe_neighbor_face (FEBase::build(dim, fe_type));
 
   QGauss qrule (dim, fe_type.default_quadrature_order());
   QGauss qface(dim-1, fe_type.default_quadrature_order());
@@ -197,15 +230,15 @@ void assemble_poisson(EquationSystems & es,
   fe_neighbor_face->attach_quadrature_rule (&qface);
 
   const std::vector<Real> & JxW = fe->get_JxW();
-  const std::vector<std::vector<Real> > & phi = fe->get_phi();
-  const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+  const std::vector<std::vector<Real>> & phi = fe->get_phi();
+  const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
   const std::vector<Real> & JxW_face = fe_elem_face->get_JxW();
 
   const std::vector<Point> & qface_points = fe_elem_face->get_xyz();
 
-  const std::vector<std::vector<Real> > & phi_face          = fe_elem_face->get_phi();
-  const std::vector<std::vector<Real> > & phi_neighbor_face = fe_neighbor_face->get_phi();
+  const std::vector<std::vector<Real>> & phi_face          = fe_elem_face->get_phi();
+  const std::vector<std::vector<Real>> & phi_neighbor_face = fe_neighbor_face->get_phi();
 
   DenseMatrix<Number> Ke;
   DenseVector<Number> Fe;
@@ -217,13 +250,8 @@ void assemble_poisson(EquationSystems & es,
 
   std::vector<dof_id_type> dof_indices;
 
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-  for ( ; el != end_el; ++el)
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      const Elem * elem = *el;
-
       dof_map.dof_indices (elem, dof_indices);
       const unsigned int n_dofs = dof_indices.size();
 
@@ -240,15 +268,15 @@ void assemble_poisson(EquationSystems & es,
 
       // Boundary flux provides forcing in this example
       {
-        for (unsigned int side=0; side<elem->n_sides(); side++)
-          if (elem->neighbor(side) == libmesh_nullptr)
+        for (auto side : elem->side_index_range())
+          if (elem->neighbor_ptr(side) == nullptr)
             {
               if (mesh.get_boundary_info().has_boundary_id (elem, side, MIN_Z_BOUNDARY))
                 {
                   fe_elem_face->reinit(elem, side);
 
                   for (unsigned int qp=0; qp<qface.n_points(); qp++)
-                    for (unsigned int i=0; i<phi.size(); i++)
+                    for (std::size_t i=0; i<phi.size(); i++)
                       Fe(i) += JxW_face[qp] * phi_face[i][qp];
                 }
 
@@ -257,18 +285,19 @@ void assemble_poisson(EquationSystems & es,
 
       // Add boundary terms on the crack
       {
-        for (unsigned int side=0; side<elem->n_sides(); side++)
-          if (elem->neighbor(side) == libmesh_nullptr)
+        for (auto side : elem->side_index_range())
+          if (elem->neighbor_ptr(side) == nullptr)
             {
               // Found the lower side of the crack. Assemble terms due to lower and upper in here.
               if (mesh.get_boundary_info().has_boundary_id (elem, side, CRACK_BOUNDARY_LOWER))
                 {
                   fe_elem_face->reinit(elem, side);
 
-                  ElementIdMap::const_iterator ltu_it =
-                    lower_to_upper.find(std::make_pair(elem->id(), side));
-                  dof_id_type upper_elem_id = ltu_it->second;
-                  const Elem * neighbor = mesh.elem(upper_elem_id);
+                  ElementSideMap::const_iterator ltu_it =
+                    lower_to_upper.find(std::make_pair(elem, side));
+                  libmesh_assert(ltu_it != lower_to_upper.end());
+
+                  const Elem * neighbor = ltu_it->second;
 
                   std::vector<Point> qface_neighbor_points;
                   FEInterface::inverse_map (elem->dim(), fe->get_fe_type(),

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,51 +22,84 @@
 
 namespace libMesh
 {
-template< typename OutputShape >
+template<typename OutputShape>
+void H1FETransformation<OutputShape>::init_map_phi(const FEGenericBase<OutputShape> & /* fe */ ) const
+{
+  // Nothing needed
+}
+
+
+
+template<typename OutputShape>
+void H1FETransformation<OutputShape>::init_map_dphi(const FEGenericBase<OutputShape> & fe) const
+{
+  fe.get_fe_map().get_dxidx();
+}
+
+
+
+template<typename OutputShape>
+void H1FETransformation<OutputShape>::init_map_d2phi(const FEGenericBase<OutputShape> & fe) const
+{
+  fe.get_fe_map().get_dxidx();
+#ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
+  fe.get_fe_map().get_d2xidxyz2();
+#endif
+}
+
+template<typename OutputShape>
 void H1FETransformation<OutputShape>::map_phi( const unsigned int dim,
                                                const Elem * const elem,
                                                const std::vector<Point> & qp,
                                                const FEGenericBase<OutputShape> & fe,
-                                               std::vector<std::vector<OutputShape> > & phi ) const
+                                               std::vector<std::vector<OutputShape>> & phi ) const
 {
   switch(dim)
     {
     case 0:
       {
-        for (unsigned int i=0; i<phi.size(); i++)
+        for (unsigned int i=0,
+             n_phi = cast_int<unsigned int>(phi.size());
+             i != n_phi; i++)
           {
             libmesh_assert_equal_to ( qp.size(), phi[i].size() );
-            for (unsigned int p=0; p<phi[i].size(); p++)
+            for (std::size_t p=0; p<phi[i].size(); p++)
               FEInterface::shape<OutputShape>(0, fe.get_fe_type(), elem, i, qp[p], phi[i][p]);
           }
         break;
       }
     case 1:
       {
-        for (unsigned int i=0; i<phi.size(); i++)
+        for (unsigned int i=0,
+             n_phi = cast_int<unsigned int>(phi.size());
+             i != n_phi; i++)
           {
             libmesh_assert_equal_to ( qp.size(), phi[i].size() );
-            for (unsigned int p=0; p<phi[i].size(); p++)
+            for (std::size_t p=0; p<phi[i].size(); p++)
               FEInterface::shape<OutputShape>(1, fe.get_fe_type(), elem, i, qp[p], phi[i][p]);
           }
         break;
       }
     case 2:
       {
-        for (unsigned int i=0; i<phi.size(); i++)
+        for (unsigned int i=0,
+             n_phi = cast_int<unsigned int>(phi.size());
+             i != n_phi; i++)
           {
             libmesh_assert_equal_to ( qp.size(), phi[i].size() );
-            for (unsigned int p=0; p<phi[i].size(); p++)
+            for (std::size_t p=0; p<phi[i].size(); p++)
               FEInterface::shape<OutputShape>(2, fe.get_fe_type(), elem, i, qp[p], phi[i][p]);
           }
         break;
       }
     case 3:
       {
-        for (unsigned int i=0; i<phi.size(); i++)
+        for (unsigned int i=0,
+             n_phi = cast_int<unsigned int>(phi.size());
+             i != n_phi; i++)
           {
             libmesh_assert_equal_to ( qp.size(), phi[i].size() );
-            for (unsigned int p=0; p<phi[i].size(); p++)
+            for (std::size_t p=0; p<phi[i].size(); p++)
               FEInterface::shape<OutputShape>(3, fe.get_fe_type(), elem, i, qp[p], phi[i][p]);
           }
         break;
@@ -78,31 +111,29 @@ void H1FETransformation<OutputShape>::map_phi( const unsigned int dim,
 }
 
 
-template< typename OutputShape >
+template<typename OutputShape>
 void H1FETransformation<OutputShape>::map_dphi( const unsigned int dim,
                                                 const Elem * const,
                                                 const std::vector<Point> &,
                                                 const FEGenericBase<OutputShape> & fe,
-                                                std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputGradient> > & dphi,
-                                                std::vector<std::vector<OutputShape> > & dphidx,
-                                                std::vector<std::vector<OutputShape> > & dphidy,
-                                                std::vector<std::vector<OutputShape> > & dphidz ) const
+                                                std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputGradient>> & dphi,
+                                                std::vector<std::vector<OutputShape>> & dphidx,
+                                                std::vector<std::vector<OutputShape>> & dphidy,
+                                                std::vector<std::vector<OutputShape>> & dphidz ) const
 {
   switch(dim)
     {
     case 0: // No derivatives in 0D
       {
-        for (unsigned int i=0; i<dphi.size(); i++)
-          for (unsigned int p=0; p<dphi[i].size(); p++)
-            {
-              dphi[i][p] = 0.;
-            }
+        for (std::size_t i=0; i<dphi.size(); i++)
+          for (std::size_t p=0; p<dphi[i].size(); p++)
+            dphi[i][p] = 0.;
         break;
       }
 
     case 1:
       {
-        const std::vector<std::vector<OutputShape> > & dphidxi = fe.get_dphidxi();
+        const std::vector<std::vector<OutputShape>> & dphidxi = fe.get_dphidxi();
 
         const std::vector<Real> & dxidx_map = fe.get_fe_map().get_dxidx();
 #if LIBMESH_DIM>1
@@ -112,8 +143,8 @@ void H1FETransformation<OutputShape>::map_dphi( const unsigned int dim,
         const std::vector<Real> & dxidz_map = fe.get_fe_map().get_dxidz();
 #endif
 
-        for (unsigned int i=0; i<dphi.size(); i++)
-          for (unsigned int p=0; p<dphi[i].size(); p++)
+        for (std::size_t i=0; i<dphi.size(); i++)
+          for (std::size_t p=0; p<dphi[i].size(); p++)
             {
               // dphi/dx    = (dphi/dxi)*(dxi/dx)
               dphi[i][p].slice(0) = dphidx[i][p] = dphidxi[i][p]*dxidx_map[p];
@@ -131,8 +162,8 @@ void H1FETransformation<OutputShape>::map_dphi( const unsigned int dim,
 
     case 2:
       {
-        const std::vector<std::vector<OutputShape> > & dphidxi = fe.get_dphidxi();
-        const std::vector<std::vector<OutputShape> > & dphideta = fe.get_dphideta();
+        const std::vector<std::vector<OutputShape>> & dphidxi = fe.get_dphidxi();
+        const std::vector<std::vector<OutputShape>> & dphideta = fe.get_dphideta();
 
         const std::vector<Real> & dxidx_map = fe.get_fe_map().get_dxidx();
         const std::vector<Real> & dxidy_map = fe.get_fe_map().get_dxidy();
@@ -146,8 +177,8 @@ void H1FETransformation<OutputShape>::map_dphi( const unsigned int dim,
         const std::vector<Real> & detadz_map = fe.get_fe_map().get_detadz();
 #endif
 
-        for (unsigned int i=0; i<dphi.size(); i++)
-          for (unsigned int p=0; p<dphi[i].size(); p++)
+        for (std::size_t i=0; i<dphi.size(); i++)
+          for (std::size_t p=0; p<dphi[i].size(); p++)
             {
               // dphi/dx    = (dphi/dxi)*(dxi/dx) + (dphi/deta)*(deta/dx)
               dphi[i][p].slice(0) = dphidx[i][p] = (dphidxi[i][p]*dxidx_map[p] +
@@ -169,9 +200,9 @@ void H1FETransformation<OutputShape>::map_dphi( const unsigned int dim,
 
     case 3:
       {
-        const std::vector<std::vector<OutputShape> > & dphidxi = fe.get_dphidxi();
-        const std::vector<std::vector<OutputShape> > & dphideta = fe.get_dphideta();
-        const std::vector<std::vector<OutputShape> > & dphidzeta = fe.get_dphidzeta();
+        const std::vector<std::vector<OutputShape>> & dphidxi = fe.get_dphidxi();
+        const std::vector<std::vector<OutputShape>> & dphideta = fe.get_dphideta();
+        const std::vector<std::vector<OutputShape>> & dphidzeta = fe.get_dphidzeta();
 
         const std::vector<Real> & dxidx_map = fe.get_fe_map().get_dxidx();
         const std::vector<Real> & dxidy_map = fe.get_fe_map().get_dxidy();
@@ -185,8 +216,8 @@ void H1FETransformation<OutputShape>::map_dphi( const unsigned int dim,
         const std::vector<Real> & dzetady_map = fe.get_fe_map().get_dzetady();
         const std::vector<Real> & dzetadz_map = fe.get_fe_map().get_dzetadz();
 
-        for (unsigned int i=0; i<dphi.size(); i++)
-          for (unsigned int p=0; p<dphi[i].size(); p++)
+        for (std::size_t i=0; i<dphi.size(); i++)
+          for (std::size_t p=0; p<dphi[i].size(); p++)
             {
               // dphi/dx    = (dphi/dxi)*(dxi/dx) + (dphi/deta)*(deta/dx) + (dphi/dzeta)*(dzeta/dx);
               dphi[i][p].slice(0) = dphidx[i][p] = (dphidxi[i][p]*dxidx_map[p] +
@@ -212,34 +243,32 @@ void H1FETransformation<OutputShape>::map_dphi( const unsigned int dim,
 }
 
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
-template< typename OutputShape >
+template<typename OutputShape>
 void H1FETransformation<OutputShape>::map_d2phi(const unsigned int dim,
                                                 const std::vector<Point> &,
                                                 const FEGenericBase<OutputShape> & fe,
-                                                std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputTensor> > & d2phi,
-                                                std::vector<std::vector<OutputShape> > & d2phidx2,
-                                                std::vector<std::vector<OutputShape> > & d2phidxdy,
-                                                std::vector<std::vector<OutputShape> > & d2phidxdz,
-                                                std::vector<std::vector<OutputShape> > & d2phidy2,
-                                                std::vector<std::vector<OutputShape> > & d2phidydz,
-                                                std::vector<std::vector<OutputShape> > & d2phidz2) const
+                                                std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputTensor>> & d2phi,
+                                                std::vector<std::vector<OutputShape>> & d2phidx2,
+                                                std::vector<std::vector<OutputShape>> & d2phidxdy,
+                                                std::vector<std::vector<OutputShape>> & d2phidxdz,
+                                                std::vector<std::vector<OutputShape>> & d2phidy2,
+                                                std::vector<std::vector<OutputShape>> & d2phidydz,
+                                                std::vector<std::vector<OutputShape>> & d2phidz2) const
 {
   switch (dim)
     {
     case 0: // No derivatives in 0D
       {
-        for (unsigned int i=0; i<d2phi.size(); i++)
-          for (unsigned int p=0; p<d2phi[i].size(); p++)
-            {
-              d2phi[i][p] = 0.;
-            }
+        for (std::size_t i=0; i<d2phi.size(); i++)
+          for (std::size_t p=0; p<d2phi[i].size(); p++)
+            d2phi[i][p] = 0.;
 
         break;
       }
 
     case 1:
       {
-        const std::vector<std::vector<OutputShape> > & d2phidxi2 = fe.get_d2phidxi2();
+        const std::vector<std::vector<OutputShape>> & d2phidxi2 = fe.get_d2phidxi2();
 
         const std::vector<Real> & dxidx_map = fe.get_fe_map().get_dxidx();
 #if LIBMESH_DIM>1
@@ -250,13 +279,13 @@ void H1FETransformation<OutputShape>::map_d2phi(const unsigned int dim,
 #endif
 
         // Shape function derivatives in reference space
-        const std::vector<std::vector<OutputShape> > & dphidxi = fe.get_dphidxi();
+        const std::vector<std::vector<OutputShape>> & dphidxi = fe.get_dphidxi();
 
         // Inverse map second derivatives
-        const std::vector<std::vector<Real> > & d2xidxyz2 = fe.get_fe_map().get_d2xidxyz2();
+        const std::vector<std::vector<Real>> & d2xidxyz2 = fe.get_fe_map().get_d2xidxyz2();
 
-        for (unsigned int i=0; i<d2phi.size(); i++)
-          for (unsigned int p=0; p<d2phi[i].size(); p++)
+        for (std::size_t i=0; i<d2phi.size(); i++)
+          for (std::size_t p=0; p<d2phi[i].size(); p++)
             {
               // phi_{x x}
               d2phi[i][p].slice(0).slice(0) = d2phidx2[i][p] =
@@ -302,9 +331,9 @@ void H1FETransformation<OutputShape>::map_d2phi(const unsigned int dim,
 
     case 2:
       {
-        const std::vector<std::vector<OutputShape> > & d2phidxi2 = fe.get_d2phidxi2();
-        const std::vector<std::vector<OutputShape> > & d2phidxideta = fe.get_d2phidxideta();
-        const std::vector<std::vector<OutputShape> > & d2phideta2 = fe.get_d2phideta2();
+        const std::vector<std::vector<OutputShape>> & d2phidxi2 = fe.get_d2phidxi2();
+        const std::vector<std::vector<OutputShape>> & d2phidxideta = fe.get_d2phidxideta();
+        const std::vector<std::vector<OutputShape>> & d2phideta2 = fe.get_d2phideta2();
 
         const std::vector<Real> & dxidx_map = fe.get_fe_map().get_dxidx();
         const std::vector<Real> & dxidy_map = fe.get_fe_map().get_dxidy();
@@ -319,15 +348,15 @@ void H1FETransformation<OutputShape>::map_d2phi(const unsigned int dim,
 #endif
 
         // Shape function derivatives in reference space
-        const std::vector<std::vector<OutputShape> > & dphidxi = fe.get_dphidxi();
-        const std::vector<std::vector<OutputShape> > & dphideta = fe.get_dphideta();
+        const std::vector<std::vector<OutputShape>> & dphidxi = fe.get_dphidxi();
+        const std::vector<std::vector<OutputShape>> & dphideta = fe.get_dphideta();
 
         // Inverse map second derivatives
-        const std::vector<std::vector<Real> > & d2xidxyz2 = fe.get_fe_map().get_d2xidxyz2();
-        const std::vector<std::vector<Real> > & d2etadxyz2 = fe.get_fe_map().get_d2etadxyz2();
+        const std::vector<std::vector<Real>> & d2xidxyz2 = fe.get_fe_map().get_d2xidxyz2();
+        const std::vector<std::vector<Real>> & d2etadxyz2 = fe.get_fe_map().get_d2etadxyz2();
 
-        for (unsigned int i=0; i<d2phi.size(); i++)
-          for (unsigned int p=0; p<d2phi[i].size(); p++)
+        for (std::size_t i=0; i<d2phi.size(); i++)
+          for (std::size_t p=0; p<d2phi[i].size(); p++)
             {
               // phi_{x x}
               d2phi[i][p].slice(0).slice(0) = d2phidx2[i][p] =
@@ -387,12 +416,12 @@ void H1FETransformation<OutputShape>::map_d2phi(const unsigned int dim,
 
     case 3:
       {
-        const std::vector<std::vector<OutputShape> > & d2phidxi2 = fe.get_d2phidxi2();
-        const std::vector<std::vector<OutputShape> > & d2phidxideta = fe.get_d2phidxideta();
-        const std::vector<std::vector<OutputShape> > & d2phideta2 = fe.get_d2phideta2();
-        const std::vector<std::vector<OutputShape> > & d2phidxidzeta = fe.get_d2phidxidzeta();
-        const std::vector<std::vector<OutputShape> > & d2phidetadzeta = fe.get_d2phidetadzeta();
-        const std::vector<std::vector<OutputShape> > & d2phidzeta2 = fe.get_d2phidzeta2();
+        const std::vector<std::vector<OutputShape>> & d2phidxi2 = fe.get_d2phidxi2();
+        const std::vector<std::vector<OutputShape>> & d2phidxideta = fe.get_d2phidxideta();
+        const std::vector<std::vector<OutputShape>> & d2phideta2 = fe.get_d2phideta2();
+        const std::vector<std::vector<OutputShape>> & d2phidxidzeta = fe.get_d2phidxidzeta();
+        const std::vector<std::vector<OutputShape>> & d2phidetadzeta = fe.get_d2phidetadzeta();
+        const std::vector<std::vector<OutputShape>> & d2phidzeta2 = fe.get_d2phidzeta2();
 
         const std::vector<Real> & dxidx_map = fe.get_fe_map().get_dxidx();
         const std::vector<Real> & dxidy_map = fe.get_fe_map().get_dxidy();
@@ -407,17 +436,17 @@ void H1FETransformation<OutputShape>::map_d2phi(const unsigned int dim,
         const std::vector<Real> & dzetadz_map = fe.get_fe_map().get_dzetadz();
 
         // Shape function derivatives in reference space
-        const std::vector<std::vector<OutputShape> > & dphidxi = fe.get_dphidxi();
-        const std::vector<std::vector<OutputShape> > & dphideta = fe.get_dphideta();
-        const std::vector<std::vector<OutputShape> > & dphidzeta = fe.get_dphidzeta();
+        const std::vector<std::vector<OutputShape>> & dphidxi = fe.get_dphidxi();
+        const std::vector<std::vector<OutputShape>> & dphideta = fe.get_dphideta();
+        const std::vector<std::vector<OutputShape>> & dphidzeta = fe.get_dphidzeta();
 
         // Inverse map second derivatives
-        const std::vector<std::vector<Real> > & d2xidxyz2 = fe.get_fe_map().get_d2xidxyz2();
-        const std::vector<std::vector<Real> > & d2etadxyz2 = fe.get_fe_map().get_d2etadxyz2();
-        const std::vector<std::vector<Real> > & d2zetadxyz2 = fe.get_fe_map().get_d2zetadxyz2();
+        const std::vector<std::vector<Real>> & d2xidxyz2 = fe.get_fe_map().get_d2xidxyz2();
+        const std::vector<std::vector<Real>> & d2etadxyz2 = fe.get_fe_map().get_d2etadxyz2();
+        const std::vector<std::vector<Real>> & d2zetadxyz2 = fe.get_fe_map().get_d2zetadxyz2();
 
-        for (unsigned int i=0; i<d2phi.size(); i++)
-          for (unsigned int p=0; p<d2phi[i].size(); p++)
+        for (std::size_t i=0; i<d2phi.size(); i++)
+          for (std::size_t p=0; p<d2phi[i].size(); p++)
             {
               // phi_{x x}
               d2phi[i][p].slice(0).slice(0) = d2phidx2[i][p] =
@@ -501,22 +530,22 @@ void H1FETransformation<OutputShape>::map_d2phi(const unsigned int dim,
 }
 #endif //LIBMESH_ENABLE_SECOND_DERIVATIVES
 
-template< >
+template<>
 void H1FETransformation<Real>::map_curl(const unsigned int,
                                         const Elem * const,
                                         const std::vector<Point> &,
                                         const FEGenericBase<Real> &,
-                                        std::vector<std::vector<Real> > &) const
+                                        std::vector<std::vector<Real>> &) const
 {
   libmesh_error_msg("Computing the curl of a shape function only \nmakes sense for vector-valued elements.");
 }
 
-template< >
+template<>
 void H1FETransformation<RealGradient>::map_curl(const unsigned int dim,
                                                 const Elem * const,
                                                 const std::vector<Point> &,
                                                 const FEGenericBase<RealGradient> & fe,
-                                                std::vector<std::vector<RealGradient> > & curl_phi ) const
+                                                std::vector<std::vector<RealGradient>> & curl_phi ) const
 {
   switch (dim)
     {
@@ -526,8 +555,8 @@ void H1FETransformation<RealGradient>::map_curl(const unsigned int dim,
 
     case 2:
       {
-        const std::vector<std::vector<RealGradient> > & dphidxi = fe.get_dphidxi();
-        const std::vector<std::vector<RealGradient> > & dphideta = fe.get_dphideta();
+        const std::vector<std::vector<RealGradient>> & dphidxi = fe.get_dphidxi();
+        const std::vector<std::vector<RealGradient>> & dphideta = fe.get_dphideta();
 
         const std::vector<Real> & dxidx_map = fe.get_fe_map().get_dxidx();
         const std::vector<Real> & dxidy_map = fe.get_fe_map().get_dxidy();
@@ -546,8 +575,8 @@ void H1FETransformation<RealGradient>::map_curl(const unsigned int dim,
 
           curl = ( -dphi_y/dz, dphi_x/dz, dphi_y/dx - dphi_x/dy )
         */
-        for (unsigned int i=0; i<curl_phi.size(); i++)
-          for (unsigned int p=0; p<curl_phi[i].size(); p++)
+        for (std::size_t i=0; i<curl_phi.size(); i++)
+          for (std::size_t p=0; p<curl_phi[i].size(); p++)
             {
 
               Real dphiy_dx = (dphidxi[i][p].slice(1))*dxidx_map[p]
@@ -574,9 +603,9 @@ void H1FETransformation<RealGradient>::map_curl(const unsigned int dim,
       }
     case 3:
       {
-        const std::vector<std::vector<RealGradient> > & dphidxi = fe.get_dphidxi();
-        const std::vector<std::vector<RealGradient> > & dphideta = fe.get_dphideta();
-        const std::vector<std::vector<RealGradient> > & dphidzeta = fe.get_dphidzeta();
+        const std::vector<std::vector<RealGradient>> & dphidxi = fe.get_dphidxi();
+        const std::vector<std::vector<RealGradient>> & dphideta = fe.get_dphideta();
+        const std::vector<std::vector<RealGradient>> & dphidzeta = fe.get_dphidzeta();
 
         const std::vector<Real> & dxidx_map = fe.get_fe_map().get_dxidx();
         const std::vector<Real> & dxidy_map = fe.get_fe_map().get_dxidy();
@@ -593,8 +622,8 @@ void H1FETransformation<RealGradient>::map_curl(const unsigned int dim,
         /*
           In 3D: curl = ( dphi_z/dy - dphi_y/dz, dphi_x/dz - dphi_z/dx, dphi_y/dx - dphi_x/dy )
         */
-        for (unsigned int i=0; i<curl_phi.size(); i++)
-          for (unsigned int p=0; p<curl_phi[i].size(); p++)
+        for (std::size_t i=0; i<curl_phi.size(); i++)
+          for (std::size_t p=0; p<curl_phi[i].size(); p++)
             {
               Real dphiz_dy = (dphidxi[i][p].slice(2))*dxidy_map[p]
                 + (dphideta[i][p].slice(2))*detady_map[p]
@@ -635,12 +664,12 @@ void H1FETransformation<RealGradient>::map_curl(const unsigned int dim,
 }
 
 
-template< >
+template<>
 void H1FETransformation<Real>::map_div(const unsigned int,
                                        const Elem * const,
                                        const std::vector<Point> &,
                                        const FEGenericBase<Real> &,
-                                       std::vector<std::vector<FEGenericBase<Real>::OutputDivergence> > & ) const
+                                       std::vector<std::vector<FEGenericBase<Real>::OutputDivergence>> & ) const
 {
   libmesh_error_msg("Computing the divergence of a shape function only \nmakes sense for vector-valued elements.");
 }
@@ -651,7 +680,7 @@ void H1FETransformation<RealGradient>::map_div(const unsigned int dim,
                                                const Elem * const,
                                                const std::vector<Point> &,
                                                const FEGenericBase<RealGradient> & fe,
-                                               std::vector<std::vector<FEGenericBase<RealGradient>::OutputDivergence> > & div_phi) const
+                                               std::vector<std::vector<FEGenericBase<RealGradient>::OutputDivergence>> & div_phi) const
 {
   switch (dim)
     {
@@ -661,8 +690,8 @@ void H1FETransformation<RealGradient>::map_div(const unsigned int dim,
 
     case 2:
       {
-        const std::vector<std::vector<RealGradient> > & dphidxi = fe.get_dphidxi();
-        const std::vector<std::vector<RealGradient> > & dphideta = fe.get_dphideta();
+        const std::vector<std::vector<RealGradient>> & dphidxi = fe.get_dphidxi();
+        const std::vector<std::vector<RealGradient>> & dphideta = fe.get_dphideta();
 
         const std::vector<Real> & dxidx_map = fe.get_fe_map().get_dxidx();
         const std::vector<Real> & dxidy_map = fe.get_fe_map().get_dxidy();
@@ -670,11 +699,9 @@ void H1FETransformation<RealGradient>::map_div(const unsigned int dim,
         const std::vector<Real> & detadx_map = fe.get_fe_map().get_detadx();
         const std::vector<Real> & detady_map = fe.get_fe_map().get_detady();
 
-        /*
-          In 2D: div = dphi_x/dx + dphi_y/dy
-        */
-        for (unsigned int i=0; i<div_phi.size(); i++)
-          for (unsigned int p=0; p<div_phi[i].size(); p++)
+        // In 2D: div = dphi_x/dx + dphi_y/dy
+        for (std::size_t i=0; i<div_phi.size(); i++)
+          for (std::size_t p=0; p<div_phi[i].size(); p++)
             {
 
               Real dphix_dx = (dphidxi[i][p].slice(0))*dxidx_map[p]
@@ -689,9 +716,9 @@ void H1FETransformation<RealGradient>::map_div(const unsigned int dim,
       }
     case 3:
       {
-        const std::vector<std::vector<RealGradient> > & dphidxi = fe.get_dphidxi();
-        const std::vector<std::vector<RealGradient> > & dphideta = fe.get_dphideta();
-        const std::vector<std::vector<RealGradient> > & dphidzeta = fe.get_dphidzeta();
+        const std::vector<std::vector<RealGradient>> & dphidxi = fe.get_dphidxi();
+        const std::vector<std::vector<RealGradient>> & dphideta = fe.get_dphideta();
+        const std::vector<std::vector<RealGradient>> & dphidzeta = fe.get_dphidzeta();
 
         const std::vector<Real> & dxidx_map = fe.get_fe_map().get_dxidx();
         const std::vector<Real> & dxidy_map = fe.get_fe_map().get_dxidy();
@@ -708,8 +735,8 @@ void H1FETransformation<RealGradient>::map_div(const unsigned int dim,
         /*
           In 3D: div = dphi_x/dx + dphi_y/dy + dphi_z/dz
         */
-        for (unsigned int i=0; i<div_phi.size(); i++)
-          for (unsigned int p=0; p<div_phi[i].size(); p++)
+        for (std::size_t i=0; i<div_phi.size(); i++)
+          for (std::size_t p=0; p<div_phi[i].size(); p++)
             {
               Real dphix_dx = (dphidxi[i][p].slice(0))*dxidx_map[p]
                 + (dphideta[i][p].slice(0))*detadx_map[p]
@@ -736,7 +763,7 @@ void H1FETransformation<RealGradient>::map_div(const unsigned int dim,
   return;
 }
 
-// Explicit Instantations
+// Explicit Instantiations
 template class H1FETransformation<Real>;
 template class H1FETransformation<RealGradient>;
 

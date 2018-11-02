@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,14 +20,18 @@
 #ifndef LIBMESH_ENUM_PRECONDITIONER_TYPE_H
 #define LIBMESH_ENUM_PRECONDITIONER_TYPE_H
 
-// ------------------------------------------------------------
-// enum PreconditionerType definition
 namespace libMesh {
 
 /**
- * Defines an \p enum for preconditioner types
+ * Defines an \p enum for preconditioner types.
+ *
+ * The fixed type, i.e. ": int", enumeration syntax used here allows
+ * this enum to be forward declared as
+ * enum PreconditionerType : int;
+ * reducing header file dependencies.
  */
-enum PreconditionerType {IDENTITY_PRECOND =0,
+enum PreconditionerType : int {
+                         IDENTITY_PRECOND =0,
                          JACOBI_PRECOND,
                          BLOCK_JACOBI_PRECOND,
                          SOR_PRECOND,
@@ -41,8 +45,8 @@ enum PreconditionerType {IDENTITY_PRECOND =0,
                          USER_PRECOND,
                          SHELL_PRECOND,
                          AMG_PRECOND,
-
+                         // Invalid
                          INVALID_PRECONDITIONER};
 }
 
-#endif // LIBMESH_ENUM_PRECONDITIONER_TYPE_H
+#endif

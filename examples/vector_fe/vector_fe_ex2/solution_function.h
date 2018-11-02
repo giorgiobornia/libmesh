@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -15,7 +15,11 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
+// libMesh includes
 #include "libmesh/function_base.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
+
+// Example includes
 #include "laplace_exact_solution.h"
 
 using namespace libMesh;
@@ -57,8 +61,8 @@ public:
     return soln(component_in, x, y, z);
   }
 
-  virtual UniquePtr<FunctionBase<Number> > clone() const
-  { return UniquePtr<FunctionBase<Number> > (new SolutionFunction(_u_var)); }
+  virtual std::unique_ptr<FunctionBase<Number>> clone() const
+  { return libmesh_make_unique<SolutionFunction>(_u_var); }
 
 private:
 
@@ -98,8 +102,8 @@ public:
     return soln(component_in, x, y, z);
   }
 
-  virtual UniquePtr<FunctionBase<Gradient> > clone() const
-  { return UniquePtr<FunctionBase<Gradient> > (new SolutionGradient(_u_var)); }
+  virtual std::unique_ptr<FunctionBase<Gradient>> clone() const
+  { return libmesh_make_unique<SolutionGradient>(_u_var); }
 
 private:
 

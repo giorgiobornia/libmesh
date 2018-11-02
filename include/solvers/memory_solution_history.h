@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -23,13 +23,21 @@
 // Local includes
 #include "libmesh/numeric_vector.h"
 #include "libmesh/solution_history.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
+
+// C++ includes
 #include <list>
 
 namespace libMesh
 {
+
 /**
  * Subclass of Solution History that stores the solutions
  * and other important vectors in memory.
+ *
+ * \author Vikram Garg
+ * \date 2012
+ * \brief Stores past solutions in memory.
  */
 class MemorySolutionHistory : public SolutionHistory
 {
@@ -50,32 +58,34 @@ public:
   /**
    * Virtual function store which we will be overriding to store timesteps
    */
-  virtual void store() libmesh_override;
+  virtual void store() override;
 
   /**
    * Virtual function retrieve which we will be overriding to retrieve timesteps
    */
-  virtual void retrieve() libmesh_override;
+  virtual void retrieve() override;
 
   /**
    * Typedef for Stored Solutions iterator, a list of pairs of the current
    * system time, map of strings and saved vectors
    */
-  typedef std::list<std::pair<Real, std::map<std::string, NumericVector<Number> *> > >::iterator stored_solutions_iterator;
+  typedef std::map<std::string, std::unique_ptr<NumericVector<Number>>> map_type;
+  typedef std::list<std::pair<Real, map_type>> list_type;
+  typedef list_type::iterator stored_solutions_iterator;
 
   /**
    * Definition of the clone function needed for the setter function
    */
-  virtual UniquePtr<SolutionHistory > clone() const libmesh_override
+  virtual std::unique_ptr<SolutionHistory > clone() const override
   {
-    return UniquePtr<SolutionHistory >(new MemorySolutionHistory(_system));
+    return libmesh_make_unique<MemorySolutionHistory>(_system);
   }
 
 private:
 
   // This list of pairs will hold the current time and stored vectors
   // from each timestep
-  std::list<std::pair<Real, std::map<std::string, NumericVector<Number> *> > > stored_solutions;
+  list_type stored_solutions;
 
   // The stored solutions iterator
   stored_solutions_iterator stored_sols;

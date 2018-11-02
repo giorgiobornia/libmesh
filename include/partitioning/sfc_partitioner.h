@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,10 +20,11 @@
 #ifndef LIBMESH_SFC_PARTITIONER_H
 #define LIBMESH_SFC_PARTITIONER_H
 
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/partitioner.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
 
-// C++ Includes   -----------------------------------
+// C++ Includes
 #include <string>
 
 namespace libMesh
@@ -32,6 +33,10 @@ namespace libMesh
 /**
  * The \p SFCPartitioner uses a Hilbert or Morton-ordered space
  * filling curve to partition the elements.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2003
+ * \brief Partitioner based on different types of space filling curves.
  */
 class SFCPartitioner : public Partitioner
 {
@@ -46,20 +51,42 @@ public:
   {}
 
   /**
-   * Creates a new partitioner of this type and returns it in
-   * an \p UniquePtr.
+   * Copy/move ctor, copy/move assignment operator, and destructor are
+   * all explicitly defaulted for this class.
    */
-  virtual UniquePtr<Partitioner> clone () const libmesh_override
+  SFCPartitioner (const SFCPartitioner &) = default;
+  SFCPartitioner (SFCPartitioner &&) = default;
+  SFCPartitioner & operator= (const SFCPartitioner &) = default;
+  SFCPartitioner & operator= (SFCPartitioner &&) = default;
+  virtual ~SFCPartitioner() = default;
+
+  /**
+   * \returns A copy of this partitioner wrapped in a smart pointer.
+   */
+  virtual std::unique_ptr<Partitioner> clone () const override
   {
-    return UniquePtr<Partitioner>(new SFCPartitioner());
+    return libmesh_make_unique<SFCPartitioner>(*this);
   }
 
   /**
    * Sets the type of space-filling curve to use.  Valid types are
-   * "Hilbert" (the default) and "Morton"
+   * "Hilbert" (the default) and "Morton".
    */
-  void set_sfc_type (const std::string & sfc_type);
+  void set_sfc_type (const std::string & sfc_type)
+  {
+    libmesh_assert ((sfc_type == "Hilbert") ||
+                    (sfc_type == "Morton"));
 
+    _sfc_type = sfc_type;
+  }
+
+  /**
+   * Called by the SubdomainPartitioner to partition elements in the range (it, end).
+   */
+  virtual void partition_range(MeshBase & mesh,
+                               MeshBase::element_iterator it,
+                               MeshBase::element_iterator end,
+                               const unsigned int n) override;
 
 protected:
 
@@ -67,7 +94,7 @@ protected:
    * Partition the \p MeshBase into \p n subdomains.
    */
   virtual void _do_partition (MeshBase & mesh,
-                              const unsigned int n) libmesh_override;
+                              const unsigned int n) override;
 
 
 private:
@@ -78,22 +105,6 @@ private:
   std::string _sfc_type;
 };
 
-
-
-// ------------------------------------------------------------
-// LinearPartitioner inline members
-inline
-void SFCPartitioner::set_sfc_type (const std::string & sfc_type)
-{
-  libmesh_assert ((sfc_type == "Hilbert") ||
-                  (sfc_type == "Morton"));
-
-  _sfc_type = sfc_type;
-}
-
-
 } // namespace libMesh
-
-
 
 #endif // LIBMESH_SFC_PARTITIONER_H

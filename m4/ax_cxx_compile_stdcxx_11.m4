@@ -81,76 +81,111 @@ AC_DEFUN([AX_CXX_COMPILE_STDCXX_11], [dnl
   [AC_COMPILE_IFELSE([AC_LANG_SOURCE([_AX_CXX_COMPILE_STDCXX_11_testbody])],
     [ax_cv_cxx_compile_cxx11=yes],
     [ax_cv_cxx_compile_cxx11=no])])
-  if test x$ax_cv_cxx_compile_cxx11 = xyes; then
-    ac_success=yes
-  fi
+  AS_IF([test "x$ax_cv_cxx_compile_cxx11" = "xyes"], [ac_success=yes])
 
   m4_if([$1], [noext], [], [dnl
-  if test x$ac_success = xno; then
+  AS_IF([test "x$ac_success" = "xno"], [
     for switch in -std=gnu++11 -std=gnu++0x; do
       cachevar=AS_TR_SH([ax_cv_cxx_compile_cxx11_$switch])
       AC_CACHE_CHECK(whether $CXX supports C++11 features with $switch,
                      $cachevar,
         [ac_save_CXXFLAGS="$CXXFLAGS"
-         CXXFLAGS="$CXXFLAGS $switch"
+         CXXFLAGS="$CXXFLAGS $switch $libmesh_CXXFLAGS"
          AC_COMPILE_IFELSE([AC_LANG_SOURCE([_AX_CXX_COMPILE_STDCXX_11_testbody])],
           [eval $cachevar=yes],
           [eval $cachevar=no])
          CXXFLAGS="$ac_save_CXXFLAGS"])
-      if eval test x\$$cachevar = xyes; then
-        CXXFLAGS="$CXXFLAGS $switch"
+      AS_IF([eval test x\$$cachevar = xyes], [
         dnl libmesh propagates CXXFLAGS_OPT, CXXFLAGS_DEVEL, and CXXFLAGS_DBG
         dnl to its config script, so make sure they know about the C++11 flag
-        dnl we found.
-        CXXFLAGS_OPT="$CXXFLAGS_OPT $switch"
-        CXXFLAGS_DEVEL="$CXXFLAGS_DEVEL $switch"
-        CXXFLAGS_DBG="$CXXFLAGS_DBG $switch"
+        dnl we found.  Note that we still determine the proper switch even if
+        dnl the user has not enabled C++11, but we only only propagate it to
+        dnl the flags if the user has enabled C++11.
+        AS_IF([test "x$enablecxx11" = "xyes"],
+              [
+                CXXFLAGS="$CXXFLAGS $switch"
+                CXXFLAGS_OPT="$CXXFLAGS_OPT $switch"
+                CXXFLAGS_DEVEL="$CXXFLAGS_DEVEL $switch"
+                CXXFLAGS_DBG="$CXXFLAGS_DBG $switch"
+              ])
         ac_success=yes
         break
-      fi
+      ])
     done
-  fi])
+  ])])
 
+  dnl The only difference between this block of code and the one above appears
+  dnl to be the noext vs. ext arguments to m4_if.  I think the intention was to
+  dnl allow people to specify whether they want special GNU extensions of the
+  dnl C++11 standard vs. "vanilla" C++11, but I'm not sure how important this
+  dnl distinction is nowadays...
   m4_if([$1], [ext], [], [dnl
-  if test x$ac_success = xno; then
+  AS_IF([test "x$ac_success" = "xno"], [
     for switch in -std=c++11 -std=c++0x; do
       cachevar=AS_TR_SH([ax_cv_cxx_compile_cxx11_$switch])
       AC_CACHE_CHECK(whether $CXX supports C++11 features with $switch,
                      $cachevar,
         [ac_save_CXXFLAGS="$CXXFLAGS"
-         CXXFLAGS="$CXXFLAGS $switch"
+         CXXFLAGS="$CXXFLAGS $switch $libmesh_CXXFLAGS"
          AC_COMPILE_IFELSE([AC_LANG_SOURCE([_AX_CXX_COMPILE_STDCXX_11_testbody])],
           [eval $cachevar=yes],
           [eval $cachevar=no])
          CXXFLAGS="$ac_save_CXXFLAGS"])
-      if eval test x\$$cachevar = xyes; then
-        CXXFLAGS="$CXXFLAGS $switch"
+      AS_IF([eval test x\$$cachevar = xyes], [
         dnl libmesh propagates CXXFLAGS_OPT, CXXFLAGS_DEVEL, and CXXFLAGS_DBG
         dnl to its config script, so make sure they know about the C++11 flag
-        dnl we found.
-        CXXFLAGS_OPT="$CXXFLAGS_OPT $switch"
-        CXXFLAGS_DEVEL="$CXXFLAGS_DEVEL $switch"
-        CXXFLAGS_DBG="$CXXFLAGS_DBG $switch"
+        dnl we found.  Note that we still determine the proper switch even if
+        dnl the user has not enabled C++11, but we only only propagate it to
+        dnl the flags if the user has enabled C++11.
+        AS_IF([test "x$enablecxx11" = "xyes"],
+              [
+                CXXFLAGS="$CXXFLAGS $switch"
+                CXXFLAGS_OPT="$CXXFLAGS_OPT $switch"
+                CXXFLAGS_DEVEL="$CXXFLAGS_DEVEL $switch"
+                CXXFLAGS_DBG="$CXXFLAGS_DBG $switch"
+              ])
         ac_success=yes
         break
-      fi
+      ])
     done
-  fi])
+  ])])
   AC_LANG_POP([C++])
-  if test x$ax_cxx_compile_cxx11_required = xtrue; then
-    if test x$ac_success = xno; then
-      AC_MSG_ERROR([*** A compiler with support for C++11 language features is required.])
-    fi
-  else
-    if test x$ac_success = xno; then
-      HAVE_CXX11=0
-      AC_MSG_NOTICE([No compiler with C++11 support was found])
-    else
-      HAVE_CXX11=1
-      AC_DEFINE(HAVE_CXX11,1,
-                [define if the compiler supports basic C++11 syntax])
-    fi
 
-    AC_SUBST(HAVE_CXX11)
-  fi
+  AS_IF([test "x$ax_cxx_compile_cxx11_required" = "xtrue"],
+        [
+          AS_IF([test "x$ac_success" = "xno"],
+                [
+                  dnl We return error code 2 here, since 0 means success and 1 is
+                  dnl indistinguishable from other errors.  Ideally, all of the
+                  dnl AC_MSG_ERROR calls in our m4 files would return a different
+                  dnl error code, but currently this is not implemented.
+                  AC_MSG_ERROR([*** A compiler with support for C++11 language features is required.], 2)
+                ],
+                [
+                  HAVE_CXX11=1
+                  AC_DEFINE(HAVE_CXX11, 1, [define if the compiler supports basic C++11 syntax])
+                ])
+        ],
+        [
+          AS_IF([test "x$ac_success" = "xno"],
+                [
+                  HAVE_CXX11=0
+                  AC_MSG_NOTICE([No compiler with C++11 support was found])
+                  dnl We couldn't find a working C++11 compiler, so we need to set
+                  dnl enablecxx11=no. This way, other C++11 features can potentially
+                  dnl still be detected, and listed as "have but disabled" by
+                  dnl configure.
+                  enablecxx11=no
+                ],
+                [
+                  dnl Only set LIBMESH_HAVE_CXX11 if the user has actually configured with --enable-cxx11.
+                  AS_IF([test "x$enablecxx11" = "xyes"],
+                        [
+                          HAVE_CXX11=1
+                          AC_DEFINE(HAVE_CXX11,1, [define if the compiler supports basic C++11 syntax])
+                        ])
+                ])
+
+          AC_SUBST(HAVE_CXX11)
+        ])
 ])

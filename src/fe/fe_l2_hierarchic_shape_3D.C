@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -671,6 +671,7 @@ Real FE<3,L2_HIERARCHIC>::shape(const Elem * elem,
     case HEX8:
     case HEX20:
       libmesh_assert_less (totalorder, 2);
+      libmesh_fallthrough();
     case HEX27:
       {
         libmesh_assert_less (i, (totalorder+1u)*(totalorder+1u)*(totalorder+1u));
@@ -694,9 +695,6 @@ Real FE<3,L2_HIERARCHIC>::shape(const Elem * elem,
     }
 
 #endif
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -764,9 +762,6 @@ Real FE<3,L2_HIERARCHIC>::shape_deriv(const Elem * elem,
   return (FE<3,L2_HIERARCHIC>::shape(elem, order, i, pp) -
           FE<3,L2_HIERARCHIC>::shape(elem, order, i, pm))/2./eps;
 #endif
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -98,7 +98,7 @@ void NonlinearImplicitSystem::set_solver_parameters ()
   const EquationSystems & es =
     this->get_equation_systems();
 
-  // Get the user-specifiied nonlinear solver tolerances
+  // Get the user-specified nonlinear solver tolerances
   const unsigned int maxits =
     es.parameters.get<unsigned int>("nonlinear solver maximum iterations");
 
@@ -117,7 +117,7 @@ void NonlinearImplicitSystem::set_solver_parameters ()
   const Real rel_step_tol =
     es.parameters.get<Real>("nonlinear solver relative step tolerance");
 
-  // Get the user-specified linear solver toleranaces
+  // Get the user-specified linear solver tolerances
   const unsigned int maxlinearits =
     es.parameters.get<unsigned int>("linear solver maximum iterations");
 
@@ -171,7 +171,7 @@ void NonlinearImplicitSystem::solve ()
     }
   else
     {
-      if (libMesh::on_command_line("--solver_system_names"))
+      if (libMesh::on_command_line("--solver-system-names"))
         nonlinear_solver->init((this->name()+"_").c_str());
       else
         nonlinear_solver->init();
@@ -210,7 +210,8 @@ std::pair<unsigned int, Real> NonlinearImplicitSystem::get_linear_solve_paramete
 
 void NonlinearImplicitSystem::assembly(bool get_residual,
                                        bool get_jacobian,
-                                       bool /*apply_heterogeneous_constraints*/)
+                                       bool /*apply_heterogeneous_constraints*/,
+                                       bool /*apply_no_constraints*/)
 {
   // Get current_local_solution in sync
   this->update();
@@ -219,28 +220,28 @@ void NonlinearImplicitSystem::assembly(bool get_residual,
   // if the user has provided both function pointers and objects only the pointer
   // will be used, so catch that as an error
   if (nonlinear_solver->jacobian && nonlinear_solver->jacobian_object)
-    libmesh_error_msg("ERROR: cannot specifiy both a function and object to compute the Jacobian!");
+    libmesh_error_msg("ERROR: cannot specify both a function and object to compute the Jacobian!");
 
   if (nonlinear_solver->residual && nonlinear_solver->residual_object)
-    libmesh_error_msg("ERROR: cannot specifiy both a function and object to compute the Residual!");
+    libmesh_error_msg("ERROR: cannot specify both a function and object to compute the Residual!");
 
   if (nonlinear_solver->matvec && nonlinear_solver->residual_and_jacobian_object)
-    libmesh_error_msg("ERROR: cannot specifiy both a function and object to compute the combined Residual & Jacobian!");
+    libmesh_error_msg("ERROR: cannot specify both a function and object to compute the combined Residual & Jacobian!");
 
 
   if (get_jacobian)
     {
-      if (nonlinear_solver->jacobian != libmesh_nullptr)
+      if (nonlinear_solver->jacobian != nullptr)
         nonlinear_solver->jacobian (*current_local_solution.get(), *matrix, *this);
 
-      else if (nonlinear_solver->jacobian_object != libmesh_nullptr)
+      else if (nonlinear_solver->jacobian_object != nullptr)
         nonlinear_solver->jacobian_object->jacobian (*current_local_solution.get(), *matrix, *this);
 
-      else if (nonlinear_solver->matvec != libmesh_nullptr)
-        nonlinear_solver->matvec (*current_local_solution.get(), get_residual ? rhs : libmesh_nullptr, matrix, *this);
+      else if (nonlinear_solver->matvec != nullptr)
+        nonlinear_solver->matvec (*current_local_solution.get(), get_residual ? rhs : nullptr, matrix, *this);
 
-      else if (nonlinear_solver->residual_and_jacobian_object != libmesh_nullptr)
-        nonlinear_solver->residual_and_jacobian_object->residual_and_jacobian (*current_local_solution.get(), get_residual ? rhs : libmesh_nullptr, matrix, *this);
+      else if (nonlinear_solver->residual_and_jacobian_object != nullptr)
+        nonlinear_solver->residual_and_jacobian_object->residual_and_jacobian (*current_local_solution.get(), get_residual ? rhs : nullptr, matrix, *this);
 
       else
         libmesh_error_msg("Error! Unable to compute residual and/or Jacobian!");
@@ -248,24 +249,24 @@ void NonlinearImplicitSystem::assembly(bool get_residual,
 
   if (get_residual)
     {
-      if (nonlinear_solver->residual != libmesh_nullptr)
+      if (nonlinear_solver->residual != nullptr)
         nonlinear_solver->residual (*current_local_solution.get(), *rhs, *this);
 
-      else if (nonlinear_solver->residual_object != libmesh_nullptr)
+      else if (nonlinear_solver->residual_object != nullptr)
         nonlinear_solver->residual_object->residual (*current_local_solution.get(), *rhs, *this);
 
-      else if (nonlinear_solver->matvec != libmesh_nullptr)
+      else if (nonlinear_solver->matvec != nullptr)
         {
           // we might have already grabbed the residual and jacobian together
           if (!get_jacobian)
-            nonlinear_solver->matvec (*current_local_solution.get(), rhs, libmesh_nullptr, *this);
+            nonlinear_solver->matvec (*current_local_solution.get(), rhs, nullptr, *this);
         }
 
-      else if (nonlinear_solver->residual_and_jacobian_object != libmesh_nullptr)
+      else if (nonlinear_solver->residual_and_jacobian_object != nullptr)
         {
           // we might have already grabbed the residual and jacobian together
           if (!get_jacobian)
-            nonlinear_solver->residual_and_jacobian_object->residual_and_jacobian (*current_local_solution.get(), rhs, libmesh_nullptr, *this);
+            nonlinear_solver->residual_and_jacobian_object->residual_and_jacobian (*current_local_solution.get(), rhs, nullptr, *this);
         }
 
       else

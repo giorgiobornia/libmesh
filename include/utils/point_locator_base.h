@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -23,17 +23,24 @@
 // Local Includes
 #include "libmesh/reference_counted_object.h"
 #include "libmesh/libmesh_common.h"
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
+
+#ifdef LIBMESH_FORWARD_DECLARE_ENUMS
+namespace libMesh
+{
+enum PointLocatorType : int;
+}
+#else
 #include "libmesh/enum_point_locator_type.h"
+#endif
 
 // C++ includes
 #include <cstddef>
 #include <vector>
+#include <memory>
 
 namespace libMesh
 {
-
-
 
 // Forward Declarations
 class PointLocatorBase;
@@ -41,7 +48,7 @@ class MeshBase;
 class Point;
 class TreeBase;
 class Elem;
-
+class Node;
 
 
 /**
@@ -72,12 +79,12 @@ public:
   /**
    * Builds an PointLocator for the mesh \p mesh.
    * Optionally takes a master PointLocator to save memory.
-   * An \p UniquePtr<PointLocatorBase> is returned to prevent memory leak.
+   * An \p std::unique_ptr<PointLocatorBase> is returned to prevent memory leak.
    * This way the user need not remember to delete the object.
    */
-  static UniquePtr<PointLocatorBase> build (PointLocatorType t,
-                                            const MeshBase & mesh,
-                                            const PointLocatorBase * master = libmesh_nullptr);
+  static std::unique_ptr<PointLocatorBase> build (PointLocatorType t,
+                                                  const MeshBase & mesh,
+                                                  const PointLocatorBase * master = nullptr);
 
   /**
    * Clears the \p PointLocator.
@@ -96,10 +103,39 @@ public:
    * the subdomains searched.
    */
   virtual const Elem * operator() (const Point & p,
-                                   const std::set<subdomain_id_type> * allowed_subdomains = libmesh_nullptr) const = 0;
+                                   const std::set<subdomain_id_type> * allowed_subdomains = nullptr) const = 0;
 
   /**
-   * @returns \p true when this object is properly initialized
+   * Locates a set of elements in proximity to the point with global coordinates
+   * \p p  Pure virtual. Optionally allows the user to restrict the subdomains searched.
+   */
+  virtual void operator() (const Point & p,
+                           std::set<const Elem *> & candidate_elements,
+                           const std::set<subdomain_id_type> * allowed_subdomains = nullptr) const = 0;
+
+  /**
+   * \returns A pointer to a Node with global coordinates \p p or \p
+   * nullptr if no such Node can be found.
+   *
+   * Virtual subclasses can override for efficiency, but the base
+   * class has a default implementation that works based on element
+   * lookup.
+   *
+   * Optionally allows the user to restrict the subdomains searched;
+   * with such a restriction, only a Node belonging to an element on
+   * one or more of those subdomains will be returned.
+   *
+   * Will only return a Node whose distance from \p p is less than
+   * \p tol multiplied by the size of a semilocal element which
+   * contains \p p.
+   */
+  virtual const Node *
+  locate_node (const Point & p,
+               const std::set<subdomain_id_type> * allowed_subdomains = nullptr,
+               Real tol = TOLERANCE) const;
+
+  /**
+   * \returns \p true when this object is properly initialized
    * and ready for use, \p false otherwise.
    */
   bool initialized () const;
@@ -107,7 +143,7 @@ public:
   /**
    * Enables out-of-mesh mode.  In this mode, if asked to find a point
    * that is contained in no mesh at all, the point locator will
-   * return a NULL pointer instead of crashing.  Per default, this
+   * return a nullptr instead of crashing.  Per default, this
    * mode is off.
    */
   virtual void enable_out_of_mesh_mode () = 0;
@@ -132,13 +168,18 @@ public:
   virtual void unset_close_to_point_tol();
 
   /**
+   * Get a const reference to this PointLocator's mesh.
+   */
+  const MeshBase & get_mesh() const;
+
+  /**
    * Boolean flag to indicate whether to print out extra info.
    */
   bool _verbose;
 
 protected:
   /**
-   * Const pointer to our master, initialized to \p NULL if none
+   * Const pointer to our master, initialized to \p nullptr if none
    * given.  When using multiple PointLocators, one can be assigned
    * master and be in charge of something that all can have access to.
    */

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -23,17 +23,19 @@
 // Local includes
 #include "libmesh/libmesh_config.h"
 #include "libmesh/libmesh_common.h"
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
 #include "libmesh/point.h"
 #include "libmesh/parallel_object.h"
 #ifdef LIBMESH_HAVE_NANOFLANN
+#  include "libmesh/ignore_warnings.h"
 #  include "libmesh/nanoflann.hpp"
+#  include "libmesh/restore_warnings.h"
 #endif
 
 // C++ includes
 #include <string>
 #include <vector>
-
+#include <memory>
 
 
 namespace libMesh
@@ -47,6 +49,10 @@ namespace libMesh
  * This is the case for conjugate heat transfer applications where
  * the common interface has overlapping but distinct boundary
  * discretizations.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2012
+ * \brief Base class which defines the mesh-free interpolation interface.
  */
 class MeshfreeInterpolation : public ParallelObject
 {
@@ -69,8 +75,7 @@ public:
   /**
    * Constructor.
    */
-  MeshfreeInterpolation (const libMesh::Parallel::Communicator & comm_in
-                         LIBMESH_CAN_DEFAULT_TO_COMMWORLD) :
+  MeshfreeInterpolation (const libMesh::Parallel::Communicator & comm_in) :
     ParallelObject(comm_in),
     _parallelization_strategy (SYNC_SOURCES)
   {}
@@ -107,19 +112,19 @@ public:
   { _names = names; }
 
   /**
-   *@returns the field variables as a read-only reference.
+   *\returns The field variables as a read-only reference.
    */
   const std::vector<std::string> & field_variables() const
   { return _names; }
 
   /**
-   * @returns a writeable reference to the point list.
+   * \returns A writable reference to the point list.
    */
   std::vector<Point> & get_source_points ()
   { return _src_pts; }
 
   /**
-   * @returns a writeable reference to the point list.
+   * \returns A writable reference to the point list.
    */
   std::vector<Number> & get_source_vals ()
   { return _src_vals; }
@@ -141,7 +146,7 @@ public:
 
   /**
    * Interpolate source data at target points.
-   * Pure virtual, must be overriden in derived classes.
+   * Pure virtual, must be overridden in derived classes.
    */
   virtual void interpolate_field_data (const std::vector<std::string> & field_names,
                                        const std::vector<Point>  & tgt_pts,
@@ -151,7 +156,8 @@ protected:
 
   /**
    * Gathers source points and values that have been added on other processors.
-   * Note the user is responsible for adding points only once per processor if this
+   *
+   * \note The user is responsible for adding points only once per processor if this
    * method is called.  No attempt is made to identify duplicate points.
    *
    * This method is virtual so that it can be overwritten or extended as required
@@ -168,7 +174,7 @@ protected:
 
 
 /**
- * Inverse distance interplation.
+ * Inverse distance interpolation.
  */
 template <unsigned int KDDim>
 class InverseDistanceInterpolation : public MeshfreeInterpolation
@@ -204,7 +210,7 @@ protected:
     inline size_t kdtree_get_point_count() const { return _pts.size(); }
 
     /**
-     * Returns the distance between the vector "p1[0:size-1]"
+     * \returns The distance between the vector "p1[0:size-1]"
      * and the data point with index "idx_p2" stored in the class
      */
     inline coord_t kdtree_distance(const coord_t * p1, const size_t idx_p2, size_t size) const
@@ -248,7 +254,7 @@ protected:
     }
 
     /**
-     * Returns the dim'th component of the idx'th point in the class:
+     * \returns The dim'th component of the idx'th point in the class:
      * Since this is inlined and the "dim" argument is typically an immediate value, the
      *  "if's" are actually solved at compile time.
      */
@@ -266,9 +272,13 @@ protected:
     }
 
     /**
-     * Optional bounding-box computation: return false to default to a standard bbox computation loop.
-     * Return true if the BBOX was already computed by the class and returned in "bb" so it can be
-     * avoided to redo it again. Look at bb.size() to find out the expected dimensionality
+     * Optional bounding-box computation.
+     *
+     * \returns \p true if the BBOX was already computed by the class
+     * and returned in \p bb so we can avoid redoing it, or \p false
+     * to default to a standard bbox computation loop.
+     *
+     * Look at bb.size() to find out the expected dimensionality
      * (e.g. 2 or 3 for point clouds)
      */
     template <class BBOX>
@@ -284,10 +294,10 @@ protected:
   // {
   // };
 
-  typedef nanoflann::KDTreeSingleIndexAdaptor<nanoflann::L2_Simple_Adaptor<Real, PointListAdaptor<KDDim> >,
+  typedef nanoflann::KDTreeSingleIndexAdaptor<nanoflann::L2_Simple_Adaptor<Real, PointListAdaptor<KDDim>>,
                                               PointListAdaptor<KDDim>, KDDim> kd_tree_t;
 
-  mutable UniquePtr<kd_tree_t> _kd_tree;
+  mutable std::unique_ptr<kd_tree_t> _kd_tree;
 
 #endif // LIBMESH_HAVE_NANOFLANN
 
@@ -334,15 +344,15 @@ public:
    * Clears all internal data structures and restores to a
    * pristine state.
    */
-  virtual void clear() libmesh_override;
+  virtual void clear() override;
 
   /**
    * Interpolate source data at target points.
-   * Pure virtual, must be overriden in derived classes.
+   * Pure virtual, must be overridden in derived classes.
    */
   virtual void interpolate_field_data (const std::vector<std::string> & field_names,
                                        const std::vector<Point>  & tgt_pts,
-                                       std::vector<Number> & tgt_vals) const libmesh_override;
+                                       std::vector<Number> & tgt_vals) const override;
 };
 
 } // namespace libMesh

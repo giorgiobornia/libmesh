@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -68,16 +68,6 @@ protected:
    */
   ~DofObject ();
 
-  /**
-   * Copy-constructor.
-   */
-  DofObject (const DofObject &);
-
-  /**
-   * Deep-copying assignment operator
-   */
-  DofObject & operator= (const DofObject & dof_obj);
-
 public:
 
 #ifdef LIBMESH_ENABLE_AMR
@@ -89,7 +79,7 @@ public:
   DofObject * old_dof_object;
 
   /**
-   * Sets the \p old_dof_object to libmesh_nullptr
+   * Sets the \p old_dof_object to nullptr
    */
   void clear_old_dof_object ();
 
@@ -127,7 +117,7 @@ public:
   void invalidate ();
 
   /**
-   * @returns the number of degrees of freedom associated with
+   * \returns The number of degrees of freedom associated with
    * system \p s for this object. Optionally only counts degrees
    * of freedom for variable number \p var
    */
@@ -136,22 +126,22 @@ public:
                        libMesh::invalid_uint) const;
 
   /**
-   * \returns the \p id for this \p DofObject
+   * \returns The \p id for this \p DofObject
    */
   dof_id_type id () const;
 
   /**
-   * \returns the \p id for this \p DofObject as a writeable reference.
+   * \returns The \p id for this \p DofObject as a writable reference.
    */
   dof_id_type & set_id ();
 
   /**
-   * \returns the globally \p unique_id for this \p DofObject
+   * \returns The globally \p unique_id for this \p DofObject
    */
   unique_id_type unique_id () const;
 
   /**
-   * \returns the globally \p unique_id for this \p DofObject as a writeable reference.
+   * \returns The globally \p unique_id for this \p DofObject as a writable reference.
    */
   unique_id_type & set_unique_id ();
 
@@ -162,19 +152,19 @@ public:
   { this->set_id() = dofid; }
 
   /**
-   * @returns \p true if this \p DofObject has a valid \p id set,
+   * \returns \p true if this \p DofObject has a valid \p id set,
    * \p false otherwise.
    */
   bool valid_id () const;
 
   /**
-   * @returns \p true if this \p DofObject has a valid \p unique_id set,
+   * \returns \p true if this \p DofObject has a valid \p unique_id set,
    * \p false otherwise.
    */
   bool valid_unique_id () const;
 
   /**
-   * @returns the processor that this DofObject belongs to.
+   * \returns The processor that this DofObject belongs to.
    *
    * When partitioning and DoF numbering have been performed by
    * libMesh, every current DoF on this DofObject will belong to its
@@ -183,8 +173,8 @@ public:
   processor_id_type processor_id () const;
 
   /**
-   * @returns the processor that this DofObject belongs to as a
-   * writeable reference.
+   * \returns The processor that this DofObject belongs to as a
+   * writable reference.
    */
   processor_id_type & processor_id ();
 
@@ -194,13 +184,13 @@ public:
   void processor_id (const processor_id_type pid);
 
   /**
-   * @returns \p true if this \p DofObject has a valid \p id set,
+   * \returns \p true if this \p DofObject has a valid \p id set,
    * \p false otherwise.
    */
   bool valid_processor_id () const;
 
   /**
-   * @returns the number of systems associated with this
+   * \returns The number of systems associated with this
    * \p DofObject
    */
   unsigned int n_systems() const;
@@ -216,27 +206,27 @@ public:
   void add_system ();
 
   /**
-   * @returns the number of \p VariableGroup variable groups
+   * \returns The number of \p VariableGroup variable groups
    * associated with system \p s for this \p DofObject
    */
   unsigned int n_var_groups(const unsigned int s) const;
 
   /**
-   * @returns the number of \p Variable variables associated
+   * \returns The number of \p Variable variables associated
    * with \p VariableGroup \p vg in system \p s for this \p DofObject
    */
   unsigned int n_vars(const unsigned int s,
                       const unsigned int vg) const;
 
   /**
-   * @returns the number of \p Variable variables associated
+   * \returns The number of \p Variable variables associated
    * with system \p s for this \p DofObject
    */
   unsigned int n_vars(const unsigned int s) const;
 
   /**
    * Sets number of variables in each group associated with system \p s for this
-   * \p DofObject. Implicit in this is salso setting the number of \p VariableGroup
+   * \p DofObject. Implicit in this is also setting the number of \p VariableGroup
    * variable groups for the system.
    * Has the effect of setting the number of components
    * to 0 even when called even with (nvg == this->n_var_groups(s)).
@@ -245,10 +235,10 @@ public:
                             const std::vector<unsigned int> & nvpg);
 
   /**
-   * @returns the number of components for variable \p var
+   * \returns The number of components for variable \p var
    * of system \p s associated with this \p DofObject.
    * For example, the \p HIERARCHIC shape functions may
-   * have @e multiple DoFs associated with @e one node.  Another
+   * have multiple DoFs associated with one node.  Another
    * example is the \p MONOMIALs, where only the elements
    * hold the DoFs.  For the different spatial directions,
    * and orders, see \p FE.
@@ -257,10 +247,10 @@ public:
                       const unsigned int var) const;
 
   /**
-   * @returns the number of components for \p VariableGroup \p vg
+   * \returns The number of components for \p VariableGroup \p vg
    * of system \p s associated with this \p DofObject.
    * For example, the \p HIERARCHIC shape functions may
-   * have @e multiple DoFs associated with @e one node.  Another
+   * have multiple DoFs associated with one node.  Another
    * example is the \p MONOMIALs, where only the elements
    * hold the DoFs.  For the different spatial directions,
    * and orders, see \p FE.
@@ -285,9 +275,8 @@ public:
                         const unsigned int ncomp);
 
   /**
-   * @returns the global degree of freedom number for variable \p var,
+   * \returns The global degree of freedom number for variable \p var,
    * component \p comp for system \p s associated with this \p DofObject
-   *
    *
    * When partitioning and DoF numbering have been performed by
    * libMesh, every current DoF on this DofObject will belong to its
@@ -296,6 +285,29 @@ public:
   dof_id_type dof_number(const unsigned int s,
                          const unsigned int var,
                          const unsigned int comp) const;
+
+  /**
+   * \returns The global degree of freedom number for variable group
+   * \p vg, variable index \p vig within the group, component \p comp
+   * out of \p n_comp, for system \p s on this \p DofObject
+   *
+   * Even users who need to call dof_number from user code probably
+   * don't want to call this overload.
+   */
+  dof_id_type dof_number(const unsigned int s,
+                         const unsigned int vg,
+                         const unsigned int vig,
+                         const unsigned int comp,
+                         const unsigned int n_comp) const;
+
+  /**
+   * \returns A pair consisting of the variable group number and the
+   * offset index from the start of that group for variable \p var on
+   * system \p s associated with this \p DofObject
+   */
+  std::pair<unsigned int, unsigned int>
+  var_to_vg_and_offset(const unsigned int s,
+                       const unsigned int var) const;
 
   /**
    * Sets the global degree of freedom number for variable \p var,
@@ -307,8 +319,8 @@ public:
                       const dof_id_type dn);
 
   /**
-   * @returns true if any system has variables which have been assigned,
-   * false otherwise
+   * \returns \p true if any system has variables which have been assigned,
+   * \p false otherwise.
    */
   bool has_dofs(const unsigned int s=libMesh::invalid_uint) const;
 
@@ -330,12 +342,12 @@ public:
                           const unsigned int vg) const;
 
   /**
-   * An invaild \p id to distinguish an uninitialized \p DofObject
+   * An invalid \p id to distinguish an uninitialized \p DofObject
    */
   static const dof_id_type invalid_id = static_cast<dof_id_type>(-1);
 
   /**
-   * An invaild \p unique_id to distinguish an uninitialized \p DofObject
+   * An invalid \p unique_id to distinguish an uninitialized \p DofObject
    */
   static const unique_id_type invalid_unique_id = static_cast<unique_id_type>(-1);
 
@@ -370,12 +382,35 @@ public:
    * basically a copy with prepended size with our current
    * implementation.
    */
-  void pack_indexing(std::back_insert_iterator<std::vector<largest_id_type> > target) const;
+  void pack_indexing(std::back_insert_iterator<std::vector<largest_id_type>> target) const;
 
   /**
    * Print our buffer for debugging.
    */
   void debug_buffer () const;
+
+  /**
+   * Print out info for debugging.
+   */
+  void print_dof_info() const;
+
+  // Deep copy (or almost-copy) of DofObjects is now deprecated in
+  // derived classes; we keep these methods around solely for a couple
+  // tricky internal uses.
+#ifndef LIBMESH_ENABLE_DEPRECATED
+private:
+#endif
+
+  /**
+   * "Copy"-constructor.  Does not copy old_dof_object, but leaves it
+   * null in the new object.
+   */
+  DofObject (const DofObject &);
+
+  /**
+   * Deep-copying assignment operator
+   */
+  DofObject & operator= (const DofObject & dof_obj);
 
 private:
 
@@ -395,7 +430,7 @@ private:
                                      const unsigned int var) const;
 
   /**
-   * A globally unique id, guarenteed not to change as the mesh is repartioned or adapted
+   * A globally unique id, guaranteed not to change as the mesh is repartitioned or adapted
    */
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
   unique_id_type _unique_id;
@@ -428,7 +463,8 @@ private:
    * \endverbatim
    *
    * where 'end_s' is the index past the end of the variable group storage for system \p s.
-   * Note that we specifically do not store the end for the last system - this always _idx_buf.size().
+   *
+   * \note We specifically do not store the end for the last system - this always _idx_buf.size().
    *
    * Specifically, consider the case of 4 systems, with 3, 0, 1, 2 variable groups, respectively.  The _idx_buf then looks like:
    *
@@ -461,7 +497,7 @@ private:
    *
    * idx_var = idx_# + n_comp*v + c
    *
-   * note there is a subtlety here - "variable v within that group" usually means nothing to the
+   * \note There is a subtlety here - "variable v within that group" usually means nothing to the
    * user. This class is either indexed with variable group numbers, or variable numbers counted
    * *within the system*. So for a system with 2 variable groups, 4 and 8 variables each,
    * the 5th variable in the system is the 1st variable in 2nd variable group.
@@ -478,7 +514,7 @@ private:
    * and nc is the number of components for this set of variables.
    *
    * It is hoped that by setting this to a power of two, an optimizing compiler
-   * will recgnize later that  #/ncv_magic is simply a bitshift
+   * will recognize later that  #/ncv_magic is simply a bitshift
    */
   static const index_t ncv_magic = 256; // = 2^8, in case we want to manually bitshift
   static const index_t ncv_magic_exp = 8; // Let's manually bitshift
@@ -508,7 +544,7 @@ public:
 inline
 DofObject::DofObject () :
 #ifdef LIBMESH_ENABLE_AMR
-  old_dof_object(libmesh_nullptr),
+  old_dof_object(nullptr),
 #endif
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
   _unique_id (invalid_unique_id),
@@ -802,8 +838,30 @@ dof_id_type DofObject::dof_number(const unsigned int s,
   libmesh_assert_less (var,  this->n_vars(s));
   libmesh_assert_less (comp, this->n_comp(s,var));
 
+  const std::pair<unsigned int, unsigned int>
+    vg_vig = this->var_to_vg_and_offset(s,var);
+
   const unsigned int
-    vg            = this->var_to_vg(s,var),
+    n_comp = this->n_comp_group(s,vg_vig.first);
+
+  return this->dof_number(s, vg_vig.first, vg_vig.second,
+                          comp, n_comp);
+}
+
+
+
+inline
+dof_id_type DofObject::dof_number(const unsigned int s,
+                                  const unsigned int vg,
+                                  const unsigned int vig,
+                                  const unsigned int comp,
+                                  const unsigned int n_comp) const
+{
+  libmesh_assert_less (s,   this->n_systems());
+  libmesh_assert_less (vg,  this->n_var_groups(s));
+  libmesh_assert_less (vig, this->n_vars(s,vg));
+
+  const unsigned int
     start_idx_sys = this->start_idx(s);
 
   libmesh_assert_less ((start_idx_sys + 2*vg + 1), _idx_buf.size());
@@ -817,22 +875,35 @@ dof_id_type DofObject::dof_number(const unsigned int s,
     return invalid_id;
 
   // otherwise the index is the first component
-  // index augemented by the component number
+  // index augmented by the component number
   else
+    return cast_int<dof_id_type>(base_idx + vig*n_comp + comp);
+}
+
+
+
+inline
+std::pair<unsigned int, unsigned int>
+DofObject::var_to_vg_and_offset(const unsigned int s,
+                                const unsigned int var) const
+{
+  std::pair<unsigned int, unsigned int> returnval(0,0);
+
+  unsigned int & vg = returnval.first;
+  unsigned int & offset = returnval.second;
+
+  unsigned int vg_start = 0;
+  for (; ; vg++)
     {
-      const unsigned int
-        ncg = this->n_comp_group(s,vg),
-        vig = this->system_var_to_vg_var(s,vg,var);
+      libmesh_assert_less(vg, this->n_var_groups(s));
 
-      // std::cout << "base_idx, var, vg, vig, ncg, comp="
-      // << base_idx << " "
-      // << var << " "
-      // << vg << " "
-      // << vig << " "
-      // << ncg << " "
-      // << comp << '\n';
-
-      return cast_int<dof_id_type>(base_idx + vig*ncg + comp);
+      const unsigned int vg_end = vg_start + this->n_vars(s,vg);
+      if (var < vg_end)
+        {
+          offset = var - vg_start;
+          return returnval;
+        }
+      vg_start = vg_end;
     }
 }
 
@@ -919,7 +990,7 @@ dof_id_type DofObject::vg_dof_base(const unsigned int s,
 
   // #ifdef DEBUG
   //   std::cout << " [ ";
-  //   for (unsigned int i=0; i<_idx_buf.size(); i++)
+  //   for (std:size_t i=0; i<_idx_buf.size(); i++)
   //     std::cout << _idx_buf[i] << " ";
   //   std::cout << "]\n";
   // #endif
@@ -942,8 +1013,7 @@ unsigned int DofObject::var_to_vg (const unsigned int s,
       if (var < vg_end) return vg;
     }
 
-  libmesh_error_msg("We'll never get here!");
-  return 0;
+  libmesh_error_msg("Error: could not map variable " << var << " to variable group.");
 }
 
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -24,31 +24,19 @@
 
 namespace libMesh {
 
-#ifndef LIBMESH_DISABLE_COMMWORLD
 /**
- * @returns the number of processors used in the current simulation.
- */
-processor_id_type n_processors();
-
-/**
- * @returns the index of the local processor.
- */
-processor_id_type processor_id();
-#endif
-
-/**
- * @returns the number of processors libMesh was initialized with.
+ * \returns The number of processors libMesh was initialized with.
  */
 processor_id_type global_n_processors();
 
 /**
- * @returns the index of the local processor with respect to the
+ * \returns The index of the local processor with respect to the
  * original MPI pool libMesh was initialized with.
  */
 processor_id_type global_processor_id();
 
 /**
- * @returns the maximum number of threads used in the simulation.
+ * \returns The maximum number of threads used in the simulation.
  */
 unsigned int n_threads();
 
@@ -83,23 +71,6 @@ extern int _n_threads;
 
 // ------------------------------------------------------------
 // libMesh inline member functions
-#ifndef LIBMESH_DISABLE_COMMWORLD
-inline
-libMesh::processor_id_type libMesh::n_processors()
-{
-  return libMesh::global_n_processors();
-}
-
-
-
-inline
-libMesh::processor_id_type libMesh::processor_id()
-{
-  return libMesh::global_processor_id();
-}
-#endif // LIBMESH_DISABLE_COMMWORLD
-
-
 inline
 libMesh::processor_id_type libMesh::global_n_processors()
 {

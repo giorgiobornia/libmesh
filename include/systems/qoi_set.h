@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -21,22 +21,26 @@
 #define LIBMESH_QOI_SET_H
 
 
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/libmesh_common.h"
 
-// C++ Includes   -----------------------------------
+// C++ Includes
 #include <vector>
 
 namespace libMesh
 {
 
-// Forward Declarations -----------------------------
+// Forward Declarations
 class System;
 
 /**
  * Data structure for specifying which Quantities of Interest
  * should be calculated in an adjoint or a parameter sensitivity
  * calculation.
+ *
+ * \author Roy Stogner
+ * \date 2009
+ * \brief Used to specify quantities of interest in a simulation.
  */
 class QoISet
 {
@@ -44,13 +48,13 @@ public:
   class iterator
   {
   public:
-    iterator(unsigned int i, const std::vector<bool> & v) : _i(i), _vecbool(v)
+    iterator(std::size_t i, const std::vector<bool> & v) : _i(i), _vecbool(v)
     {
       while (_i < _vecbool.size() && !_vecbool[_i])
         _i++;
     }
 
-    unsigned int operator*() const { return _i; }
+    std::size_t operator*() const { return _i; }
 
     iterator & operator++()
     {
@@ -78,7 +82,7 @@ public:
 
   private:
 
-    unsigned int _i;
+    std::size_t _i;
 
     const std::vector<bool> & _vecbool;
   };
@@ -120,10 +124,10 @@ public:
   void clear() { _indices.clear(); _weights.clear(); }
 
   /**
-   * Returns the number of QoIs that would be computed for the
+   * \returns The number of QoIs that would be computed for the
    * System \p sys
    */
-  unsigned int size(const System & sys) const;
+  std::size_t size(const System & sys) const;
 
   /**
    * Add this indices to the set to be calculated
@@ -133,7 +137,7 @@ public:
   /**
    * Add this index to the set to be calculated
    */
-  void add_index(unsigned int);
+  void add_index(std::size_t);
 
   /**
    * Remove these indices from the set to be calculated
@@ -143,22 +147,22 @@ public:
   /**
    * Remove this index from the set to be calculated
    */
-  void remove_index(unsigned int);
+  void remove_index(std::size_t);
 
   /**
    * Set the weight for this index
    */
-  void set_weight(unsigned int, Real);
+  void set_weight(std::size_t, Real);
 
   /**
    * Get the weight for this index (default 1.0)
    */
-  Real weight(unsigned int) const;
+  Real weight(std::size_t) const;
 
   /**
    * Return whether or not this index is in the set to be calculated
    */
-  bool has_index(unsigned int) const;
+  bool has_index(std::size_t) const;
 
   /**
    * Return an iterator pointing to the first index in the set
@@ -194,7 +198,7 @@ QoISet::QoISet(const std::vector<unsigned int> & indices) :
 
 
 inline
-void QoISet::add_index(unsigned int i)
+void QoISet::add_index(std::size_t i)
 {
   if (i >= _indices.size())
     _indices.resize(i+1, true);
@@ -204,7 +208,7 @@ void QoISet::add_index(unsigned int i)
 
 
 inline
-void QoISet::remove_index(unsigned int i)
+void QoISet::remove_index(std::size_t i)
 {
   if (i >= _indices.size())
     _indices.resize(i+1, true);
@@ -214,7 +218,7 @@ void QoISet::remove_index(unsigned int i)
 
 
 inline
-bool QoISet::has_index(unsigned int i) const
+bool QoISet::has_index(std::size_t i) const
 {
   return (_indices.size() <= i || _indices[i]);
 }
@@ -222,7 +226,7 @@ bool QoISet::has_index(unsigned int i) const
 
 
 inline
-void QoISet::set_weight(unsigned int i, Real w)
+void QoISet::set_weight(std::size_t i, Real w)
 {
   if (_weights.size() <= i)
     _weights.resize(i+1, 1.0);
@@ -233,7 +237,7 @@ void QoISet::set_weight(unsigned int i, Real w)
 
 
 inline
-Real QoISet::weight(unsigned int i) const
+Real QoISet::weight(std::size_t i) const
 {
   if (_weights.size() <= i)
     return 1.0;

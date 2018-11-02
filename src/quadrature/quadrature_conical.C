@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -16,9 +16,11 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
+// libMesh includes
 #include "libmesh/quadrature_conical.h"
 #include "libmesh/quadrature_gauss.h"
 #include "libmesh/quadrature_jacobi.h"
+#include "libmesh/enum_quadrature_type.h"
 
 namespace libMesh
 {
@@ -28,20 +30,19 @@ namespace libMesh
 // quadrature_conical_3D.C
 // for additional implementation.
 
-
-
-
-// Constructor
-QConical::QConical(const unsigned int d,
-                   const Order o) : QBase(d,o)
+QuadratureType QConical::type() const
 {
+  return QCONICAL;
 }
 
-
-
-// Destructor
-QConical::~QConical()
+void QConical::init_1D(const ElemType /*type_in*/,
+                       unsigned int p)
 {
+  QGauss gauss1D(1, static_cast<Order>(_order+2*p));
+
+  // Swap points and weights with the about-to-be destroyed rule.
+  _points.swap(gauss1D.get_points());
+  _weights.swap(gauss1D.get_weights());
 }
 
 

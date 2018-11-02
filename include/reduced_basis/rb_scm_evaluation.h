@@ -1,4 +1,3 @@
-
 // rbOOmit: An implementation of the Certified Reduced Basis method.
 // Copyright (C) 2009, 2010 David J. Knezevic
 
@@ -58,8 +57,7 @@ public:
   /**
    * Constructor.
    */
-  RBSCMEvaluation (const Parallel::Communicator & comm
-                   LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
+  RBSCMEvaluation (const Parallel::Communicator & comm);
 
   /**
    * Destructor.
@@ -151,7 +149,7 @@ public:
   virtual void save_current_parameters();
 
   /**
-   * Helper functiont to (re)load current_parameters
+   * Helper function to (re)load current_parameters
    * from saved_parameters.
    */
   virtual void reload_current_parameters();
@@ -164,7 +162,8 @@ public:
   /**
    * Write out all the data to text files in order to segregate the
    * Offline stage from the Online stage.
-   * Note: This is a legacy method, use RBDataSerialization instead.
+   *
+   * \note This is a legacy method, use RBDataSerialization instead.
    */
   virtual void legacy_write_offline_data_to_files(const std::string & directory_name = "offline_data",
                                                   const bool write_binary_data = true);
@@ -172,7 +171,8 @@ public:
   /**
    * Read in the saved Offline reduced basis data
    * to initialize the system for Online solves.
-   * Note: This is a legacy method, use RBDataSerialization instead.
+   *
+   * \note This is a legacy method, use RBDataSerialization instead.
    */
   virtual void legacy_read_offline_data_from_files(const std::string & directory_name = "offline_data",
                                                    const bool read_binary_data = true);
@@ -189,7 +189,7 @@ public:
    * Vector storing the greedily selected parameters
    * during SCM training.
    */
-  std::vector< RBParameters > C_J;
+  std::vector<RBParameters > C_J;
 
   /**
    * Vector storing the (truth) stability values
@@ -203,7 +203,7 @@ public:
    * C_J, which are used in computing the SCM
    * upper bounds.
    */
-  std::vector< std::vector<Real> > SCM_UB_vectors;
+  std::vector<std::vector<Real>> SCM_UB_vectors;
 
 private:
 
@@ -215,8 +215,9 @@ private:
 
   /**
    * A pointer to to the object that stores the theta expansion.
-   * This is not an UniquePtr since we may want to share it.
-   * (Note: a shared_ptr would be a good option here.)
+   * This is not a std::unique_ptr since we may want to share it.
+   *
+   * \note A \p shared_ptr would be a good option here.
    */
   RBThetaExpansion * rb_theta_expansion;
 

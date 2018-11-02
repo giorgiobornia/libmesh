@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,31 +20,40 @@
 
 // Local includes
 #include "libmesh/centroid_partitioner.h"
-#include "libmesh/mesh_base.h"
 #include "libmesh/elem.h"
 
 namespace libMesh
 {
 
 
-//---------------------------------------------------------
-// CentroidPartitioner methods
-void CentroidPartitioner::_do_partition (MeshBase & mesh,
-                                         const unsigned int n)
+void CentroidPartitioner::partition_range(MeshBase & mesh,
+                                          MeshBase::element_iterator it,
+                                          MeshBase::element_iterator end,
+                                          unsigned int n)
 {
-  // Check for an easy return
+  // Check for easy returns
+  if (it == end)
+    return;
+
   if (n == 1)
     {
-      this->single_partition (mesh);
+      this->single_partition_range (it, end);
       return;
     }
 
+  // Make sure the user has not handed us an
+  // invalid number of partitions.
+  libmesh_assert_greater (n, 0);
 
-  // Possibly reconstruct centroids
-  if (mesh.n_elem() != _elem_centroids.size())
-    this->compute_centroids (mesh);
+  // We don't yet support distributed meshes with this Partitioner
+  if (!mesh.is_serial())
+    libmesh_not_implemented();
 
-
+  // Compute the element centroids.  Note: we used to skip this step
+  // if the number of elements was unchanged from the last call, but
+  // that doesn't account for elements that have moved a lot since the
+  // last time the Partitioner was called...
+  this->compute_centroids (it, end);
 
   switch (this->sort_method())
     {
@@ -91,24 +100,16 @@ void CentroidPartitioner::_do_partition (MeshBase & mesh,
       libmesh_error_msg("Unknown sort method: " << this->sort_method());
     }
 
+  // Compute target_size, the approximate number of elements on each processor.
+  const dof_id_type target_size = cast_int<dof_id_type>
+    (_elem_centroids.size() / n);
 
-  // Make sure the user has not handed us an
-  // invalid number of partitions.
-  libmesh_assert_greater (n, 0);
-
-  // the number of elements, e.g. 1000
-  const dof_id_type n_elem      = mesh.n_elem();
-  // the number of elements per processor, e.g 400
-  const dof_id_type target_size = n_elem / n;
-
-  // Make sure the mesh hasn't changed since the
-  // last time we computed the centroids.
-  libmesh_assert_equal_to (mesh.n_elem(), _elem_centroids.size());
-
-  for (dof_id_type i=0; i<n_elem; i++)
+  for (dof_id_type i=0; i<_elem_centroids.size(); i++)
     {
       Elem * elem = _elem_centroids[i].second;
 
+      // FIXME: All "extra" elements go on the last processor... this
+      // could probably be improved.
       elem->processor_id() =
         std::min (cast_int<processor_id_type>(i / target_size),
                   cast_int<processor_id_type>(n-1));
@@ -117,28 +118,24 @@ void CentroidPartitioner::_do_partition (MeshBase & mesh,
 
 
 
+void CentroidPartitioner::_do_partition (MeshBase & mesh,
+                                         const unsigned int n)
+{
+  this->partition_range(mesh,
+                        mesh.elements_begin(),
+                        mesh.elements_end(),
+                        n);
+}
 
 
 
-
-
-void CentroidPartitioner::compute_centroids (MeshBase & mesh)
+void CentroidPartitioner::compute_centroids (MeshBase::element_iterator it,
+                                             MeshBase::element_iterator end)
 {
   _elem_centroids.clear();
-  _elem_centroids.reserve(mesh.n_elem());
 
-  //   elem_iterator it(mesh.elements_begin());
-  //   const elem_iterator it_end(mesh.elements_end());
-
-  MeshBase::element_iterator       it     = mesh.elements_begin();
-  const MeshBase::element_iterator it_end = mesh.elements_end();
-
-  for (; it != it_end; ++it)
-    {
-      Elem * elem = *it;
-
-      _elem_centroids.push_back(std::make_pair(elem->centroid(), elem));
-    }
+  for (auto & elem : as_range(it, end))
+    _elem_centroids.push_back(std::make_pair(elem->centroid(), elem));
 }
 
 

@@ -1,5 +1,5 @@
-//-------------// The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// The libMesh Finite Element Library.
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -32,29 +32,52 @@
 namespace libMesh
 {
 
+/**
+ * Function which is a function of another function.  All overridden
+ * virtual functions are documented in function_base.h.
+ *
+ * \author Roy Stogner
+ * \date 2012
+ * \brief Function which is a function of another function.
+ */
 template <typename Output=Number>
 class CompositeFunction : public FunctionBase<Output>
 {
 public:
   explicit
-  CompositeFunction () {}
+  CompositeFunction () = default;
 
-  ~CompositeFunction ()
-  {
-    for (unsigned int i=0; i != subfunctions.size(); ++i)
-      delete subfunctions[i];
-  }
+  /**
+   * This class can be default move constructed and assigned.
+   */
+  CompositeFunction (CompositeFunction &&) = default;
+  CompositeFunction & operator= (CompositeFunction &&) = default;
 
-  // Attach a new subfunction, along with a map from the indices of
-  // that subfunction to the indices of the global function.
-  // (*this)(index_map[i]) will return f(i).
+  /**
+   * This class contains unique_ptr members so it can't be default
+   * copied or assigned.
+   */
+  CompositeFunction (const CompositeFunction &) = delete;
+  CompositeFunction & operator= (const CompositeFunction &) = delete;
+
+  /**
+   * The subfunctions vector is automatically cleaned up.
+   */
+  virtual ~CompositeFunction () = default;
+
+  /**
+   * Attach a new subfunction, along with a map from the indices of
+   * that subfunction to the indices of the global function.
+   * (*this)(index_map[i]) will return f(i).
+   */
   void attach_subfunction (const FunctionBase<Output> & f,
                            const std::vector<unsigned int> & index_map)
   {
-    const unsigned int subfunction_index = subfunctions.size();
+    const unsigned int subfunction_index =
+      cast_int<unsigned int>(subfunctions.size());
     libmesh_assert_equal_to(subfunctions.size(), index_maps.size());
 
-    subfunctions.push_back(f.clone().release());
+    subfunctions.push_back(f.clone());
     index_maps.push_back(index_map);
 
     unsigned int max_index =
@@ -65,7 +88,7 @@ public:
         (max_index+1, std::make_pair(libMesh::invalid_uint,
                                      libMesh::invalid_uint));
 
-    for (unsigned int j=0; j != index_map.size(); ++j)
+    for (std::size_t j=0; j != index_map.size(); ++j)
       {
         libmesh_assert_less(index_map[j], reverse_index_map.size());
         libmesh_assert_equal_to(reverse_index_map[index_map[j]].first,
@@ -79,7 +102,7 @@ public:
     // Now check for time dependence
     // We only check the function we just added instead of researching all subfunctions
     // If this is the first subfunction, then that determines the time-dependence.
-    if( subfunctions.size() == 1 )
+    if (subfunctions.size() == 1)
       this->_is_time_dependent = subfunctions[0]->is_time_dependent();
 
     // Otherwise, we have more than 1 function already.
@@ -87,19 +110,19 @@ public:
     // subfunctions is time-dependent and thus this CompositeFunction
     // time-dependent. If _is_time_dependent is false, then the subfunction
     // just added determines the time-dependence.
-    else if( !this->_is_time_dependent )
+    else if (!this->_is_time_dependent)
       this->_is_time_dependent = (subfunctions.back())->is_time_dependent();
   }
 
   virtual Output operator() (const Point & p,
-                             const Real time = 0) libmesh_override
+                             const Real time = 0) override
   {
     return this->component(0,p,time);
   }
 
   virtual void operator() (const Point & p,
                            const Real time,
-                           DenseVector<Output> & output) libmesh_override
+                           DenseVector<Output> & output) override
   {
     libmesh_assert_greater_equal (output.size(),
                                   reverse_index_map.size());
@@ -109,22 +132,18 @@ public:
     output.zero();
 
     DenseVector<Output> temp;
-    for (unsigned int i=0; i != subfunctions.size(); ++i)
+    for (std::size_t i=0; i != subfunctions.size(); ++i)
       {
-        temp.resize(index_maps[i].size());
+        temp.resize(cast_int<unsigned int>(index_maps[i].size()));
         (*subfunctions[i])(p, time, temp);
         for (unsigned int j=0; j != temp.size(); ++j)
           output(index_maps[i][j]) = temp(j);
       }
   }
 
-  /**
-   * @returns the vector component \p i at coordinate
-   * \p p and time \p time.
-   */
   virtual Output component (unsigned int i,
                             const Point & p,
-                            Real time) libmesh_override
+                            Real time) override
   {
     if (i >= reverse_index_map.size() ||
         reverse_index_map[i].first == libMesh::invalid_uint)
@@ -138,12 +157,12 @@ public:
       component(reverse_index_map[i].second,p,time);
   }
 
-  virtual UniquePtr<FunctionBase<Output> > clone() const libmesh_override
+  virtual std::unique_ptr<FunctionBase<Output>> clone() const override
   {
     CompositeFunction * returnval = new CompositeFunction();
-    for (unsigned int i=0; i != subfunctions.size(); ++i)
+    for (std::size_t i=0; i != subfunctions.size(); ++i)
       returnval->attach_subfunction(*subfunctions[i], index_maps[i]);
-    return UniquePtr<FunctionBase<Output> > (returnval);
+    return std::unique_ptr<FunctionBase<Output>> (returnval);
   }
 
   unsigned int n_subfunctions () const
@@ -158,13 +177,13 @@ public:
 
 private:
   // list of functions which fill in our values
-  std::vector<FunctionBase<Output> *> subfunctions;
+  std::vector<std::unique_ptr<FunctionBase<Output>>> subfunctions;
 
   // for each function, list of which global indices it fills in
-  std::vector<std::vector<unsigned int> > index_maps;
+  std::vector<std::vector<unsigned int>> index_maps;
 
   // for each global index, which local index of which function is it?
-  std::vector<std::pair<unsigned int, unsigned int> > reverse_index_map;
+  std::vector<std::pair<unsigned int, unsigned int>> reverse_index_map;
 };
 
 

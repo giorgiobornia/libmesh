@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -241,9 +241,6 @@ Real jacobi_20_00_eval(Real v, unsigned i)
     default:
       libmesh_error_msg("bad index i = " << i);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 } // jacobi_20_00_eval()
 
 
@@ -453,9 +450,6 @@ Real jacobi_20_00_eval_deriv(Real v, unsigned i)
     default:
       libmesh_error_msg("bad index i = " << i);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 } // jacobi_20_00_eval_deriv()
 
 

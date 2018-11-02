@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -17,11 +17,14 @@
 
 
 
-// Local includes
 #include "libmesh/libmesh_config.h"
+
 #ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
 
+// Local includes
 #include "libmesh/edge_inf_edge2.h"
+#include "libmesh/enum_io_package.h"
+#include "libmesh/enum_order.h"
 
 namespace libMesh
 {
@@ -56,11 +59,23 @@ bool InfEdge2::is_node_on_side(const unsigned int n,
   return (s == n);
 }
 
+std::vector<unsigned>
+InfEdge2::nodes_on_side(const unsigned int s) const
+{
+  libmesh_assert_less(s, 1);
+  return {s};
+}
+
 bool InfEdge2::is_node_on_edge(const unsigned int,
                                const unsigned int libmesh_dbg_var(e)) const
 {
   libmesh_assert_equal_to (e, 0);
   return true;
+}
+
+Order InfEdge2::default_order() const
+{
+  return FIRST;
 }
 
 void InfEdge2::connectivity(const unsigned int libmesh_dbg_var(se),
@@ -77,15 +92,15 @@ void InfEdge2::connectivity(const unsigned int libmesh_dbg_var(se),
     {
     case TECPLOT:
       {
-        conn[0] = this->node(0)+1;
-        conn[1] = this->node(1)+1;
+        conn[0] = this->node_id(0)+1;
+        conn[1] = this->node_id(1)+1;
         return;
       }
 
     case VTK:
       {
-        conn[0] = this->node(0);
-        conn[1] = this->node(1);
+        conn[0] = this->node_id(0);
+        conn[1] = this->node_id(1);
         return;
       }
 

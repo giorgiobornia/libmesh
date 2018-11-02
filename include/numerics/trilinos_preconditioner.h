@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,21 +22,31 @@
 
 #include "libmesh/libmesh_config.h"
 
-#ifdef LIBMESH_HAVE_TRILINOS
+#ifdef LIBMESH_TRILINOS_HAVE_EPETRA
 
 // Local includes
 #include "libmesh/preconditioner.h"
 #include "libmesh/libmesh_common.h"
-#include "libmesh/enum_solver_package.h"
-#include "libmesh/enum_preconditioner_type.h"
 #include "libmesh/reference_counted_object.h"
 #include "libmesh/libmesh.h"
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
 
-// Trilinos includes
+// Trilinos includes.  Ignore many unused parameter warnings coming
+// from these headers.
+#include "libmesh/ignore_warnings.h"
 #include "Epetra_Operator.h"
 #include "Epetra_FECrsMatrix.h"
 #include "Teuchos_ParameterList.hpp"
+#include "libmesh/restore_warnings.h"
+
+#ifdef LIBMESH_FORWARD_DECLARE_ENUMS
+namespace libMesh
+{
+enum PreconditionerType : int;
+}
+#else
+#include "libmesh/enum_preconditioner_type.h"
+#endif
 
 // C++ includes
 #include <cstddef>
@@ -50,8 +60,9 @@ template <typename T> class NumericVector;
 template <typename T> class ShellMatrix;
 
 /**
- * This class provides an interface to the suite of preconditioners available
- * from Trilinos.
+ * This class provides an interface to the suite of preconditioners
+ * available from Trilinos. All overridden virtual functions are
+ * documented in preconditioner.h.
  *
  * \author David Andrs
  * \date 2011
@@ -66,38 +77,33 @@ public:
   /**
    *  Constructor. Initializes PetscPreconditioner data structures
    */
-  TrilinosPreconditioner (const libMesh::Parallel::Communicator & comm
-                          LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
+  TrilinosPreconditioner (const libMesh::Parallel::Communicator & comm);
 
   /**
    * Destructor.
    */
   virtual ~TrilinosPreconditioner ();
 
-  /**
-   * Computes the preconditioned vector "y" based on input "x".
-   * Usually by solving Py=x to get the action of P^-1 x.
-   */
-  virtual void apply(const NumericVector<T> & x, NumericVector<T> & y) libmesh_override;
+  virtual void apply(const NumericVector<T> & x, NumericVector<T> & y) override;
+
+  virtual void clear () override {}
+
+  virtual void init () override;
 
   /**
-   * Release all memory and clear data structures.
+   * Stores a copy of the ParameterList \p list internally.
    */
-  virtual void clear () libmesh_override {}
-
-  /**
-   * Initialize data structures if not done so already.
-   */
-  virtual void init () libmesh_override;
-
   void set_params(Teuchos::ParameterList & list);
 
   /**
-   * Returns the actual Trilinos preconditioner object.
+   * \returns The actual Trilinos preconditioner object.
    */
   Epetra_FECrsMatrix * mat() { return _mat; }
 
   /**
+   * Sets the Trilinos preconditioner to use based on the libMesh PreconditionerType.
+   *
+   * \note Not all libMesh PreconditionerTypes are supported.
    */
   void set_preconditioner_type (const PreconditionerType & preconditioner_type);
 
@@ -109,7 +115,7 @@ public:
 protected:
 
   /**
-   * Trilinos preconditioner
+   * Trilinos preconditioner.
    */
   Epetra_Operator * _prec;
 
@@ -119,21 +125,21 @@ protected:
   Epetra_FECrsMatrix * _mat;
 
   /**
-   * Parameter list to be used for building the preconditioner
+   * Parameter list to be used for building the preconditioner.
    */
   Teuchos::ParameterList _param_list;
 
   // Epetra_Operator interface
-  virtual int SetUseTranspose(bool UseTranspose);
-  virtual int Apply(const Epetra_MultiVector & X, Epetra_MultiVector & Y) const;
-  virtual int ApplyInverse(const Epetra_MultiVector & r, Epetra_MultiVector & z) const;
-  virtual double NormInf() const;
-  virtual const char * Label() const;
-  virtual bool UseTranspose() const;
-  virtual bool HasNormInf() const;
-  virtual const Epetra_Comm & Comm() const;
-  virtual const Epetra_Map & OperatorDomainMap() const;
-  virtual const Epetra_Map & OperatorRangeMap() const;
+  virtual int SetUseTranspose(bool UseTranspose) override;
+  virtual int Apply(const Epetra_MultiVector & X, Epetra_MultiVector & Y) const override;
+  virtual int ApplyInverse(const Epetra_MultiVector & r, Epetra_MultiVector & z) const override;
+  virtual double NormInf() const override;
+  virtual const char * Label() const override;
+  virtual bool UseTranspose() const override;
+  virtual bool HasNormInf() const override;
+  virtual const Epetra_Comm & Comm() const override;
+  virtual const Epetra_Map & OperatorDomainMap() const override;
+  virtual const Epetra_Map & OperatorRangeMap() const override;
 };
 
 
@@ -144,8 +150,8 @@ template <typename T>
 inline
 TrilinosPreconditioner<T>::TrilinosPreconditioner (const libMesh::Parallel::Communicator & comm) :
   Preconditioner<T>(comm),
-  _prec(libmesh_nullptr),
-  _mat(libmesh_nullptr)
+  _prec(nullptr),
+  _mat(nullptr)
 {
 }
 
@@ -160,5 +166,5 @@ TrilinosPreconditioner<T>::~TrilinosPreconditioner ()
 
 } // namespace libMesh
 
-#endif // #ifdef LIBMESH_HAVE_TRILINOS
+#endif // LIBMESH_TRILINOS_HAVE_EPETRA
 #endif // LIBMESH_TRILINOS_PRECONDITIONER_H

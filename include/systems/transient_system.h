@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,9 +22,7 @@
 
 // Local Includes
 #include "libmesh/system.h"
-
-// C++ includes
-
+#include "libmesh/libmesh_config.h"
 
 namespace libMesh
 {
@@ -33,13 +31,21 @@ namespace libMesh
 class LinearImplicitSystem;
 class NonlinearImplicitSystem;
 class ExplicitSystem;
+#ifdef LIBMESH_HAVE_SLEPC
+class EigenSystem;
+#endif
 
 /**
  * This class provides a specific system class.  It aims
  * at transient systems, offering nothing more than just
- * the essentials needed to solve a system.  Note
- * that still additional vectors/matrices may be added,
- * as offered in the parent classes.
+ * the essentials needed to solve a system.
+ *
+ * \note Additional vectors/matrices can be added via parent class
+ * interfaces.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2004
+ * \brief Used for solving transient systems of equations.
  */
 template <class Base>
 class TransientSystem : public Base
@@ -65,7 +71,7 @@ public:
   typedef TransientSystem<Base> sys_type;
 
   /**
-   * @returns a clever pointer to the system.
+   * \returns A reference to *this.
    */
   sys_type & system () { return *this; }
 
@@ -73,33 +79,27 @@ public:
    * Clear all the data structures associated with
    * the system.
    */
-  virtual void clear () libmesh_override;
+  virtual void clear () override;
 
   /**
-   * Reinitializes the member data fields associated with
-   * the system, so that, e.g., \p assemble() may be used.
-   */
-  virtual void reinit () libmesh_override;
-
-  /**
-   * @returns \p "Transient" prepended to T::system_type().
+   * \returns \p "Transient" prepended to T::system_type().
    * Helps in identifying the system type in an equation
    * system file.
    */
-  virtual std::string system_type () const libmesh_override;
+  virtual std::string system_type () const override;
 
 
   //-----------------------------------------------------------------
   // access to the solution data fields
 
   /**
-   * @returns the old solution (at the previous timestep)
+   * \returns The old solution (at the previous timestep)
    * for the specified global DOF.
    */
   Number old_solution (const dof_id_type global_dof_number) const;
 
   /**
-   * @returns the older solution (two timesteps ago)
+   * \returns The older solution (two timesteps ago)
    * for the specified global DOF.
    */
   Number older_solution (const dof_id_type global_dof_number) const;
@@ -110,7 +110,7 @@ public:
    * current solution with any ghost values needed from
    * other processors.
    */
-  UniquePtr<NumericVector<Number> > old_local_solution;
+  std::unique_ptr<NumericVector<Number>> old_local_solution;
 
   /**
    * All the values I need to compute my contribution
@@ -118,23 +118,24 @@ public:
    * current solution with any ghost values needed from
    * other processors.
    */
-  UniquePtr<NumericVector<Number> > older_local_solution;
+  std::unique_ptr<NumericVector<Number>> older_local_solution;
 
 
 protected:
-
-  /**
-   * Initializes the member data fields associated with
-   * the system, so that, e.g., \p assemble() may be used.
-   */
-  virtual void init_data () libmesh_override;
 
   /**
    * Re-update the local values when the mesh has changed.
    * This method takes the data updated by \p update() and
    * makes it up-to-date on the current mesh.
    */
-  virtual void re_update () libmesh_override;
+  virtual void re_update () override;
+
+private:
+
+  /**
+   * Helper function for (re-)adding old and older solution vectors.
+   */
+  virtual void add_old_vectors ();
 };
 
 
@@ -146,6 +147,9 @@ typedef TransientSystem<LinearImplicitSystem> TransientLinearImplicitSystem;
 typedef TransientSystem<NonlinearImplicitSystem> TransientNonlinearImplicitSystem;
 typedef TransientSystem<ExplicitSystem> TransientExplicitSystem;
 typedef TransientSystem<System> TransientBaseSystem;
+#ifdef LIBMESH_HAVE_SLEPC
+typedef TransientSystem<EigenSystem> TransientEigenSystem;
+#endif
 
 
 

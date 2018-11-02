@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -42,14 +42,19 @@ class DenseVectorBase
 {
 public:
   /**
-   * Constructor.  Empty.
+   * Constructor.
    */
-  DenseVectorBase() {}
+  DenseVectorBase() = default;
 
   /**
-   * Destructor.  Does nothing.
+   * The 5 special functions can be defaulted for this class, as it
+   * does not manage any memory itself.
    */
-  virtual ~DenseVectorBase() {}
+  DenseVectorBase (DenseVectorBase &&) = default;
+  DenseVectorBase (const DenseVectorBase &) = default;
+  DenseVectorBase & operator= (const DenseVectorBase &) = default;
+  DenseVectorBase & operator= (DenseVectorBase &&) = default;
+  virtual ~DenseVectorBase() = default;
 
   /**
    * Set every element in the vector to 0.  Needs to
@@ -59,22 +64,22 @@ public:
   virtual void zero() = 0;
 
   /**
-   * @returns the \p (i) element of the vector.
+   * \returns The \p (i) element of the vector.
    */
   virtual T el(const unsigned int i) const = 0;
 
   /**
-   * @returns the \p (i) element of the vector as a writeable reference.
+   * \returns The \p (i) element of the vector as a writable reference.
    */
   virtual T & el(const unsigned int i) = 0;
 
   /**
-   * @returns the size of the vector.
+   * \returns The size of the vector.
    */
   virtual unsigned int size() const = 0;
 
   /**
-   * @returns true iff size() is 0.
+   * \returns \p true iff size() is 0.
    */
   virtual bool empty() const { return (this->size() == 0); }
 
@@ -98,7 +103,6 @@ public:
    * decimal places in scientific notation.
    */
   void print_scientific(std::ostream & os, unsigned precision=8) const;
-
 };
 
 } // namespace libMesh

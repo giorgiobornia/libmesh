@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,20 +20,24 @@
 #ifndef LIBMESH_ENUM_POINT_LOCATOR_TYPE_H
 #define LIBMESH_ENUM_POINT_LOCATOR_TYPE_H
 
-// ------------------------------------------------------------
-// enum PointLocatorType definition
 namespace libMesh {
 
 /**
  * \enum PointLocatorType defines an \p enum for the types
  * of point locators (given a point with global coordinates,
  * locate the corresponding element in space) available in libMesh.
+ *
+ * The fixed type, i.e. ": int", enumeration syntax used here allows
+ * this enum to be forward declared as
+ * enum PointLocatorType : int;
+ * reducing header file dependencies.
  */
-enum PointLocatorType {TREE = 0,
+enum PointLocatorType : int {
+                       TREE = 0,
                        TREE_ELEMENTS,
                        TREE_LOCAL_ELEMENTS,
-                       LIST,
+                       // Invalid
                        INVALID_LOCATOR};
 }
 
-#endif // LIBMESH_ENUM_POINT_LOCATOR_TYPE_H
+#endif

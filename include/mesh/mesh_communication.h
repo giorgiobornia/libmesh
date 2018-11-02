@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,19 +20,23 @@
 #ifndef LIBMESH_MESH_COMMUNICATION_H
 #define LIBMESH_MESH_COMMUNICATION_H
 
-
-
-// Local Includes -----------------------------------
+// Local Includes
+#include "libmesh/compare_elems_by_level.h"
 #include "libmesh/libmesh_common.h"
 #include "libmesh/mesh_tools.h"
 
-// C++ Includes   -----------------------------------
+// C++ Includes
+#include <unordered_map>
 
 namespace libMesh
 {
 
 // Forward declarations
 class MeshBase;
+class DistributedMesh;
+
+// This is for backwards compatibility, but if your code relies on
+// forward declarations in our headers then fix it.
 class ParallelMesh;
 
 /**
@@ -58,7 +62,7 @@ public:
   ~MeshCommunication () {}
 
   /**
-   * Clears all data structures and returns to a pristine state.
+   * Clears all data structures and resets to a pristine state.
    */
   void clear ();
 
@@ -90,44 +94,54 @@ public:
    * only the elements it actually owns and any ghost elements required
    * to satisfy data dependencies. This method can be invoked after a
    * partitioning step to affect the new partitioning.
+   *
+   * Redistribution can also be done with newly coarsened elements'
+   * neighbors only.
    */
-  void redistribute (ParallelMesh &) const;
+  void redistribute (DistributedMesh & mesh,
+                     bool newly_coarsened_only = false) const;
 
   /**
    *
    */
-  void gather_neighboring_elements (ParallelMesh &) const;
+  void gather_neighboring_elements (DistributedMesh &) const;
 
   /**
-   * This method takes an input \p ParallelMesh which may be
+   * Examine a just-coarsened mesh, and for any newly-coarsened elements,
+   * send the associated ghosted elements to the processor which needs them.
+   */
+  void send_coarse_ghosts (MeshBase &) const;
+
+  /**
+   * This method takes an input \p DistributedMesh which may be
    * distributed among all the processors.  Each processor then
    * sends its local nodes and elements to processor \p root_id.
-   * The end result is that a previously distributed \p ParallelMesh
+   * The end result is that a previously distributed \p DistributedMesh
    * will be serialized on processor \p root_id.  Since this method is
    * collective it must be called by all processors. For the special
    * case of \p root_id equal to \p DofObject::invalid_processor_id
    * this function performs an allgather.
    */
-  void gather (const processor_id_type root_id, ParallelMesh &) const;
+  void gather (const processor_id_type root_id, DistributedMesh &) const;
 
   /**
-   * This method takes an input \p ParallelMesh which may be
+   * This method takes an input \p DistributedMesh which may be
    * distributed among all the processors.  Each processor then
    * sends its local nodes and elements to the other processors.
-   * The end result is that a previously distributed \p ParallelMesh
+   * The end result is that a previously distributed \p DistributedMesh
    * will be serialized on each processor.  Since this method is
    * collective it must be called by all processors.
    */
-  void allgather (ParallelMesh & mesh) const
+  void allgather (DistributedMesh & mesh) const
   { MeshCommunication::gather(DofObject::invalid_processor_id, mesh); }
 
   /**
-   * This method takes an input \p ParallelMesh which may be
+   * This method takes an input \p DistributedMesh which may be
    * distributed among all the processors.  Each processor
    * deletes all elements which are neither local elements nor "ghost"
    * elements which touch local elements, and deletes all nodes which
    * are not contained in local or ghost elements.
-   * The end result is that a previously serial \p ParallelMesh
+   * The end result is that a previously serial \p DistributedMesh
    * will be distributed between processors.  Since this method is
    * collective it must be called by all processors.
    *
@@ -135,7 +149,7 @@ public:
    * to delete.  These will be left on the current processor along with
    * local elements and ghosted neighbors.
    */
-  void delete_remote_elements (ParallelMesh &, const std::set<Elem *> &) const;
+  void delete_remote_elements (DistributedMesh &, const std::set<Elem *> &) const;
 
   /**
    * This method assigns globally unique, partition-agnostic
@@ -156,12 +170,22 @@ public:
   void check_for_duplicate_global_indices (MeshBase & ) const;
 
   /**
+   * This method determines a locally unique, contiguous
+   * index for each object in the input range.
+   */
+  template <typename ForwardIterator>
+  void find_local_indices (const libMesh::BoundingBox &,
+                           const ForwardIterator &,
+                           const ForwardIterator &,
+                           std::unordered_map<dof_id_type, dof_id_type> &) const;
+
+  /**
    * This method determines a globally unique, partition-agnostic
    * index for each object in the input range.
    */
   template <typename ForwardIterator>
   void find_global_indices (const Parallel::Communicator & communicator,
-                            const MeshTools::BoundingBox &,
+                            const libMesh::BoundingBox &,
                             const ForwardIterator &,
                             const ForwardIterator &,
                             std::vector<dof_id_type> &) const;
@@ -171,6 +195,13 @@ public:
    */
   void make_elems_parallel_consistent (MeshBase &);
 
+#ifdef LIBMESH_ENABLE_AMR
+  /**
+   * Copy p levels of ghost elements from their local processors.
+   */
+  void make_p_levels_parallel_consistent (MeshBase &);
+#endif // LIBMESH_ENABLE_AMR
+
   /**
    * Assuming all ids on local nodes are globally unique, and
    * assuming all processor ids are parallel consistent, this function makes
@@ -178,7 +209,7 @@ public:
    */
   void make_node_ids_parallel_consistent (MeshBase &);
 
- /**
+  /**
    * Assuming all unique_ids on local nodes are globally unique, and
    * assuming all processor ids are parallel consistent, this function makes
    * all ghost unique_ids parallel consistent.
@@ -193,13 +224,53 @@ public:
   void make_node_proc_ids_parallel_consistent (MeshBase &);
 
   /**
+   * Assuming all processor ids on nodes touching local elements
+   * are parallel consistent, this function makes processor ids
+   * on new nodes on other processors parallel consistent as well.
+   */
+  void make_new_node_proc_ids_parallel_consistent (MeshBase &);
+
+  /**
    * Copy processor_ids and ids on ghost nodes from their
-   * local processors.  This is an internal function of MeshRefinement
-   * which turns out to be useful for other code which wants to add
+   * local processors.  This is useful for code which wants to add
    * nodes to a distributed mesh.
    */
   void make_nodes_parallel_consistent (MeshBase &);
+
+  /**
+   * Copy processor_ids and ids on new nodes from their local
+   * processors.
+   */
+  void make_new_nodes_parallel_consistent (MeshBase &);
 };
+
+
+// Related utilities
+
+// Ask a mesh's ghosting functors to insert into a set all elements
+// that are either on or connected to processor id \p pid.  Ask only
+// for elements in the range from \p elem_it before \p elem_end;
+// typically this may be mesh.active_pid_elements_*(pid)
+void query_ghosting_functors(const MeshBase & mesh,
+                             processor_id_type pid,
+                             MeshBase::const_element_iterator elem_it,
+                             MeshBase::const_element_iterator elem_end,
+                             std::set<const Elem *, CompareElemIdsByLevel> & connected_elements);
+
+// Take a set of elements and insert all immediate
+// children of elements in the given range
+void connect_children(const MeshBase & mesh,
+                      MeshBase::const_element_iterator elem_it,
+                      MeshBase::const_element_iterator elem_end,
+                      std::set<const Elem *, CompareElemIdsByLevel> & connected_elements);
+
+// Take a set of elements and insert all elements' ancestors and
+// subactive descendants as well.
+void connect_families(std::set<const Elem *, CompareElemIdsByLevel> & connected_elements);
+
+// Take a set of elements and create a set of connected nodes.
+void reconnect_nodes (const std::set<const Elem *, CompareElemIdsByLevel> & connected_elements,
+                      std::set<const Node *> & connected_nodes);
 
 
 

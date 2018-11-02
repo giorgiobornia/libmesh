@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -34,7 +34,8 @@ namespace libMesh
 /**
  * This class provides a wrapper with which to evaluate a
  * (libMesh-style) function pointer in a FunctionBase-compatible
- * interface.
+ * interface. All overridden virtual functions are documented in
+ * fem_function_base.h.
  *
  * \author Roy Stogner
  * \date 2015
@@ -46,51 +47,52 @@ public:
 
   /**
    * Constructor to wrap FunctionBase functors in a FEMFunctionBase
-   * compatible shim
+   * compatible shim.
    */
   WrappedFunctor (const FunctionBase<Output> & func)
     : _func(func.clone())
   { }
 
-  virtual UniquePtr<FEMFunctionBase<Output> > clone () const libmesh_override
+  /**
+   * This class can't be copy constructed or assigned because it
+   * contains a unique_ptr member.
+   */
+  WrappedFunctor (const WrappedFunctor &) = delete;
+  WrappedFunctor & operator= (const WrappedFunctor &) = delete;
+
+  /**
+   * The remaining 5 special functions can be defaulted.
+   */
+  WrappedFunctor (WrappedFunctor &&) = default;
+  WrappedFunctor & operator= (WrappedFunctor &&) = default;
+  virtual ~WrappedFunctor () = default;
+
+  virtual std::unique_ptr<FEMFunctionBase<Output>> clone () const override
   {
-    return UniquePtr<FEMFunctionBase<Output> >
+    return std::unique_ptr<FEMFunctionBase<Output>>
       (new WrappedFunctor<Output> (*_func));
   }
 
-  /**
-   * @returns the scalar value of variable varnum at coordinate \p p
-   * and time \p time.
-   */
   virtual Output operator() (const FEMContext &,
                              const Point & p,
-                             const Real time = 0.) libmesh_override
+                             const Real time = 0.) override
   { return _func->operator()(p, time); }
 
-  /**
-   * Return function for vectors.
-   * Returns in \p output the values of all system variables at the
-   * coordinate \p p and for time \p time.
-   */
   virtual void operator() (const FEMContext &,
                            const Point & p,
                            const Real time,
-                           DenseVector<Output> & output) libmesh_override
+                           DenseVector<Output> & output) override
   { _func->operator() (p, time, output); }
 
-  /**
-   * @returns the vector component \p i at coordinate
-   * \p p and time \p time.
-   */
   virtual Output component (const FEMContext &,
                             unsigned int i,
                             const Point & p,
-                            Real time=0.) libmesh_override
+                            Real time=0.) override
   { return _func->component(i, p, time); }
 
 protected:
 
-  UniquePtr<FunctionBase<Output> > _func;
+  std::unique_ptr<FunctionBase<Output>> _func;
 };
 
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -17,20 +17,17 @@
 
 
 
-// C++ Includes -----------------------------------
-#include <limits>
-#include <utility>
-
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/elem.h"
 #include "libmesh/location_maps.h"
 #include "libmesh/mesh_base.h"
 #include "libmesh/node.h"
 #include "libmesh/parallel.h"
 
+// C++ Includes
+#include <limits>
+#include <utility>
 
-
-//--------------------------------------------------------------------------
 namespace
 {
 using libMesh::Real;
@@ -45,7 +42,6 @@ const Real chunkfloat = 1024.0;
 namespace libMesh
 {
 
-//--------------------------------------------------------------------------
 template <typename T>
 void LocationMap<T>::init(MeshBase & mesh)
 {
@@ -54,7 +50,7 @@ void LocationMap<T>::init(MeshBase & mesh)
   if (!mesh.is_serial())
     libmesh_parallel_only(mesh.comm());
 
-  START_LOG("init()", "LocationMap");
+  LOG_SCOPE("init()", "LocationMap");
 
   // Clear the old map
   _map.clear();
@@ -65,22 +61,15 @@ void LocationMap<T>::init(MeshBase & mesh)
   _upper_bound.clear();
   _upper_bound.resize(LIBMESH_DIM, -std::numeric_limits<Real>::max());
 
-  MeshBase::node_iterator       it  = mesh.nodes_begin();
-  const MeshBase::node_iterator end = mesh.nodes_end();
-
-  for (; it != end; ++it)
-    {
-      Node * node = *it;
-
-      for (unsigned int i=0; i != LIBMESH_DIM; ++i)
-        {
-          // Expand the bounding box if necessary
-          _lower_bound[i] = std::min(_lower_bound[i],
-                                     (*node)(i));
-          _upper_bound[i] = std::max(_upper_bound[i],
-                                     (*node)(i));
-        }
-    }
+  for (auto & node : mesh.node_ptr_range())
+    for (unsigned int i=0; i != LIBMESH_DIM; ++i)
+      {
+        // Expand the bounding box if necessary
+        _lower_bound[i] = std::min(_lower_bound[i],
+                                   (*node)(i));
+        _upper_bound[i] = std::max(_upper_bound[i],
+                                   (*node)(i));
+      }
 
   // On a parallel mesh we might not yet have a full bounding box
   if (!mesh.is_serial())
@@ -90,8 +79,6 @@ void LocationMap<T>::init(MeshBase & mesh)
     }
 
   this->fill(mesh);
-
-  STOP_LOG("init()", "LocationMap");
 }
 
 
@@ -124,25 +111,15 @@ template <typename T>
 T * LocationMap<T>::find(const Point & p,
                          const Real tol)
 {
-  START_LOG("find()","LocationMap");
+  LOG_SCOPE("find()", "LocationMap");
 
   // Look for a likely key in the multimap
   unsigned int pointkey = this->key(p);
 
   // Look for the exact key first
-  std::pair<typename map_type::iterator,
-            typename map_type::iterator>
-    pos = _map.equal_range(pointkey);
-
-  while (pos.first != pos.second)
-    if (p.absolute_fuzzy_equals
-        (this->point_of(*(pos.first->second)), tol))
-      {
-        STOP_LOG("find()","LocationMap");
-        return pos.first->second;
-      }
-    else
-      ++pos.first;
+  for (const auto & pr : as_range(_map.equal_range(pointkey)))
+    if (p.absolute_fuzzy_equals(this->point_of(*(pr.second)), tol))
+      return pr.second;
 
   // Look for neighboring bins' keys next
   for (int xoffset = -1; xoffset != 2; ++xoffset)
@@ -151,27 +128,18 @@ T * LocationMap<T>::find(const Point & p,
         {
           for (int zoffset = -1; zoffset != 2; ++zoffset)
             {
-              std::pair<typename map_type::iterator,
-                        typename map_type::iterator>
-                key_pos = _map.equal_range(pointkey +
-                                           xoffset*chunkmax*chunkmax +
-                                           yoffset*chunkmax +
-                                           zoffset);
-              while (key_pos.first != key_pos.second)
-                if (p.absolute_fuzzy_equals
-                    (this->point_of(*(key_pos.first->second)), tol))
-                  {
-                    STOP_LOG("find()","LocationMap");
-                    return key_pos.first->second;
-                  }
-                else
-                  ++key_pos.first;
+              auto key_pos = _map.equal_range(pointkey +
+                                              xoffset*chunkmax*chunkmax +
+                                              yoffset*chunkmax +
+                                              zoffset);
+              for (const auto & pr : as_range(key_pos))
+                if (p.absolute_fuzzy_equals(this->point_of(*(pr.second)), tol))
+                  return pr.second;
             }
         }
     }
 
-  STOP_LOG("find()","LocationMap");
-  return libmesh_nullptr;
+  return nullptr;
 }
 
 
@@ -215,10 +183,8 @@ template <>
 void LocationMap<Node>::fill(MeshBase & mesh)
 {
   // Populate the nodes map
-  MeshBase::node_iterator  it = mesh.nodes_begin(),
-    end = mesh.nodes_end();
-  for (; it != end; ++it)
-    this->insert(**it);
+  for (auto & node : mesh.node_ptr_range())
+    this->insert(*node);
 }
 
 
@@ -227,10 +193,8 @@ template <>
 void LocationMap<Elem>::fill(MeshBase & mesh)
 {
   // Populate the elem map
-  MeshBase::element_iterator       it  = mesh.active_elements_begin(),
-    end = mesh.active_elements_end();
-  for (; it != end; ++it)
-    this->insert(**it);
+  for (auto & elem : mesh.active_element_ptr_range())
+    this->insert(*elem);
 }
 
 

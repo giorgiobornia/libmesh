@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -54,7 +54,7 @@ public:
   NameBasedIO (const MeshBase &);
 
   /**
-   * Constructor.  Takes a writeable reference to a mesh object.
+   * Constructor.  Takes a writable reference to a mesh object.
    * This constructor is required to let us read in a mesh.
    */
   explicit
@@ -63,12 +63,12 @@ public:
   /**
    * This method implements reading a mesh from a specified file.
    */
-  virtual void read (const std::string & mesh_file) libmesh_override;
+  virtual void read (const std::string & mesh_file) override;
 
   /**
    * This method implements writing a mesh to a specified file.
    */
-  virtual void write (const std::string & mesh_file) libmesh_override;
+  virtual void write (const std::string & mesh_file) override;
 
   /**
    * This method implements writing a mesh with data to a specified file
@@ -81,7 +81,13 @@ public:
    */
   virtual void write_equation_systems (const std::string & filename,
                                        const EquationSystems & es,
-                                       const std::set<std::string> * system_names=libmesh_nullptr) libmesh_override;
+                                       const std::set<std::string> * system_names=nullptr) override;
+
+  /**
+   * Bring in base class functionality for name resolution and to
+   * avoid warnings about hidden overloaded virtual functions.
+   */
+  using MeshOutput<MeshBase>::write_nodal_data;
 
   /**
    * This method implements writing a mesh with nodal data to a
@@ -89,7 +95,7 @@ public:
    */
   virtual void write_nodal_data (const std::string &,
                                  const std::vector<Number> &,
-                                 const std::vector<std::string> &) libmesh_override;
+                                 const std::vector<std::string> &) override;
 
   // Certain mesh formats can support parallel I/O, including the
   // "new" Xdr format and the Nemesis format.
@@ -119,8 +125,8 @@ NameBasedIO::is_parallel_file_format (const std::string & name)
 {
   return ((name.rfind(".xda") < name.size()) ||
           (name.rfind(".xdr") < name.size()) ||
-          (name.rfind(".nem") < name.size()) ||
-          (name.rfind(".n") < name.size())   ||
+          (name.rfind(".nem") + 4 == name.size()) ||
+          (name.rfind(".n") + 2 == name.size()) ||
           (name.rfind(".cp") < name.size())
           );
 }

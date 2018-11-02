@@ -1,6 +1,5 @@
-
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,10 +21,12 @@
 #define LIBMESH_DIFF_QOI_H
 
 // Local Includes
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
 #include "libmesh/parallel.h"
+#include "libmesh/diff_context.h"
 
 // C++ includes
+#include <memory>
 
 namespace libMesh
 {
@@ -154,7 +155,7 @@ public:
   /**
    * Copy of this object. User should override to copy any needed state.
    */
-  virtual UniquePtr<DifferentiableQoI> clone() =0;
+  virtual std::unique_ptr<DifferentiableQoI> clone() =0;
 
   /**
    * Method to combine thread-local qois. By default, simply sums thread qois.
@@ -171,6 +172,12 @@ public:
                            std::vector<Number> & sys_qoi,
                            std::vector<Number> & local_qoi,
                            const QoISet & qoi_indices);
+
+  /**
+   * Method to finalize qoi derivatives which require more than just a simple
+   * sum of element contributions.
+   */
+  virtual void finalize_derivative(NumericVector<Number> & derivatives, std::size_t qoi_index);
 };
 
 } // namespace libMesh

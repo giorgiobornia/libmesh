@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -16,7 +16,7 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-// C++ inlcludes
+// C++ includes
 
 // Local includes
 #include "libmesh/fe.h"
@@ -103,9 +103,6 @@ Real FEHermite<1>::hermite_raw_shape_second_deriv (const unsigned int i, const R
               (8.*(i-4)+4.)*xi*xi*xipower*(xi*xi-1.) +
               (i-4)*(i-5)*xipower*(xi*xi-1.)*(xi*xi-1.))/denominator;
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -139,9 +136,6 @@ Real FEHermite<1>::hermite_raw_shape_deriv(const unsigned int i, const Real xi)
       return (4*xi*xi*xi*xipower*(xi*xi-1.) +
               (i-4)*xi*xipower*(xi*xi-1.)*(xi*xi-1.))/denominator;
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 template<>
@@ -174,9 +168,6 @@ Real FEHermite<1>::hermite_raw_shape(const unsigned int i, const Real xi)
       return (xi*xi*xipower*(xi*xi-1.)*(xi*xi-1.))/denominator;
 
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -194,7 +185,7 @@ Real FE<1,HERMITE>::shape(const ElemType,
 
 template <>
 Real FE<1,HERMITE>::shape(const Elem * elem,
-                          const Order order,
+                          const Order libmesh_dbg_var(order),
                           const unsigned int i,
                           const Point & p)
 {
@@ -209,46 +200,35 @@ Real FE<1,HERMITE>::shape(const Elem * elem,
 
   const ElemType type = elem->type();
 
-  const Order totalorder = static_cast<Order>(order + elem->p_level());
+#ifndef NDEBUG
+  const unsigned int totalorder = order + elem->p_level();
+#endif
 
-  switch (totalorder)
+  switch (type)
     {
-      // Hermite cubic shape functions
-    case THIRD:
+      // C1 functions on the C1 cubic edge
+    case EDGE2:
+    case EDGE3:
       {
-        switch (type)
-          {
-            // C1 functions on the C1 cubic edge
-          case EDGE2:
-          case EDGE3:
-            {
-              libmesh_assert_less (i, 4);
+        libmesh_assert_less (i, totalorder+1);
 
-              switch (i)
-                {
-                case 0:
-                  return FEHermite<1>::hermite_raw_shape(0, p(0));
-                case 1:
-                  return d1xd1x * FEHermite<1>::hermite_raw_shape(2, p(0));
-                case 2:
-                  return FEHermite<1>::hermite_raw_shape(1, p(0));
-                case 3:
-                  return d2xd2x * FEHermite<1>::hermite_raw_shape(3, p(0));
-                default:
-                  return FEHermite<1>::hermite_raw_shape(i, p(0));
-                }
-            }
+        switch (i)
+          {
+          case 0:
+            return FEHermite<1>::hermite_raw_shape(0, p(0));
+          case 1:
+            return d1xd1x * FEHermite<1>::hermite_raw_shape(2, p(0));
+          case 2:
+            return FEHermite<1>::hermite_raw_shape(1, p(0));
+          case 3:
+            return d2xd2x * FEHermite<1>::hermite_raw_shape(3, p(0));
           default:
-            libmesh_error_msg("ERROR: Unsupported element type = " << type);
+            return FEHermite<1>::hermite_raw_shape(i, p(0));
           }
       }
-      // by default throw an error
     default:
-      libmesh_error_msg("ERROR: Unsupported polynomial order = " << totalorder);
+      libmesh_error_msg("ERROR: Unsupported element type = " << type);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -268,7 +248,7 @@ Real FE<1,HERMITE>::shape_deriv(const ElemType,
 
 template <>
 Real FE<1,HERMITE>::shape_deriv(const Elem * elem,
-                                const Order order,
+                                const Order libmesh_dbg_var(order),
                                 const unsigned int i,
                                 const unsigned int,
                                 const Point & p)
@@ -284,51 +264,42 @@ Real FE<1,HERMITE>::shape_deriv(const Elem * elem,
 
   const ElemType type = elem->type();
 
-  const Order totalorder = static_cast<Order>(order + elem->p_level());
+#ifndef NDEBUG
+  const unsigned int totalorder = order + elem->p_level();
+#endif
 
-  switch (totalorder)
+  switch (type)
     {
-      // Hermite cubic shape functions
-    case THIRD:
+      // C1 functions on the C1 cubic edge
+    case EDGE2:
+    case EDGE3:
       {
-        switch (type)
+        libmesh_assert_less (i, totalorder+1);
+
+        switch (i)
           {
-            // C1 functions on the C1 cubic edge
-          case EDGE2:
-          case EDGE3:
-            {
-              switch (i)
-                {
-                case 0:
-                  return FEHermite<1>::hermite_raw_shape_deriv(0, p(0));
-                case 1:
-                  return d1xd1x * FEHermite<1>::hermite_raw_shape_deriv(2, p(0));
-                case 2:
-                  return FEHermite<1>::hermite_raw_shape_deriv(1, p(0));
-                case 3:
-                  return d2xd2x * FEHermite<1>::hermite_raw_shape_deriv(3, p(0));
-                default:
-                  return FEHermite<1>::hermite_raw_shape_deriv(i, p(0));
-                }
-            }
+          case 0:
+            return FEHermite<1>::hermite_raw_shape_deriv(0, p(0));
+          case 1:
+            return d1xd1x * FEHermite<1>::hermite_raw_shape_deriv(2, p(0));
+          case 2:
+            return FEHermite<1>::hermite_raw_shape_deriv(1, p(0));
+          case 3:
+            return d2xd2x * FEHermite<1>::hermite_raw_shape_deriv(3, p(0));
           default:
-            libmesh_error_msg("ERROR: Unsupported element type = " << type);
+            return FEHermite<1>::hermite_raw_shape_deriv(i, p(0));
           }
       }
-      // by default throw an error
     default:
-      libmesh_error_msg("ERROR: Unsupported polynomial order = " << totalorder);
+      libmesh_error_msg("ERROR: Unsupported element type = " << type);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
 
 template <>
 Real FE<1,HERMITE>::shape_second_deriv(const Elem * elem,
-                                       const Order order,
+                                       const Order libmesh_dbg_var(order),
                                        const unsigned int i,
                                        const unsigned int,
                                        const Point & p)
@@ -344,44 +315,35 @@ Real FE<1,HERMITE>::shape_second_deriv(const Elem * elem,
 
   const ElemType type = elem->type();
 
-  const Order totalorder = static_cast<Order>(order + elem->p_level());
+#ifndef NDEBUG
+  const unsigned int totalorder = order + elem->p_level();
+#endif
 
-  switch (totalorder)
+  switch (type)
     {
-      // Hermite cubic shape functions
-    case THIRD:
+      // C1 functions on the C1 cubic edge
+    case EDGE2:
+    case EDGE3:
       {
-        switch (type)
+        libmesh_assert_less (i, totalorder+1);
+
+        switch (i)
           {
-            // C1 functions on the C1 cubic edge
-          case EDGE2:
-          case EDGE3:
-            {
-              switch (i)
-                {
-                case 0:
-                  return FEHermite<1>::hermite_raw_shape_second_deriv(0, p(0));
-                case 1:
-                  return d1xd1x * FEHermite<1>::hermite_raw_shape_second_deriv(2, p(0));
-                case 2:
-                  return FEHermite<1>::hermite_raw_shape_second_deriv(1, p(0));
-                case 3:
-                  return d2xd2x * FEHermite<1>::hermite_raw_shape_second_deriv(3, p(0));
-                default:
-                  return FEHermite<1>::hermite_raw_shape_second_deriv(i, p(0));
-                }
-            }
+          case 0:
+            return FEHermite<1>::hermite_raw_shape_second_deriv(0, p(0));
+          case 1:
+            return d1xd1x * FEHermite<1>::hermite_raw_shape_second_deriv(2, p(0));
+          case 2:
+            return FEHermite<1>::hermite_raw_shape_second_deriv(1, p(0));
+          case 3:
+            return d2xd2x * FEHermite<1>::hermite_raw_shape_second_deriv(3, p(0));
           default:
-            libmesh_error_msg("ERROR: Unsupported element type = " << type);
+            return FEHermite<1>::hermite_raw_shape_second_deriv(i, p(0));
           }
       }
-      // by default throw an error
     default:
-      libmesh_error_msg("ERROR: Unsupported polynomial order = " << totalorder);
+      libmesh_error_msg("ERROR: Unsupported element type = " << type);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 } // namespace libMesh

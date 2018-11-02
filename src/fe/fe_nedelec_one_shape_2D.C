@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -16,7 +16,7 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-// C++ inlcludes
+// C++ includes
 
 // Local includes
 #include "libmesh/fe.h"
@@ -73,14 +73,14 @@ RealGradient FE<2,NEDELEC_ONE>::shape(const Elem * elem,
                 {
                 case 0:
                   {
-                    if( elem->point(0) > elem->point(1) )
+                    if (elem->point(0) > elem->point(1))
                       return RealGradient( -0.25*(1.0-eta), 0.0 );
                     else
                       return RealGradient( 0.25*(1.0-eta), 0.0 );
                   }
                 case 1:
                   {
-                    if( elem->point(1) > elem->point(2) )
+                    if (elem->point(1) > elem->point(2))
                       return RealGradient( 0.0, -0.25*(1.0+xi) );
                     else
                       return RealGradient( 0.0, 0.25*(1.0+xi) );
@@ -88,14 +88,14 @@ RealGradient FE<2,NEDELEC_ONE>::shape(const Elem * elem,
 
                 case 2:
                   {
-                    if( elem->point(2) > elem->point(3) )
+                    if (elem->point(2) > elem->point(3))
                       return RealGradient( 0.25*(1.0+eta), 0.0 );
                     else
                       return RealGradient( -0.25*(1.0+eta), 0.0 );
                   }
                 case 3:
                   {
-                    if( elem->point(3) > elem->point(0) )
+                    if (elem->point(3) > elem->point(0))
                       return RealGradient( 0.0, -0.25*(xi-1.0) );
                     else
                       return RealGradient( 0.0, 0.25*(xi-1.0) );
@@ -119,14 +119,14 @@ RealGradient FE<2,NEDELEC_ONE>::shape(const Elem * elem,
                 {
                 case 0:
                   {
-                    if( elem->point(0) > elem->point(1) )
+                    if (elem->point(0) > elem->point(1))
                       return RealGradient( -1.0+eta, -xi );
                     else
                       return RealGradient( 1.0-eta, xi );
                   }
                 case 1:
                   {
-                    if( elem->point(1) > elem->point(2) )
+                    if (elem->point(1) > elem->point(2))
                       return RealGradient( eta, -xi );
                     else
                       return RealGradient( -eta, xi );
@@ -134,7 +134,7 @@ RealGradient FE<2,NEDELEC_ONE>::shape(const Elem * elem,
 
                 case 2:
                   {
-                    if( elem->point(2) > elem->point(0) )
+                    if (elem->point(2) > elem->point(0))
                       return RealGradient( eta, -xi+1.0 );
                     else
                       return RealGradient( -eta, xi-1.0 );
@@ -154,10 +154,9 @@ RealGradient FE<2,NEDELEC_ONE>::shape(const Elem * elem,
     default:
       libmesh_error_msg("ERROR: Unsupported 2D FE order!: " << total_order);
     }
-#endif // LIBMESH_DIM > 1
-
-  libmesh_error_msg("We'll never get here!");
+#else // LIBMESH_DIM > 1
   return RealGradient();
+#endif
 }
 
 
@@ -212,14 +211,14 @@ RealGradient FE<2,NEDELEC_ONE>::shape_deriv(const Elem * elem,
                         return RealGradient();
                       case 1:
                         {
-                          if( elem->point(1) > elem->point(2) )
+                          if (elem->point(1) > elem->point(2))
                             return RealGradient( 0.0, -0.25 );
                           else
                             return RealGradient( 0.0, 0.25 );
                         }
                       case 3:
                         {
-                          if( elem->point(3) > elem->point(0) )
+                          if (elem->point(3) > elem->point(0))
                             return RealGradient( 0.0, -0.25 );
                           else
                             return RealGradient( 0.0, 0.25 );
@@ -239,14 +238,14 @@ RealGradient FE<2,NEDELEC_ONE>::shape_deriv(const Elem * elem,
                         return RealGradient();
                       case 0:
                         {
-                          if( elem->point(0) > elem->point(1) )
+                          if (elem->point(0) > elem->point(1))
                             return RealGradient( 0.25 );
                           else
                             return RealGradient( -0.25 );
                         }
                       case 2:
                         {
-                          if( elem->point(2) > elem->point(3) )
+                          if (elem->point(2) > elem->point(3))
                             return RealGradient( 0.25 );
                           else
                             return RealGradient( -0.25 );
@@ -274,19 +273,19 @@ RealGradient FE<2,NEDELEC_ONE>::shape_deriv(const Elem * elem,
                 {
                 case 0:
                   {
-                    if( elem->point(0) > elem->point(1) )
+                    if (elem->point(0) > elem->point(1))
                       f = -1.0;
                     break;
                   }
                 case 1:
                   {
-                    if( elem->point(1) > elem->point(2) )
+                    if (elem->point(1) > elem->point(2))
                       f = -1.0;
                     break;
                   }
                 case 2:
                   {
-                    if( elem->point(2) > elem->point(0) )
+                    if (elem->point(2) > elem->point(0))
                       f = -1.0;
                     break;
                   }
@@ -319,10 +318,9 @@ RealGradient FE<2,NEDELEC_ONE>::shape_deriv(const Elem * elem,
     default:
       libmesh_error_msg("ERROR: Unsupported 2D FE order!: " << total_order);
     }
-#endif // LIBMESH_DIM > 1
-
-  libmesh_error_msg("We'll never get here!");
+#else // LIBMESH_DIM > 1
   return RealGradient();
+#endif
 }
 
 
@@ -392,10 +390,9 @@ RealGradient FE<2,NEDELEC_ONE>::shape_second_deriv(const Elem * elem,
 
     } // end switch (order)
 
-#endif // LIBMESH_DIM > 1
-
-  libmesh_error_msg("We'll never get here!");
+#else // LIBMESH_DIM > 1
   return RealGradient();
+#endif
 }
 
 } // namespace libMesh

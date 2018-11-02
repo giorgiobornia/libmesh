@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -55,12 +55,11 @@ std::string ReferenceCounter::get_info ()
       << "| Reference count information                                                |\n"
       << " ---------------------------------------------------------------------------- \n";
 
-  for (Counts::iterator it = _counts.begin();
-       it != _counts.end(); ++it)
+  for (const auto & pr : _counts)
     {
-      const std::string name(it->first);
-      const unsigned int creations    = it->second.first;
-      const unsigned int destructions = it->second.second;
+      const std::string name(pr.first);
+      const unsigned int creations    = pr.second.first;
+      const unsigned int destructions = pr.second.second;
 
       oss << "| " << name << " reference count information:\n"
           << "|  Creations:    " << creations    << '\n'
@@ -87,7 +86,8 @@ std::string ReferenceCounter::get_info ()
 
 void ReferenceCounter::print_info (std::ostream & out_stream)
 {
-  if( _enable_print_counter ) out_stream << ReferenceCounter::get_info();
+  if (_enable_print_counter)
+    out_stream << ReferenceCounter::get_info();
 }
 
 #else

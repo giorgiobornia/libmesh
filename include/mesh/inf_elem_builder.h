@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -65,18 +65,21 @@ public:
   typedef std::pair<bool, double> InfElemOriginValue;
 
   /**
-   * Build infinite elements atop a volume-based mesh,
-   * determine origin automatically.  Also returns the
-   * origin as a \p const \p Point to make it more obvious that
-   * the origin should not change after the infinite elements
-   * have been built.  When symmetry planes are present, use
-   * the version with optional symmetry switches.
-   * The flag \p be_verbose enables some diagnostic output.
+   * Build infinite elements atop a volume-based mesh, determine
+   * origin automatically.
+   *
+   * \returns The origin as a \p const \p Point to make it more
+   * obvious that the origin should not change after the infinite
+   * elements have been built.
+   *
+   * When symmetry planes are present, use the version with optional
+   * symmetry switches.  The flag \p be_verbose enables some
+   * diagnostic output.
    */
   const Point build_inf_elem (const bool be_verbose = false);
 
   /**
-   * @returns the origin of the infinite elements.
+   * \returns The origin of the infinite elements.
    * Builds infinite elements atop a volume-based mesh.
    * Finds all faces on the outer boundary and build infinite elements
    * on them.  Using the \p InfElemOriginValue the user can
@@ -85,7 +88,7 @@ public:
    * of the mesh.
    *
    * During the search for faces on which infinite elements are built,
-   * @e interior faces that are not on symmetry planes are found, too.
+   * interior faces that are not on symmetry planes are found, too.
    * When an (optional) pointer to \p inner_boundary_nodes is provided,
    * then this vector will be filled with the nodes that lie on the
    * inner boundary.
@@ -104,7 +107,7 @@ public:
                               const bool y_sym = false,
                               const bool z_sym = false,
                               const bool be_verbose = false,
-                              std::vector<const Node *> * inner_boundary_nodes = libmesh_nullptr);
+                              std::vector<const Node *> * inner_boundary_nodes = nullptr);
 
 
 
@@ -119,7 +122,7 @@ private:
                        const bool z_sym = false,
                        const bool be_verbose = false,
                        std::set<std::pair<dof_id_type,
-                       unsigned int> > * inner_faces = libmesh_nullptr);
+                       unsigned int>> * inner_faces = nullptr);
   /**
    * Reference to the mesh we're building infinite
    * elements for.

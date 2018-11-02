@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,8 +22,6 @@
 
 // Local includes
 #include "libmesh/quadrature.h"
-
-// C++ includes
 
 namespace libMesh
 {
@@ -83,59 +81,65 @@ namespace libMesh
  * \endverbatim
  *
  * Reference:
- *    Axel Grundmann and Michael M\"{o}ller,
- *    "Invariant Integration Formulas for the N-Simplex
- *    by Combinatorial Methods,"
- *    SIAM Journal on Numerical Analysis,
- *    Volume 15, Number 2, April 1978, pages 282-290.
+ *    Axel Grundmann and Michael M\"{o}ller, "Invariant Integration
+ *    Formulas for the N-Simplex by Combinatorial Methods," SIAM
+ *    Journal on Numerical Analysis, Volume 15, Number 2, April 1978,
+ *    pages 282-290.
  *
  * Reference LGPL Fortran90 code by John Burkardt can be found here:
  * http://people.scs.fsu.edu/~burkardt/f_src/gm_rules/gm_rules.html
  *
  * \author John W. Peterson
  * \date 2008
+ * \brief Implements the quadrature rules of Grundmann and Moller in 2D and 3D.
  */
-class QGrundmann_Moller libmesh_final : public QBase
+class QGrundmann_Moller final : public QBase
 {
 public:
 
   /**
    * Constructor.  Declares the order of the quadrature rule.
    */
-  QGrundmann_Moller (const unsigned int _dim,
-                     const Order _order=INVALID_ORDER);
+  QGrundmann_Moller (unsigned int dim,
+                     Order order=INVALID_ORDER) :
+    QBase(dim,order)
+  {}
 
   /**
-   * Destructor.
+   * Copy/move ctor, copy/move assignment operator, and destructor are
+   * all explicitly defaulted for this simple class.
    */
-  ~QGrundmann_Moller();
+  QGrundmann_Moller (const QGrundmann_Moller &) = default;
+  QGrundmann_Moller (QGrundmann_Moller &&) = default;
+  QGrundmann_Moller & operator= (const QGrundmann_Moller &) = default;
+  QGrundmann_Moller & operator= (QGrundmann_Moller &&) = default;
+  virtual ~QGrundmann_Moller() = default;
 
   /**
-   * @returns \p QGRUNDMANN_MOLLER
+   * \returns \p QGRUNDMANN_MOLLER.
    */
-  virtual QuadratureType type() const libmesh_override { return QGRUNDMANN_MOLLER; }
+  virtual QuadratureType type() const override;
 
 
 private:
 
+  /**
+   * In 1D, simply use a Gauss rule.
+   */
   virtual void init_1D (const ElemType,
-                        unsigned int =0) libmesh_override
-  {
-    // See about making this non-pure virtual in the base class
-    libmesh_not_implemented();
-  }
+                        unsigned int = 0) override;
 
   /**
    * Initialize a 3D GM rule.  Only makes sense for Tets.
    */
   virtual void init_3D (const ElemType _type=INVALID_ELEM,
-                        unsigned int p_level=0) libmesh_override;
+                        unsigned int p_level=0) override;
 
   /**
    * Initialize a 2D GM rule.  Only makes sense for Tris.
    */
   virtual void init_2D (const ElemType _type=INVALID_ELEM,
-                        unsigned int p_level=0) libmesh_override;
+                        unsigned int p_level=0) override;
 
   /**
    * This routine is called from init_2D() and init_3D().  It actually
@@ -151,15 +155,9 @@ private:
    */
   void compose_all(unsigned int s, // number to be compositioned
                    unsigned int p, // # of partitions
-                   std::vector<std::vector<unsigned int> > & result);
+                   std::vector<std::vector<unsigned int>> & result);
 };
 
-
-
 } // namespace libMesh
-
-
-
-
 
 #endif // LIBMESH_QUADRATURE_GM_H

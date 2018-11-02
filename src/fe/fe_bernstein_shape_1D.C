@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -155,24 +155,25 @@ Real FE<1,BERNSTEIN>::shape(const ElemType,
 
         // Use this for arbitrary orders.
         // Note that this implementation is less efficient.
-        const int p_order = static_cast<unsigned int>(order);
+        const int p_order = static_cast<int>(order);
         const int m       = p_order-i+1;
         const int n       = (i-1);
 
-        unsigned int binomial_p_i = 1;
+        Real binomial_p_i = 1;
 
         // the binomial coefficient (p choose n)
+        // Using an unsigned long here will work for any of the orders we support.
+        // Explicitly construct a Real to prevent conversion warnings
         if (i>1)
-          binomial_p_i = Utility::factorial(p_order)
-            / (Utility::factorial(n)*Utility::factorial(p_order-n));
-
+          binomial_p_i = Real(Utility::binomial(static_cast<unsigned long>(p_order),
+                                                static_cast<unsigned long>(n)));
 
         switch(i)
           {
           case 0:
-            return binomial_p_i * std::pow((1-xi)/2,static_cast<int>(p_order));
+            return binomial_p_i * std::pow((1-xi)/2, p_order);
           case 1:
-            return binomial_p_i * std::pow((1+xi)/2,static_cast<int>(p_order));
+            return binomial_p_i * std::pow((1+xi)/2, p_order);
           default:
             {
               return binomial_p_i * std::pow((1+xi)/2,n)
@@ -181,9 +182,6 @@ Real FE<1,BERNSTEIN>::shape(const ElemType,
           }
       }
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -326,25 +324,25 @@ Real FE<1,BERNSTEIN>::shape_deriv(const ElemType,
         libmesh_assert (order>6);
 
         // Use this for arbitrary orders
-        const int p_order = static_cast<unsigned int>(order);
+        const int p_order = static_cast<int>(order);
         const int m       = p_order-(i-1);
         const int n       = (i-1);
 
-        unsigned int binomial_p_i = 1;
+        Real binomial_p_i = 1;
 
         // the binomial coefficient (p choose n)
+        // Using an unsigned long here will work for any of the orders we support.
+        // Explicitly construct a Real to prevent conversion warnings
         if (i>1)
-          binomial_p_i = Utility::factorial(p_order)
-            / (Utility::factorial(n)*Utility::factorial(p_order-n));
-
-
+          binomial_p_i = Real(Utility::binomial(static_cast<unsigned long>(p_order),
+                                                static_cast<unsigned long>(n)));
 
         switch(i)
           {
           case 0:
-            return binomial_p_i * (-1./2.) * p_order * std::pow((1-xi)/2,static_cast<int>(p_order-1));
+            return binomial_p_i * (-1./2.) * p_order * std::pow((1-xi)/2, p_order-1);
           case 1:
-            return binomial_p_i * ( 1./2.) * p_order * std::pow((1+xi)/2,static_cast<int>(p_order-1));
+            return binomial_p_i * ( 1./2.) * p_order * std::pow((1+xi)/2, p_order-1);
 
           default:
             {
@@ -355,9 +353,6 @@ Real FE<1,BERNSTEIN>::shape_deriv(const ElemType,
       }
 
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 

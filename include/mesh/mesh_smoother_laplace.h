@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,27 +20,23 @@
 #ifndef LIBMESH_MESH_SMOOTHER_LAPLACE_H
 #define LIBMESH_MESH_SMOOTHER_LAPLACE_H
 
-
-// forward declarations
-
-// C++ Includes   -----------------------------------
+// C++ Includes
 #include <vector>
 
-// Local Includes -----------------------------------
-#include "libmesh/libmesh.h" // libMesh::out/err
+// Local Includes
+#include "libmesh/libmesh.h"
 #include "libmesh/mesh_smoother.h"
 
 namespace libMesh
 {
 
-
 /**
- * This class defines the data structures necessary
- * for Laplace smoothing.  Note that this is a simple
- * averaging smoother, which does NOT guarantee that
- * points will be smoothed to valid locations, e.g.
- * locations inside the boundary!  This aspect could
- * use work.
+ * This class defines the data structures necessary for Laplace
+ * smoothing.
+ *
+ * \note This is a simple averaging smoother, which does \e not
+ * guarantee that points will be smoothed to valid locations, e.g.
+ * locations inside the boundary!  This aspect could use work.
  *
  * \author John W. Peterson
  * \date 2002-2007
@@ -66,7 +62,7 @@ public:
    * function in this class which takes an int, using
    * a default value of 1.
    */
-  virtual void smooth() libmesh_override { this->smooth(1); }
+  virtual void smooth() override { this->smooth(1); }
 
   /**
    * The actual smoothing function, gets called whenever
@@ -105,7 +101,7 @@ private:
   /**
    * Data structure for holding the L-graph
    */
-  std::vector<std::vector<dof_id_type> > _graph;
+  std::vector<std::vector<dof_id_type>> _graph;
 };
 
 

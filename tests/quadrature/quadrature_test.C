@@ -7,41 +7,63 @@
 #include <libmesh/quadrature.h>
 #include <libmesh/string_to_enum.h>
 #include <libmesh/utility.h>
+#include <libmesh/enum_quadrature_type.h>
 
 #include <iomanip>
+
+// THE CPPUNIT_TEST_SUITE_END macro expands to code that involves
+// std::auto_ptr, which in turn produces -Wdeprecated-declarations
+// warnings.  These can be ignored in GCC as long as we wrap the
+// offending code in appropriate pragmas.  We can't get away with a
+// single ignore_warnings.h inclusion at the beginning of this file,
+// since the libmesh headers pull in a restore_warnings.h at some
+// point.  We also don't bother restoring warnings at the end of this
+// file since it's not a header.
+#include <libmesh/ignore_warnings.h>
 
 using namespace libMesh;
 
 #define MACROCOMMA ,
 
-#define TEST_ONE_ORDER(qtype, order, maxorder) \
-  CPPUNIT_TEST( testBuild<qtype MACROCOMMA order> ); \
+#if LIBMESH_DIM > 2
+#define TEST_ONE_ORDER(qtype, order, maxorder)                          \
+  CPPUNIT_TEST( testBuild<qtype MACROCOMMA order> );                    \
   CPPUNIT_TEST( test1DWeights<qtype MACROCOMMA order MACROCOMMA maxorder> ); \
   CPPUNIT_TEST( test2DWeights<qtype MACROCOMMA order MACROCOMMA maxorder> ); \
   CPPUNIT_TEST( test3DWeights<qtype MACROCOMMA order MACROCOMMA maxorder> );
+#elif LIBMESH_DIM > 1
+#define TEST_ONE_ORDER(qtype, order, maxorder)                          \
+  CPPUNIT_TEST( testBuild<qtype MACROCOMMA order> );                    \
+  CPPUNIT_TEST( test1DWeights<qtype MACROCOMMA order MACROCOMMA maxorder> ); \
+  CPPUNIT_TEST( test2DWeights<qtype MACROCOMMA order MACROCOMMA maxorder> );
+#else
+#define TEST_ONE_ORDER(qtype, order, maxorder)                          \
+  CPPUNIT_TEST( testBuild<qtype MACROCOMMA order> );                    \
+  CPPUNIT_TEST( test1DWeights<qtype MACROCOMMA order MACROCOMMA maxorder> );
+#endif
 
 // std::min isn't constexpr, and C++03 lacks constexpr anyway
 #define mymin(a, b) (a < b ? a : b)
 
-#define TEST_ALL_ORDERS(qtype, maxorder) \
-  TEST_ONE_ORDER(qtype, FIRST, mymin(1,maxorder)); \
-  TEST_ONE_ORDER(qtype, SECOND, mymin(2,maxorder)); \
-  TEST_ONE_ORDER(qtype, THIRD, mymin(3,maxorder)); \
-  TEST_ONE_ORDER(qtype, FOURTH, mymin(4,maxorder)); \
-  TEST_ONE_ORDER(qtype, FIFTH, mymin(5,maxorder)); \
-  TEST_ONE_ORDER(qtype, SIXTH, mymin(6,maxorder)); \
-  TEST_ONE_ORDER(qtype, SEVENTH, mymin(7,maxorder)); \
-  TEST_ONE_ORDER(qtype, EIGHTH, mymin(8,maxorder)); \
+#define TEST_ALL_ORDERS(qtype, maxorder)                \
+  TEST_ONE_ORDER(qtype, FIRST, mymin(1,maxorder));      \
+  TEST_ONE_ORDER(qtype, SECOND, mymin(2,maxorder));     \
+  TEST_ONE_ORDER(qtype, THIRD, mymin(3,maxorder));      \
+  TEST_ONE_ORDER(qtype, FOURTH, mymin(4,maxorder));     \
+  TEST_ONE_ORDER(qtype, FIFTH, mymin(5,maxorder));      \
+  TEST_ONE_ORDER(qtype, SIXTH, mymin(6,maxorder));      \
+  TEST_ONE_ORDER(qtype, SEVENTH, mymin(7,maxorder));    \
+  TEST_ONE_ORDER(qtype, EIGHTH, mymin(8,maxorder));     \
   TEST_ONE_ORDER(qtype, NINTH, mymin(9,maxorder));
 
-#define LIBMESH_ASSERT_REALS_EQUAL(first, second, tolerance) \
-  if (std::abs(first-second) >= tolerance) \
-    { \
-      std::cerr << "first = " << first << std::endl; \
-      std::cerr << "second = " << second << std::endl; \
-      std::cerr << "error = " << std::abs(first-second) << std::endl; \
-      std::cerr << "tolerance = " << tolerance << std::endl; \
-    } \
+#define LIBMESH_ASSERT_REALS_EQUAL(first, second, tolerance)            \
+  if (std::abs(first-second) >= tolerance)                              \
+    {                                                                   \
+      std::cerr << "first = " << first << std::endl;                    \
+      std::cerr << "second = " << second << std::endl;                  \
+      std::cerr << "error = " << std::abs(first-second) << std::endl;   \
+      std::cerr << "tolerance = " << tolerance << std::endl;            \
+    }                                                                   \
   CPPUNIT_ASSERT (std::abs(first-second) < tolerance)
 
 class QuadratureTest : public CppUnit::TestCase {
@@ -83,10 +105,14 @@ public:
   CPPUNIT_TEST( testMonomialQuadrature );
 
   // Test quadrature rules on Triangles
+#if LIBMESH_DIM > 1
   CPPUNIT_TEST( testTriQuadrature );
+#endif
 
   // Test quadrature rules on Tetrahedra
+#if LIBMESH_DIM > 2
   CPPUNIT_TEST( testTetQuadrature );
+#endif
 
   // Test Jacobi quadrature rules with special weighting function
   CPPUNIT_TEST( testJacobi );
@@ -110,46 +136,49 @@ public:
     ElemType elem_type[2] = {QUAD4, HEX8};
     int dims[2]           = {2, 3};
 
-    for (int i=0; i<2; ++i)
+    for (int i=0; i<(LIBMESH_DIM-1); ++i)
       {
         // std::cout << "\nChecking monomial quadrature on element type " << elem_type[i] << std::endl;
 
         for (int order=0; order<7; ++order)
           {
-            UniquePtr<QBase> qrule = QBase::build(QMONOMIAL,
-                                                  dims[i],
-                                                  static_cast<Order>(order));
+            std::unique_ptr<QBase> qrule = QBase::build(QMONOMIAL,
+                                                        dims[i],
+                                                        static_cast<Order>(order));
             qrule->init(elem_type[i]);
 
             // In 3D, max(z_power)==order, in 2D max(z_power)==0
             int max_z_power = dims[i]==2 ? 0 : order;
 
-            for (int x_power=0; x_power<=order; ++x_power)
-              for (int y_power=0; y_power<=order; ++y_power)
-                for (int z_power=0; z_power<=max_z_power; ++z_power)
+            int xyz_power[3];
+            for (xyz_power[0]=0; xyz_power[0]<=order; ++xyz_power[0])
+              for (xyz_power[1]=0; xyz_power[1]<=order; ++xyz_power[1])
+                for (xyz_power[2]=0; xyz_power[2]<=max_z_power; ++xyz_power[2])
                   {
                     // Only try to integrate polynomials we can integrate exactly
-                    if (x_power + y_power + z_power > order)
+                    if (xyz_power[0] + xyz_power[1] + xyz_power[2] > order)
                       continue;
 
                     // Compute the integral via quadrature.  Note that
                     // std::pow(0,0) returns 1 in the 2D case.
                     Real sumq = 0.;
                     for (unsigned int qp=0; qp<qrule->n_points(); qp++)
-                      sumq += qrule->w(qp)
-                        * std::pow(qrule->qp(qp)(0), x_power)
-                        * std::pow(qrule->qp(qp)(1), y_power)
-                        * std::pow(qrule->qp(qp)(2), z_power);
+                      {
+                        Real term = qrule->w(qp);
+                        for (unsigned int d=0; d != LIBMESH_DIM; ++d)
+                          term *= std::pow(qrule->qp(qp)(d), xyz_power[d]);
+                        sumq += term;
+                      }
 
-                    // std::cout << "Quadrature of x^" << x_power
-                    //           << " y^" << y_power
-                    //           << " z^" << z_power
+                    // std::cout << "Quadrature of x^" << xyz_power[0]
+                    //           << " y^" << xyz_power[1]
+                    //           << " z^" << xyz_power[2]
                     //           << " = " << sumq << std::endl;
 
                     // Copy-pasted code from test3DWeights()
-                    Real exact_x = (x_power % 2) ? 0 : (Real(2.0) / (x_power+1));
-                    Real exact_y = (y_power % 2) ? 0 : (Real(2.0) / (y_power+1));
-                    Real exact_z = (z_power % 2) ? 0 : (Real(2.0) / (z_power+1));
+                    Real exact_x = (xyz_power[0] % 2) ? 0 : (Real(2.0) / (xyz_power[0]+1));
+                    Real exact_y = (xyz_power[1] % 2) ? 0 : (Real(2.0) / (xyz_power[1]+1));
+                    Real exact_z = (xyz_power[2] % 2) ? 0 : (Real(2.0) / (xyz_power[2]+1));
 
                     // Handle 2D
                     if (dims[i]==2)
@@ -172,9 +201,9 @@ public:
     for (int qt=0; qt<3; ++qt)
       for (int order=0; order<7; ++order)
         {
-          UniquePtr<QBase> qrule = QBase::build(qtype[qt],
-                                                /*dim=*/3,
-                                                static_cast<Order>(order));
+          std::unique_ptr<QBase> qrule = QBase::build(qtype[qt],
+                                                      /*dim=*/3,
+                                                      static_cast<Order>(order));
 
           // Initialize on a TET element
           qrule->init (TET4);
@@ -226,7 +255,7 @@ public:
                     Utility::iota(denominator.begin(), denominator.end(), sorted_powers[2]+1);
 
                     // The denominator is guaranteed to have the most terms...
-                    for (unsigned i=0; i<denominator.size(); ++i)
+                    for (std::size_t i=0; i<denominator.size(); ++i)
                       {
                         if (i < numerator_1.size())
                           analytical *= numerator_1[i];
@@ -253,9 +282,9 @@ public:
     for (int qt=0; qt<4; ++qt)
       for (int order=0; order<10; ++order)
         {
-          UniquePtr<QBase> qrule = QBase::build(qtype[qt],
-                                                /*dim=*/2,
-                                                static_cast<Order>(order));
+          std::unique_ptr<QBase> qrule = QBase::build(qtype[qt],
+                                                      /*dim=*/2,
+                                                      static_cast<Order>(order));
 
           // Initialize on a TRI element
           qrule->init (TRI3);
@@ -279,7 +308,9 @@ public:
                 // Compute the integral via quadrature
                 Real sumq = 0.;
                 for (unsigned int qp=0; qp<qrule->n_points(); qp++)
-                  sumq += qrule->w(qp) * std::pow(qrule->qp(qp)(0), x_power) * std::pow(qrule->qp(qp)(1), y_power);
+                  sumq += qrule->w(qp)
+                    * std::pow(qrule->qp(qp)(0), x_power)
+                    * std::pow(qrule->qp(qp)(1), y_power);
 
                 // std::cout << "sumq = " << sumq << std::endl;
 
@@ -301,7 +332,7 @@ public:
                   Utility::iota(denominator.begin(), denominator.end(), larger_power+1);
 
                   // The denominator is guaranteed to have more terms...
-                  for (unsigned i=0; i<denominator.size(); ++i)
+                  for (std::size_t i=0; i<denominator.size(); ++i)
                     {
                       if (i < numerator.size())
                         analytical *= numerator[i];
@@ -336,18 +367,18 @@ public:
     // simply be the element length for weighted quadrature rules like
     // Jacobi.  For general alpha and beta=0, the sum of the weights
     // on the interval [-1,1] is 2^(alpha+1) / (alpha+1).
-    std::vector<std::vector<Real> > true_integrals(2);
+    std::vector<std::vector<Real>> true_integrals(2);
 
     // alpha=1 integral values
     // int((1-x)*x^p, x=0..1) = 1 / (p^2 + 3p + 2)
     true_integrals[0].resize(10);
-    for (unsigned p=0; p<true_integrals[0].size(); ++p)
+    for (std::size_t p=0; p<true_integrals[0].size(); ++p)
       true_integrals[0][p] = 1. / (p*p + 3.*p + 2.);
 
     // alpha=2 integral values
     // int((1-x)^2*x^p, x=0..1) = 2 / (p^3 + 6*p^2 + 11*p + 6)
     true_integrals[1].resize(10);
-    for (unsigned p=0; p<true_integrals[1].size(); ++p)
+    for (std::size_t p=0; p<true_integrals[1].size(); ++p)
       true_integrals[1][p] = 2. / (p*p*p + 6.*p*p + 11.*p + 6.);
 
     // Test both types of Jacobi quadrature rules
@@ -355,9 +386,9 @@ public:
       {
         for (int order=0; order<10; ++order)
           {
-            UniquePtr<QBase> qrule = QBase::build(qtype[qt],
-                                                /*dim=*/1,
-                                                static_cast<Order>(order));
+            std::unique_ptr<QBase> qrule = QBase::build(qtype[qt],
+                                                        /*dim=*/1,
+                                                        static_cast<Order>(order));
 
             // Initialize on a 1D element, EDGE2/3/4 should not matter...
             qrule->init (EDGE2);
@@ -393,9 +424,9 @@ public:
   template <QuadratureType qtype, Order order>
   void testBuild ()
   {
-    UniquePtr<QBase> qrule1D = QBase::build (qtype, 1, order);
-    UniquePtr<QBase> qrule2D = QBase::build (qtype, 2, order);
-    UniquePtr<QBase> qrule3D = QBase::build (qtype, 3, order);
+    std::unique_ptr<QBase> qrule1D = QBase::build (qtype, 1, order);
+    std::unique_ptr<QBase> qrule2D = QBase::build (qtype, 2, order);
+    std::unique_ptr<QBase> qrule3D = QBase::build (qtype, 3, order);
 
     CPPUNIT_ASSERT_EQUAL ( static_cast<unsigned int>(1) , qrule1D->get_dim() );
     CPPUNIT_ASSERT_EQUAL ( static_cast<unsigned int>(2) , qrule2D->get_dim() );
@@ -413,7 +444,7 @@ public:
   template <QuadratureType qtype, Order order, unsigned int exactorder>
   void test1DWeights ()
   {
-    UniquePtr<QBase> qrule = QBase::build(qtype , 1, order);
+    std::unique_ptr<QBase> qrule = QBase::build(qtype , 1, order);
     qrule->init (EDGE3);
 
     for (unsigned int mode=0; mode <= exactorder; ++mode)
@@ -447,7 +478,7 @@ public:
   template <QuadratureType qtype, Order order, unsigned int exactorder>
   void test2DWeights ()
   {
-    UniquePtr<QBase> qrule = QBase::build(qtype, 2, order);
+    std::unique_ptr<QBase> qrule = QBase::build(qtype, 2, order);
     qrule->init (QUAD8);
 
     for (unsigned int modex=0; modex <= exactorder; ++modex)
@@ -456,8 +487,9 @@ public:
           Real sum = 0;
 
           for (unsigned int qp=0; qp<qrule->n_points(); qp++)
-            sum += qrule->w(qp) * std::pow(qrule->qp(qp)(0), static_cast<Real>(modex))
-                                * std::pow(qrule->qp(qp)(1), static_cast<Real>(modey));
+            sum += qrule->w(qp)
+              * std::pow(qrule->qp(qp)(0), static_cast<Real>(modex))
+              * std::pow(qrule->qp(qp)(1), static_cast<Real>(modey));
 
           const Real exactx = (modex % 2) ?
             0 : (Real(2.0) / (modex+1));
@@ -491,7 +523,7 @@ public:
   template <QuadratureType qtype, Order order, unsigned int exactorder>
   void test3DWeights ()
   {
-    UniquePtr<QBase> qrule = QBase::build(qtype, 3, order);
+    std::unique_ptr<QBase> qrule = QBase::build(qtype, 3, order);
     qrule->init (HEX20);
 
     for (unsigned int modex=0; modex <= exactorder; ++modex)
@@ -501,9 +533,10 @@ public:
             Real sum = 0;
 
             for (unsigned int qp=0; qp<qrule->n_points(); qp++)
-              sum += qrule->w(qp) * std::pow(qrule->qp(qp)(0), static_cast<Real>(modex))
-                                  * std::pow(qrule->qp(qp)(1), static_cast<Real>(modey))
-                                  * std::pow(qrule->qp(qp)(2), static_cast<Real>(modez));
+              sum += qrule->w(qp)
+                * std::pow(qrule->qp(qp)(0), static_cast<Real>(modex))
+                * std::pow(qrule->qp(qp)(1), static_cast<Real>(modey))
+                * std::pow(qrule->qp(qp)(2), static_cast<Real>(modez));
 
             const Real exactx = (modex % 2) ?
               0 : (Real(2.0) / (modex+1));

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -36,6 +36,10 @@ namespace libMesh
  * the connectivity of the hole is implicit in the numbering of the points,
  * i.e. node 0 is connected to node 1, node 1 is connected to node 2, etc,
  * and the last node "wraps around" to connect back to node 0.
+ *
+ * \author John W. Peterson
+ * \date 2011
+ * \brief Class for parameterizing 2D holes to be meshed with Triangle.
  */
 class TriangleInterface::Hole
 {
@@ -84,11 +88,11 @@ public:
    */
   PolygonHole(const Point & center, Real radius, unsigned int n_points);
 
-  virtual unsigned int n_points() const libmesh_override;
+  virtual unsigned int n_points() const override;
 
-  virtual Point point(const unsigned int n) const libmesh_override;
+  virtual Point point(const unsigned int n) const override;
 
-  virtual Point inside() const libmesh_override;
+  virtual Point inside() const override;
 
 private:
   /**
@@ -129,11 +133,11 @@ public:
   ArbitraryHole(const Point & center,
                 const std::vector<Point> & points);
 
-  virtual unsigned int n_points() const libmesh_override;
+  virtual unsigned int n_points() const override;
 
-  virtual Point point(const unsigned int n) const libmesh_override;
+  virtual Point point(const unsigned int n) const override;
 
-  virtual Point inside() const libmesh_override;
+  virtual Point inside() const override;
 
 private:
   /**

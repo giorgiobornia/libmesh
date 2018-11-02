@@ -35,10 +35,7 @@ RBEIMAssembly::RBEIMAssembly(RBEIMConstruction & rb_eim_con_in,
                              unsigned int basis_function_index_in)
   : _rb_eim_con(rb_eim_con_in),
     _basis_function_index(basis_function_index_in),
-    _ghosted_basis_function(NumericVector<Number>::build(
-      rb_eim_con_in.get_explicit_system().comm())),
-    _fe(NULL),
-    _qrule(NULL)
+    _ghosted_basis_function(NumericVector<Number>::build(rb_eim_con_in.get_explicit_system().comm()))
 {
   // localize the vector that stores the basis function for this assembly object,
   // i.e. the vector that is used in evaluate_basis_function_at_quad_pts
@@ -50,7 +47,7 @@ RBEIMAssembly::RBEIMAssembly(RBEIMConstruction & rb_eim_con_in,
                                  GHOSTED);
   _rb_eim_con.get_rb_evaluation().get_basis_function(_basis_function_index).
     localize(*_ghosted_basis_function,
-              _rb_eim_con.get_explicit_system().get_dof_map().get_send_list());
+             _rb_eim_con.get_explicit_system().get_dof_map().get_send_list());
 #else
   _ghosted_basis_function->init (_rb_eim_con.get_explicit_system().n_dofs(), false, SERIAL);
   _rb_eim_con.get_rb_evaluation().get_basis_function(_basis_function_index).
@@ -62,11 +59,6 @@ RBEIMAssembly::RBEIMAssembly(RBEIMConstruction & rb_eim_con_in,
 
 RBEIMAssembly::~RBEIMAssembly()
 {
-  delete _fe;
-  _fe = libmesh_nullptr;
-
-  delete _qrule;
-  _qrule = libmesh_nullptr;
 }
 
 void RBEIMAssembly::evaluate_basis_function(unsigned int var,
@@ -74,10 +66,10 @@ void RBEIMAssembly::evaluate_basis_function(unsigned int var,
                                             const QBase & element_qrule,
                                             std::vector<Number> & values)
 {
-  START_LOG("evaluate_basis_function", "RBEIMAssembly");
+  LOG_SCOPE("evaluate_basis_function", "RBEIMAssembly");
 
   bool repeated_qrule = false;
-  if (_qrule != libmesh_nullptr)
+  if (_qrule)
     {
       repeated_qrule =
         ( (element_qrule.type()      == _qrule->type()) &&
@@ -88,18 +80,14 @@ void RBEIMAssembly::evaluate_basis_function(unsigned int var,
   // If the qrule is not repeated, then we need to make a new copy of element_qrule.
   if (!repeated_qrule)
     {
-      // First, possibly delete the old qrule
-      delete _qrule;
+      _qrule = QBase::build(element_qrule.type(),
+                            element_qrule.get_dim(),
+                            element_qrule.get_order());
 
-      _qrule =
-        QBase::build(element_qrule.type(),
-                     element_qrule.get_dim(),
-                     element_qrule.get_order()).release();
-
-      get_fe().attach_quadrature_rule (_qrule);
+      get_fe().attach_quadrature_rule (_qrule.get());
     }
 
-  const std::vector<std::vector<Real> > & phi = get_fe().get_phi();
+  const std::vector<std::vector<Real>> & phi = get_fe().get_phi();
 
   // The FE object caches data, hence we recompute as little as
   // possible on the call to reinit.
@@ -115,14 +103,12 @@ void RBEIMAssembly::evaluate_basis_function(unsigned int var,
   unsigned int n_qpoints = _qrule->n_points();
   values.resize(n_qpoints);
 
-  for(unsigned int qp=0; qp<n_qpoints; qp++)
+  for (unsigned int qp=0; qp<n_qpoints; qp++)
     {
       values[qp] = 0.;
-      for (unsigned int i=0; i<dof_indices_var.size(); i++)
+      for (std::size_t i=0; i<dof_indices_var.size(); i++)
         values[qp] += (*_ghosted_basis_function)(dof_indices_var[i]) * phi[i][qp];
     }
-
-  STOP_LOG("evaluate_basis_function", "RBEIMAssembly");
 }
 
 RBEIMConstruction & RBEIMAssembly::get_rb_eim_construction()
@@ -148,7 +134,7 @@ void RBEIMAssembly::initialize_fe()
     get_rb_eim_construction().get_mesh().mesh_dimension();
 
   FEType fe_type = dof_map.variable_type(0);
-  _fe = (FEBase::build(dim, fe_type)).release();
+  _fe = FEBase::build(dim, fe_type);
 
   // Pre-request the shape function for efficieny's sake
   _fe->get_phi();

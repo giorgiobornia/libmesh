@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -40,9 +40,19 @@
 #include "libmesh/tensor_value.h"
 #include "libmesh/threads.h"
 #include "libmesh/tensor_tools.h"
+#include "libmesh/enum_error_estimator_type.h"
+#include "libmesh/enum_norm_type.h"
 
 namespace libMesh
 {
+
+ErrorEstimatorType PatchRecoveryErrorEstimator::type() const
+{
+  return PATCH_RECOVERY;
+}
+
+
+
 // Setter function for the patch_reuse flag
 void PatchRecoveryErrorEstimator::set_patch_reuse(bool patch_reuse_flag)
 {
@@ -51,6 +61,17 @@ void PatchRecoveryErrorEstimator::set_patch_reuse(bool patch_reuse_flag)
 
 //-----------------------------------------------------------------
 // PatchRecoveryErrorEstimator implementations
+PatchRecoveryErrorEstimator::PatchRecoveryErrorEstimator() :
+    ErrorEstimator(),
+    target_patch_size(20),
+    patch_growth_strategy(&Patch::add_local_face_neighbors),
+    patch_reuse(true)
+{
+  error_norm = H1_SEMINORM;
+}
+
+
+
 std::vector<Real> PatchRecoveryErrorEstimator::specpoly(const unsigned int dim,
                                                         const Order order,
                                                         const Point p,
@@ -83,7 +104,7 @@ std::vector<Real> PatchRecoveryErrorEstimator::specpoly(const unsigned int dim,
   // builds psi vector of form 1 x y z x^2 xy xz y^2 yz z^2 etc..
   // I haven't added 1D support here
   for (unsigned int poly_deg=0; poly_deg <= static_cast<unsigned int>(order) ; poly_deg++)
-    { // loop over all polynomials of total degreee = poly_deg
+    { // loop over all polynomials of total degree = poly_deg
 
       switch (dim)
         {
@@ -133,7 +154,7 @@ void PatchRecoveryErrorEstimator::estimate_error (const System & system,
                                                   const NumericVector<Number> * solution_vector,
                                                   bool)
 {
-  START_LOG("estimate_error()", "PatchRecoveryErrorEstimator");
+  LOG_SCOPE("estimate_error()", "PatchRecoveryErrorEstimator");
 
   // The current mesh
   const MeshBase & mesh = system.get_mesh();
@@ -181,8 +202,6 @@ void PatchRecoveryErrorEstimator::estimate_error (const System & system,
       newsol->swap(*sys.solution);
       sys.update();
     }
-
-  STOP_LOG("estimate_error()", "PatchRecoveryErrorEstimator");
 }
 
 
@@ -203,11 +222,8 @@ void PatchRecoveryErrorEstimator::EstimateError::operator()(const ConstElemRange
 
   //------------------------------------------------------------
   // Iterate over all the elements in the range.
-  for (ConstElemRange::const_iterator elem_it=range.begin(); elem_it!=range.end(); ++elem_it)
+  for (const auto & elem : range)
     {
-      // elem is necessarily an active element on the local processor
-      const Elem * elem = *elem_it;
-
       // We'll need an index into the error vector
       const dof_id_type e_id=elem->id();
 
@@ -218,7 +234,7 @@ void PatchRecoveryErrorEstimator::EstimateError::operator()(const ConstElemRange
       // If we are reusing patches and the current element
       // already has an estimate associated with it, move on the
       // next element
-      if(this->error_estimator.patch_reuse && error_per_cell[e_id] != 0)
+      if (this->error_estimator.patch_reuse && error_per_cell[e_id] != 0)
         continue;
 
       // If we are not reusing patches or havent built one containing this element, we build one
@@ -232,7 +248,7 @@ void PatchRecoveryErrorEstimator::EstimateError::operator()(const ConstElemRange
       // not reusing patches since we will only be computing error for
       // one cell
       std::vector<Real> new_error_per_cell(1, 0.);
-      if(this->error_estimator.patch_reuse)
+      if (this->error_estimator.patch_reuse)
         new_error_per_cell.resize(patch.size(), 0.);
 
       //------------------------------------------------------------
@@ -268,7 +284,7 @@ void PatchRecoveryErrorEstimator::EstimateError::operator()(const ConstElemRange
           if (var > 0)
             {
               // We can't mix L_inf and L_2 norms
-              bool is_valid_norm_type =
+              bool is_valid_norm_combo =
                 ((error_estimator.error_norm.type(var) == L2 ||
                   error_estimator.error_norm.type(var) == H1_SEMINORM ||
                   error_estimator.error_norm.type(var) == H1_X_SEMINORM ||
@@ -287,7 +303,7 @@ void PatchRecoveryErrorEstimator::EstimateError::operator()(const ConstElemRange
                  (error_estimator.error_norm.type(var-1) == L_INF ||
                   error_estimator.error_norm.type(var-1) == W1_INF_SEMINORM ||
                   error_estimator.error_norm.type(var-1) == W2_INF_SEMINORM));
-              libmesh_assert (is_valid_norm_type);
+              libmesh_assert (is_valid_norm_combo);
             }
 #endif // DEBUG
 
@@ -301,10 +317,10 @@ void PatchRecoveryErrorEstimator::EstimateError::operator()(const ConstElemRange
             (fe_type.order + elem->p_level());
 
           // Finite element object for use in this patch
-          UniquePtr<FEBase> fe (FEBase::build (dim, fe_type));
+          std::unique_ptr<FEBase> fe (FEBase::build (dim, fe_type));
 
           // Build an appropriate Gaussian quadrature rule
-          UniquePtr<QBase> qrule (fe_type.default_quadrature_rule(dim));
+          std::unique_ptr<QBase> qrule (fe_type.default_quadrature_rule(dim));
 
           // Tell the finite element about the quadrature rule.
           fe->attach_quadrature_rule (qrule.get());
@@ -317,7 +333,7 @@ void PatchRecoveryErrorEstimator::EstimateError::operator()(const ConstElemRange
           // getting them unless the requested norm is actually going
           // to use them.
 
-          const std::vector<std::vector<Real> > * phi = libmesh_nullptr;
+          const std::vector<std::vector<Real>> * phi = nullptr;
           // If we're using phi to assert the correct dof_indices
           // vector size later, then we'll need to get_phi whether we
           // plan to use it or not.
@@ -327,7 +343,7 @@ void PatchRecoveryErrorEstimator::EstimateError::operator()(const ConstElemRange
 #endif
             phi = &(fe->get_phi());
 
-          const std::vector<std::vector<RealGradient> > * dphi = libmesh_nullptr;
+          const std::vector<std::vector<RealGradient>> * dphi = nullptr;
           if (error_estimator.error_norm.type(var) == H1_SEMINORM ||
               error_estimator.error_norm.type(var) == H1_X_SEMINORM ||
               error_estimator.error_norm.type(var) == H1_Y_SEMINORM ||
@@ -336,7 +352,7 @@ void PatchRecoveryErrorEstimator::EstimateError::operator()(const ConstElemRange
             dphi = &(fe->get_dphi());
 
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
-          const std::vector<std::vector<RealTensor> > * d2phi = libmesh_nullptr;
+          const std::vector<std::vector<RealTensor>> * d2phi = nullptr;
           if (error_estimator.error_norm.type(var) == H2_SEMINORM ||
               error_estimator.error_norm.type(var) == W2_INF_SEMINORM)
             d2phi = &(fe->get_d2phi());
@@ -345,7 +361,7 @@ void PatchRecoveryErrorEstimator::EstimateError::operator()(const ConstElemRange
           // global DOF indices
           std::vector<dof_id_type> dof_indices;
 
-          // Compute the approprite size for the patch projection matrices
+          // Compute the appropriate size for the patch projection matrices
           // and vectors;
           unsigned int matsize = element_order + 1;
           if (dim > 1)
@@ -437,6 +453,8 @@ void PatchRecoveryErrorEstimator::EstimateError::operator()(const ConstElemRange
                   // Construct the shape function values for the patch projection
                   std::vector<Real> psi(specpoly(dim, element_order, q_point[qp], matsize));
 
+                  const unsigned int psi_size = cast_int<unsigned int>(psi.size());
+
                   // Patch matrix contribution
                   for (unsigned int i=0; i<Kp.m(); i++)
                     for (unsigned int j=0; j<Kp.n(); j++)
@@ -453,7 +471,7 @@ void PatchRecoveryErrorEstimator::EstimateError::operator()(const ConstElemRange
                         u_h += (*phi)[i][qp]*system.current_solution (dof_indices[i]);
 
                       // Patch RHS contributions
-                      for (unsigned int i=0; i<psi.size(); i++)
+                      for (unsigned int i=0; i != psi_size; i++)
                         F(i) += JxW[qp]*u_h*psi[i];
 
                     }
@@ -469,7 +487,7 @@ void PatchRecoveryErrorEstimator::EstimateError::operator()(const ConstElemRange
                                              system.current_solution(dof_indices[i]));
 
                       // Patch RHS contributions
-                      for (unsigned int i=0; i<psi.size(); i++)
+                      for (unsigned int i=0; i != psi_size; i++)
                         {
                           Fx(i) += JxW[qp]*grad_u_h(0)*psi[i];
 #if LIBMESH_DIM > 1
@@ -491,7 +509,7 @@ void PatchRecoveryErrorEstimator::EstimateError::operator()(const ConstElemRange
                                              system.current_solution(dof_indices[i]));
 
                       // Patch RHS contributions
-                      for (unsigned int i=0; i<psi.size(); i++)
+                      for (unsigned int i=0; i != psi_size; i++)
                         {
                           Fx(i) += JxW[qp]*grad_u_h(0)*psi[i];
                         }
@@ -507,7 +525,7 @@ void PatchRecoveryErrorEstimator::EstimateError::operator()(const ConstElemRange
                                              system.current_solution(dof_indices[i]));
 
                       // Patch RHS contributions
-                      for (unsigned int i=0; i<psi.size(); i++)
+                      for (unsigned int i=0; i != psi_size; i++)
                         {
                           Fy(i) += JxW[qp]*grad_u_h(1)*psi[i];
                         }
@@ -523,7 +541,7 @@ void PatchRecoveryErrorEstimator::EstimateError::operator()(const ConstElemRange
                                              system.current_solution(dof_indices[i]));
 
                       // Patch RHS contributions
-                      for (unsigned int i=0; i<psi.size(); i++)
+                      for (unsigned int i=0; i != psi_size; i++)
                         {
                           Fz(i) += JxW[qp]*grad_u_h(2)*psi[i];
                         }
@@ -541,7 +559,7 @@ void PatchRecoveryErrorEstimator::EstimateError::operator()(const ConstElemRange
                                              system.current_solution(dof_indices[i]));
 
                       // Patch RHS contributions
-                      for (unsigned int i=0; i<psi.size(); i++)
+                      for (unsigned int i=0; i != psi_size; i++)
                         {
                           Fx(i)  += JxW[qp]*hess_u_h(0,0)*psi[i];
 #if LIBMESH_DIM > 1
@@ -622,7 +640,7 @@ void PatchRecoveryErrorEstimator::EstimateError::operator()(const ConstElemRange
           // Declare a new patch
           Patch patch_re(mesh.processor_id());
 
-          if(this->error_estimator.patch_reuse)
+          if (this->error_estimator.patch_reuse)
             {
               // Just get the iterators from the current patch
               patch_re_it  = patch.begin();
@@ -908,7 +926,7 @@ void PatchRecoveryErrorEstimator::EstimateError::operator()(const ConstElemRange
       // Build a new patch if necessary
       Patch current_elem_patch(mesh.processor_id());
 
-      if(this->error_estimator.patch_reuse)
+      if (this->error_estimator.patch_reuse)
         {
           // Just get the iterators from the current patch
           patch_re_it  = patch.begin();

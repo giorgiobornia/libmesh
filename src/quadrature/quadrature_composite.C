@@ -25,6 +25,7 @@
 #include "libmesh/quadrature_simpson.h"
 #include "libmesh/quadrature_composite.h"
 #include "libmesh/elem.h"
+#include "libmesh/enum_quadrature_type.h"
 
 
 
@@ -33,8 +34,16 @@ namespace libMesh
 
 
 template <class QSubCell>
-QComposite<QSubCell>::QComposite(const unsigned int d,
-                                 const Order o) :
+QuadratureType QComposite<QSubCell>::type() const
+{
+  return QCOMPOSITE;
+}
+
+
+
+template <class QSubCell>
+QComposite<QSubCell>::QComposite(unsigned int d,
+                                 Order o) :
   QSubCell(d,o), // explicitly call base class constructor
   _q_subcell(d,o),
   _lagrange_fe(FEBase::build (d, FEType (FIRST, LAGRANGE)))
@@ -47,16 +56,10 @@ QComposite<QSubCell>::QComposite(const unsigned int d,
   if (_dim == 1)
     QSubCell::init(EDGE2);
 
-  libmesh_assert (_lagrange_fe.get() != libmesh_nullptr);
+  libmesh_assert (_lagrange_fe.get() != nullptr);
 
   _lagrange_fe->attach_quadrature_rule (&_q_subcell);
 }
-
-
-
-template <class QSubCell>
-QComposite<QSubCell>::~QComposite()
-{}
 
 
 
@@ -86,7 +89,7 @@ void QComposite<QSubCell>::init (const Elem & elem,
   // mapping.
   const Elem * reference_elem = elem.reference_elem();
 
-  libmesh_assert (reference_elem != libmesh_nullptr);
+  libmesh_assert (reference_elem != nullptr);
 
   _elem_cutter(*reference_elem, vertex_distance_func);
   //_elem_cutter(elem, vertex_distance_func);
@@ -123,34 +126,29 @@ void QComposite<QSubCell>::add_subelem_values (const std::vector<Elem const *> &
   const std::vector<Real>  & subelem_weights = _lagrange_fe->get_JxW();
   const std::vector<Point> & subelem_points  = _lagrange_fe->get_xyz();
 
-  for (std::vector<Elem const *>::const_iterator it = subelem.begin();
-       it!=subelem.end(); ++it)
+  for (const auto & elem : subelem)
     {
       // tetgen seems to create 0-volume cells on occasion, but we *should*
       // be catching that appropriately now inside the ElemCutter class.
       // Just in case trap here, describe the error, and abort.
-#ifdef LIBMESH_ENABLE_EXCEPTIONS
-      try
+      libmesh_try
         {
-#endif
-          _lagrange_fe->reinit(*it);
+          _lagrange_fe->reinit(elem);
           _weights.insert(_weights.end(),
                           subelem_weights.begin(), subelem_weights.end());
 
           _points.insert(_points.end(),
                          subelem_points.begin(), subelem_points.end());
-#ifdef LIBMESH_ENABLE_EXCEPTIONS
         }
-      catch (...)
+      libmesh_catch (...)
         {
           libMesh::err << "ERROR: found a bad cut cell!\n";
 
-          for (unsigned int n=0; n<(*it)->n_nodes(); n++)
-            libMesh::err << (*it)->point(n) << std::endl;
+          for (unsigned int n=0; n<elem->n_nodes(); n++)
+            libMesh::err << elem->point(n) << std::endl;
 
           libmesh_error_msg("Tetgen may have created a 0-volume cell during Cutcell integration.");
         }
-#endif
     }
 }
 

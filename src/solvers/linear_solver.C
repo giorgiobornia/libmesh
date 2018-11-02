@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -17,11 +17,9 @@
 
 
 
-// C++ includes
-
 // Local Includes
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
 #include "libmesh/libmesh_logging.h"
-#include "libmesh/auto_ptr.h"
 #include "libmesh/linear_solver.h"
 #include "libmesh/laspack_linear_solver.h"
 #include "libmesh/eigen_sparse_linear_solver.h"
@@ -31,6 +29,9 @@
 #include "libmesh/sparse_matrix.h"
 #include "libmesh/string_to_enum.h"
 #include "libmesh/solver_configuration.h"
+#include "libmesh/enum_solver_package.h"
+#include "libmesh/enum_preconditioner_type.h"
+#include "libmesh/enum_solver_type.h"
 
 namespace libMesh
 {
@@ -38,50 +39,65 @@ namespace libMesh
 //------------------------------------------------------------------
 // LinearSolver members
 template <typename T>
-UniquePtr<LinearSolver<T> >
+LinearSolver<T>::LinearSolver (const libMesh::Parallel::Communicator & comm_in) :
+  ParallelObject       (comm_in),
+  _solver_type         (GMRES),
+  _preconditioner_type (ILU_PRECOND),
+  _is_initialized      (false),
+  _preconditioner      (nullptr),
+  same_preconditioner  (false),
+  _solver_configuration(nullptr)
+{
+}
+
+
+
+template <typename T>
+std::unique_ptr<LinearSolver<T>>
 LinearSolver<T>::build(const libMesh::Parallel::Communicator & comm,
                        const SolverPackage solver_package)
 {
+  // Avoid unused parameter warnings when no solver packages are enabled.
+  libmesh_ignore(comm);
+
   // Build the appropriate solver
   switch (solver_package)
     {
-
-
 #ifdef LIBMESH_HAVE_LASPACK
     case LASPACK_SOLVERS:
-      return UniquePtr<LinearSolver<T> >(new LaspackLinearSolver<T>(comm));
+      return libmesh_make_unique<LaspackLinearSolver<T>>(comm);
 #endif
 
 
 #ifdef LIBMESH_HAVE_PETSC
     case PETSC_SOLVERS:
-      return UniquePtr<LinearSolver<T> >(new PetscLinearSolver<T>(comm));
+      return libmesh_make_unique<PetscLinearSolver<T>>(comm);
 #endif
 
 
-#if defined(LIBMESH_HAVE_TRILINOS) && (LIBMESH_TRILINOS_HAVE_AZTECOO)
+#ifdef LIBMESH_TRILINOS_HAVE_AZTECOO
     case TRILINOS_SOLVERS:
-      return UniquePtr<LinearSolver<T> >(new AztecLinearSolver<T>(comm));
+      return libmesh_make_unique<AztecLinearSolver<T>>(comm);
 #endif
 
 
 #ifdef LIBMESH_HAVE_EIGEN
     case EIGEN_SOLVERS:
-      return UniquePtr<LinearSolver<T> >(new EigenSparseLinearSolver<T>(comm));
+      return libmesh_make_unique<EigenSparseLinearSolver<T>>(comm);
 #endif
 
     default:
       libmesh_error_msg("ERROR:  Unrecognized solver package: " << solver_package);
     }
 
-  return UniquePtr<LinearSolver<T> >();
+  return std::unique_ptr<LinearSolver<T>>();
 }
 
 template <typename T>
 PreconditionerType
 LinearSolver<T>::preconditioner_type () const
 {
-  if(_preconditioner)
+  if (_preconditioner)
     return _preconditioner->type();
 
   return _preconditioner_type;
@@ -91,7 +107,7 @@ template <typename T>
 void
 LinearSolver<T>::set_preconditioner_type (const PreconditionerType pct)
 {
-  if(_preconditioner)
+  if (_preconditioner)
     _preconditioner->set_type(pct);
   else
     _preconditioner_type = pct;
@@ -120,7 +136,7 @@ void
 LinearSolver<T>::restrict_solve_to(const std::vector<unsigned int> * const dofs,
                                    const SubsetSolveMode /*subset_solve_mode*/)
 {
-  if (dofs != libmesh_nullptr)
+  if (dofs != nullptr)
     libmesh_not_implemented();
 }
 
@@ -133,7 +149,7 @@ std::pair<unsigned int, Real> LinearSolver<T>::adjoint_solve (SparseMatrix<T> & 
                                                               const unsigned int n_iter)
 {
   // Log how long the linear solve takes.
-  START_LOG("adjoint_solve()", "LinearSolver");
+  LOG_SCOPE("adjoint_solve()", "LinearSolver");
 
   // Take the discrete adjoint
   mat.close();
@@ -147,11 +163,7 @@ std::pair<unsigned int, Real> LinearSolver<T>::adjoint_solve (SparseMatrix<T> & 
   // by taking the discrete adjoint
   mat.get_transpose(mat);
 
-  // Stop logging the nonlinear solve
-  STOP_LOG("adjoint_solve()", "LinearSolver");
-
   return totalrval;
-
 }
 
 template <typename T>

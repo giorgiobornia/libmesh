@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -67,7 +67,7 @@ public:
                 const NumericVector<Number> & vec,
                 const DofMap & dof_map,
                 const std::vector<unsigned int> & vars,
-                const FunctionBase<Number> * master=libmesh_nullptr);
+                const FunctionBase<Number> * master=nullptr);
 
   /**
    * Constructor for mesh based functions with a number
@@ -81,7 +81,21 @@ public:
                 const NumericVector<Number> & vec,
                 const DofMap & dof_map,
                 const unsigned int var,
-                const FunctionBase<Number> * master=libmesh_nullptr);
+                const FunctionBase<Number> * master=nullptr);
+
+  /**
+   * This class is sometimes responsible for cleaning up the
+   * _point_locator, so it can't be default (shallow) copy constructed
+   * or move constructed.
+   */
+  MeshFunction (MeshFunction &&) = delete;
+  MeshFunction (const MeshFunction &) = delete;
+
+  /**
+   * This class contains const references so it can't be assigned.
+   */
+  MeshFunction & operator= (const MeshFunction &) = delete;
+  MeshFunction & operator= (MeshFunction &&) = delete;
 
   /**
    * Destructor.
@@ -93,7 +107,7 @@ public:
    * own and specifying the Trees::NODES method.  specifies the method
    * to use when building a \p PointLocator
    */
-  virtual void init () libmesh_override { this->init(Trees::NODES); }
+  virtual void init () override { this->init(Trees::NODES); }
 
   /**
    * The actual initialization process.  Takes an optional argument which
@@ -104,34 +118,56 @@ public:
   /**
    * Clears the function.
    */
-  virtual void clear () libmesh_override;
+  virtual void clear () override;
 
   /**
-   * Returns a new copy of the function.  The new copy uses the
-   * original as a master function to enable simultaneous evaluations
-   * of the copies in different threads.
-   * Note that this implies the copy should not be used after the
+   * \returns A new copy of the function.
+   *
+   * The new copy uses the original as a master function to enable
+   * simultaneous evaluations of the copies in different threads.
+   *
+   * \note This implies the copy should not be used after the
    * original is destroyed.
    */
-  virtual UniquePtr<FunctionBase<Number> > clone () const libmesh_override;
+  virtual std::unique_ptr<FunctionBase<Number>> clone () const override;
 
   /**
-   * @returns the value of variable 0 at point
-   * \p p and for \p time, which defaults to zero.
+   * \returns The value of variable 0 at point \p p and for \p time,
+   * which defaults to zero.
    */
   Number operator() (const Point & p,
-                     const Real time=0.) libmesh_override;
+                     const Real time=0.) override;
 
   /**
-   * @returns the first derivatives of variable 0 at point
+   * \returns A map of values of variable 0 at point
+   * \p p and for \p time.
+   *
+   * The std::map is from element to Number and accounts for
+   * doubly-defined values on faces if discontinuous variables are
+   * used.
+   */
+  std::map<const Elem *, Number> discontinuous_value (const Point & p,
+                                                      const Real time=0.);
+
+  /**
+   * \returns The first derivatives of variable 0 at point
    * \p p and for \p time, which defaults to zero.
    */
   Gradient gradient (const Point & p,
                      const Real time=0.);
 
+  /**
+   * \returns A map of first derivatives (gradients) of variable 0 at point
+   * \p p and for \p time.
+   * map is from element to Gradient and accounts for double defined
+   * values on faces if the gradient is discontinuous
+   */
+  std::map<const Elem *, Gradient> discontinuous_gradient (const Point & p,
+                                                           const Real time=0.);
+
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
   /**
-   * @returns the second derivatives of variable 0 at point
+   * \returns The second derivatives of variable 0 at point
    * \p p and for \p time, which defaults to zero.
    */
   Tensor hessian (const Point & p,
@@ -146,7 +182,7 @@ public:
    */
   void operator() (const Point & p,
                    const Real time,
-                   DenseVector<Number> & output) libmesh_override;
+                   DenseVector<Number> & output) override;
 
   /**
    * Computes values at coordinate \p p and for time \p time,
@@ -159,6 +195,25 @@ public:
                    const std::set<subdomain_id_type> * subdomain_ids);
 
   /**
+   * Similar to operator() with the same parameter list, but with the difference
+   * that multiple values on faces are explicitly permitted. This is useful for
+   * discontinuous shape functions that are evaluated on faces.
+   */
+  void discontinuous_value (const Point & p,
+                            const Real time,
+                            std::map<const Elem *, DenseVector<Number>> & output);
+
+  /**
+   * Similar to operator() with the same parameter list, but with the difference
+   * that multiple values on faces are explicitly permitted. This is useful for
+   * discontinuous shape functions that are evaluated on faces.
+   */
+  void discontinuous_value (const Point & p,
+                            const Real time,
+                            std::map<const Elem *, DenseVector<Number>> & output,
+                            const std::set<subdomain_id_type> * subdomain_ids);
+
+  /**
    * Computes gradients at coordinate \p p and for time \p time, which
    * defaults to zero, optionally restricting the point to the passed
    * subdomain_ids. This is useful in cases where there are multiple
@@ -167,7 +222,26 @@ public:
   void gradient (const Point & p,
                  const Real time,
                  std::vector<Gradient> & output,
-                 const std::set<subdomain_id_type> * subdomain_ids = libmesh_nullptr);
+                 const std::set<subdomain_id_type> * subdomain_ids = nullptr);
+
+  /**
+   * Similar to gradient, but with the difference
+   * that multiple values on faces are explicitly permitted. This is useful for
+   * evaluating gradients on faces where the values to the left and right are different.
+   */
+  void discontinuous_gradient (const Point & p,
+                               const Real time,
+                               std::map<const Elem *, std::vector<Gradient>> & output);
+
+  /**
+   * Similar to gradient, but with the difference
+   * that multiple values on faces are explicitly permitted. This is useful for
+   * evaluating gradients on faces where the values to the left and right are different.
+   */
+  void discontinuous_gradient (const Point & p,
+                               const Real time,
+                               std::map<const Elem *, std::vector<Gradient>> & output,
+                               const std::set<subdomain_id_type> * subdomain_ids);
 
   /**
    * Computes gradients at coordinate \p p and for time \p time, which
@@ -178,12 +252,13 @@ public:
   void hessian (const Point & p,
                 const Real time,
                 std::vector<Tensor> & output,
-                const std::set<subdomain_id_type> * subdomain_ids = libmesh_nullptr);
+                const std::set<subdomain_id_type> * subdomain_ids = nullptr);
 
   /**
-   * Returns the current \p PointLocator object, for you might want to
-   * use it elsewhere.  The \p MeshFunction object must be initialized
-   * before.
+   * \returns The current \p PointLocator object, for use elsewhere.
+   *
+   * \note The \p MeshFunction object must be initialized before this
+   * is called.
    */
   const PointLocatorBase & get_point_locator (void) const;
 
@@ -235,7 +310,16 @@ protected:
    * Helper function to reduce code duplication
    */
   const Elem * find_element(const Point & p,
-                            const std::set<subdomain_id_type> * subdomain_ids = libmesh_nullptr) const;
+                            const std::set<subdomain_id_type> * subdomain_ids = nullptr) const;
+
+  /**
+   * \returns All elements that are close to a point \p p.
+   *
+   * This is similar to \p find_element() but covers cases where \p p
+   * is on the boundary.
+   */
+  std::set<const Elem *> find_elements(const Point & p,
+                                       const std::set<subdomain_id_type> * subdomain_ids = nullptr) const;
 
   /**
    * The equation systems handler, from which

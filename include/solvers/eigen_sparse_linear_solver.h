@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -30,8 +30,8 @@
 #include "libmesh/linear_solver.h"
 #include "libmesh/eigen_sparse_vector.h"
 #include "libmesh/eigen_sparse_matrix.h"
+#include "libmesh/enum_convergence_flags.h" // The build_map() function uses these.
 
-// C++ includes
 
 namespace libMesh
 {
@@ -51,8 +51,7 @@ public:
   /**
    *  Constructor. Initializes Eigen data structures
    */
-  EigenSparseLinearSolver (const libMesh::Parallel::Communicator & comm_in
-                           LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
+  EigenSparseLinearSolver (const libMesh::Parallel::Communicator & comm_in);
 
   /**
    * Destructor.
@@ -62,12 +61,12 @@ public:
   /**
    * Release all memory and clear data structures.
    */
-  virtual void clear () libmesh_override;
+  virtual void clear () override;
 
   /**
    * Initialize data structures if not done so already.
    */
-  virtual void init (const char * name=libmesh_nullptr) libmesh_override;
+  virtual void init (const char * name=nullptr) override;
 
   /**
    * Call the Eigen solver
@@ -77,7 +76,7 @@ public:
          NumericVector<T> & solution,
          NumericVector<T> & rhs,
          const double tol,
-         const unsigned int m_its) libmesh_override;
+         const unsigned int m_its) override;
 
   /**
    * Call the Eigen solver to solve A^T x = b
@@ -87,7 +86,7 @@ public:
                  NumericVector<T> & solution,
                  NumericVector<T> & rhs,
                  const double tol,
-                 const unsigned int m_its) libmesh_override;
+                 const unsigned int m_its) override;
 
   /**
    * Call the Eigen solver
@@ -98,7 +97,7 @@ public:
          NumericVector<T> & solution,
          NumericVector<T> & rhs,
          const double tol,
-         const unsigned int m_its) libmesh_override;
+         const unsigned int m_its) override;
 
   /**
    * This function solves a system whose matrix is a shell matrix.
@@ -108,7 +107,7 @@ public:
          NumericVector<T> & solution_in,
          NumericVector<T> & rhs_in,
          const double tol,
-         const unsigned int m_its) libmesh_override;
+         const unsigned int m_its) override;
 
   /**
    * This function solves a system whose matrix is a shell matrix, but
@@ -121,12 +120,12 @@ public:
          NumericVector<T> & solution_in,
          NumericVector<T> & rhs_in,
          const double tol,
-         const unsigned int m_its) libmesh_override;
+         const unsigned int m_its) override;
 
   /**
-   * Returns the solver's convergence flag
+   * \returns The solver's convergence flag
    */
-  virtual LinearConvergenceReason get_converged_reason() const libmesh_override;
+  virtual LinearConvergenceReason get_converged_reason() const override;
 
 private:
 
@@ -148,7 +147,7 @@ private:
   static std::map<Eigen::ComputationInfo, LinearConvergenceReason> _convergence_reasons;
 
   /**
-   * Static function used to initialize _covergence_reasons map
+   * Static function used to initialize _convergence_reasons map
    */
   static std::map<Eigen::ComputationInfo, LinearConvergenceReason> build_map()
   {

@@ -21,13 +21,14 @@
 #define LIBMESH_RB_EIM_EVALUATION_H
 
 // libMesh includes
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
 #include "libmesh/point.h"
 #include "libmesh/rb_evaluation.h"
-#include "libmesh/serial_mesh.h"
+#include "libmesh/replicated_mesh.h"
 #include "libmesh/rb_theta_expansion.h"
 
 // C++ includes
+#include <memory>
 
 namespace libMesh
 {
@@ -55,8 +56,7 @@ public:
   /**
    * Constructor.
    */
-  RBEIMEvaluation (const libMesh::Parallel::Communicator & comm_in
-                   LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
+  RBEIMEvaluation (const libMesh::Parallel::Communicator & comm_in);
 
   /**
    * Destructor.
@@ -71,14 +71,14 @@ public:
   /**
    * Clear this object.
    */
-  virtual void clear() libmesh_override;
+  virtual void clear() override;
 
   /**
    * Resize the data structures for storing data associated
    * with this object.
    */
   virtual void resize_data_structures(const unsigned int Nmax,
-                                      bool resize_error_bound_data=true) libmesh_override;
+                                      bool resize_error_bound_data=true) override;
 
   /**
    * Attach the parametrized function that we will approximate
@@ -96,10 +96,10 @@ public:
   /**
    * Get a writable reference to the interpolation points mesh.
    */
-  SerialMesh & get_interpolation_points_mesh();
+  ReplicatedMesh & get_interpolation_points_mesh();
 
   /**
-   * @return the value of the parametrized function that is being
+   * \returns The value of the parametrized function that is being
    * approximated at the point \p p.
    * \p var_index specifies the
    * variable (i.e. the parametrized function index) to be evaluated.
@@ -113,9 +113,9 @@ public:
    * Calculate the EIM approximation to parametrized_function
    * using the first \p N EIM basis functions. Store the
    * solution coefficients in the member RB_solution.
-   * @return the EIM a posteriori error bound.
+   * \returns The EIM a posteriori error bound.
    */
-  virtual Real rb_solve(unsigned int N) libmesh_override;
+  virtual Real rb_solve(unsigned int N) override;
 
   /**
    * Calculate the EIM approximation for the given
@@ -125,6 +125,12 @@ public:
   void rb_solve(DenseVector<Number> & EIM_rhs);
 
   /**
+   * \returns A scaling factor that we can use to provide a consistent
+   * scaling of the RB error bound across different parameter values.
+   */
+  virtual Real get_error_bound_normalization() override;
+
+  /**
    * Build a vector of RBTheta objects that accesses the components
    * of the RB_solution member variable of this RBEvaluation.
    * Store these objects in the member vector rb_theta_objects.
@@ -132,33 +138,35 @@ public:
   void initialize_eim_theta_objects();
 
   /**
-   * @return the vector of theta objects that point to this RBEIMEvaluation.
+   * \returns The vector of theta objects that point to this RBEIMEvaluation.
    */
-  std::vector<RBTheta *> get_eim_theta_objects();
+  std::vector<std::unique_ptr<RBTheta>> & get_eim_theta_objects();
 
   /**
    * Build a theta object corresponding to EIM index \p index.
    * The default implementation builds an RBEIMTheta object, possibly
    * override in subclasses if we need more specialized behavior.
    */
-  virtual UniquePtr<RBTheta> build_eim_theta(unsigned int index);
+  virtual std::unique_ptr<RBTheta> build_eim_theta(unsigned int index);
 
   /**
    * Write out all the data to text files in order to segregate the
    * Offline stage from the Online stage.
-   * Note: This is a legacy method, use RBDataSerialization instead.
+   *
+   * \note This is a legacy method, use RBDataSerialization instead.
    */
   virtual void legacy_write_offline_data_to_files(const std::string & directory_name = "offline_data",
-                                                  const bool write_binary_data=true) libmesh_override;
+                                                  const bool write_binary_data=true) override;
 
   /**
    * Read in the saved Offline reduced basis data
    * to initialize the system for Online solves.
-   * Note: This is a legacy method, use RBDataSerialization instead.
+   *
+   * \note This is a legacy method, use RBDataSerialization instead.
    */
   virtual void legacy_read_offline_data_from_files(const std::string & directory_name = "offline_data",
                                                    bool read_error_bound_data=true,
-                                                   const bool read_binary_data=true) libmesh_override;
+                                                   const bool read_binary_data=true) override;
 
   //----------- PUBLIC DATA MEMBERS -----------//
 
@@ -186,21 +194,6 @@ public:
    */
   std::vector<Elem *> interpolation_points_elem;
 
-  /**
-   * We also need an extra interpolation point and associated
-   * variable and Elem for the "extra" solve we do at the end of
-   * the Greedy algorithm.
-   */
-  Point extra_interpolation_point;
-  unsigned int extra_interpolation_point_var;
-  Elem * extra_interpolation_point_elem;
-
-  /**
-   * We also need a DenseVector to represent the corresponding
-   * "extra" row of the interpolation matrix.
-   */
-  DenseVector<Number> extra_interpolation_matrix_row;
-
 private:
 
   /**
@@ -224,7 +217,7 @@ private:
    * The vector of RBTheta objects that are created to point to
    * this RBEIMEvaluation.
    */
-  std::vector<RBTheta *> _rb_eim_theta_objects;
+  std::vector<std::unique_ptr<RBTheta>> _rb_eim_theta_objects;
 
   /**
    * We initialize RBEIMEvaluation so that it has an "empty" RBThetaExpansion, because
@@ -254,7 +247,7 @@ private:
    * Mesh object that we use to store copies of the elements associated with
    * interpolation points.
    */
-  SerialMesh _interpolation_points_mesh;
+  ReplicatedMesh _interpolation_points_mesh;
 
 };
 

@@ -185,6 +185,40 @@ data = [
 # 2016
     '2016-01-04', 849, 180538,
     '2016-02-04', 846, 182244,
+    '2016-03-04', 846, 182727,
+    '2016-04-04', 849, 183261,
+    '2016-05-04', 849, 183393,
+    '2016-06-04', 853, 184649,
+    '2016-07-04', 839, 183363,
+    '2016-08-04', 837, 183308,
+    '2016-09-04', 842, 183850,
+    '2016-10-04', 847, 184879,
+    '2016-11-04', 850, 185408,
+    '2016-12-04', 853, 185683,
+# 2017
+    '2017-01-04', 853, 185885,
+    '2017-02-04', 853, 186246,
+    '2017-03-04', 850, 184993,
+    '2017-04-04', 856, 185906,
+    '2017-05-04', 855, 186311,
+    '2017-06-04', 855, 186441,
+    '2017-07-04', 856, 186664,
+    '2017-08-04', 856, 186707,
+    '2017-09-04', 856, 186793,
+    '2017-10-04', 856, 187211,
+    '2017-11-04', 861, 186893,
+    '2017-12-04', 863, 187335,
+# 2018
+    '2018-01-04', 862, 186607,
+    '2018-02-04', 862, 186902,
+    '2018-03-04', 862, 187127,
+    '2018-04-04', 862, 186557,
+    '2018-05-04', 879, 186594,
+    '2018-06-04', 880, 186738,
+    '2018-07-04', 882, 189241,
+    '2018-08-04', 884, 189659,
+    '2018-09-04', 884, 190046,
+    '2018-10-04', 886, 190234,
        ]
 
 # Extract the dates from the data array
@@ -204,18 +238,21 @@ n_lines = data[2::3]
 # Get a reference to the figure
 fig = plt.figure()
 
-# 111 is equivalent to Matlab's subplot(1,1,1) command
+# 111 is equivalent to Matlab's subplot(1,1,1) command.
+# The colors used come from sns.color_palette("muted").as_hex() They
+# are the "same basic order of hues as the default matplotlib color
+# cycle but more attractive colors."
 ax1 = fig.add_subplot(111)
-ax1.plot(date_nums, n_files, 'bo-')
+ax1.plot(date_nums, n_files, color=u'#4878cf', marker='o', linestyle='-', markersize=3)
 ax1.set_ylabel('Files (blue circles)')
 
 # Set up x-tick locations
-ticks_names = ['2003-03-04', '2007-03-04', '2011-03-04', '2015-01-04']
+ticks_names = ['2003', '2005', '2007', '2009', '2011', '2013', '2015', '2017']
 
 # Get numerical values for the names
 tick_nums = []
 for x in ticks_names:
-  tick_nums.append(date2num(datetime.strptime(x, '%Y-%m-%d')))
+  tick_nums.append(date2num(datetime.strptime(x + '-03-04', '%Y-%m-%d')))
 
 # Set tick labels and positions
 ax1.set_xticks(tick_nums)
@@ -223,7 +260,7 @@ ax1.set_xticklabels(ticks_names)
 
 # Use the twinx() command to plot more data on the other axis
 ax2 = ax1.twinx()
-ax2.plot(date_nums, np.divide(n_lines, 1000.), 'gs-')
+ax2.plot(date_nums, np.divide(n_lines, 1000.), color=u'#6acc65', marker='s', linestyle='-', markersize=3)
 ax2.set_ylabel('Lines of code in thousands (green squares)')
 
 # Create linear curve fits of the data

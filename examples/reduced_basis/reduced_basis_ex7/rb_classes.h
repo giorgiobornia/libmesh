@@ -20,9 +20,9 @@
 #ifndef RB_CLASSES_H
 #define RB_CLASSES_H
 
+// libMesh includes
 #include "libmesh/rb_construction.h"
 #include "libmesh/fe_base.h"
-#include "libmesh/auto_ptr.h"
 #include "libmesh/rb_evaluation.h"
 
 // local include
@@ -87,7 +87,7 @@ public:
   /**
    * Destructor.
    */
-  virtual ~SimpleRBConstruction () { delete acoustics_rb_assembly_expansion; }
+  virtual ~SimpleRBConstruction () {}
 
   /**
    * The type of system.
@@ -108,7 +108,8 @@ public:
 
     Parent::init_data();
 
-    acoustics_rb_assembly_expansion = new AcousticsRBAssemblyExpansion;
+    acoustics_rb_assembly_expansion.reset
+      (new AcousticsRBAssemblyExpansion);
 
     // Set the rb_assembly_expansion for this Construction object.
     // The theta expansion comes from the RBEvaluation object.
@@ -126,13 +127,13 @@ public:
     // For efficiency, we should prerequest all
     // the data we will need to build the
     // linear system before doing an element loop.
-    FEBase * elem_fe = libmesh_nullptr;
+    FEBase * elem_fe = nullptr;
     c.get_element_fe(p_var, elem_fe);
     elem_fe->get_JxW();
     elem_fe->get_phi();
     elem_fe->get_dphi();
 
-    FEBase * side_fe = libmesh_nullptr;
+    FEBase * side_fe = nullptr;
     c.get_side_fe(p_var, side_fe);
     side_fe->get_JxW();
     side_fe->get_phi();
@@ -148,7 +149,7 @@ public:
    * i.e. the objects that define how to assemble the set of parameter-independent
    * operators in the affine expansion of the PDE.
    */
-  AcousticsRBAssemblyExpansion * acoustics_rb_assembly_expansion;
+  std::unique_ptr<AcousticsRBAssemblyExpansion> acoustics_rb_assembly_expansion;
 };
 
 #endif

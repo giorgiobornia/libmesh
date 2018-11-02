@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -24,24 +24,30 @@
 namespace libMesh
 {
 
-
-UniquePtr<Elem> Edge::side (const unsigned int i) const
+unsigned int Edge::which_node_am_i(unsigned int side,
+                                   unsigned int /*side_node*/) const
 {
-  libmesh_assert_less (i, 2);
-  const Elem * the_parent = this;
-  Elem * nodeelem = new NodeElem(const_cast<Elem *>(the_parent));
-  nodeelem->set_node(0) = this->get_node(i);
-  return UniquePtr<Elem>(nodeelem);
+  libmesh_assert_less (side, this->n_sides());
+  return side;
 }
 
 
-UniquePtr<Elem> Edge::build_side (const unsigned int i, bool) const
+
+std::unique_ptr<Elem> Edge::side_ptr (const unsigned int i)
 {
   libmesh_assert_less (i, 2);
-  const Elem * the_parent = this;
-  Elem * nodeelem = new NodeElem(const_cast<Elem *>(the_parent));
-  nodeelem->set_node(0) = this->get_node(i);
-  return UniquePtr<Elem>(nodeelem);
+  std::unique_ptr<Elem> nodeelem = libmesh_make_unique<NodeElem>(this);
+  nodeelem->set_node(0) = this->node_ptr(i);
+  return nodeelem;
+}
+
+
+std::unique_ptr<Elem> Edge::build_side_ptr (const unsigned int i, bool)
+{
+  libmesh_assert_less (i, 2);
+  std::unique_ptr<Elem> nodeelem = libmesh_make_unique<NodeElem>(this);
+  nodeelem->set_node(0) = this->node_ptr(i);
+  return nodeelem;
 }
 
 
@@ -74,6 +80,11 @@ unsigned int Edge::opposite_node(const unsigned int node_in,
   return 1 - node_in;
 }
 
-
+std::vector<unsigned>
+Edge::nodes_on_side(const unsigned int s) const
+{
+  libmesh_assert_less(s, 2);
+  return {s};
+}
 
 } // namespace libMesh

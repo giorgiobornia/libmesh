@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -31,15 +31,19 @@
 // Simo & Laursen (1992). For the sake of simplicity, in this example we assume that contact
 // nodes are perfectly aligned (this assumption can be eliminated relatively easily).
 //
-// The mesh in this example consists of two disconnected cylinders. We impose a displacement
-// boundary condition of -1 in the z-direction on the top cylinder in order to impose contact.
+// The mesh in this example consists of two disconnected cylinders. We add edge elements into
+// the mesh in order to ensure correct parallel communication of data on contact surfaces,
+// and also so that we do not have to manually augment the sparsity pattern.
+
+//  We impose a displacement boundary condition of -1 in the z-direction on the top cylinder
+// in order to impose contact.
 
 // C++ include files that we need
 #include <iostream>
 
 // libMesh includes
 #include "libmesh/libmesh.h"
-#include "libmesh/serial_mesh.h"
+#include "libmesh/replicated_mesh.h"
 #include "libmesh/exodusII_io.h"
 #include "libmesh/equation_systems.h"
 #include "libmesh/dof_map.h"
@@ -51,6 +55,7 @@
 #include "libmesh/nonlinear_solver.h"
 #include "libmesh/nonlinear_implicit_system.h"
 #include "libmesh/petsc_macro.h"
+#include "libmesh/enum_solver_package.h"
 
 // Local includes
 #include "linear_elasticity_with_contact.h"
@@ -61,14 +66,16 @@ int main (int argc, char ** argv)
 {
   LibMeshInit init (argc, argv);
 
+  // This example uses an ExodusII input file
+#ifndef LIBMESH_HAVE_EXODUS_API
+  libmesh_example_requires(false, "--enable-exodus");
+#endif
+
+  // We use a 3D domain.
+  libmesh_example_requires(LIBMESH_DIM > 2, "--disable-1D-only --disable-2D-only");
+
   // This example requires the PETSc nonlinear solvers
   libmesh_example_requires(libMesh::default_solver_package() == PETSC_SOLVERS, "--enable-petsc");
-
-  // This example requires PETSc >= 3.5.0 since it uses
-  // PetscMatrix::update_preallocation_and_zero().
-#if PETSC_VERSION_LESS_THAN(3,5,0)
-  libmesh_example_requires(false, "PETSc >= 3.5.0");
-#endif
 
   GetPot infile("systems_of_equations_ex8.in");
   const std::string approx_order = infile("approx_order", "FIRST");
@@ -84,7 +91,7 @@ int main (int argc, char ** argv)
   const Real gap_function_tol = infile("gap_function_tol", 1.e-8);
 
   // This example code has not been written to cope with a distributed mesh
-  SerialMesh mesh(init.comm());
+  ReplicatedMesh mesh(init.comm());
   mesh.read("systems_of_equations_ex8.exo");
 
   mesh.print_info();
@@ -144,7 +151,11 @@ int main (int argc, char ** argv)
 
     ZeroFunction<Number> zero;
 
-    system.get_dof_map().add_dirichlet_boundary(DirichletBoundary (clamped_boundaries, uvw, &zero));
+    // Most DirichletBoundary users will want to supply a "locally
+    // indexed" functor
+    system.get_dof_map().add_dirichlet_boundary
+      (DirichletBoundary (clamped_boundaries, uvw, zero,
+                          LOCAL_VARIABLE_ORDER));
   }
   {
     std::set<boundary_id_type> clamped_boundaries;
@@ -156,7 +167,9 @@ int main (int argc, char ** argv)
 
     ZeroFunction<Number> zero;
 
-    system.get_dof_map().add_dirichlet_boundary(DirichletBoundary (clamped_boundaries, uv, &zero));
+    system.get_dof_map().add_dirichlet_boundary
+      (DirichletBoundary (clamped_boundaries, uv, zero,
+                          LOCAL_VARIABLE_ORDER));
   }
   {
     std::set<boundary_id_type> clamped_boundaries;
@@ -167,13 +180,19 @@ int main (int argc, char ** argv)
 
     ConstFunction<Number> neg_one(-1.);
 
-    system.get_dof_map().add_dirichlet_boundary(DirichletBoundary (clamped_boundaries, w, &neg_one));
+    system.get_dof_map().add_dirichlet_boundary
+      (DirichletBoundary (clamped_boundaries, w, neg_one,
+                          LOCAL_VARIABLE_ORDER));
   }
 
   le.initialize_contact_load_paths();
 
-  // The augment_sparsity object was initialized in initialize_contact_load_paths.
-  system.get_dof_map().attach_extra_sparsity_object(le.get_augment_sparsity());
+  libMesh::out << "Mesh before adding edge connectors" << std::endl;
+  mesh.print_info();
+  le.add_contact_edge_elements();
+
+  libMesh::out << "Mesh after adding edge connectors" << std::endl;
+  mesh.print_info();
 
   equation_systems.init();
   equation_systems.print_info();
@@ -182,9 +201,16 @@ int main (int argc, char ** argv)
 
   Real current_max_gap_function = std::numeric_limits<Real>::max();
 
-  unsigned int outer_iteration = 0;
-  while (current_max_gap_function > gap_function_tol)
+  const unsigned int max_outer_iterations = 10;
+  for (unsigned int outer_iteration = 0;
+       outer_iteration != max_outer_iterations; ++outer_iteration)
     {
+      if (current_max_gap_function <= gap_function_tol)
+        {
+          libMesh::out << "Outer loop converged" << std::endl;
+          break;
+        }
+
       libMesh::out << "Starting outer iteration " << outer_iteration << std::endl;
 
       // Perform inner iteration (i.e. Newton's method loop)
@@ -206,8 +232,6 @@ int main (int argc, char ** argv)
                    << std::endl;
 
       current_max_gap_function = std::max(std::abs(least_gap_fn), std::abs(max_gap_fn));
-
-      outer_iteration++;
     }
 
   libMesh::out << "Computing stresses..." << std::endl;

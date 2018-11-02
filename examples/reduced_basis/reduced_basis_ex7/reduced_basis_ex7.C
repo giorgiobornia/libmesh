@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -51,6 +51,7 @@
 #include "libmesh/elem.h"
 #include "libmesh/rb_data_serialization.h"
 #include "libmesh/rb_data_deserialization.h"
+#include "libmesh/enum_solver_package.h"
 
 // local includes
 #include "rb_classes.h"
@@ -144,14 +145,11 @@ int main (int argc, char** argv)
       // Compute the reduced basis space by computing "snapshots", i.e.
       // "truth" solves, at well-chosen parameter values and employing
       // these snapshots as basis functions.
-#ifdef LIBMESH_ENABLE_EXCEPTIONS
-      try
+      libmesh_try
         {
-#endif
           rb_con.train_reduced_basis();
-#ifdef LIBMESH_ENABLE_EXCEPTIONS
         }
-      catch (LogicError & e)
+      libmesh_catch (LogicError & e)
         {
           libMesh::err << "\n\n"
                        << "********************************************************************************\n"
@@ -159,9 +157,8 @@ int main (int argc, char** argv)
                        << "Try running with -ksp_type preonly -pc_type lu instead.\n"
                        << "********************************************************************************"
                        << std::endl;
-          return 1;
+          return 77;
         }
-#endif
 
       // Write out the data that will subsequently be required for the Evaluation stage
 #if defined(LIBMESH_HAVE_CAPNPROTO)

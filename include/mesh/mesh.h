@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,14 +22,15 @@
 #include "libmesh/libmesh_config.h"
 
 #ifdef LIBMESH_ENABLE_PARMESH
-#include "libmesh/parallel_mesh.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
+#include "libmesh/distributed_mesh.h"
 namespace libMesh {
-typedef ParallelMesh DefaultMesh;
+typedef DistributedMesh DefaultMesh;
 }
 #else
-#include "libmesh/serial_mesh.h"
+#include "libmesh/replicated_mesh.h"
 namespace libMesh {
-typedef SerialMesh DefaultMesh;
+typedef ReplicatedMesh DefaultMesh;
 }
 #endif
 
@@ -37,11 +38,15 @@ namespace libMesh
 {
 
 // Forward declarations don't like typedefs...
-// typedef SerialMesh Mesh;
+// typedef ReplicatedMesh Mesh;
 
 /**
- * The \p Mesh class is a thin wrapper, around the \p SerialMesh class
- * by default.
+ * The \p Mesh class is a thin wrapper, around the \p ReplicatedMesh
+ * class by default.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2002
+ * \brief Manages a collection of Nodes and Elems.
  */
 class Mesh : public DefaultMesh
 {
@@ -57,17 +62,6 @@ public:
         unsigned char dim=1)
     : DefaultMesh(comm_in,dim) {}
 
-#ifndef LIBMESH_DISABLE_COMMWORLD
-  /**
-   * Deprecated constructor.  Takes \p dim, the dimension of the mesh.
-   * The mesh dimension can be changed (and may automatically be
-   * changed by mesh generation/loading) later.
-   */
-  explicit
-  Mesh (unsigned char dim=1)
-    : DefaultMesh(dim) {}
-#endif
-
   /**
    * Copy-constructor.  This should be able to take a
    * serial or parallel mesh.
@@ -75,9 +69,17 @@ public:
   Mesh (const UnstructuredMesh & other_mesh) : DefaultMesh(other_mesh) {}
 
   /**
-   * Destructor.
+   * Default copy/move constructors and destructor.
    */
-  ~Mesh() {}
+  Mesh(const Mesh &) = default;
+  Mesh(Mesh &&) = default;
+  ~Mesh() = default;
+
+  /**
+   * Copy and move assignment are not allowed.
+   */
+  Mesh & operator= (const Mesh &) = delete;
+  Mesh & operator= (Mesh &&) = delete;
 };
 
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -40,7 +40,7 @@ namespace libMesh
 // FroIO  members
 void FroIO::write (const std::string & fname)
 {
-  // We may need to gather a ParallelMesh to output it, making that
+  // We may need to gather a DistributedMesh to output it, making that
   // const qualifier in our constructor a dirty lie
   MeshSerializer serialize(const_cast<MeshBase &>(this->mesh()), !_is_parallel_format);
 
@@ -73,25 +73,23 @@ void FroIO::write (const std::string & fname)
                    << 0. << '\n';
 
       // Write the elements -- 1-based!
-      MeshBase::const_element_iterator       it  = the_mesh.active_elements_begin();
-      const MeshBase::const_element_iterator end = the_mesh.active_elements_end();
-
-      for (unsigned int e=0 ; it != end; ++it)
+      unsigned int e = 0;
+      for (const auto & elem : the_mesh.active_element_ptr_range())
         {
           // .fro likes TRI3's
-          if ((*it)->type() != TRI3)
+          if (elem->type() != TRI3)
             libmesh_error_msg("ERROR:  .fro format only valid for triangles!\n" \
                               << "  writing of " << fname << " aborted.");
 
           out_stream << ++e << " \t";
 
-          for (unsigned int n=0; n<(*it)->n_nodes(); n++)
-            out_stream << (*it)->node(n)+1 << " \t";
+          for (unsigned int n=0; n<elem->n_nodes(); n++)
+            out_stream << elem->node_id(n)+1 << " \t";
 
           //   // LHS -> RHS Mapping, for inverted triangles
-          //   out_stream << (*it)->node(0)+1 << " \t";
-          //   out_stream << (*it)->node(2)+1 << " \t";
-          //   out_stream << (*it)->node(1)+1 << " \t";
+          //   out_stream << elem->node_id(0)+1 << " \t";
+          //   out_stream << elem->node_id(2)+1 << " \t";
+          //   out_stream << elem->node_id(1)+1 << " \t";
 
           out_stream << "1\n";
         }
@@ -101,18 +99,13 @@ void FroIO::write (const std::string & fname)
         const std::set<boundary_id_type> & bc_ids =
           the_mesh.get_boundary_info().get_boundary_ids();
 
-        std::vector<dof_id_type>        el;
-        std::vector<unsigned short int> sl;
-        std::vector<boundary_id_type>   il;
-
-        the_mesh.get_boundary_info().build_side_list (el, sl, il);
-
+        // Build a list of (elem, side, bc) tuples.
+        auto bc_triples = the_mesh.get_boundary_info().build_side_list();
 
         // Map the boundary ids into [1,n_bc_ids],
         // treat them one at a time.
         boundary_id_type bc_id=0;
-        for (std::set<boundary_id_type>::const_iterator id = bc_ids.begin();
-             id != bc_ids.end(); ++id)
+        for (const auto & id : bc_ids)
           {
             std::deque<dof_id_type> node_list;
 
@@ -120,8 +113,8 @@ void FroIO::write (const std::string & fname)
               forward_edges, backward_edges;
 
             // Get all sides on this element with the relevant BC id.
-            for (std::size_t e=0; e<el.size(); e++)
-              if (il[e] == *id)
+            for (const auto & t : bc_triples)
+              if (std::get<2>(t) == id)
                 {
                   // need to build up node_list as a sorted array of edge nodes...
                   // for the following:
@@ -133,16 +126,17 @@ void FroIO::write (const std::string & fname)
                   // a---b b---c c---d d---e
                   // and piece them together.
                   //
-                  // so, for an arbitray edge n0---n1, we build the
+                  // so, for an arbitrary edge n0---n1, we build the
                   // "forward_edges"  map n0-->n1
                   // "backward_edges" map n1-->n0
                   // and then start with one chain link, and add on...
                   //
-                  UniquePtr<Elem> side = the_mesh.elem(el[e])->build_side(sl[e]);
+                  std::unique_ptr<const Elem> side =
+                    the_mesh.elem_ref(std::get<0>(t)).build_side_ptr(std::get<1>(t));
 
                   const dof_id_type
-                    n0 = side->node(0),
-                    n1 = side->node(1);
+                    n0 = side->node_id(0),
+                    n1 = side->node_id(1);
 
                   // insert into forward-edge set
                   forward_edges.insert (std::make_pair(n0, n1));
@@ -173,8 +167,7 @@ void FroIO::write (const std::string & fname)
 
                 // look for front_pair in the backward_edges list
                 {
-                  std::map<dof_id_type, dof_id_type>::iterator
-                    pos = backward_edges.find(front_node);
+                  auto pos = backward_edges.find(front_node);
 
                   if (pos != backward_edges.end())
                     {
@@ -186,8 +179,7 @@ void FroIO::write (const std::string & fname)
 
                 // look for back_pair in the forward_edges list
                 {
-                  std::map<dof_id_type, dof_id_type>::iterator
-                    pos = forward_edges.find(back_node);
+                  auto pos = forward_edges.find(back_node);
 
                   if (pos != forward_edges.end())
                     {
@@ -196,17 +188,12 @@ void FroIO::write (const std::string & fname)
                       forward_edges.erase(pos);
                     }
                 }
-
-                // libMesh::out << "node_list.size()=" << node_list.size()
-                //       << ", n_edges+1=" << n_edges+1 << std::endl;
               }
-
 
             out_stream << ++bc_id << " " << node_list.size() << '\n';
 
-            std::deque<dof_id_type>::iterator pos = node_list.begin();
-            for ( ; pos != node_list.end(); ++pos)
-              out_stream << *pos+1 << " \t0\n";
+            for (const auto & node_id : node_list)
+              out_stream << node_id + 1 << " \t0\n";
           }
       }
     }

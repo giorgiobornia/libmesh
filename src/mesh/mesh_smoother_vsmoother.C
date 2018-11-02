@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -18,18 +18,19 @@
 #include "libmesh/libmesh_config.h"
 #ifdef LIBMESH_ENABLE_VSMOOTHER
 
-// C++ includes
-#include <time.h> // for clock_t, clock()
-#include <cstdlib> // *must* precede <cmath> for proper std:abs() on PGI, Sun Studio CC
-#include <cmath>
-#include <iomanip>
-
 // Local includes
 #include "libmesh/mesh_smoother_vsmoother.h"
 #include "libmesh/mesh_tools.h"
 #include "libmesh/elem.h"
 #include "libmesh/unstructured_mesh.h"
 #include "libmesh/utility.h"
+
+// C++ includes
+#include <time.h> // for clock_t, clock()
+#include <cstdlib> // *must* precede <cmath> for proper std:abs() on PGI, Sun Studio CC
+#include <cmath>
+#include <iomanip>
+#include <limits>
 
 namespace libMesh
 {
@@ -49,7 +50,7 @@ VariationalMeshSmoother::VariationalMeshSmoother(UnstructuredMesh & mesh,
   MeshSmoother(mesh),
   _percent_to_move(1),
   _dist_norm(0.),
-  _adapt_data(libmesh_nullptr),
+  _adapt_data(nullptr),
   _dim(mesh.mesh_dimension()),
   _miniter(miniter),
   _maxiter(maxiter),
@@ -61,7 +62,7 @@ VariationalMeshSmoother::VariationalMeshSmoother(UnstructuredMesh & mesh,
   _n_nodes(0),
   _n_cells(0),
   _n_hanging_edges(0),
-  _area_of_interest(libmesh_nullptr)
+  _area_of_interest(nullptr)
 {}
 
 
@@ -89,7 +90,7 @@ VariationalMeshSmoother::VariationalMeshSmoother(UnstructuredMesh & mesh,
   _n_nodes(0),
   _n_cells(0),
   _n_hanging_edges(0),
-  _area_of_interest(libmesh_nullptr)
+  _area_of_interest(nullptr)
 {}
 
 
@@ -225,27 +226,25 @@ int VariationalMeshSmoother::writegr(const Array2D<double> & R)
 
   // Adjust nodal coordinates to new positions
   {
-    MeshBase::node_iterator       it  = _mesh.nodes_begin();
-    const MeshBase::node_iterator end = _mesh.nodes_end();
-
     libmesh_assert_equal_to(_dist_norm, 0.);
     _dist_norm = 0;
-    for (int i=0; it!=end; ++it)
+    int i = 0;
+    for (auto & node : _mesh.node_ptr_range())
       {
         double total_dist = 0.;
+
+        // Get a reference to the node
+        Node & node_ref = *node;
 
         // For each node set its X Y [Z] coordinates
         for (unsigned int j=0; j<_dim; j++)
           {
-            // Get a reference to the node
-            Node & node = *(*it);
-
-            double distance = R[i][j] - node(j);
+            double distance = R[i][j] - node_ref(j);
 
             // Save the squares of the distance
             total_dist += Utility::pow<2>(distance);
 
-            node(j) += distance*_percent_to_move;
+            node_ref(j) += distance * _percent_to_move;
           }
 
         libmesh_assert_greater_equal (total_dist, 0.);
@@ -274,36 +273,34 @@ int VariationalMeshSmoother::readgr(Array2D<double> & R,
                                     std::vector<int> & edges,
                                     std::vector<int> & hnodes)
 {
-  libMesh::out << "Sarting readgr" << std::endl;
+  libMesh::out << "Starting readgr" << std::endl;
   // add error messages where format can be inconsistent
 
-  // Find the boundary nodes
-  std::vector<bool> on_boundary;
-  MeshTools::find_boundary_nodes(_mesh, on_boundary);
+  // Create a quickly-searchable list of boundary nodes.
+  std::unordered_set<dof_id_type> boundary_node_ids =
+    MeshTools::find_boundary_nodes (_mesh);
 
   // Grab node coordinates and set mask
   {
-    MeshBase::const_node_iterator       it  = _mesh.nodes_begin();
-    const MeshBase::const_node_iterator end = _mesh.nodes_end();
-
     // Only compute the node to elem map once
-    std::vector<std::vector<const Elem *> > nodes_to_elem_map;
+    std::unordered_map<dof_id_type, std::vector<const Elem *>> nodes_to_elem_map;
     MeshTools::build_nodes_to_elem_map(_mesh, nodes_to_elem_map);
 
-    for (int i=0; it != end; ++it)
+    int i = 0;
+    for (auto & node : _mesh.node_ptr_range())
       {
         // Get a reference to the node
-        Node & node = *(*it);
+        Node & node_ref = *node;
 
         // For each node grab its X Y [Z] coordinates
         for (unsigned int j=0; j<_dim; j++)
-          R[i][j] = node(j);
+          R[i][j] = node_ref(j);
 
         // Set the Proper Mask
         // Internal nodes are 0
         // Immovable boundary nodes are 1
         // Movable boundary nodes are 2
-        if (on_boundary[i])
+        if (boundary_node_ids.count(i))
           {
             // Only look for sliding edge nodes in 2D
             if (_dim == 2)
@@ -311,14 +308,14 @@ int VariationalMeshSmoother::readgr(Array2D<double> & R,
                 // Find all the nodal neighbors... that is the nodes directly connected
                 // to this node through one edge
                 std::vector<const Node *> neighbors;
-                MeshTools::find_nodal_neighbors(_mesh, node, nodes_to_elem_map, neighbors);
+                MeshTools::find_nodal_neighbors(_mesh, node_ref, nodes_to_elem_map, neighbors);
 
                 std::vector<const Node *>::const_iterator ne = neighbors.begin();
                 std::vector<const Node *>::const_iterator ne_end = neighbors.end();
 
                 // Grab the x,y coordinates
-                Real x = node(0);
-                Real y = node(1);
+                Real x = node_ref(0);
+                Real y = node_ref(1);
 
                 // Theta will represent the atan2 angle (meaning with the proper quadrant in mind)
                 // of the neighbor node in a system where the current node is at the origin
@@ -342,16 +339,16 @@ int VariationalMeshSmoother::readgr(Array2D<double> & R,
                 mask[i] = 1;
 
                 // Search through neighbor nodes looking for two that form a straight line with this node
-                for (unsigned int a=0; a<thetas.size()-1; a++)
+                for (std::size_t a=0; a<thetas.size()-1; a++)
                   {
                     // Only try each pairing once
-                    for (unsigned int b=a+1; b<thetas.size(); b++)
+                    for (std::size_t b=a+1; b<thetas.size(); b++)
                       {
-                        // Find if the two neighbor nodes angles are 180 degrees (pi) off of eachother (withing a tolerance)
+                        // Find if the two neighbor nodes angles are 180 degrees (pi) off of each other (withing a tolerance)
                         // In order to make this a true movable boundary node... the two that forma  straight line with
                         // it must also be on the boundary
-                        if (on_boundary[neighbors[a]->id()] &&
-                            on_boundary[neighbors[b]->id()] &&
+                        if (boundary_node_ids.count(neighbors[a]->id()) &&
+                            boundary_node_ids.count(neighbors[b]->id()) &&
                             (
                              (std::abs(thetas[a] - (thetas[b] + (libMesh::pi))) < .001) ||
                              (std::abs(thetas[a] - (thetas[b] - (libMesh::pi))) < .001)
@@ -379,13 +376,9 @@ int VariationalMeshSmoother::readgr(Array2D<double> & R,
   // Grab the connectivity
   // FIXME: Generalize this!
   {
-    MeshBase::const_element_iterator it  = _mesh.active_elements_begin();
-    const MeshBase::const_element_iterator end = _mesh.active_elements_end();
-
-    for (int i=0; it != end; ++it)
+    int i = 0;
+    for (const auto & elem : _mesh.active_element_ptr_range())
       {
-        const Elem * elem = *it;
-
         // Keep track of the number of nodes
         // there must be 6 for 2D
         // 10 for 3D
@@ -408,16 +401,16 @@ int VariationalMeshSmoother::readgr(Array2D<double> & R,
                 // Grab nodes that do exist
               case 3:  // Tri
                 for (unsigned int k=0; k<elem->n_vertices(); k++)
-                  cells[i][k] = elem->node(k);
+                  cells[i][k] = elem->node_id(k);
 
                 num = elem->n_vertices();
                 break;
 
               case 4:  // Quad 4
-                cells[i][0] = elem->node(0);
-                cells[i][1] = elem->node(1);
-                cells[i][2] = elem->node(3); // Note that 2 and 3 are switched!
-                cells[i][3] = elem->node(2);
+                cells[i][0] = elem->node_id(0);
+                cells[i][1] = elem->node_id(1);
+                cells[i][2] = elem->node_id(3); // Note that 2 and 3 are switched!
+                cells[i][3] = elem->node_id(2);
                 num = 4;
                 break;
 
@@ -433,21 +426,21 @@ int VariationalMeshSmoother::readgr(Array2D<double> & R,
                 // Tet 4
               case 4:
                 for (unsigned int k=0; k<elem->n_vertices(); k++)
-                  cells[i][k] = elem->node(k);
+                  cells[i][k] = elem->node_id(k);
                 num = elem->n_vertices();
                 break;
 
                 // Hex 8
               case 8:
-                cells[i][0] = elem->node(0);
-                cells[i][1] = elem->node(1);
-                cells[i][2] = elem->node(3); // Note that 2 and 3 are switched!
-                cells[i][3] = elem->node(2);
+                cells[i][0] = elem->node_id(0);
+                cells[i][1] = elem->node_id(1);
+                cells[i][2] = elem->node_id(3); // Note that 2 and 3 are switched!
+                cells[i][3] = elem->node_id(2);
 
-                cells[i][4] = elem->node(4);
-                cells[i][5] = elem->node(5);
-                cells[i][6] = elem->node(7); // Note that 6 and 7 are switched!
-                cells[i][7] = elem->node(6);
+                cells[i][4] = elem->node_id(4);
+                cells[i][5] = elem->node_id(5);
+                cells[i][6] = elem->node_id(7); // Note that 6 and 7 are switched!
+                cells[i][7] = elem->node_id(6);
                 num=8;
                 break;
 
@@ -469,7 +462,7 @@ int VariationalMeshSmoother::readgr(Array2D<double> & R,
 
   // Grab hanging node connectivity
   {
-    std::map<dof_id_type, std::vector<dof_id_type> >::iterator
+    std::map<dof_id_type, std::vector<dof_id_type>>::iterator
       it = _hanging_nodes.begin(),
       end = _hanging_nodes.end();
 
@@ -523,9 +516,9 @@ int VariationalMeshSmoother::readmetr(std::string name,
 // Stolen from ErrorVector!
 float VariationalMeshSmoother::adapt_minimum() const
 {
-  float min = 1.e30;
+  float min = std::numeric_limits<float>::max();
 
-  for (unsigned int i=0; i<_adapt_data->size(); i++)
+  for (std::size_t i=0; i<_adapt_data->size(); i++)
     {
       // Only positive (or zero) values in the error vector
       libmesh_assert_greater_equal ((*_adapt_data)[i], 0.);
@@ -898,7 +891,7 @@ void VariationalMeshSmoother::full_smooth(Array2D<double> & R,
                                           int adp,
                                           int gr)
 {
-  // Control the amount of print statements in this funcion
+  // Control the amount of print statements in this function
   int msglev = 1;
 
   dof_id_type afun_size = 0;
@@ -1050,7 +1043,7 @@ void VariationalMeshSmoother::full_smooth(Array2D<double> & R,
         // Outrageous Enm1 to make sure we hit this at least once
         Enm1 = 99999;
 
-        // Now that we've moved the boundary nodes (or not) we need to resmoooth
+        // Now that we've moved the boundary nodes (or not) we need to resmooth
         for (int j=0; j<iter[1]; j++)
           {
             if (std::abs(emax-Enm1) < 1e-2)
@@ -1186,11 +1179,11 @@ double VariationalMeshSmoother::maxE(Array2D<double> & R,
                         basisA(Q, 6, K, H[ii], me);
 
                         std::vector<double> a1(3), a2(3);
-                        for (int k=0; k<2; k++)
+                        for (int k2=0; k2<2; k2++)
                           for (int l=0; l<6; l++)
                             {
-                              a1[k] += Q[k][l]*R[cells[ii][l]][0];
-                              a2[k] += Q[k][l]*R[cells[ii][l]][1];
+                              a1[k2] += Q[k2][l]*R[cells[ii][l]][0];
+                              a2[k2] += Q[k2][l]*R[cells[ii][l]][1];
                             }
 
                         double det = jac2(a1[0],a1[1],a2[0],a2[1]);
@@ -1387,6 +1380,8 @@ double VariationalMeshSmoother::maxE(Array2D<double> & R,
                                 K[1] = 1./3.;
                                 K[2] = 1;
                                 break;
+                              default:
+                                break;
                               }
 
                             switch (j)
@@ -1411,6 +1406,8 @@ double VariationalMeshSmoother::maxE(Array2D<double> & R,
                                 K[4] = 1./3.;
                                 K[5] = 1;
                                 break;
+                              default:
+                                break;
                               }
 
                             switch (k)
@@ -1434,6 +1431,8 @@ double VariationalMeshSmoother::maxE(Array2D<double> & R,
                                 K[6] = 0.5;
                                 K[7] = 1./3.;
                                 K[8] = 1;
+                                break;
+                              default:
                                 break;
                               }
 
@@ -1579,11 +1578,11 @@ double VariationalMeshSmoother::minq(const Array2D<double> & R,
                         basisA(Q, 6, K, H[ii], me);
 
                         std::vector<double> a1(3), a2(3);
-                        for (int k=0; k<2; k++)
+                        for (int k2=0; k2<2; k2++)
                           for (int l=0; l<6; l++)
                             {
-                              a1[k] += Q[k][l]*R[cells[ii][l]][0];
-                              a2[k] += Q[k][l]*R[cells[ii][l]][1];
+                              a1[k2] += Q[k2][l]*R[cells[ii][l]][0];
+                              a2[k2] += Q[k2][l]*R[cells[ii][l]][1];
                             }
 
                         double det = jac2(a1[0], a1[1], a2[0], a2[1]);
@@ -1777,6 +1776,8 @@ double VariationalMeshSmoother::minq(const Array2D<double> & R,
                                 K[2] = 1;
                                 break;
 
+                              default:
+                                break;
                               }
                             switch (j)
                               {
@@ -1804,6 +1805,8 @@ double VariationalMeshSmoother::minq(const Array2D<double> & R,
                                 K[5] = 1;
                                 break;
 
+                              default:
+                                break;
                               }
                             switch (k)
                               {
@@ -1829,6 +1832,9 @@ double VariationalMeshSmoother::minq(const Array2D<double> & R,
                                 K[6] = 0.5;
                                 K[7] = 1./3.;
                                 K[8] = 1;
+                                break;
+
+                              default:
                                 break;
                               }
 
@@ -1958,7 +1964,7 @@ double VariationalMeshSmoother::minJ(Array2D<double> & R,
         }
       for (unsigned index=0; index<_dim; index++)
         {
-          // initialise local matrices
+          // initialize local matrices
           for (unsigned k=0; k<3*_dim + _dim%2; k++)
             {
               F[index][k] = 0;
@@ -2041,7 +2047,7 @@ double VariationalMeshSmoother::minJ(Array2D<double> & R,
 
       for (unsigned j=0; j<_dim; j++)
         {
-          int g_i = R[ind_i][j] - 0.5*(R[ind_j][j]+R[ind_k][j]);
+          int g_i = int(R[ind_i][j] - 0.5*(R[ind_j][j]+R[ind_k][j]));
           Jpr += g_i*g_i/(2*Tau_hn);
           b[ind_i + j*_n_nodes] -= g_i/Tau_hn;
           b[ind_j + j*_n_nodes] += 0.5*g_i/Tau_hn;
@@ -2252,7 +2258,7 @@ double VariationalMeshSmoother::minJ(Array2D<double> & R,
                   int ind_k = edges[2*ii+1];
                   for (unsigned jj=0; jj<_dim; jj++)
                     {
-                      int g_i = Rpr[ind_i][jj] - 0.5*(Rpr[ind_j][jj]+Rpr[ind_k][jj]);
+                      int g_i = int(Rpr[ind_i][jj] - 0.5*(Rpr[ind_j][jj]+Rpr[ind_k][jj]));
                       J += g_i*g_i/(2*Tau_hn);
                     }
                 }
@@ -2310,7 +2316,7 @@ double VariationalMeshSmoother::minJ(Array2D<double> & R,
 
                   for (unsigned jj=0; jj<_dim; jj++)
                     {
-                      int g_i = Rpr[ind_i][jj] - 0.5*(Rpr[ind_j][jj] + Rpr[ind_k][jj]);
+                      int g_i = int(Rpr[ind_i][jj] - 0.5*(Rpr[ind_j][jj] + Rpr[ind_k][jj]));
                       J += g_i*g_i/(2*Tau_hn);
                     }
                 }
@@ -2337,11 +2343,11 @@ double VariationalMeshSmoother::minJ(Array2D<double> & R,
     }
 
   nonzero = 0;
-  for (dof_id_type j=0; j<_n_nodes; j++)
+  for (dof_id_type j2=0; j2<_n_nodes; j2++)
     for (unsigned k=0; k<_dim; k++)
       {
-        R[j][k] = R[j][k] + T*P[j][k];
-        nonzero += T*P[j][k]*T*P[j][k];
+        R[j2][k] = R[j2][k] + T*P[j2][k];
+        nonzero += T*P[j2][k]*T*P[j2][k];
       }
 
   if (msglev >= 2)
@@ -3197,6 +3203,9 @@ double VariationalMeshSmoother::localP(Array3D<double> & W,
                           K[1] = 1./3.;
                           K[2] = 1;
                           break;
+
+                        default:
+                          break;
                         }
 
                       switch (j)
@@ -3225,6 +3234,8 @@ double VariationalMeshSmoother::localP(Array3D<double> & W,
                           K[5] = 1;
                           break;
 
+                        default:
+                          break;
                         }
 
                       switch (k)
@@ -3253,6 +3264,8 @@ double VariationalMeshSmoother::localP(Array3D<double> & W,
                           K[8] = 1;
                           break;
 
+                        default:
+                          break;
                         }
 
                       if ((i==j) && (j==k))
@@ -3397,7 +3410,7 @@ double VariationalMeshSmoother::avertex(const std::vector<double> & afun,
 
 
 
-// Computes local matrics W and local rhs F on one basis
+// Computes local matrix W and local rhs F on one basis
 double VariationalMeshSmoother::vertex(Array3D<double> & W,
                                        Array2D<double> & F,
                                        const Array2D<double> & R,
@@ -3999,7 +4012,7 @@ void VariationalMeshSmoother::metr_data_gen(std::string grid,
 
   readgr(R, mask, cells, mcells, mcells, mcells);
 
-  // genetrate metric file
+  // generate metric file
   std::ofstream metric_file(metr.c_str());
   if (!metric_file.good())
     libmesh_error_msg("Error opening metric output file.");

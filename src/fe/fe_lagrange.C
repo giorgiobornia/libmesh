@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,6 +22,7 @@
 #include "libmesh/fe.h"
 #include "libmesh/fe_interface.h"
 #include "libmesh/elem.h"
+#include "libmesh/remote_elem.h"
 #include "libmesh/threads.h"
 #include "libmesh/string_to_enum.h"
 
@@ -349,12 +350,15 @@ unsigned int lagrange_n_dofs(const ElemType t, const Order o)
             return 2;
 
           case TRI3:
+          case TRISHELL3:
           case TRI3SUBDIVISION:
           case TRI6:
             return 3;
 
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             return 4;
 
@@ -401,6 +405,7 @@ unsigned int lagrange_n_dofs(const ElemType t, const Order o)
             return 6;
 
           case QUAD8:
+          case QUADSHELL8:
             return 8;
 
           case QUAD9:
@@ -456,9 +461,6 @@ unsigned int lagrange_n_dofs(const ElemType t, const Order o)
     default:
       libmesh_error_msg("ERROR: Invalid Order " << Utility::enum_to_string(o) << " selected for LAGRANGE FE family!");
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0;
 }
 
 
@@ -495,6 +497,7 @@ unsigned int lagrange_n_dofs_at_node(const ElemType t,
             }
 
           case TRI3:
+          case TRISHELL3:
           case TRI3SUBDIVISION:
           case TRI6:
             {
@@ -511,7 +514,9 @@ unsigned int lagrange_n_dofs_at_node(const ElemType t,
             }
 
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             {
               switch (n)
@@ -620,6 +625,7 @@ unsigned int lagrange_n_dofs_at_node(const ElemType t,
           case EDGE3:
           case TRI6:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
           case TET10:
           case HEX20:
@@ -657,10 +663,6 @@ unsigned int lagrange_n_dofs_at_node(const ElemType t,
     default:
       libmesh_error_msg("Unsupported order: " << o );
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0;
-
 }
 
 
@@ -689,21 +691,22 @@ void lagrange_compute_constraints (DofConstraints & constraints,
 
   // Look at the element faces.  Check to see if we need to
   // build constraints.
-  for (unsigned int s=0; s<elem->n_sides(); s++)
-    if (elem->neighbor(s) != libmesh_nullptr)
-      if (elem->neighbor(s)->level() < elem->level()) // constrain dofs shared between
-        {                                                     // this element and ones coarser
+  for (auto s : elem->side_index_range())
+    if (elem->neighbor_ptr(s) != nullptr &&
+        elem->neighbor_ptr(s) != remote_elem)
+      if (elem->neighbor_ptr(s)->level() < elem->level()) // constrain dofs shared between
+        {                                                 // this element and ones coarser
           // than this element.
           // Get pointers to the elements of interest and its parent.
           const Elem * parent = elem->parent();
 
-          // This can't happen...  Only level-0 elements have NULL
+          // This can't happen...  Only level-0 elements have nullptr
           // parents, and no level-0 elements can be at a higher
           // level than their neighbors!
           libmesh_assert(parent);
 
-          const UniquePtr<Elem> my_side     (elem->build_side(s));
-          const UniquePtr<Elem> parent_side (parent->build_side(s));
+          const std::unique_ptr<const Elem> my_side     (elem->build_side_ptr(s));
+          const std::unique_ptr<const Elem> parent_side (parent->build_side_ptr(s));
 
           // This function gets called element-by-element, so there
           // will be a lot of memory allocation going on.  We can
@@ -717,9 +720,11 @@ void lagrange_compute_constraints (DofConstraints & constraints,
           dof_map.dof_indices (parent_side.get(), parent_dof_indices,
                                variable_number);
 
-          for (unsigned int my_dof=0;
-               my_dof<FEInterface::n_dofs(Dim-1, fe_type, my_side->type());
-               my_dof++)
+          const unsigned int n_side_dofs =
+            FEInterface::n_dofs(Dim-1, fe_type, my_side->type());
+          const unsigned int n_parent_side_dofs =
+            FEInterface::n_dofs(Dim-1, fe_type, parent_side->type());
+          for (unsigned int my_dof=0; my_dof != n_side_dofs; my_dof++)
             {
               libmesh_assert_less (my_dof, my_side->n_nodes());
 
@@ -730,8 +735,7 @@ void lagrange_compute_constraints (DofConstraints & constraints,
               // we bother creating a constraint row
               bool self_constraint = false;
               for (unsigned int their_dof=0;
-                   their_dof<FEInterface::n_dofs(Dim-1, fe_type, parent_side->type());
-                   their_dof++)
+                   their_dof != n_parent_side_dofs; their_dof++)
                 {
                   libmesh_assert_less (their_dof, parent_side->n_nodes());
 
@@ -774,8 +778,7 @@ void lagrange_compute_constraints (DofConstraints & constraints,
 
               // Compute the parent's side shape function values.
               for (unsigned int their_dof=0;
-                   their_dof<FEInterface::n_dofs(Dim-1, fe_type, parent_side->type());
-                   their_dof++)
+                   their_dof != n_parent_side_dofs; their_dof++)
                 {
                   libmesh_assert_less (their_dof, parent_side->n_nodes());
 
@@ -806,7 +809,7 @@ void lagrange_compute_constraints (DofConstraints & constraints,
                 }
             }
         }
-} // lagrange_compute_constrants()
+} // lagrange_compute_constraints()
 #endif // #ifdef LIBMESH_ENABLE_AMR
 
 } // anonymous namespace

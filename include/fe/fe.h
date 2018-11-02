@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -69,7 +69,7 @@ struct FEOutputType<NEDELEC_ONE>
 
 
 /**
- * A specific instatiation of the \p FEBase class. This
+ * A specific instantiation of the \p FEBase class. This
  * class is templated, and specific template instantiations
  * will result in different Finite Element families. Full specialization
  * of the template for specific dimensions(\p Dim) and families
@@ -83,6 +83,7 @@ struct FEOutputType<NEDELEC_ONE>
  *
  * \author Benjamin S. Kirk
  * \date 2002-2007
+ * \brief Template class which generates the different FE families and orders.
  */
 template <unsigned int Dim, FEFamily T>
 class FE : public FEGenericBase<typename FEOutputType<T>::type>
@@ -100,8 +101,8 @@ public:
   OutputShape;
 
   /**
-   * @returns the value of the \f$ i^{th} \f$ shape function at
-   * point \p p.  This method allows you to specify the imension,
+   * \returns The value of the \f$ i^{th} \f$ shape function at
+   * point \p p.  This method allows you to specify the dimension,
    * element type, and order directly.  This allows the method to
    * be static.
    *
@@ -113,8 +114,8 @@ public:
                            const Point & p);
 
   /**
-   * @returns the value of the \f$ i^{th} \f$ shape function at
-   * point \p p.  This method allows you to specify the imension,
+   * \returns The value of the \f$ i^{th} \f$ shape function at
+   * point \p p.  This method allows you to specify the dimension,
    * element type, and order directly.  This allows the method to
    * be static.
    *
@@ -126,7 +127,7 @@ public:
                            const Point & p);
 
   /**
-   * @returns the \f$ j^{th} \f$ derivative of the \f$ i^{th} \f$
+   * \returns The \f$ j^{th} \f$ derivative of the \f$ i^{th} \f$
    * shape function at point \p p.  This method allows you to
    * specify the dimension, element type, and order directly.
    *
@@ -139,7 +140,7 @@ public:
                                  const Point & p);
 
   /**
-   * @returns the \f$ j^{th} \f$ derivative of the \f$ i^{th} \f$
+   * \returns The \f$ j^{th} \f$ derivative of the \f$ i^{th} \f$
    * shape function.  You must specify element type, and order directly.
    *
    * On a p-refined element, \p o should be the base order of the element.
@@ -151,9 +152,10 @@ public:
                                  const Point & p);
 
   /**
-   * @returns the second \f$ j^{th} \f$ derivative of the \f$ i^{th} \f$
-   * shape function at the point \p p.  Note that cross-derivatives are
-   * also possible, i.e.
+   * \returns The second \f$ j^{th} \f$ derivative of the \f$ i^{th} \f$
+   * shape function at the point \p p.
+   *
+   * \note Cross-derivatives are indexed according to:
    * j = 0 ==> d^2 phi / dxi^2
    * j = 1 ==> d^2 phi / dxi deta
    * j = 2 ==> d^2 phi / deta^2
@@ -161,10 +163,11 @@ public:
    * j = 4 ==> d^2 phi / deta dzeta
    * j = 5 ==> d^2 phi / dzeta^2
    *
-   * Note:  Computing second derivatives is not currently supported
-   * for all element types: C1 (Clough, Hermite and Subdivision), Lagrange,
-   * Hierarchic, L2_Hierarchic, and Monomial are supported.
-   * All other element types return an error when asked for second derivatives.
+   * \note Computing second derivatives is not currently supported for
+   * all element types: \f$ C^1 \f$ (Clough, Hermite and Subdivision),
+   * Lagrange, Hierarchic, L2_Hierarchic, and Monomial are supported.
+   * All other element types return an error when asked for second
+   * derivatives.
    *
    * On a p-refined element, \p o should be the total order of the element.
    */
@@ -175,9 +178,10 @@ public:
                                         const Point & p);
 
   /**
-   * @returns the second \f$ j^{th} \f$ derivative of the \f$ i^{th} \f$
-   * shape function at the point \p p.  Note that cross-derivatives are
-   * also possible, i.e.
+   * \returns The second \f$ j^{th} \f$ derivative of the \f$ i^{th} \f$
+   * shape function at the point \p p.
+   *
+   * \note Cross-derivatives are indexed according to:
    * j = 0 ==> d^2 phi / dxi^2
    * j = 1 ==> d^2 phi / dxi deta
    * j = 2 ==> d^2 phi / deta^2
@@ -185,10 +189,11 @@ public:
    * j = 4 ==> d^2 phi / deta dzeta
    * j = 5 ==> d^2 phi / dzeta^2
    *
-   * Note:  Computing second derivatives is not currently supported
-   * for all element types: C1 (Clough, Hermite and Subdivision), Lagrange,
-   * Hierarchic, L2_Hierarchic, and Monomial are supported.
-   * All other element types return an error when asked for second derivatives.
+   * \note Computing second derivatives is not currently supported for
+   * all element types: \f$ C^1 \f$ (Clough, Hermite and Subdivision),
+   * Lagrange, Hierarchic, L2_Hierarchic, and Monomial are supported.
+   * All other element types return an error when asked for second
+   * derivatives.
    *
    * On a p-refined element, \p o should be the base order of the element.
    */
@@ -209,13 +214,13 @@ public:
                          std::vector<Number> & nodal_soln);
 
   /**
-   * @returns the number of shape functions associated with
+   * \returns The number of shape functions associated with
    * this finite element.
    */
-  virtual unsigned int n_shape_functions () const libmesh_override;
+  virtual unsigned int n_shape_functions () const override;
 
   /**
-   * @returns the number of shape functions associated with
+   * \returns The number of shape functions associated with
    * a finite element of type \p t and approximation order \p o.
    *
    * On a p-refined element, \p o should be the total order of the element.
@@ -225,7 +230,7 @@ public:
   { return FE<Dim,T>::n_dofs (t,o); }
 
   /**
-   * @returns the number of shape functions associated with this
+   * \returns The number of shape functions associated with this
    * finite element.
    *
    * On a p-refined element, \p o should be the total order of the element.
@@ -234,7 +239,7 @@ public:
                              const Order o);
 
   /**
-   * @returns the number of dofs at node \p n for a finite element
+   * \returns The number of dofs at node \p n for a finite element
    * of type \p t and order \p o.
    *
    * On a p-refined element, \p o should be the total order of the element.
@@ -244,7 +249,7 @@ public:
                                      const unsigned int n);
 
   /**
-   * @returns the number of dofs interior to the element,
+   * \returns The number of dofs interior to the element,
    * not associated with any interior nodes.
    *
    * On a p-refined element, \p o should be the total order of the element.
@@ -253,15 +258,15 @@ public:
                                       const Order o);
 
   /**
-   * @returns the continuity level of the finite element.
+   * \returns The continuity level of the finite element.
    */
-  virtual FEContinuity get_continuity() const libmesh_override;
+  virtual FEContinuity get_continuity() const override;
 
   /**
-   * @returns true if the finite element's higher order shape functions are
+   * \returns \p true if the finite element's higher order shape functions are
    * hierarchic
    */
-  virtual bool is_hierarchic() const libmesh_override;
+  virtual bool is_hierarchic() const override;
 
   /**
    * Fills the vector di with the local degree of freedom indices
@@ -285,7 +290,7 @@ public:
                            std::vector<unsigned int> & di);
 
   /**
-   * @returns the location (on the reference element) of the
+   * \returns The location (on the reference element) of the
    * point \p p located in physical space.  This function requires
    * inverting the (possibly nonlinear) transformation map, so
    * it is not trivial. The optional parameter \p tolerance defines
@@ -325,12 +330,12 @@ public:
    * argument \p pts.
    */
   virtual void reinit (const Elem * elem,
-                       const std::vector<Point> * const pts = libmesh_nullptr,
-                       const std::vector<Real> * const weights = libmesh_nullptr) libmesh_override;
+                       const std::vector<Point> * const pts = nullptr,
+                       const std::vector<Real> * const weights = nullptr) override;
 
   /**
    * Reinitializes all the physical element-dependent data based on
-   * the \p side of \p face.  The \p tolerance paremeter is passed to
+   * the \p side of \p face.  The \p tolerance parameter is passed to
    * the involved call to \p inverse_map().  By default the shape
    * functions and associated data are computed at the quadrature
    * points specified by the quadrature rule \p qrule, but may be any
@@ -340,12 +345,12 @@ public:
   virtual void reinit (const Elem * elem,
                        const unsigned int side,
                        const Real tolerance = TOLERANCE,
-                       const std::vector<Point> * const pts = libmesh_nullptr,
-                       const std::vector<Real> * const weights = libmesh_nullptr) libmesh_override;
+                       const std::vector<Point> * const pts = nullptr,
+                       const std::vector<Real> * const weights = nullptr) override;
 
   /**
    * Reinitializes all the physical element-dependent data based on
-   * the \p edge.  The \p tolerance paremeter is passed to the
+   * the \p edge.  The \p tolerance parameter is passed to the
    * involved call to \p inverse_map().  By default the shape
    * functions and associated data are computed at the quadrature
    * points specified by the quadrature rule \p qrule, but may be any
@@ -355,8 +360,8 @@ public:
   virtual void edge_reinit (const Elem * elem,
                             const unsigned int edge,
                             const Real tolerance = TOLERANCE,
-                            const std::vector<Point> * const pts = libmesh_nullptr,
-                            const std::vector<Real> * const weights = libmesh_nullptr) libmesh_override;
+                            const std::vector<Point> * const pts = nullptr,
+                            const std::vector<Real> * const weights = nullptr) override;
 
   /**
    * Computes the reference space quadrature points on the side of
@@ -366,21 +371,21 @@ public:
                          const Elem * side,
                          const unsigned int s,
                          const std::vector<Point> & reference_side_points,
-                         std::vector<Point> &       reference_points) libmesh_override;
+                         std::vector<Point> &       reference_points) override;
 
   /**
    * Provides the class with the quadrature rule, which provides the
    * locations (on a reference element) where the shape functions are
    * to be calculated.
    */
-  virtual void attach_quadrature_rule (QBase * q) libmesh_override;
+  virtual void attach_quadrature_rule (QBase * q) override;
 
   /**
-   * @returns the total number of quadrature points.  Call this
+   * \returns The total number of quadrature points.  Call this
    * to get an upper bound for the \p for loop in your simulation
    * for matrix assembly of the current element.
    */
-  virtual unsigned int n_quadrature_points () const libmesh_override;
+  virtual unsigned int n_quadrature_points () const override;
 
 #ifdef LIBMESH_ENABLE_AMR
   /**
@@ -396,36 +401,36 @@ public:
 #endif // #ifdef LIBMESH_ENABLE_AMR
 
   /**
-   * @returns \p true when the shape functions (for
+   * \returns \p true when the shape functions (for
    * this \p FEFamily) depend on the particular
    * element, and therefore needs to be re-initialized
    * for each new element.  \p false otherwise.
    */
-  virtual bool shapes_need_reinit() const libmesh_override;
+  virtual bool shapes_need_reinit() const override;
 
   /**
-   * @returns the location (in physical space) of the point
+   * \returns The location (in physical space) of the point
    * \p p located on the reference element.
    */
   static Point map (const Elem * elem,
                     const Point & reference_point);
 
   /**
-   * @returns d(xyz)/dxi (in physical space) of the point
+   * \returns d(xyz)/dxi (in physical space) of the point
    * \p p located on the reference element.
    */
   static Point map_xi (const Elem * elem,
                        const Point & reference_point);
 
   /**
-   * @returns d(xyz)/deta (in physical space) of the point
+   * \returns d(xyz)/deta (in physical space) of the point
    * \p p located on the reference element.
    */
   static Point map_eta (const Elem * elem,
                         const Point & reference_point);
 
   /**
-   * @returns d(xyz)/dzeta (in physical space) of the point
+   * \returns d(xyz)/dzeta (in physical space) of the point
    * \p p located on the reference element.
    */
   static Point map_zeta (const Elem * elem,
@@ -459,7 +464,7 @@ protected:
    * an infinite element.
    */
   virtual void init_base_shape_functions(const std::vector<Point> & qp,
-                                         const Elem * e) libmesh_override;
+                                         const Elem * e) override;
 
 #endif
 
@@ -586,8 +591,8 @@ public:
    * argument \p pts.
    */
   virtual void reinit (const Elem * elem,
-                       const std::vector<Point> * const pts = libmesh_nullptr,
-                       const std::vector<Real> * const weights = libmesh_nullptr) libmesh_override;
+                       const std::vector<Point> * const pts = nullptr,
+                       const std::vector<Real> * const weights = nullptr) override;
 
   /**
    * This prevents some compilers being confused by partially
@@ -596,8 +601,8 @@ public:
   virtual void reinit (const Elem *,
                        const unsigned int,
                        const Real = TOLERANCE,
-                       const std::vector<Point> * const = libmesh_nullptr,
-                       const std::vector<Real> * const = libmesh_nullptr) libmesh_override
+                       const std::vector<Point> * const = nullptr,
+                       const std::vector<Real> * const = nullptr) override
   { libmesh_not_implemented(); }
 
   /**
@@ -605,7 +610,7 @@ public:
    * locations (on a reference element) where the shape functions are
    * to be calculated.
    */
-  virtual void attach_quadrature_rule (QBase * q) libmesh_override;
+  virtual void attach_quadrature_rule (QBase * q) override;
 
   /**
    * Update the various member data fields \p phi,
@@ -615,10 +620,10 @@ public:
    * the quadrature points.
    */
   virtual void init_shape_functions(const std::vector<Point> & qp,
-                                    const Elem * elem) libmesh_override;
+                                    const Elem * elem) override;
 
   /**
-   * @returns the value of the \f$ i^{th} \f$ of the 12 quartic
+   * \returns The value of the \f$ i^{th} \f$ of the 12 quartic
    * box splines interpolating a regular Loop subdivision
    * element, evaluated at the barycentric coordinates \p v,
    * \p w.
@@ -628,7 +633,7 @@ public:
                             const Real w);
 
   /**
-   * @returns the \f$ j^{th} \f$ derivative of the \f$ i^{th}
+   * \returns The \f$ j^{th} \f$ derivative of the \f$ i^{th}
    * \f$ of the 12 quartic box splines interpolating a regular
    * Loop subdivision element, evaluated at the barycentric
    * coordinates \p v, \p w.
@@ -639,7 +644,7 @@ public:
                                   const Real w);
 
   /**
-   * @returns the second \f$ j^{th} \f$ derivative of the
+   * \returns The second \f$ j^{th} \f$ derivative of the
    * \f$ i^{th} \f$ of the 12 quartic box splines interpolating
    * a regular Loop subdivision element, evaluated at the
    * barycentric coordinates \p v, \p w.
@@ -787,7 +792,7 @@ public:
 
 
 /**
- * The FEScalar class is used for workign with SCALAR variables.
+ * The FEScalar class is used for working with SCALAR variables.
  */
 template <unsigned int Dim>
 class FEScalar : public FE<Dim,SCALAR>
@@ -834,8 +839,8 @@ public:
    * compilers being confused by partially overriding this virtual function.
    */
   virtual void reinit (const Elem * elem,
-                       const std::vector<Point> * const pts = libmesh_nullptr,
-                       const std::vector<Real> * const weights = libmesh_nullptr) libmesh_override
+                       const std::vector<Point> * const pts = nullptr,
+                       const std::vector<Real> * const weights = nullptr) override
   { FE<Dim,XYZ>::reinit (elem, pts, weights); }
 
   /**
@@ -845,8 +850,8 @@ public:
   virtual void reinit (const Elem * elem,
                        const unsigned int side,
                        const Real tolerance = TOLERANCE,
-                       const std::vector<Point> * const pts = libmesh_nullptr,
-                       const std::vector<Real> * const weights = libmesh_nullptr) libmesh_override;
+                       const std::vector<Point> * const pts = nullptr,
+                       const std::vector<Real> * const weights = nullptr) override;
 
 
 protected:
@@ -859,7 +864,7 @@ protected:
    * the quadrature points.
    */
   virtual void init_shape_functions(const std::vector<Point> & qp,
-                                    const Elem * e) libmesh_override;
+                                    const Elem * e) override;
 
   /**
    * After having updated the jacobian and the transformation
@@ -871,7 +876,7 @@ protected:
    * still should be usable for children. Therefore, keep
    * it protected.
    */
-  virtual void compute_shape_functions(const Elem * elem, const std::vector<Point> & qp) libmesh_override;
+  virtual void compute_shape_functions(const Elem * elem, const std::vector<Point> & qp) override;
 
   /**
    * Compute the map & shape functions for this face.
@@ -1036,23 +1041,6 @@ typedef FE<2,MONOMIAL> FEMonomial2D;
  */
 typedef FE<3,MONOMIAL> FEMonomial3D;
 
-}
-
-
-
-// ------------------------------------------------------------
-// FE class inline members
-template <unsigned int Dim, FEFamily T>
-inline
-FE<Dim,T>::FE (const FEType & fet) :
-  FEGenericBase<typename FEOutputType<T>::type> (Dim,fet),
-  last_side(INVALID_ELEM),
-  last_edge(libMesh::invalid_uint)
-{
-  // Sanity check.  Make sure the
-  // Family specified in the template instantiation
-  // matches the one in the FEType object
-  libmesh_assert_equal_to (T, this->get_family());
 }
 
 } // namespace libMesh

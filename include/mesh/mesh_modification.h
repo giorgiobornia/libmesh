@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,13 +20,9 @@
 #ifndef LIBMESH_MESH_MODIFICATION_H
 #define LIBMESH_MESH_MODIFICATION_H
 
-
-
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/libmesh_common.h"
 #include "libmesh/id_types.h" // for boundary_id_type, subdomain_id_type
-
-// C++ Includes   -----------------------------------
 
 namespace libMesh
 {
@@ -112,8 +108,9 @@ void scale (MeshBase & mesh,
 /**
  * Converts the 2D quadrilateral elements of a Mesh into
  * triangular elements.
- * Note: Only works for 2D elements!  3D elements are ignored.
- * Note: Probably won't do the right thing for meshes which
+ *
+ * \note Only works for 2D elements!  3D elements are ignored.
+ * \note Probably won't do the right thing for meshes which
  * have been refined previously.
  */
 void all_tri (MeshBase & mesh);
@@ -121,7 +118,7 @@ void all_tri (MeshBase & mesh);
 /**
  * Smooth the mesh with a simple Laplace smoothing algorithm.  The mesh is
  * smoothed \p n_iterations times.  If the parameter \p power is 0, each
- * node is moved to the average postition of the neighboring connected
+ * node is moved to the average position of the neighboring connected
  * nodes. If \p power > 0, the node positions are weighted by their
  * distance.  The positions of higher order nodes, and nodes living in
  * refined elements, are calculated from the vertex positions of their
@@ -137,10 +134,11 @@ void smooth(MeshBase &, unsigned int, Real);
  * Removes all the refinement tree structure of Mesh, leaving
  * only the highest-level (most-refined) elements.  This is useful
  * when you want to write out a uniformly-refined grid to be treated later
- * as an initial mesh.  Note that many functions in LibMesh assume a
- * conforming (with no hanging nodes) grid exists at some level, so
- * you probably only want to do this on meshes which have been uniformly
- * refined.
+ * as an initial mesh.
+ *
+ * \note Many functions in LibMesh assume a conforming (with no
+ * hanging nodes) grid exists at some level, so you probably only want
+ * to do this on meshes which have been uniformly refined.
  */
 void flatten(MeshBase & mesh);
 #endif // #ifdef LIBMESH_ENABLE_AMR

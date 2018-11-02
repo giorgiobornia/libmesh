@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -28,18 +28,10 @@
 namespace libMesh
 {
 
-// Local includes
-
-
-
-// ------------------------------------------------------------
-// Utility::string_to_enum<> definition
-
 namespace Utility {
 
 /**
- * Takes the string \p s and returns the matching
- * enumeration of type \p T.
+ * \returns the enumeration of type \p T which matches the string \p s.
  */
 template <typename T>
 T string_to_enum (const std::string & s);
@@ -47,8 +39,7 @@ T string_to_enum (const std::string & s);
 
 
 /**
- * Takes the enumeration \p e of type \p T
- * and returns the matching string.
+ * \returns the \p string which matches the enumeration \p e of type \p T.
  */
 template <typename T>
 std::string enum_to_string (const T e);

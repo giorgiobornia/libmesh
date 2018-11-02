@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -112,18 +112,18 @@ void nedelec_one_nodal_soln(const Elem * elem,
 
         // Need to create new fe object so the shape function as the FETransformation
         // applied to it.
-        UniquePtr<FEVectorBase> vis_fe = FEVectorBase::build(dim,fe_type);
+        std::unique_ptr<FEVectorBase> vis_fe = FEVectorBase::build(dim,fe_type);
 
-        const std::vector<std::vector<RealGradient> > & vis_phi = vis_fe->get_phi();
+        const std::vector<std::vector<RealGradient>> & vis_phi = vis_fe->get_phi();
 
         vis_fe->reinit(elem,&refspace_nodes);
 
-        for( unsigned int n = 0; n < n_nodes; n++ )
+        for (unsigned int n = 0; n < n_nodes; n++)
           {
             libmesh_assert_equal_to (elem_soln.size(), n_sf);
 
             // Zero before summation
-            for( int d = 0; d < dim; d++ )
+            for (int d = 0; d < dim; d++)
               {
                 nodal_soln[dim*n+d] = 0;
               }
@@ -131,7 +131,7 @@ void nedelec_one_nodal_soln(const Elem * elem,
             // u = Sum (u_i phi_i)
             for (unsigned int i=0; i<n_sf; i++)
               {
-                for( int d = 0; d < dim; d++ )
+                for (int d = 0; d < dim; d++)
                   {
                     nodal_soln[dim*n+d]   += elem_soln[i]*(vis_phi[i][n](d));
                   }
@@ -183,9 +183,6 @@ unsigned int nedelec_one_n_dofs(const ElemType t, const Order o)
     default:
       libmesh_error_msg("ERROR: Invalid Order " << Utility::enum_to_string(o) << " selected for NEDELEC_ONE FE family!");
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0;
 }
 
 
@@ -360,9 +357,6 @@ unsigned int nedelec_one_n_dofs_at_node(const ElemType t,
     default:
       libmesh_error_msg("ERROR: Invalid Order " << Utility::enum_to_string(o) << " selected for NEDELEC_ONE FE family!");
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0;
 }
 
 
@@ -395,20 +389,20 @@ void nedelec_one_compute_constraints (DofConstraints & /*constraints*/,
   // Look at the element faces.  Check to see if we need to
   // build constraints.
   for (unsigned int s=0; s<elem->n_sides(); s++)
-  if (elem->neighbor(s) != libmesh_nullptr)
+  if (elem->neighbor(s) != nullptr)
   if (elem->neighbor(s)->level() < elem->level()) // constrain dofs shared between
   {                                                     // this element and ones coarser
   // than this element.
   // Get pointers to the elements of interest and its parent.
   const Elem * parent = elem->parent();
 
-  // This can't happen...  Only level-0 elements have NULL
+  // This can't happen...  Only level-0 elements have nullptr
   // parents, and no level-0 elements can be at a higher
   // level than their neighbors!
   libmesh_assert(parent);
 
-  const UniquePtr<Elem> my_side     (elem->build_side(s));
-  const UniquePtr<Elem> parent_side (parent->build_side(s));
+  const std::unique_ptr<const Elem> my_side     (elem->build_side_ptr(s));
+  const std::unique_ptr<const Elem> parent_side (parent->build_side_ptr(s));
 
   // This function gets called element-by-element, so there
   // will be a lot of memory allocation going on.  We can
@@ -482,7 +476,7 @@ void nedelec_one_compute_constraints (DofConstraints & /*constraints*/,
   }
   }
   */
-} // nedelec_one_compute_constrants()
+} // nedelec_one_compute_constraints()
 #endif // #ifdef LIBMESH_ENABLE_AMR
 
 } // anonymous namespace

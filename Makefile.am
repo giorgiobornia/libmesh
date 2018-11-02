@@ -8,6 +8,20 @@ ACLOCAL_AMFLAGS  = -I m4
 AM_CFLAGS        = $(libmesh_CFLAGS)
 AM_LDFLAGS       = $(libmesh_LDFLAGS)
 
+# We might have turned on -Werror and/or paranoid warnings
+CXXFLAGS_DBG += $(ANY_WERROR_FLAG) $(ANY_PARANOID_FLAGS)
+CXXFLAGS_DEVEL += $(ANY_WERROR_FLAG) $(ANY_PARANOID_FLAGS)
+CXXFLAGS_OPROF += $(ANY_WERROR_FLAG) $(ANY_PARANOID_FLAGS)
+CXXFLAGS_OPT += $(ANY_WERROR_FLAG) $(ANY_PARANOID_FLAGS)
+CXXFLAGS_PROF += $(ANY_WERROR_FLAG) $(ANY_PARANOID_FLAGS)
+
+# We need to set the no-undefined flag for linking
+# with libtool, because Windows requires all shared
+# libraries to include all used symbols. This flag
+# should do no harm on other platforms.
+AM_LDFLAGS += -no-undefined
+
+
 # AM_CPPFLAGS are method-independent cppflags that
 # we use when compiling libmesh proper, or its utility
 # codes.  These will be augmented with method-specific
@@ -27,7 +41,8 @@ EXTRA_DIST = reference_elements \
              src/rebuild_libmesh_SOURCES.sh \
              contrib/tecplot/README \
              contrib/bin/strip_dup_incl_paths.pl \
-             contrib/bin/strip_dup_libs.pl
+             contrib/bin/strip_dup_libs.pl \
+             CITATION
 
 nobase_data_DATA = \
         reference_elements/2D/one_quad.xda \
@@ -42,6 +57,7 @@ nobase_data_DATA = \
         reference_elements/3D/one_prism15.xda \
         reference_elements/3D/one_prism18.xda \
         reference_elements/3D/one_pyramid.xda \
+        reference_elements/3D/one_pyramid13.xda \
         reference_elements/3D/one_pyramid14.xda \
         reference_elements/3D/one_tet.xda \
         reference_elements/3D/one_tet10.xda
@@ -69,10 +85,9 @@ config_DATA      = contrib/utils/Make.common \
                    contrib/utils/libmesh-prof.pc \
                    contrib/utils/libmesh-oprof.pc
 
-# install the old make_dependencies.pl script for backwards compatibility
+# install the libtool script so that dependent apps can also use it
 contribbindir      = $(prefix)/contrib/bin
-contribbin_SCRIPTS = contrib/bin/make_dependencies.pl libtool
-EXTRA_DIST        += contrib/bin/make_dependencies.pl
+contribbin_SCRIPTS = libtool
 
 # Support for libmesh-config in $(exec_prefix)/bin
 libmesh_configdir      = $(exec_prefix)/bin
@@ -88,7 +103,7 @@ install-data-hook:
 	@if (test "x$(prefix)" != "x@prefix@") ; then \
           oldprefix="@prefix@" ; \
           newprefix="$(prefix)" ; \
-          for genfile in `find $(DESTDIR)$(prefix) -name "*.pc" -o -name Make.common -o -name libmesh-config -type f` ; do \
+          for genfile in `echo $(DESTDIR)$(prefix)/lib/pkgconfig/*.pc $(DESTDIR)$(prefix)/etc/libmesh/*.pc $(DESTDIR)$(prefix)/etc/libmesh/Make.common $(DESTDIR)$(prefix)/lib/pkgconfig/Make.common $(DESTDIR)$(prefix)/bin/libmesh-config` ; do \
             echo " " ; \
             echo " *** replacing $$oldprefix" ; \
             echo " ***      with $$newprefix" ; \
@@ -254,6 +269,25 @@ getpot_parse_dbg_CPPFLAGS   = $(CPPFLAGS_DBG) $(AM_CPPFLAGS)
 getpot_parse_dbg_CXXFLAGS   = $(CXXFLAGS_DBG)
 getpot_parse_dbg_LDADD      = libmesh_dbg.la
 
+# amr
+opt_programs    += amr-opt
+amr_opt_SOURCES  = src/apps/amr.C
+amr_opt_CPPFLAGS = $(CPPFLAGS_OPT) $(AM_CPPFLAGS)
+amr_opt_CXXFLAGS = $(CXXFLAGS_OPT)
+amr_opt_LDADD    = libmesh_opt.la
+
+devel_programs    += amr-devel
+amr_devel_SOURCES  = src/apps/amr.C
+amr_devel_CPPFLAGS = $(CPPFLAGS_DEVEL) $(AM_CPPFLAGS)
+amr_devel_CXXFLAGS = $(CXXFLAGS_DEVEL)
+amr_devel_LDADD    = libmesh_devel.la
+
+dbg_programs    += amr-dbg
+amr_dbg_SOURCES  = src/apps/amr.C
+amr_dbg_CPPFLAGS = $(CPPFLAGS_DBG) $(AM_CPPFLAGS)
+amr_dbg_CXXFLAGS = $(CXXFLAGS_DBG)
+amr_dbg_LDADD    = libmesh_dbg.la
+
 # meshtool
 opt_programs           += meshtool-opt
 meshtool_opt_SOURCES    = src/apps/meshtool.C
@@ -273,7 +307,7 @@ meshtool_dbg_CPPFLAGS   = $(CPPFLAGS_DBG) $(AM_CPPFLAGS)
 meshtool_dbg_CXXFLAGS   = $(CXXFLAGS_DBG)
 meshtool_dbg_LDADD      = libmesh_dbg.la
 
-# compare
+# calculator
 opt_programs          += calculator-opt
 calculator_opt_SOURCES    = src/apps/calculator.C
 calculator_opt_SOURCES   += src/apps/L2system.C src/apps/L2system.h
@@ -485,6 +519,24 @@ solution_components_dbg_CPPFLAGS   = $(CPPFLAGS_DBG) $(AM_CPPFLAGS)
 solution_components_dbg_CXXFLAGS   = $(CXXFLAGS_DBG)
 solution_components_dbg_LDADD      = libmesh_dbg.la
 
+# splitter
+opt_programs           += splitter-opt
+splitter_opt_SOURCES    = src/apps/splitter.C
+splitter_opt_CPPFLAGS   = $(CPPFLAGS_OPT) $(AM_CPPFLAGS)
+splitter_opt_CXXFLAGS   = $(CXXFLAGS_OPT)
+splitter_opt_LDADD      = libmesh_opt.la
+
+devel_programs         += splitter-devel
+splitter_devel_SOURCES  = src/apps/splitter.C
+splitter_devel_CPPFLAGS = $(CPPFLAGS_DEVEL) $(AM_CPPFLAGS)
+splitter_devel_CXXFLAGS = $(CXXFLAGS_DEVEL)
+splitter_devel_LDADD    = libmesh_devel.la
+
+dbg_programs           += splitter-dbg
+splitter_dbg_SOURCES    = src/apps/splitter.C
+splitter_dbg_CPPFLAGS   = $(CPPFLAGS_DBG) $(AM_CPPFLAGS)
+splitter_dbg_CXXFLAGS   = $(CXXFLAGS_DBG)
+splitter_dbg_LDADD      = libmesh_dbg.la
 
 if LIBMESH_OPT_MODE
   bin_PROGRAMS += $(opt_programs)
@@ -536,7 +588,6 @@ upload:
 # special things to do when running 'make dist'
 dist-hook:
 	rm -rf `find $(distdir) -name libmesh_config.h`
-	rm -rf `find $(distdir) -name .svn`
 
 
 #

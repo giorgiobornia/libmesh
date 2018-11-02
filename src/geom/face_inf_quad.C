@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,13 +20,12 @@
 #include "libmesh/libmesh_config.h"
 #ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
 
-// C++ includes
-
 // Local includes cont'd
 #include "libmesh/face_inf_quad.h"
 #include "libmesh/edge_edge2.h"
 #include "libmesh/edge_inf_edge2.h"
 #include "libmesh/face_inf_quad4.h"
+#include "libmesh/enum_elem_quality.h"
 
 namespace libMesh
 {
@@ -56,31 +55,42 @@ dof_id_type InfQuad::key (const unsigned int s) const
 
   // The order of the node ids does not matter, they are sorted by the
   // compute_key() function.
-  return this->compute_key(this->node(InfQuad4::side_nodes_map[s][0]),
-                           this->node(InfQuad4::side_nodes_map[s][1]));
+  return this->compute_key(this->node_id(InfQuad4::side_nodes_map[s][0]),
+                           this->node_id(InfQuad4::side_nodes_map[s][1]));
 }
 
 
 
-UniquePtr<Elem> InfQuad::side (const unsigned int i) const
+unsigned int InfQuad::which_node_am_i(unsigned int side,
+                                      unsigned int side_node) const
+{
+  libmesh_assert_less (side, this->n_sides());
+  libmesh_assert_less (side_node, 2);
+
+  return InfQuad4::side_nodes_map[side][side_node];
+}
+
+
+
+std::unique_ptr<Elem> InfQuad::side_ptr (const unsigned int i)
 {
   libmesh_assert_less (i, this->n_sides());
 
-  // To be returned wrapped in an UniquePtr
-  Elem * edge = libmesh_nullptr;
+  // Return value
+  std::unique_ptr<Elem> edge;
 
   switch (i)
     {
     case 0: // base face
       {
-        edge = new Edge2;
+        edge = libmesh_make_unique<Edge2>();
         break;
       }
 
     case 1: // adjacent to another infinite element
     case 2: // adjacent to another infinite element
       {
-        edge = new InfEdge2;
+        edge = libmesh_make_unique<InfEdge2>();
         break;
       }
 
@@ -90,9 +100,9 @@ UniquePtr<Elem> InfQuad::side (const unsigned int i) const
 
   // Set the nodes
   for (unsigned n=0; n<edge->n_nodes(); ++n)
-    edge->set_node(n) = this->get_node(InfQuad4::side_nodes_map[i][n]);
+    edge->set_node(n) = this->node_ptr(InfQuad4::side_nodes_map[i][n]);
 
-  return UniquePtr<Elem>(edge);
+  return edge;
 }
 
 

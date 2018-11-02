@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -38,7 +38,7 @@ namespace libMesh
  * \author Roy Stogner
  * \date 2010
  */
-template <typename charT=char, typename traits=std::char_traits<charT> >
+template <typename charT=char, typename traits=std::char_traits<charT>>
 class BasicOStreamProxy
 {
 public:
@@ -200,8 +200,9 @@ public:
   //
 
   /**
-   * Reset the proxy to point to a different \p target.  Note that this
-   * does not delete the previous target.
+   * Reset the proxy to point to a different \p target.
+   *
+   * \note This does not delete the previous target.
    */
   void reset (streamT & target) { _target = &target; }
 

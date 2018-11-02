@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -42,9 +42,9 @@ class Elem;
 
 /**
  * Class \p TetGenMeshInterface provides an interface for
- * tetrahedrization of meshes using the TetGen library.  For
+ * tetrahedralization of meshes using the TetGen library.  For
  * information about TetGen cf.
- * <a href="http://tetgen.berlios.de/">TetGen home page</a>.
+ * <a href="http://tetgen.org/">TetGen home page</a>.
  *
  * \author Steffen Petersen
  * \date 2004
@@ -67,19 +67,24 @@ public:
   ~TetGenMeshInterface() {}
 
   /**
-   * Method invokes TetGen library to compute a Delaunay tetrahedrization
+   * Method to set switches to tetgen, allowing for different behaviours
+   */
+  void set_switches(const std::string &);
+
+  /**
+   * Method invokes TetGen library to compute a Delaunay tetrahedralization
    * from the nodes point set.
    */
   void triangulate_pointset ();
 
   /**
-   * Method invokes TetGen library to compute a Delaunay tetrahedrization
+   * Method invokes TetGen library to compute a Delaunay tetrahedralization
    * from the nodes point set. Stores only 2D hull surface elements.
    */
   void pointset_convexhull ();
 
   /**
-   * Method invokes TetGen library to compute a Delaunay tetrahedrization
+   * Method invokes TetGen library to compute a Delaunay tetrahedralization
    * from the nodes point set. Boundary constraints are taken from
    * elements array.
    */
@@ -87,7 +92,7 @@ public:
                                            double volume_constraint=0.);
 
   /**
-   * Method invokes TetGen library to compute a Delaunay tetrahedrization
+   * Method invokes TetGen library to compute a Delaunay tetrahedralization
    * from the nodes point set. Boundary constraints are taken from
    * elements array. Include carve-out functionality.
    */
@@ -101,7 +106,7 @@ protected:
   /**
    * This function copies nodes from the _mesh into TetGen's
    * pointlist.  Takes some pains to ensure that non-sequential
-   * node numberings (which can happen with e.g. ParallelMesh)
+   * node numberings (which can happen with e.g. DistributedMesh)
    * are handled.
    */
   void fill_pointlist(TetGenWrapper & wrapper);
@@ -116,13 +121,13 @@ protected:
    * This function checks the integrity of the current set of
    * elements in the Mesh to see if they comprise a convex hull,
    * that is:
-   * .) If they are all TRI3 elements
-   * .) They all have non-NULL neighbors
+   * - If they are all TRI3 elements
+   * - They all have non-nullptr neighbors
    *
-   * Returns:
-   * .) 0 if the mesh forms a valid convex hull
-   * .) 1 if a non-TRI3 element is found
-   * .) 2 if an element with a NULL-neighbor is found
+   * \returns
+   * - 0 if the mesh forms a valid convex hull
+   * - 1 if a non-TRI3 element is found
+   * - 2 if an element with a nullptr-neighbor is found
    */
   unsigned check_hull_integrity();
 
@@ -147,7 +152,7 @@ protected:
 
   /**
    * We should not assume libmesh nodes are numbered sequentially...
-   * This is not the default behavior of ParallelMesh, for example,
+   * This is not the default behavior of DistributedMesh, for example,
    * unless you specify node IDs explicitly.  So this array allows us
    * to keep a mapping between the sequential numbering in
    * tetgen_data.pointlist.
@@ -159,6 +164,11 @@ protected:
    */
   MeshSerializer _serializer;
 
+  /**
+   * Parameter controlling the behaviour of tetgen.
+   * By default quiet.
+   */
+  std::string _switches;
 };
 
 } // namespace libMesh

@@ -35,6 +35,8 @@
 #include "libmesh/getpot.h"
 #include "libmesh/parallel.h"
 #include "libmesh/dof_map.h"
+#include "libmesh/enum_eigen_solver_type.h"
+
 // For creating a directory
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -49,7 +51,7 @@ RBSCMConstruction::RBSCMConstruction (EquationSystems & es,
   : Parent(es, name_in, number_in),
     SCM_training_tolerance(0.5),
     RB_system_name(""),
-    rb_scm_eval(libmesh_nullptr)
+    rb_scm_eval(nullptr)
 {
 
   // set assemble_before_solve flag to false
@@ -79,7 +81,7 @@ void RBSCMConstruction::set_rb_scm_evaluation(RBSCMEvaluation & rb_scm_eval_in)
 
 RBSCMEvaluation & RBSCMConstruction::get_rb_scm_evaluation()
 {
-  if(!rb_scm_eval)
+  if (!rb_scm_eval)
     libmesh_error_msg("Error: RBSCMEvaluation object hasn't been initialized yet");
 
   return *rb_scm_eval;
@@ -113,7 +115,7 @@ void RBSCMConstruction::process_parameters_file(const std::string & parameters_f
   unsigned int n_continuous_parameters = infile.vector_variable_size("parameter_names");
   RBParameters mu_min_in;
   RBParameters mu_max_in;
-  for(unsigned int i=0; i<n_continuous_parameters; i++)
+  for (unsigned int i=0; i<n_continuous_parameters; i++)
     {
       // Read in the parameter names
       std::string param_name = infile("parameter_names", "NONE", i);
@@ -129,19 +131,17 @@ void RBSCMConstruction::process_parameters_file(const std::string & parameters_f
       }
     }
 
-  std::map< std::string, std::vector<Real> > discrete_parameter_values_in;
+  std::map<std::string, std::vector<Real>> discrete_parameter_values_in;
 
   unsigned int n_discrete_parameters = infile.vector_variable_size("discrete_parameter_names");
-  for(unsigned int i=0; i<n_discrete_parameters; i++)
+  for (unsigned int i=0; i<n_discrete_parameters; i++)
     {
       std::string param_name = infile("discrete_parameter_names", "NONE", i);
 
       unsigned int n_vals_for_param = infile.vector_variable_size(param_name);
       std::vector<Real> vals_for_param(n_vals_for_param);
-      for(unsigned int j=0; j<vals_for_param.size(); j++)
-        {
-          vals_for_param[j] = infile(param_name, 0., j);
-        }
+      for (unsigned int j=0; j != n_vals_for_param; j++)
+        vals_for_param[j] = infile(param_name, 0., j);
 
       discrete_parameter_values_in[param_name] = vals_for_param;
     }
@@ -153,7 +153,7 @@ void RBSCMConstruction::process_parameters_file(const std::string & parameters_f
   RBParameters::const_iterator it     = mu.begin();
   RBParameters::const_iterator it_end = mu.end();
   unsigned int i=0;
-  for( ; it != it_end; ++it)
+  for ( ; it != it_end; ++it)
     {
       std::string param_name = it->first;
       log_scaling[param_name] = static_cast<bool>(infile("log_scaling", 0, i));
@@ -173,7 +173,7 @@ void RBSCMConstruction::print_info()
   libMesh::out << std::endl << "RBSCMConstruction parameters:" << std::endl;
   libMesh::out << "system name: " << this->name() << std::endl;
   libMesh::out << "SCM Greedy tolerance: " << get_SCM_training_tolerance() << std::endl;
-  if(rb_scm_eval)
+  if (rb_scm_eval)
     {
       libMesh::out << "A_q operators attached: " << get_rb_theta_expansion().get_n_A_terms() << std::endl;
     }
@@ -184,7 +184,7 @@ void RBSCMConstruction::print_info()
   libMesh::out << "Number of parameters: " << get_n_params() << std::endl;
   RBParameters::const_iterator it     = get_parameters().begin();
   RBParameters::const_iterator it_end = get_parameters().end();
-  for( ; it != it_end; ++it)
+  for ( ; it != it_end; ++it)
     {
       std::string param_name = it->first;
       libMesh::out <<   "Parameter " << param_name
@@ -203,7 +203,7 @@ void RBSCMConstruction::resize_SCM_vectors()
   rb_scm_eval->B_max.clear();
   rb_scm_eval->C_J.clear();
   rb_scm_eval->C_J_stability_vector.clear();
-  for(unsigned int i=0; i<rb_scm_eval->SCM_UB_vectors.size(); i++)
+  for (std::size_t i=0; i<rb_scm_eval->SCM_UB_vectors.size(); i++)
     rb_scm_eval->SCM_UB_vectors[i].clear();
   rb_scm_eval->SCM_UB_vectors.clear();
 
@@ -214,12 +214,11 @@ void RBSCMConstruction::resize_SCM_vectors()
 
 void RBSCMConstruction::add_scaled_symm_Aq(unsigned int q_a, Number scalar)
 {
-  START_LOG("add_scaled_symm_Aq()", "RBSCMConstruction");
+  LOG_SCOPE("add_scaled_symm_Aq()", "RBSCMConstruction");
   // Load the operators from the RBConstruction
   EquationSystems & es = this->get_equation_systems();
   RBConstruction & rb_system = es.get_system<RBConstruction>(RB_system_name);
-  rb_system.add_scaled_Aq(scalar, q_a, matrix_A, true);
-  STOP_LOG("add_scaled_symm_Aq()", "RBSCMConstruction");
+  rb_system.add_scaled_Aq(scalar, q_a, matrix_A.get(), true);
 }
 
 void RBSCMConstruction::load_matrix_B()
@@ -235,19 +234,19 @@ void RBSCMConstruction::load_matrix_B()
 
 void RBSCMConstruction::perform_SCM_greedy()
 {
-  START_LOG("perform_SCM_greedy()", "RBSCMConstruction");
+  LOG_SCOPE("perform_SCM_greedy()", "RBSCMConstruction");
 
   // initialize rb_scm_eval's parameters
   rb_scm_eval->initialize_parameters(*this);
 
   // Get a list of constrained dofs from rb_system
-  std::set<unsigned int> constrained_dofs_set;
+  std::set<dof_id_type> constrained_dofs_set;
   EquationSystems & es = this->get_equation_systems();
   RBConstruction & rb_system = es.get_system<RBConstruction>(RB_system_name);
 
-  for(unsigned int i=0; i<rb_system.n_dofs(); i++)
+  for (dof_id_type i=0; i<rb_system.n_dofs(); i++)
     {
-      if( rb_system.get_dof_map().is_constrained_dof(i) )
+      if (rb_system.get_dof_map().is_constrained_dof(i))
         {
           constrained_dofs_set.insert(i);
         }
@@ -267,7 +266,7 @@ void RBSCMConstruction::perform_SCM_greedy()
   enrich_C_J(0);
 
   unsigned int SCM_iter=0;
-  while(true)
+  while (true)
     {
       // matrix_A is reinitialized for the current parameters
       // on each call to evaluate_stability_constant
@@ -278,7 +277,7 @@ void RBSCMConstruction::perform_SCM_greedy()
       libMesh::out << "SCM iteration " << SCM_iter
                    << ", max_SCM_error = " << SCM_error_pair.second << std::endl;
 
-      if( SCM_error_pair.second < SCM_training_tolerance )
+      if (SCM_error_pair.second < SCM_training_tolerance)
         {
           libMesh::out << std::endl << "SCM tolerance of " << SCM_training_tolerance << " reached."
                        << std::endl << std::endl;
@@ -292,19 +291,17 @@ void RBSCMConstruction::perform_SCM_greedy()
 
       SCM_iter++;
     }
-
-  STOP_LOG("perform_SCM_greedy()", "RBSCMConstruction");
 }
 
 void RBSCMConstruction::compute_SCM_bounding_box()
 {
-  START_LOG("compute_SCM_bounding_box()", "RBSCMConstruction");
+  LOG_SCOPE("compute_SCM_bounding_box()", "RBSCMConstruction");
 
   // Resize the bounding box vectors
   rb_scm_eval->B_min.resize(get_rb_theta_expansion().get_n_A_terms());
   rb_scm_eval->B_max.resize(get_rb_theta_expansion().get_n_A_terms());
 
-  for(unsigned int q=0; q<get_rb_theta_expansion().get_n_A_terms(); q++)
+  for (unsigned int q=0; q<get_rb_theta_expansion().get_n_A_terms(); q++)
     {
       matrix_A->zero();
       add_scaled_symm_Aq(q, 1.);
@@ -351,16 +348,14 @@ void RBSCMConstruction::compute_SCM_bounding_box()
       else
         libmesh_error_msg("Eigen solver for computing B_max did not converge");
     }
-
-  STOP_LOG("compute_SCM_bounding_box()", "RBSCMConstruction");
 }
 
 void RBSCMConstruction::evaluate_stability_constant()
 {
-  START_LOG("evaluate_stability_constant()", "RBSCMConstruction");
+  LOG_SCOPE("evaluate_stability_constant()", "RBSCMConstruction");
 
   // Get current index of C_J
-  const unsigned int j = rb_scm_eval->C_J.size()-1;
+  const unsigned int j = cast_int<unsigned int>(rb_scm_eval->C_J.size()-1);
 
   eigen_solver->set_position_of_spectrum(SMALLEST_REAL);
 
@@ -370,7 +365,7 @@ void RBSCMConstruction::evaluate_stability_constant()
 
   // Set matrix A corresponding to mu_star
   matrix_A->zero();
-  for(unsigned int q=0; q<get_rb_theta_expansion().get_n_A_terms(); q++)
+  for (unsigned int q=0; q<get_rb_theta_expansion().get_n_A_terms(); q++)
     {
       add_scaled_symm_Aq(q, get_rb_theta_expansion().eval_A_theta(q,get_parameters()));
     }
@@ -397,7 +392,7 @@ void RBSCMConstruction::evaluate_stability_constant()
       // We use this later to compute the SCM upper bounds.
       Real norm_B2 = libmesh_real( B_inner_product(*solution, *solution) );
 
-      for(unsigned int q=0; q<get_rb_theta_expansion().get_n_A_terms(); q++)
+      for (unsigned int q=0; q<get_rb_theta_expansion().get_n_A_terms(); q++)
         {
           Real norm_Aq2 = libmesh_real( Aq_inner_product(q, *solution, *solution) );
 
@@ -406,8 +401,6 @@ void RBSCMConstruction::evaluate_stability_constant()
     }
   else
     libmesh_error_msg("Error: Eigensolver did not converge in evaluate_stability_constant");
-
-  STOP_LOG("evaluate_stability_constant()", "RBSCMConstruction");
 }
 
 Number RBSCMConstruction::B_inner_product(const NumericVector<Number> & v,
@@ -422,7 +415,7 @@ Number RBSCMConstruction::Aq_inner_product(unsigned int q,
                                            const NumericVector<Number> & v,
                                            const NumericVector<Number> & w)
 {
-  if(q >= get_rb_theta_expansion().get_n_A_terms())
+  if (q >= get_rb_theta_expansion().get_n_A_terms())
     libmesh_error_msg("Error: We must have q < Q_a in Aq_inner_product.");
 
   matrix_A->zero();
@@ -434,14 +427,14 @@ Number RBSCMConstruction::Aq_inner_product(unsigned int q,
 
 std::pair<unsigned int,Real> RBSCMConstruction::compute_SCM_bounds_on_training_set()
 {
-  START_LOG("compute_SCM_bounds_on_training_set()", "RBSCMConstruction");
+  LOG_SCOPE("compute_SCM_bounds_on_training_set()", "RBSCMConstruction");
 
   // Now compute the maximum bound error over training_parameters
   unsigned int new_C_J_index = 0;
   Real max_SCM_error = 0.;
 
-  unsigned int first_index = get_first_local_training_index();
-  for(unsigned int i=0; i<get_local_n_training_samples(); i++)
+  numeric_index_type first_index = get_first_local_training_index();
+  for (unsigned int i=0; i<get_local_n_training_samples(); i++)
     {
       set_params_from_training_set(first_index+i);
       rb_scm_eval->set_parameters( get_parameters() );
@@ -450,25 +443,23 @@ std::pair<unsigned int,Real> RBSCMConstruction::compute_SCM_bounds_on_training_s
 
       Real error_i = SCM_greedy_error_indicator(LB, UB);
 
-      if( error_i > max_SCM_error )
+      if (error_i > max_SCM_error)
         {
           max_SCM_error = error_i;
           new_C_J_index = i;
         }
     }
 
-  unsigned int global_index = first_index + new_C_J_index;
-  std::pair<unsigned int,Real> error_pair(global_index, max_SCM_error);
+  numeric_index_type global_index = first_index + new_C_J_index;
+  std::pair<numeric_index_type,Real> error_pair(global_index, max_SCM_error);
   get_global_max_error_pair(this->comm(),error_pair);
-
-  STOP_LOG("compute_SCM_bounds_on_training_set()", "RBSCMConstruction");
 
   return error_pair;
 }
 
 void RBSCMConstruction::enrich_C_J(unsigned int new_C_J_index)
 {
-  START_LOG("enrich_C_J()", "RBSCMConstruction");
+  LOG_SCOPE("enrich_C_J()", "RBSCMConstruction");
 
   set_params_from_training_set_and_broadcast(new_C_J_index);
 
@@ -478,9 +469,10 @@ void RBSCMConstruction::enrich_C_J(unsigned int new_C_J_index)
 
   RBParameters::const_iterator it     = get_parameters().begin();
   RBParameters::const_iterator it_end = get_parameters().end();
-  for( ; it != it_end; ++it)
+  for ( ; it != it_end; ++it)
     {
-      if(it != get_parameters().begin()) libMesh::out << ",";
+      if (it != get_parameters().begin())
+        libMesh::out << ",";
       std::string param_name = it->first;
       RBParameters C_J_params = rb_scm_eval->C_J[rb_scm_eval->C_J.size()-1];
       libMesh::out << C_J_params.get_value(param_name);
@@ -492,8 +484,6 @@ void RBSCMConstruction::enrich_C_J(unsigned int new_C_J_index)
 
   std::vector<Real> zero_vector(get_rb_theta_expansion().get_n_A_terms());
   rb_scm_eval->SCM_UB_vectors.push_back(zero_vector);
-
-  STOP_LOG("enrich_C_J()", "RBSCMConstruction");
 }
 
 

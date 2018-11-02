@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,26 +20,26 @@
 #ifndef LIBMESH_MORTON_SFC_PARTITIONER_H
 #define LIBMESH_MORTON_SFC_PARTITIONER_H
 
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/sfc_partitioner.h"
-
-// C++ Includes   -----------------------------------
 
 namespace libMesh
 {
 
-
-
 /**
- * The \p MortonSFCPartitioner uses a Morton space
- * filling curve to partition the elements.
+ * The \p MortonSFCPartitioner uses a Morton space filling curve to
+ * partition the elements.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2003
+ * \brief Partitioner based on Morton's space filling curve algorithm.
  */
 class MortonSFCPartitioner : public SFCPartitioner
 {
 public:
 
   /**
-   * Constructor.
+   * Constructor. Sets the underlying space filling curve type.
    */
   MortonSFCPartitioner ()
   {
@@ -47,26 +47,35 @@ public:
   }
 
   /**
-   * Creates a new partitioner of this type and returns it in
-   * an \p UniquePtr.
+   * Copy/move ctor, copy/move assignment operator, and destructor are
+   * all explicitly defaulted for this class.
    */
-  virtual UniquePtr<Partitioner> clone () const libmesh_override
+  MortonSFCPartitioner (const MortonSFCPartitioner &) = default;
+  MortonSFCPartitioner (MortonSFCPartitioner &&) = default;
+  MortonSFCPartitioner & operator= (const MortonSFCPartitioner &) = default;
+  MortonSFCPartitioner & operator= (MortonSFCPartitioner &&) = default;
+  virtual ~MortonSFCPartitioner() = default;
+
+  /**
+   * \returns A copy of this partitioner wrapped in a smart pointer.
+   */
+  virtual std::unique_ptr<Partitioner> clone () const override
   {
-    return UniquePtr<Partitioner>(new MortonSFCPartitioner());
+    return libmesh_make_unique<MortonSFCPartitioner>(*this);
   }
 
 protected:
+
   /**
    * Partition the \p MeshBase into \p n subdomains.
    */
   virtual void _do_partition (MeshBase & mesh,
-                              const unsigned int n) libmesh_override
+                              const unsigned int n) override
   {
     SFCPartitioner::_do_partition (mesh, n);
   }
 };
 
 } // namespace libMesh
-
 
 #endif // LIBMESH_MORTON_SFC_PARTITIONER_H

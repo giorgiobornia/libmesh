@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -17,12 +17,11 @@
 
 
 
-// C++ Includes   -----------------------------------
-#include <numeric>
-
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/boundary_info.h"
+#include "libmesh/distributed_mesh.h"
 #include "libmesh/elem.h"
+#include "libmesh/ghosting_functor.h"
 #include "libmesh/libmesh_config.h"
 #include "libmesh/libmesh_common.h"
 #include "libmesh/libmesh_logging.h"
@@ -32,11 +31,16 @@
 #include "libmesh/mesh_tools.h"
 #include "libmesh/parallel.h"
 #include "libmesh/parallel_elem.h"
-#include "libmesh/parallel_mesh.h"
 #include "libmesh/parallel_node.h"
 #include "libmesh/parallel_ghost_sync.h"
 #include "libmesh/utility.h"
 #include "libmesh/remote_elem.h"
+
+// C++ Includes
+#include <numeric>
+#include <set>
+#include <unordered_set>
+#include <unordered_map>
 
 
 
@@ -45,28 +49,6 @@
 namespace {
 
 using namespace libMesh;
-
-/**
- * Specific weak ordering for Elem *'s to be used in a set.
- * We use the id, but first sort by level.  This guarantees
- * when traversing the set from beginning to end the lower
- * level (parent) elements are encountered first.
- */
-struct CompareElemIdsByLevel
-{
-  bool operator()(const Elem * a,
-                  const Elem * b) const
-  {
-    libmesh_assert (a);
-    libmesh_assert (b);
-    const unsigned int
-      al = a->level(), bl = b->level();
-    const dof_id_type
-      aid = a->id(),   bid = b->id();
-
-    return (al == bl) ? aid < bid : al < bl;
-  }
-};
 
 struct SyncNeighbors
 {
@@ -79,7 +61,7 @@ struct SyncNeighbors
 
   // Find the neighbor ids for each requested element
   void gather_data (const std::vector<dof_id_type> & ids,
-                    std::vector<datum> & neighbors)
+                    std::vector<datum> & neighbors) const
   {
     neighbors.resize(ids.size());
 
@@ -87,14 +69,14 @@ struct SyncNeighbors
       {
         // Look for this element in the mesh
         // We'd better find every element we're asked for
-        const Elem * elem = mesh.elem(ids[i]);
+        const Elem & elem = mesh.elem_ref(ids[i]);
 
         // Return the element's neighbors
-        const unsigned int n_neigh = elem->n_neighbors();
+        const unsigned int n_neigh = elem.n_neighbors();
         neighbors[i].resize(n_neigh);
         for (unsigned int n = 0; n != n_neigh; ++n)
           {
-            const Elem * neigh = elem->neighbor(n);
+            const Elem * neigh = elem.neighbor_ptr(n);
             if (neigh)
               {
                 libmesh_assert_not_equal_to(neigh, remote_elem);
@@ -107,21 +89,21 @@ struct SyncNeighbors
   }
 
   void act_on_data (const std::vector<dof_id_type> & ids,
-                    std::vector<datum> & neighbors)
+                    const std::vector<datum> & neighbors) const
   {
     for (std::size_t i=0; i != ids.size(); ++i)
       {
-        Elem * elem = mesh.elem(ids[i]);
+        Elem & elem = mesh.elem_ref(ids[i]);
 
-        datum & new_neigh = neighbors[i];
+        const datum & new_neigh = neighbors[i];
 
-        const unsigned int n_neigh = elem->n_neighbors();
+        const unsigned int n_neigh = elem.n_neighbors();
         libmesh_assert_equal_to (n_neigh, new_neigh.size());
 
         for (unsigned int n = 0; n != n_neigh; ++n)
           {
             const dof_id_type new_neigh_id = new_neigh[n];
-            const Elem * old_neigh = elem->neighbor(n);
+            const Elem * old_neigh = elem.neighbor_ptr(n);
             if (old_neigh && old_neigh != remote_elem)
               {
                 libmesh_assert_equal_to(old_neigh->id(), new_neigh_id);
@@ -132,22 +114,160 @@ struct SyncNeighbors
               }
             else
               {
-                Elem * neigh = mesh.query_elem(new_neigh_id);
+                Elem * neigh = mesh.query_elem_ptr(new_neigh_id);
                 if (neigh)
-                  elem->set_neighbor(n, neigh);
+                  elem.set_neighbor(n, neigh);
                 else
-                  elem->set_neighbor(n, const_cast<RemoteElem *>(remote_elem));
+                  elem.set_neighbor(n, const_cast<RemoteElem *>(remote_elem));
               }
           }
       }
   }
 };
 
+
 }
+
 
 
 namespace libMesh
 {
+
+
+void query_ghosting_functors(const MeshBase & mesh,
+                             processor_id_type pid,
+                             MeshBase::const_element_iterator elem_it,
+                             MeshBase::const_element_iterator elem_end,
+                             std::set<const Elem *, CompareElemIdsByLevel> & connected_elements)
+{
+  for (auto & gf :
+         as_range(mesh.ghosting_functors_begin(),
+                  mesh.ghosting_functors_end()))
+    {
+      GhostingFunctor::map_type elements_to_ghost;
+      libmesh_assert(gf);
+      (*gf)(elem_it, elem_end, pid, elements_to_ghost);
+
+      // We can ignore the CouplingMatrix in ->second, but we
+      // need to ghost all the elements in ->first.
+      for (auto & pr : elements_to_ghost)
+        {
+          const Elem * elem = pr.first;
+          libmesh_assert(elem != remote_elem);
+          connected_elements.insert(elem);
+        }
+    }
+
+  // The GhostingFunctors won't be telling us about the elements from
+  // pid; we need to add those ourselves.
+  for (; elem_it != elem_end; ++elem_it)
+    connected_elements.insert(*elem_it);
+}
+
+
+void connect_children(const MeshBase & mesh,
+                      MeshBase::const_element_iterator elem_it,
+                      MeshBase::const_element_iterator elem_end,
+                      std::set<const Elem *, CompareElemIdsByLevel> & connected_elements)
+{
+  // None of these parameters are used when !LIBMESH_ENABLE_AMR.
+  libmesh_ignore(mesh, elem_it, elem_end, connected_elements);
+
+#ifdef LIBMESH_ENABLE_AMR
+  // Our XdrIO output needs inactive local elements to not have any
+  // remote_elem children.  Let's make sure that doesn't happen.
+  //
+  for (const auto & elem : as_range(elem_it, elem_end))
+    {
+      if (elem->has_children())
+        for (auto & child : elem->child_ref_range())
+          if (&child != remote_elem)
+            connected_elements.insert(&child);
+    }
+#endif // LIBMESH_ENABLE_AMR
+}
+
+
+void connect_families(std::set<const Elem *, CompareElemIdsByLevel> & connected_elements)
+{
+  // This parameter is not used when !LIBMESH_ENABLE_AMR.
+  libmesh_ignore(connected_elements);
+
+#ifdef LIBMESH_ENABLE_AMR
+
+  // Because our set is sorted by ascending level, we can traverse it
+  // in reverse order, adding parents as we go, and end up with all
+  // ancestors added.  This is safe for std::set where insert doesn't
+  // invalidate iterators.
+  //
+  // This only works because we do *not* cache
+  // connected_elements.rend(), whose value can change when we insert
+  // elements which are sorted before the original rend.
+  //
+  // We're also going to get subactive descendents here, when any
+  // exist.  We're iterating in the wrong direction to do that
+  // non-recursively, so we'll cop out and rely on total_family_tree.
+  // Iterating backwards does mean that we won't be querying the newly
+  // inserted subactive elements redundantly.
+
+  std::set<const Elem *, CompareElemIdsByLevel>::reverse_iterator
+    elem_rit  = connected_elements.rbegin();
+
+  for (; elem_rit != connected_elements.rend(); ++elem_rit)
+    {
+      const Elem * elem = *elem_rit;
+      libmesh_assert(elem);
+      const Elem * parent = elem->parent();
+
+      // We let ghosting functors worry about only active elements,
+      // but the remote processor needs all its semilocal elements'
+      // ancestors and active semilocal elements' descendants too.
+      if (parent)
+        connected_elements.insert (parent);
+
+      if (elem->active() && elem->has_children())
+        {
+          std::vector<const Elem *> subactive_family;
+          elem->total_family_tree(subactive_family);
+          for (std::size_t i=0; i != subactive_family.size(); ++i)
+            {
+              libmesh_assert(subactive_family[i] != remote_elem);
+              connected_elements.insert(subactive_family[i]);
+            }
+        }
+    }
+
+#  ifdef DEBUG
+  // Let's be paranoid and make sure that all our ancestors
+  // really did get inserted.  I screwed this up the first time
+  // by caching rend, and I can easily imagine screwing it up in
+  // the future by changing containers.
+  for (const auto & elem : connected_elements)
+    {
+      libmesh_assert(elem);
+      const Elem * parent = elem->parent();
+      if (parent)
+        libmesh_assert(connected_elements.count(parent));
+    }
+#  endif // DEBUG
+
+#endif // LIBMESH_ENABLE_AMR
+}
+
+
+void reconnect_nodes (const std::set<const Elem *, CompareElemIdsByLevel> & connected_elements,
+                      std::set<const Node *> & connected_nodes)
+{
+  // We're done using the nodes list for element decisions; now
+  // let's reuse it for nodes of the elements we've decided on.
+  connected_nodes.clear();
+
+  for (const auto & elem : connected_elements)
+    for (auto & n : elem->node_ref_range())
+      connected_nodes.insert(&n);
+}
+
+
 
 
 // ------------------------------------------------------------
@@ -161,14 +281,16 @@ void MeshCommunication::clear ()
 
 #ifndef LIBMESH_HAVE_MPI // avoid spurious gcc warnings
 // ------------------------------------------------------------
-void MeshCommunication::redistribute (ParallelMesh &) const
+void MeshCommunication::redistribute (DistributedMesh &, bool) const
 {
   // no MPI == one processor, no redistribution
   return;
 }
+
 #else
 // ------------------------------------------------------------
-void MeshCommunication::redistribute (ParallelMesh & mesh) const
+void MeshCommunication::redistribute (DistributedMesh & mesh,
+                                      bool newly_coarsened_only) const
 {
   // This method will be called after a new partitioning has been
   // assigned to the elements.  This partitioning was defined in
@@ -180,9 +302,15 @@ void MeshCommunication::redistribute (ParallelMesh & mesh) const
   // local may now be assigned to other processors, so we need to
   // send those off.  Similarly, we need to accept elements from
   // other processors.
-  //
+
+  // This method is also useful in the more limited case of
+  // post-coarsening redistribution: if elements are only ghosting
+  // neighbors of their active elements, but adaptive coarsening
+  // causes an inactive element to become active, then we may need a
+  // copy of that inactive element's neighbors.
+
   // The approach is as follows:
-  // (1) send all elements we have stored to their proper homes
+  // (1) send all relevant elements we have stored to their proper homes
   // (2) receive elements from all processors, watching for duplicates
   // (3) deleting all nonlocal elements elements
   // (4) obtaining required ghost elements from neighboring processors
@@ -191,7 +319,7 @@ void MeshCommunication::redistribute (ParallelMesh & mesh) const
   libmesh_assert (MeshTools::n_elem(mesh.unpartitioned_elements_begin(),
                                     mesh.unpartitioned_elements_end()) == 0);
 
-  START_LOG("redistribute()","MeshCommunication");
+  LOG_SCOPE("redistribute()", "MeshCommunication");
 
   // Get a few unique message tags to use in communications; we'll
   // default to some numbers around pi*1000
@@ -211,100 +339,110 @@ void MeshCommunication::redistribute (ParallelMesh & mesh) const
   std::vector<Parallel::Request>
     node_send_requests, element_send_requests;
 
+  // We're going to sort elements-to-send by pid in one pass, to avoid
+  // sending predicated iterators through the whole mesh N_p times
+  std::unordered_map<processor_id_type, std::vector<Elem *>> send_to_pid;
+
+  const MeshBase::const_element_iterator send_elems_begin =
+#ifdef LIBMESH_ENABLE_AMR
+    newly_coarsened_only ?
+      mesh.flagged_elements_begin(Elem::JUST_COARSENED) :
+#endif
+      mesh.active_elements_begin();
+
+  const MeshBase::const_element_iterator send_elems_end =
+#ifdef LIBMESH_ENABLE_AMR
+    newly_coarsened_only ?
+      mesh.flagged_elements_end(Elem::JUST_COARSENED) :
+#endif
+      mesh.active_elements_end();
+
+  for (auto & elem : as_range(send_elems_begin, send_elems_end))
+    send_to_pid[elem->processor_id()].push_back(elem);
+
   for (processor_id_type pid=0; pid<mesh.n_processors(); pid++)
     if (pid != mesh.processor_id()) // don't send to ourselves!!
       {
         // Build up a list of nodes and elements to send to processor pid.
         // We will certainly send all the elements assigned to this processor,
-        // but we will also ship off any other elements which touch
-        // their nodes.
-        std::set<const Node *> connected_nodes;
-        {
-          MeshBase::const_element_iterator       elem_it  = mesh.pid_elements_begin(pid);
-          const MeshBase::const_element_iterator elem_end = mesh.pid_elements_end(pid);
+        // but we will also ship off any elements which are required
+        // to be ghosted and any nodes which are used by any of the
+        // above.
 
-          for (; elem_it!=elem_end; ++elem_it)
-            {
-              const Elem * elem = *elem_it;
+        const auto elements_vec_it = send_to_pid.find(pid);
 
-              for (unsigned int n=0; n<elem->n_nodes(); n++)
-                connected_nodes.insert (elem->get_node(n));
-            }
-        }
+        // If we don't have any just-coarsened elements to send to
+        // pid, then there won't be any nodes or any elements pulled
+        // in by ghosting either, and we're done with this pid.
+        if (elements_vec_it == send_to_pid.end())
+          continue;
+
+        const auto & p_elements = elements_vec_it->second;
+        libmesh_assert(!p_elements.empty());
+
+        Elem * const * elempp = p_elements.data();
+        Elem * const * elemend = elempp + p_elements.size();
+
+#ifndef LIBMESH_ENABLE_AMR
+        // This parameter is not used when !LIBMESH_ENABLE_AMR.
+        libmesh_ignore(newly_coarsened_only);
+        libmesh_assert(!newly_coarsened_only);
+#endif
+
+        MeshBase::const_element_iterator elem_it =
+          MeshBase::const_element_iterator
+            (elempp, elemend, Predicates::NotNull<Elem * const *>());
+
+        const MeshBase::const_element_iterator elem_end =
+          MeshBase::const_element_iterator
+            (elemend, elemend, Predicates::NotNull<Elem * const *>());
 
         std::set<const Elem *, CompareElemIdsByLevel> elements_to_send;
-        {
-          MeshBase::const_element_iterator       elem_it  = mesh.elements_begin();
-          const MeshBase::const_element_iterator elem_end = mesh.elements_end();
 
-          for (; elem_it!=elem_end; ++elem_it)
-            {
-              const Elem * elem = *elem_it;
+        // See which to-be-ghosted elements we need to send
+        query_ghosting_functors (mesh, pid, elem_it, elem_end,
+                                 elements_to_send);
 
-              for (unsigned int n=0; n<elem->n_nodes(); n++)
-                if (connected_nodes.count(elem->get_node(n)))
-                  {
-                    elements_to_send.insert (elem);
+        // The inactive elements we need to send should have their
+        // immediate children present.
+        connect_children(mesh, mesh.pid_elements_begin(pid),
+                         mesh.pid_elements_end(pid),
+                         elements_to_send);
 
-                    // The remote processor needs all its semilocal
-                    // elements' ancestors, and it's possible that
-                    // they might not all be connected to the remote
-                    // processor's nodes.
-                    for (const Elem * parent = elem->parent(); parent;
-                         parent = parent->parent())
-                      elements_to_send.insert(parent);
-                  }
-            }
-        }
+        // The elements we need should have their ancestors and their
+        // subactive children present too.
+        connect_families(elements_to_send);
 
-        connected_nodes.clear();
-        {
-          std::set<const Elem *, CompareElemIdsByLevel>::iterator
-            elem_it  = elements_to_send.begin(),
-            elem_end = elements_to_send.end();
-
-          for (; elem_it!=elem_end; ++elem_it)
-            {
-              const Elem * elem = *elem_it;
-
-              for (unsigned int n=0; n<elem->n_nodes(); n++)
-                connected_nodes.insert(elem->get_node(n));
-            }
-        }
+        std::set<const Node *> connected_nodes;
+        reconnect_nodes(elements_to_send, connected_nodes);
 
         // the number of nodes we will ship to pid
         send_n_nodes_and_elem_per_proc[2*pid+0] =
           cast_int<dof_id_type>(connected_nodes.size());
 
         // send any nodes off to the destination processor
-        if (!connected_nodes.empty())
-          {
-            node_send_requests.push_back(Parallel::request());
+        libmesh_assert (!connected_nodes.empty());
+        node_send_requests.push_back(Parallel::request());
 
-            mesh.comm().send_packed_range (pid,
-                                           &mesh,
-                                           connected_nodes.begin(),
-                                           connected_nodes.end(),
-                                           node_send_requests.back(),
-                                           nodestag);
-          }
+        mesh.comm().send_packed_range (pid, &mesh,
+                                       connected_nodes.begin(),
+                                       connected_nodes.end(),
+                                       node_send_requests.back(),
+                                       nodestag);
 
         // the number of elements we will send to this processor
         send_n_nodes_and_elem_per_proc[2*pid+1] =
           cast_int<dof_id_type>(elements_to_send.size());
 
-        if (!elements_to_send.empty())
-          {
-            // send the elements off to the destination processor
-            element_send_requests.push_back(Parallel::request());
+        // send the elements off to the destination processor
+        libmesh_assert (!elements_to_send.empty());
+        element_send_requests.push_back(Parallel::request());
 
-            mesh.comm().send_packed_range (pid,
-                                           &mesh,
-                                           elements_to_send.begin(),
-                                           elements_to_send.end(),
-                                           element_send_requests.back(),
-                                           elemstag);
-          }
+        mesh.comm().send_packed_range (pid, &mesh,
+                                       elements_to_send.begin(),
+                                       elements_to_send.end(),
+                                       element_send_requests.back(),
+                                       elemstag);
       }
 
   std::vector<dof_id_type> recv_n_nodes_and_elem_per_proc(send_n_nodes_and_elem_per_proc);
@@ -359,7 +497,7 @@ void MeshCommunication::redistribute (ParallelMesh & mesh) const
     mesh.comm().receive_packed_range (Parallel::any_source,
                                       &mesh,
                                       mesh_inserter_iterator<Node>(mesh),
-                                      (Node**)libmesh_nullptr,
+                                      (Node**)nullptr,
                                       nodestag);
 
   // Receive elements.
@@ -369,7 +507,7 @@ void MeshCommunication::redistribute (ParallelMesh & mesh) const
     mesh.comm().receive_packed_range (Parallel::any_source,
                                       &mesh,
                                       mesh_inserter_iterator<Elem>(mesh),
-                                      (Elem**)libmesh_nullptr,
+                                      (Elem**)nullptr,
                                       elemstag);
 
   // Wait for all sends to complete
@@ -383,7 +521,15 @@ void MeshCommunication::redistribute (ParallelMesh & mesh) const
   MeshTools::libmesh_assert_valid_refinement_tree(mesh);
 #endif
 
-  STOP_LOG("redistribute()","MeshCommunication");
+  // If we had a point locator, it's invalid now that there are new
+  // elements it can't locate.
+  mesh.clear_point_locator();
+
+  // We now have all elements and nodes redistributed; our ghosting
+  // functors should be ready to redistribute and/or recompute any
+  // cached data they use too.
+  for (auto & gf : as_range(mesh.ghosting_functors_begin(), mesh.ghosting_functors_end()))
+    gf->redistribute();
 }
 #endif // LIBMESH_HAVE_MPI
 
@@ -391,14 +537,14 @@ void MeshCommunication::redistribute (ParallelMesh & mesh) const
 
 #ifndef LIBMESH_HAVE_MPI // avoid spurious gcc warnings
 // ------------------------------------------------------------
-void MeshCommunication::gather_neighboring_elements (ParallelMesh &) const
+void MeshCommunication::gather_neighboring_elements (DistributedMesh &) const
 {
   // no MPI == one processor, no need for this method...
   return;
 }
 #else
 // ------------------------------------------------------------
-void MeshCommunication::gather_neighboring_elements (ParallelMesh & mesh) const
+void MeshCommunication::gather_neighboring_elements (DistributedMesh & mesh) const
 {
   // Don't need to do anything if there is
   // only one processor.
@@ -408,7 +554,7 @@ void MeshCommunication::gather_neighboring_elements (ParallelMesh & mesh) const
   // This function must be run on all processors at once
   libmesh_parallel_only(mesh.comm());
 
-  START_LOG("gather_neighboring_elements()","MeshCommunication");
+  LOG_SCOPE("gather_neighboring_elements()", "MeshCommunication");
 
   //------------------------------------------------------------------
   // The purpose of this function is to provide neighbor data structure
@@ -417,8 +563,8 @@ void MeshCommunication::gather_neighboring_elements (ParallelMesh & mesh) const
   // neighbors.  In some cases this requires us to store "ghost elements" -
   // elements that belong to other processors but we store to provide
   // data structure consistency.  Also, it is assumed that any element
-  // with a NULL neighbor resides on a physical domain boundary.  So,
-  // even our "ghost elements" must have non-NULL neighbors.  To handle
+  // with a nullptr neighbor resides on a physical domain boundary.  So,
+  // even our "ghost elements" must have non-nullptr neighbors.  To handle
   // this the concept of "RemoteElem" is used - a special construct which
   // is used to denote that an element has a face neighbor, but we do
   // not actually store detailed information about that neighbor.  This
@@ -426,12 +572,12 @@ void MeshCommunication::gather_neighboring_elements (ParallelMesh & mesh) const
   //
   // So when this method is called we should have only local elements.
   // These local elements will then find neighbors among the local
-  // element set.  After this is completed, any element with a NULL
+  // element set.  After this is completed, any element with a nullptr
   // neighbor has either (i) a face on the physical boundary of the mesh,
   // or (ii) a neighboring element which lives on a remote processor.
   // To handle case (ii), we communicate the global node indices connected
   // to all such faces to our neighboring processors.  They then send us
-  // all their elements with a NULL neighbor that are connected to any
+  // all their elements with a nullptr neighbor that are connected to any
   // of the nodes in our list.
   //------------------------------------------------------------------
 
@@ -446,7 +592,7 @@ void MeshCommunication::gather_neighboring_elements (ParallelMesh & mesh) const
   Parallel::MessageTag
     element_neighbors_tag = mesh.comm().get_unique_tag(31416);
 
-  // Now any element with a NULL neighbor either
+  // Now any element with a nullptr neighbor either
   // (i) lives on the physical domain boundary, or
   // (ii) lives on an inter-processor boundary.
   // We will now gather all the elements from adjacent processors
@@ -465,7 +611,7 @@ void MeshCommunication::gather_neighboring_elements (ParallelMesh & mesh) const
     cast_int<processor_id_type>(adjacent_processors.size());
 
   //-------------------------------------------------------------------------
-  // Let's build a list of all nodes which live on NULL-neighbor sides.
+  // Let's build a list of all nodes which live on nullptr-neighbor sides.
   // For simplicity, we will use a set to build the list, then transfer
   // it to a vector for communication.
   std::vector<dof_id_type> my_interface_node_list;
@@ -474,25 +620,21 @@ void MeshCommunication::gather_neighboring_elements (ParallelMesh & mesh) const
     std::set<dof_id_type> my_interface_node_set;
 
     // since parent nodes are a subset of children nodes, this should be sufficient
-    MeshBase::const_element_iterator       it     = mesh.active_local_elements_begin();
-    const MeshBase::const_element_iterator it_end = mesh.active_local_elements_end();
-
-    for (; it != it_end; ++it)
+    for (const auto & elem : mesh.active_local_element_ptr_range())
       {
-        const Elem * const elem = *it;
         libmesh_assert(elem);
 
-        if (elem->on_boundary()) // denotes *any* side has a NULL neighbor
+        if (elem->on_boundary()) // denotes *any* side has a nullptr neighbor
           {
             my_interface_elements.push_back(elem); // add the element, but only once, even
-            // if there are multiple NULL neighbors
-            for (unsigned int s=0; s<elem->n_sides(); s++)
-              if (elem->neighbor(s) == libmesh_nullptr)
+            // if there are multiple nullptr neighbors
+            for (auto s : elem->side_index_range())
+              if (elem->neighbor_ptr(s) == nullptr)
                 {
-                  UniquePtr<Elem> side(elem->build_side(s));
+                  std::unique_ptr<const Elem> side(elem->build_side_ptr(s));
 
                   for (unsigned int n=0; n<side->n_vertices(); n++)
-                    my_interface_node_set.insert (side->node(n));
+                    my_interface_node_set.insert (side->node_id(n));
                 }
           }
       }
@@ -510,7 +652,7 @@ void MeshCommunication::gather_neighboring_elements (ParallelMesh & mesh) const
   // MPI 2.1 standard seeks to remove this restriction as unnecessary, so in
   // the future we should change this to send the same buffer to each of the
   // adjacent processors. - BSK 11/17/2008
-  std::vector<std::vector<dof_id_type> >
+  std::vector<std::vector<dof_id_type>>
     my_interface_node_xfer_buffers (n_adjacent_processors, my_interface_node_list);
   std::map<processor_id_type, unsigned char> n_comm_steps;
 
@@ -538,7 +680,7 @@ void MeshCommunication::gather_neighboring_elements (ParallelMesh & mesh) const
 
   std::vector<dof_id_type> common_interface_node_list;
 
-  // we expect two classess of messages -
+  // we expect two classes of messages -
   // (1) incoming interface node lists, to which we will reply with our elements
   //     touching nodes in the list, and
   // (2) replies from the requests we sent off previously.
@@ -640,14 +782,14 @@ void MeshCommunication::gather_neighboring_elements (ParallelMesh & mesh) const
 
           std::vector<const Elem *> family_tree;
 
-          for (dof_id_type e=0, n_shared_nodes=0; e<my_interface_elements.size(); e++, n_shared_nodes=0)
+          for (std::size_t e=0, n_shared_nodes=0; e<my_interface_elements.size(); e++, n_shared_nodes=0)
             {
               const Elem * elem = my_interface_elements[e];
 
               for (unsigned int n=0; n<elem->n_vertices(); n++)
                 if (std::binary_search (common_interface_node_list.begin(),
                                         common_interface_node_list.end(),
-                                        elem->node(n)))
+                                        elem->node_id(n)))
                   {
                     n_shared_nodes++;
 
@@ -671,13 +813,13 @@ void MeshCommunication::gather_neighboring_elements (ParallelMesh & mesh) const
                       family_tree.clear();
                       family_tree.push_back(elem);
 #endif
-                      for (unsigned int leaf=0; leaf<family_tree.size(); leaf++)
+                      for (std::size_t leaf=0; leaf<family_tree.size(); leaf++)
                         {
                           elem = family_tree[leaf];
                           elements_to_send.insert (elem);
 
-                          for (unsigned int n=0; n<elem->n_nodes(); n++)
-                            connected_nodes.insert (elem->get_node(n));
+                          for (auto & n : elem->node_ref_range())
+                            connected_nodes.insert (&n);
                         }
                     }
                 }
@@ -717,7 +859,7 @@ void MeshCommunication::gather_neighboring_elements (ParallelMesh & mesh) const
           mesh.comm().receive_packed_range (source_pid_idx,
                                             &mesh,
                                             mesh_inserter_iterator<Node>(mesh),
-                                            (Node**)libmesh_nullptr,
+                                            (Node**)nullptr,
                                             element_neighbors_tag);
         }
       //------------------------------------------------------------------
@@ -729,7 +871,7 @@ void MeshCommunication::gather_neighboring_elements (ParallelMesh & mesh) const
           mesh.comm().receive_packed_range (source_pid_idx,
                                             &mesh,
                                             mesh_inserter_iterator<Elem>(mesh),
-                                            (Elem**)libmesh_nullptr,
+                                            (Elem**)nullptr,
                                             element_neighbors_tag);
         }
       //------------------------------------------------------------------
@@ -745,6 +887,10 @@ void MeshCommunication::gather_neighboring_elements (ParallelMesh & mesh) const
   // allow any pending requests to complete
   Parallel::wait (send_requests);
 
+  // If we had a point locator, it's invalid now that there are new
+  // elements it can't locate.
+  mesh.clear_point_locator();
+
   // We can now find neighbor information for the interfaces between
   // local elements and ghost elements.
   mesh.find_neighbors (/* reset_remote_elements = */ true,
@@ -757,11 +903,178 @@ void MeshCommunication::gather_neighboring_elements (ParallelMesh & mesh) const
 
   Parallel::sync_dofobject_data_by_id
     (mesh.comm(), mesh.elements_begin(), mesh.elements_end(), nsync);
-
-  STOP_LOG("gather_neighboring_elements()","MeshCommunication");
 }
 #endif // LIBMESH_HAVE_MPI
 
+
+#ifndef LIBMESH_HAVE_MPI // avoid spurious gcc warnings
+// ------------------------------------------------------------
+void MeshCommunication::send_coarse_ghosts(MeshBase &) const
+{
+  // no MPI == one processor, no need for this method...
+  return;
+}
+#else
+void MeshCommunication::send_coarse_ghosts(MeshBase & mesh) const
+{
+
+  // Don't need to do anything if all processors already ghost all non-local
+  // elements.
+  if (mesh.is_serial())
+    return;
+
+  // This algorithm uses the MeshBase::flagged_pid_elements_begin/end iterators
+  // which are only available when AMR is enabled.
+#ifndef LIBMESH_ENABLE_AMR
+  libmesh_error_msg("Calling MeshCommunication::send_coarse_ghosts() requires AMR to be enabled. "
+                    "Please configure libmesh with --enable-amr.");
+#else
+  // When we coarsen elements on a DistributedMesh, we make their
+  // parents active.  This may increase the ghosting requirements on
+  // the processor which owns the newly-activated parent element.  To
+  // ensure ghosting requirements are satisfied, processors which
+  // coarsen an element will send all the associated ghosted elements
+  // to all processors which own any of the coarsened-away-element's
+  // siblings.
+  typedef std::unordered_map<processor_id_type, std::vector<Elem *>> ghost_map;
+  ghost_map coarsening_elements_to_ghost;
+
+  const processor_id_type proc_id = mesh.processor_id();
+  // Look for just-coarsened elements
+  for (auto elem : as_range(mesh.flagged_pid_elements_begin(Elem::COARSEN, proc_id),
+                            mesh.flagged_pid_elements_end(Elem::COARSEN, proc_id)))
+    {
+      // If it's flagged for coarsening it had better have a parent
+      libmesh_assert(elem->parent());
+
+      // On a distributed mesh:
+      // If we don't own this element's parent but we do own it, then
+      // there is a chance that we are aware of ghost elements which
+      // the parent's owner needs us to send them.
+      const processor_id_type their_proc_id = elem->parent()->processor_id();
+      if (their_proc_id != proc_id)
+        coarsening_elements_to_ghost[their_proc_id].push_back(elem);
+    }
+
+  const processor_id_type n_proc = mesh.n_processors();
+
+  // Get a few unique message tags to use in communications; we'll
+  // default to some numbers around pi*1000
+  Parallel::MessageTag
+    nodestag   = mesh.comm().get_unique_tag(3141),
+    elemstag   = mesh.comm().get_unique_tag(3142);
+
+  std::vector<Parallel::Request> send_requests;
+
+  // Using unsigned char instead of bool since it'll get converted for
+  // MPI use later anyway
+  std::vector<unsigned char> send_to_proc(n_proc, 0);
+
+  for (processor_id_type p=0; p != n_proc; ++p)
+    {
+      if (p == proc_id)
+        break;
+
+      // We'll send these asynchronously, but their data will be
+      // packed into Parallel:: buffers so it will be okay when the
+      // original containers are destructed before the sends complete.
+      std::set<const Elem *, CompareElemIdsByLevel> elements_to_send;
+      std::set<const Node *> nodes_to_send;
+
+      const ghost_map::const_iterator it =
+        coarsening_elements_to_ghost.find(p);
+      if (it != coarsening_elements_to_ghost.end())
+        {
+          const std::vector<Elem *> & elems = it->second;
+          libmesh_assert(elems.size());
+
+          // Make some fake element iterators defining this vector of
+          // elements
+          Elem * const * elempp = const_cast<Elem * const *>(&elems[0]);
+          Elem * const * elemend = elempp+elems.size();
+          const MeshBase::const_element_iterator elem_it =
+            MeshBase::const_element_iterator(elempp, elemend, Predicates::NotNull<Elem * const *>());
+          const MeshBase::const_element_iterator elem_end =
+            MeshBase::const_element_iterator(elemend, elemend, Predicates::NotNull<Elem * const *>());
+
+          for (auto & gf : as_range(mesh.ghosting_functors_begin(),
+                                    mesh.ghosting_functors_end()))
+            {
+              GhostingFunctor::map_type elements_to_ghost;
+              libmesh_assert(gf);
+              (*gf)(elem_it, elem_end, p, elements_to_ghost);
+
+              // We can ignore the CouplingMatrix in ->second, but we
+              // need to ghost all the elements in ->first.
+              for (auto & pr : elements_to_ghost)
+                {
+                  const Elem * elem = pr.first;
+                  libmesh_assert(elem);
+                  while (elem)
+                    {
+                      libmesh_assert(elem != remote_elem);
+                      elements_to_send.insert(elem);
+                      for (auto & n : elem->node_ref_range())
+                        nodes_to_send.insert(&n);
+                      elem = elem->parent();
+                    }
+                }
+            }
+
+          send_requests.push_back(Parallel::request());
+
+          mesh.comm().send_packed_range (p, &mesh,
+                                         nodes_to_send.begin(),
+                                         nodes_to_send.end(),
+                                         send_requests.back(),
+                                         nodestag);
+
+          send_requests.push_back(Parallel::request());
+
+          send_to_proc[p] = 1; // true
+
+          mesh.comm().send_packed_range (p, &mesh,
+                                         elements_to_send.begin(),
+                                         elements_to_send.end(),
+                                         send_requests.back(),
+                                         elemstag);
+        }
+    }
+
+  // Find out how many other processors are sending us elements+nodes.
+  std::vector<unsigned char> recv_from_proc(send_to_proc);
+  mesh.comm().alltoall(recv_from_proc);
+
+  const processor_id_type n_receives = cast_int<processor_id_type>
+    (std::count(recv_from_proc.begin(), recv_from_proc.end(), 1));
+
+  // Receive nodes first since elements will need to attach to them
+  for (processor_id_type recv_i = 0; recv_i != n_receives; ++recv_i)
+    {
+      mesh.comm().receive_packed_range
+        (Parallel::any_source,
+         &mesh,
+         mesh_inserter_iterator<Node>(mesh),
+         (Node**)nullptr,
+         nodestag);
+    }
+
+  for (processor_id_type recv_i = 0; recv_i != n_receives; ++recv_i)
+    {
+      mesh.comm().receive_packed_range
+        (Parallel::any_source,
+         &mesh,
+         mesh_inserter_iterator<Elem>(mesh),
+         (Elem**)nullptr,
+         elemstag);
+    }
+
+  // Wait for all sends to complete
+  Parallel::wait (send_requests);
+#endif // LIBMESH_ENABLE_AMR
+}
+
+#endif // LIBMESH_HAVE_MPI
 
 #ifndef LIBMESH_HAVE_MPI // avoid spurious gcc warnings
 // ------------------------------------------------------------
@@ -782,7 +1095,7 @@ void MeshCommunication::broadcast (MeshBase & mesh) const
   // This function must be run on all processors at once
   libmesh_parallel_only(mesh.comm());
 
-  START_LOG("broadcast()","MeshCommunication");
+  LOG_SCOPE("broadcast()", "MeshCommunication");
 
   // Explicitly clear the mesh on all but processor 0.
   if (mesh.processor_id() != 0)
@@ -797,8 +1110,12 @@ void MeshCommunication::broadcast (MeshBase & mesh) const
 
   // Broadcast elements from coarsest to finest, so that child
   // elements will see their parents already in place.
-  unsigned int n_levels = MeshTools::n_levels(mesh);
-  mesh.comm().broadcast(n_levels);
+  //
+  // When restarting from a checkpoint, we may have elements which are
+  // assigned to a processor but which have not yet been sent to that
+  // processor, so we need to use a paranoid n_levels() count and not
+  // the usual fast algorithm.
+  const unsigned int n_levels = MeshTools::paranoid_n_levels(mesh);
 
   for (unsigned int l=0; l != n_levels; ++l)
     mesh.comm().broadcast_packed_range(&mesh,
@@ -815,6 +1132,10 @@ void MeshCommunication::broadcast (MeshBase & mesh) const
   mesh.comm().broadcast(mesh.get_boundary_info().set_sideset_name_map());
   mesh.comm().broadcast(mesh.get_boundary_info().set_nodeset_name_map());
 
+  // If we had a point locator, it's invalid now that there are new
+  // elements it can't locate.
+  mesh.clear_point_locator();
+
   libmesh_assert (mesh.comm().verify(mesh.n_elem()));
   libmesh_assert (mesh.comm().verify(mesh.n_nodes()));
 
@@ -822,8 +1143,6 @@ void MeshCommunication::broadcast (MeshBase & mesh) const
   MeshTools::libmesh_assert_valid_procids<Elem>(mesh);
   MeshTools::libmesh_assert_valid_procids<Node>(mesh);
 #endif
-
-  STOP_LOG("broadcast()","MeshCommunication");
 }
 #endif // LIBMESH_HAVE_MPI
 
@@ -831,18 +1150,15 @@ void MeshCommunication::broadcast (MeshBase & mesh) const
 
 #ifndef LIBMESH_HAVE_MPI // avoid spurious gcc warnings
 // ------------------------------------------------------------
-void MeshCommunication::gather (const processor_id_type, ParallelMesh &) const
+void MeshCommunication::gather (const processor_id_type, DistributedMesh &) const
 {
   // no MPI == one processor, no need for this method...
   return;
 }
 #else
 // ------------------------------------------------------------
-void MeshCommunication::gather (const processor_id_type root_id, ParallelMesh & mesh) const
+void MeshCommunication::gather (const processor_id_type root_id, DistributedMesh & mesh) const
 {
-  // The mesh should know it's about to be serialized
-  libmesh_assert (mesh.is_serial());
-
   // Check for quick return
   if (mesh.n_processors() == 1)
     return;
@@ -850,7 +1166,7 @@ void MeshCommunication::gather (const processor_id_type root_id, ParallelMesh & 
   // This function must be run on all processors at once
   libmesh_parallel_only(mesh.comm());
 
-  START_LOG("(all)gather()","MeshCommunication");
+  LOG_SCOPE("(all)gather()", "MeshCommunication");
 
   (root_id == DofObject::invalid_processor_id) ?
 
@@ -867,10 +1183,7 @@ void MeshCommunication::gather (const processor_id_type root_id, ParallelMesh & 
 
   // Gather elements from coarsest to finest, so that child
   // elements will see their parents already in place.
-  // rank 0 should know n_levels regardless, so this is
-  // safe independent of root_id
-  unsigned int n_levels = MeshTools::n_levels(mesh);
-  mesh.comm().broadcast(n_levels);
+  const unsigned int n_levels = MeshTools::n_levels(mesh);
 
   for (unsigned int l=0; l != n_levels; ++l)
     (root_id == DofObject::invalid_processor_id) ?
@@ -886,6 +1199,9 @@ void MeshCommunication::gather (const processor_id_type root_id, ParallelMesh & 
                                        mesh.level_elements_end(l),
                                        mesh_inserter_iterator<Elem>(mesh));
 
+  // If we had a point locator, it's invalid now that there are new
+  // elements it can't locate.
+  mesh.clear_point_locator();
 
   // If we are doing an allgather(), perform sanity check on the result.
   if (root_id == DofObject::invalid_processor_id)
@@ -896,13 +1212,15 @@ void MeshCommunication::gather (const processor_id_type root_id, ParallelMesh & 
 
   // Inform new elements of their neighbors,
   // while resetting all remote_elem links on
-  // the appropriate ranks.
-  if ((root_id == DofObject::invalid_processor_id) ||
-      (mesh.comm().rank() == root_id))
-    mesh.find_neighbors(true);
+  // the ranks which did the gather.
+  mesh.find_neighbors(root_id == DofObject::invalid_processor_id ||
+                      root_id == mesh.processor_id());
 
-  // All done!
-  STOP_LOG("(all)gather()","MeshCommunication");
+  // All done, but let's make sure it's done correctly
+
+#ifdef DEBUG
+  MeshTools::libmesh_assert_valid_boundary_ids(mesh);
+#endif
 }
 #endif // LIBMESH_HAVE_MPI
 
@@ -928,19 +1246,152 @@ struct SyncIds
   // Find the id of each requested DofObject -
   // Parallel::sync_* already did the work for us
   void gather_data (const std::vector<dof_id_type> & ids,
-                    std::vector<datum> & ids_out)
+                    std::vector<datum> & ids_out) const
   {
     ids_out = ids;
   }
 
   void act_on_data (const std::vector<dof_id_type> & old_ids,
-                    std::vector<datum> & new_ids)
+                    const std::vector<datum> & new_ids) const
   {
-    for (unsigned int i=0; i != old_ids.size(); ++i)
+    for (std::size_t i=0; i != old_ids.size(); ++i)
       if (old_ids[i] != new_ids[i])
         (mesh.*renumber)(old_ids[i], new_ids[i]);
   }
 };
+
+
+struct SyncNodeIds
+{
+  typedef dof_id_type datum;
+
+  SyncNodeIds(MeshBase & _mesh) :
+    mesh(_mesh) {}
+
+  MeshBase & mesh;
+
+  // We only know a Node id() is definitive if we own the Node or if
+  // we're told it's definitive.  We keep track of the latter cases by
+  // putting ghost node definitive ids into this set.
+  typedef std::unordered_set<dof_id_type> uset_type;
+  uset_type definitive_ids;
+
+  // We should never be told two different definitive ids for the same
+  // node, but let's check on that in debug mode.
+#ifdef DEBUG
+  typedef std::unordered_map<dof_id_type, dof_id_type> umap_type;
+  umap_type definitive_renumbering;
+#endif
+
+  // Find the id of each requested DofObject -
+  // Parallel::sync_* already tried to do the work for us, but we can
+  // only say the result is definitive if we own the DofObject or if
+  // we were given the definitive result from another processor.
+  void gather_data (const std::vector<dof_id_type> & ids,
+                    std::vector<datum> & ids_out) const
+  {
+    ids_out.clear();
+    ids_out.resize(ids.size(), DofObject::invalid_id);
+
+    for (std::size_t i = 0; i != ids.size(); ++i)
+      {
+        const dof_id_type id = ids[i];
+        const Node * node = mesh.node_ptr(id);
+        if (node->processor_id() == mesh.processor_id() ||
+            definitive_ids.count(id))
+          ids_out[i] = id;
+      }
+  }
+
+  bool act_on_data (const std::vector<dof_id_type> & old_ids,
+                    const std::vector<datum> & new_ids)
+  {
+    bool data_changed = false;
+    for (std::size_t i=0; i != old_ids.size(); ++i)
+      {
+        const dof_id_type new_id = new_ids[i];
+
+        // If we asked for an id but there's no definitive id ready
+        // for us yet, then we can't quit trying to sync yet.
+        if (new_id == DofObject::invalid_id)
+          data_changed = true;
+        else
+          {
+            const dof_id_type old_id = old_ids[i];
+
+            Node * node = mesh.query_node_ptr(old_id);
+
+            // If we can't find the node we were asking about, another
+            // processor must have already given us the definitive id
+            // for it
+            if (!node)
+              {
+                // But let's check anyway in debug mode
+#ifdef DEBUG
+                libmesh_assert
+                  (definitive_renumbering.count(old_id));
+                libmesh_assert_equal_to
+                  (new_id, definitive_renumbering[old_id]);
+#endif
+                continue;
+              }
+
+            if (node->processor_id() != mesh.processor_id())
+              definitive_ids.insert(new_id);
+            if (old_id != new_id)
+              {
+#ifdef DEBUG
+                libmesh_assert
+                  (!definitive_renumbering.count(old_id));
+                definitive_renumbering[old_id] = new_id;
+#endif
+                mesh.renumber_node(old_id, new_id);
+                data_changed = true;
+              }
+          }
+      }
+    return data_changed;
+  }
+};
+
+
+#ifdef LIBMESH_ENABLE_AMR
+struct SyncPLevels
+{
+  typedef unsigned char datum;
+
+  SyncPLevels(MeshBase & _mesh) :
+    mesh(_mesh) {}
+
+  MeshBase & mesh;
+
+  // Find the p_level of each requested Elem
+  void gather_data (const std::vector<dof_id_type> & ids,
+                    std::vector<datum> & ids_out) const
+  {
+    ids_out.reserve(ids.size());
+
+    for (std::size_t i=0; i != ids.size(); ++i)
+      {
+        Elem & elem = mesh.elem_ref(ids[i]);
+
+        ids_out.push_back(cast_int<unsigned char>(elem.p_level()));
+      }
+  }
+
+  void act_on_data (const std::vector<dof_id_type> & old_ids,
+                    const std::vector<datum> & new_p_levels) const
+  {
+    for (std::size_t i=0; i != old_ids.size(); ++i)
+      {
+        Elem & elem = mesh.elem_ref(old_ids[i]);
+
+        elem.set_p_level(new_p_levels[i]);
+      }
+  }
+};
+#endif // LIBMESH_ENABLE_AMR
+
 
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
 template <typename DofObjSubclass>
@@ -959,11 +1410,11 @@ struct SyncUniqueIds
   // Find the id of each requested DofObject -
   // Parallel::sync_* already did the work for us
   void gather_data (const std::vector<dof_id_type>& ids,
-                    std::vector<datum>& ids_out)
+                    std::vector<datum>& ids_out) const
   {
     ids_out.reserve(ids.size());
 
-    for (unsigned int i=0; i != ids.size(); ++i)
+    for (std::size_t i=0; i != ids.size(); ++i)
       {
         DofObjSubclass *d = (mesh.*query)(ids[i]);
         libmesh_assert(d);
@@ -973,9 +1424,9 @@ struct SyncUniqueIds
   }
 
   void act_on_data (const std::vector<dof_id_type>& ids,
-                    std::vector<datum>& unique_ids)
+                    const std::vector<datum>& unique_ids) const
   {
-    for (unsigned int i=0; i != ids.size(); ++i)
+    for (std::size_t i=0; i != ids.size(); ++i)
       {
         DofObjSubclass *d = (mesh.*query)(ids[i]);
         libmesh_assert(d);
@@ -995,32 +1446,47 @@ void MeshCommunication::make_node_ids_parallel_consistent (MeshBase & mesh)
   // This function must be run on all processors at once
   libmesh_parallel_only(mesh.comm());
 
-  START_LOG ("make_node_ids_parallel_consistent()", "MeshCommunication");
+  // We need to agree on which processor owns every node, but we can't
+  // easily assert that here because we don't currently agree on which
+  // id every node has, and some of our temporary ids on unrelated
+  // nodes will "overlap".
+//#ifdef DEBUG
+//  MeshTools::libmesh_assert_parallel_consistent_procids<Node> (mesh);
+//#endif // DEBUG
 
-  SyncIds syncids(mesh, &MeshBase::renumber_node);
+  LOG_SCOPE ("make_node_ids_parallel_consistent()", "MeshCommunication");
+
+  SyncNodeIds syncids(mesh);
   Parallel::sync_node_data_by_element_id
-    (mesh, mesh.elements_begin(), mesh.elements_end(), syncids);
+    (mesh, mesh.elements_begin(), mesh.elements_end(),
+     Parallel::SyncEverything(), Parallel::SyncEverything(), syncids);
 
-  STOP_LOG ("make_node_ids_parallel_consistent()", "MeshCommunication");
+  // At this point, with both ids and processor ids synced, we can
+  // finally check for topological consistency of node processor ids.
+#ifdef DEBUG
+  MeshTools::libmesh_assert_topology_consistent_procids<Node> (mesh);
+#endif
 }
 
 
 
-void MeshCommunication::make_node_unique_ids_parallel_consistent
-(MeshBase &mesh)
+void MeshCommunication::make_node_unique_ids_parallel_consistent (MeshBase & mesh)
 {
+  // Avoid unused variable warnings if unique ids aren't enabled.
+  libmesh_ignore(mesh);
+
   // This function must be run on all processors at once
   libmesh_parallel_only(mesh.comm());
 
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
-  START_LOG ("make_node_unique_ids_parallel_consistent()", "MeshCommunication");
+  LOG_SCOPE ("make_node_unique_ids_parallel_consistent()", "MeshCommunication");
 
   SyncUniqueIds<Node> syncuniqueids(mesh, &MeshBase::query_node_ptr);
-  Parallel::sync_dofobject_data_by_id
-    (mesh.comm(), mesh.nodes_begin(), mesh.nodes_end(),
-     syncuniqueids);
+  Parallel::sync_dofobject_data_by_id(mesh.comm(),
+                                      mesh.nodes_begin(),
+                                      mesh.nodes_end(),
+                                      syncuniqueids);
 
-  STOP_LOG ("make_node_unique_ids_parallel_consistent()", "MeshCommunication");
 #endif
 }
 
@@ -1033,7 +1499,7 @@ void MeshCommunication::make_elems_parallel_consistent(MeshBase & mesh)
   // This function must be run on all processors at once
   libmesh_parallel_only(mesh.comm());
 
-  START_LOG ("make_elems_parallel_consistent()", "MeshCommunication");
+  LOG_SCOPE ("make_elems_parallel_consistent()", "MeshCommunication");
 
   SyncIds syncids(mesh, &MeshBase::renumber_elem);
   Parallel::sync_element_data_by_parent_id
@@ -1041,14 +1507,30 @@ void MeshCommunication::make_elems_parallel_consistent(MeshBase & mesh)
      mesh.active_elements_end(), syncids);
 
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
-  SyncUniqueIds<Elem> syncuniqueids(mesh, &MeshBase::query_elem);
+  SyncUniqueIds<Elem> syncuniqueids(mesh, &MeshBase::query_elem_ptr);
   Parallel::sync_dofobject_data_by_id
     (mesh.comm(), mesh.active_elements_begin(),
      mesh.active_elements_end(), syncuniqueids);
 #endif
-
-  STOP_LOG ("make_elems_parallel_consistent()", "MeshCommunication");
 }
+
+
+
+// ------------------------------------------------------------
+#ifdef LIBMESH_ENABLE_AMR
+void MeshCommunication::make_p_levels_parallel_consistent(MeshBase & mesh)
+{
+  // This function must be run on all processors at once
+  libmesh_parallel_only(mesh.comm());
+
+  LOG_SCOPE ("make_p_levels_parallel_consistent()", "MeshCommunication");
+
+  SyncPLevels syncplevels(mesh);
+  Parallel::sync_dofobject_data_by_id
+    (mesh.comm(), mesh.elements_begin(), mesh.elements_end(),
+     syncplevels);
+}
+#endif // LIBMESH_ENABLE_AMR
 
 
 
@@ -1074,25 +1556,86 @@ struct SyncProcIds
       {
         // Look for this point in the mesh
         // We'd better find every node we're asked for
-        Node * node = mesh.node_ptr(ids[i]);
+        Node & node = mesh.node_ref(ids[i]);
 
         // Return the node's correct processor id,
-        data[i] = node->processor_id();
+        data[i] = node.processor_id();
       }
   }
 
   // ------------------------------------------------------------
-  void act_on_data (const std::vector<dof_id_type> & ids,
-                    std::vector<datum> proc_ids)
+  bool act_on_data (const std::vector<dof_id_type> & ids,
+                    const std::vector<datum> proc_ids)
   {
+    bool data_changed = false;
+
     // Set the ghost node processor ids we've now been informed of
     for (std::size_t i=0; i != ids.size(); ++i)
       {
-        Node * node = mesh.node_ptr(ids[i]);
-        node->processor_id() = proc_ids[i];
+        Node & node = mesh.node_ref(ids[i]);
+
+        // We may not have ids synched when this synchronization is done, so we
+        // *can't* use id to load-balance processor id properly; we have to use
+        // the old heuristic of choosing the smallest valid processor id.
+        //
+        // If someone tells us our node processor id is too low, then
+        // they're wrong.  If they tell us our node processor id is
+        // too high, then we're wrong.
+        if (node.processor_id() > proc_ids[i])
+          {
+            data_changed = true;
+            node.processor_id() = proc_ids[i];
+          }
       }
+
+    return data_changed;
   }
 };
+
+
+struct ElemNodesMaybeNew
+{
+  ElemNodesMaybeNew() {}
+
+  bool operator() (const Elem * elem) const
+  {
+    // If this element was just refined then it may have new nodes we
+    // need to work on
+#ifdef LIBMESH_ENABLE_AMR
+    if (elem->refinement_flag() == Elem::JUST_REFINED)
+      return true;
+#endif
+
+    // If this element has remote_elem neighbors then there may have
+    // been refinement of those neighbors that affect its nodes'
+    // processor_id()
+    for (auto neigh : elem->neighbor_ptr_range())
+      if (neigh == remote_elem)
+        return true;
+    return false;
+  }
+};
+
+
+struct NodeWasNew
+{
+  NodeWasNew(const MeshBase & mesh)
+  {
+    for (const auto & node : mesh.node_ptr_range())
+      if (node->processor_id() == DofObject::invalid_processor_id)
+        was_new.insert(node);
+  }
+
+  bool operator() (const Elem * elem, unsigned int local_node_num) const
+  {
+    if (was_new.count(elem->node_ptr(local_node_num)))
+      return true;
+    return false;
+  }
+
+  std::unordered_set<const Node *> was_new;
+};
+
 }
 
 
@@ -1100,7 +1643,7 @@ struct SyncProcIds
 // ------------------------------------------------------------
 void MeshCommunication::make_node_proc_ids_parallel_consistent(MeshBase & mesh)
 {
-  START_LOG ("make_node_proc_ids_parallel_consistent()", "MeshCommunication");
+  LOG_SCOPE ("make_node_proc_ids_parallel_consistent()", "MeshCommunication");
 
   // This function must be run on all processors at once
   libmesh_parallel_only(mesh.comm());
@@ -1118,12 +1661,88 @@ void MeshCommunication::make_node_proc_ids_parallel_consistent(MeshBase & mesh)
   // Ghost nodes touching local elements should have processor ids
   // consistent with all processors which own an element touching
   // them.
-
   SyncProcIds sync(mesh);
   Parallel::sync_node_data_by_element_id
-    (mesh, mesh.elements_begin(), mesh.elements_end(), sync);
+    (mesh, mesh.elements_begin(), mesh.elements_end(),
+     Parallel::SyncEverything(), Parallel::SyncEverything(), sync);
+}
 
-  STOP_LOG ("make_node_proc_ids_parallel_consistent()", "MeshCommunication");
+
+
+// ------------------------------------------------------------
+void MeshCommunication::make_new_node_proc_ids_parallel_consistent(MeshBase & mesh)
+{
+  LOG_SCOPE ("make_new_node_proc_ids_parallel_consistent()", "MeshCommunication");
+
+  // This function must be run on all processors at once
+  libmesh_parallel_only(mesh.comm());
+
+  // When this function is called, each section of a parallelized mesh
+  // should be in the following state:
+  //
+  // Local nodes should have unique authoritative ids,
+  // and new nodes should be unpartitioned.
+  //
+  // New ghost nodes touching local elements should be unpartitioned.
+
+  // We may not have consistent processor ids for new nodes (because a
+  // node may be old and partitioned on one processor but new and
+  // unpartitioned on another) when we start
+#ifdef DEBUG
+  MeshTools::libmesh_assert_parallel_consistent_procids<Node>(mesh);
+  // MeshTools::libmesh_assert_parallel_consistent_new_node_procids(mesh);
+#endif
+
+  // We have two kinds of new nodes.  *NEW* nodes are unpartitioned on
+  // all processors: we need to use a id-independent (i.e. dumb)
+  // heuristic to partition them.  But "new" nodes are newly created
+  // on some processors (when ghost elements are refined) yet
+  // correspond to existing nodes on other processors: we need to use
+  // the existing processor id for them.
+  //
+  // A node which is "new" on one processor will be associated with at
+  // least one ghost element, and we can just query that ghost
+  // element's owner to find out the correct processor id.
+
+  auto node_unpartitioned =
+    [](const Elem * elem, unsigned int local_node_num)
+    { return elem->node_ref(local_node_num).processor_id() ==
+        DofObject::invalid_processor_id; };
+
+  SyncProcIds sync(mesh);
+
+  sync_node_data_by_element_id_once
+    (mesh, mesh.not_local_elements_begin(),
+     mesh.not_local_elements_end(), Parallel::SyncEverything(),
+     node_unpartitioned, sync);
+
+  // Nodes should now be unpartitioned iff they are truly new; those
+  // are the *only* nodes we will touch.
+#ifdef DEBUG
+  MeshTools::libmesh_assert_parallel_consistent_new_node_procids(mesh);
+#endif
+
+  NodeWasNew node_was_new(mesh);
+
+  // Set the lowest processor id we can on truly new nodes
+  for (auto & elem : mesh.element_ptr_range())
+    for (auto & node : elem->node_ref_range())
+      if (node_was_new.was_new.count(&node))
+        {
+          processor_id_type & pid = node.processor_id();
+          pid = std::min(pid, elem->processor_id());
+        }
+
+  // Then finally see if other processors have a lower option
+  Parallel::sync_node_data_by_element_id
+    (mesh, mesh.elements_begin(), mesh.elements_end(),
+     ElemNodesMaybeNew(), node_was_new, sync);
+
+  // We should have consistent processor ids when we're done.
+#ifdef DEBUG
+  MeshTools::libmesh_assert_parallel_consistent_procids<Node>(mesh);
+  MeshTools::libmesh_assert_parallel_consistent_new_node_procids(mesh);
+#endif
 }
 
 
@@ -1155,6 +1774,7 @@ void MeshCommunication::make_nodes_parallel_consistent (MeshBase & mesh)
   // may be "wrong" from coarsening, but they're right in the sense
   // that they'll tell us who has the authoritative dofobject ids for
   // each node.
+
   this->make_node_proc_ids_parallel_consistent(mesh);
 
   // Second, sync up dofobject ids.
@@ -1170,145 +1790,111 @@ void MeshCommunication::make_nodes_parallel_consistent (MeshBase & mesh)
 
 
 // ------------------------------------------------------------
-void MeshCommunication::delete_remote_elements(ParallelMesh & mesh, const std::set<Elem *> & extra_ghost_elem_ids) const
+void MeshCommunication::make_new_nodes_parallel_consistent (MeshBase & mesh)
+{
+  // This function must be run on all processors at once
+  libmesh_parallel_only(mesh.comm());
+
+  // When this function is called, each section of a parallelized mesh
+  // should be in the following state:
+  //
+  // All nodes should have the exact same physical location on every
+  // processor where they exist.
+  //
+  // Local nodes should have unique authoritative ids,
+  // and new nodes should be unpartitioned.
+  //
+  // New ghost nodes touching local elements should be unpartitioned.
+  //
+  // New ghost nodes should have ids which are either already correct
+  // or which are in the "unpartitioned" id space.
+  //
+  // Non-new nodes should have correct ids and processor ids already.
+
+  // First, let's sync up new nodes' processor ids.
+
+  this->make_new_node_proc_ids_parallel_consistent(mesh);
+
+  // Second, sync up dofobject ids.
+  this->make_node_ids_parallel_consistent(mesh);
+
+  // Third, sync up dofobject unique_ids if applicable.
+  this->make_node_unique_ids_parallel_consistent(mesh);
+
+  // Finally, correct the processor ids to make DofMap happy
+  MeshTools::correct_node_proc_ids(mesh);
+}
+
+
+
+// ------------------------------------------------------------
+void
+MeshCommunication::delete_remote_elements (DistributedMesh & mesh,
+                                           const std::set<Elem *> & extra_ghost_elem_ids) const
 {
   // The mesh should know it's about to be parallelized
   libmesh_assert (!mesh.is_serial());
 
-  START_LOG("delete_remote_elements()", "MeshCommunication");
+  LOG_SCOPE("delete_remote_elements()", "MeshCommunication");
 
 #ifdef DEBUG
   // We expect maximum ids to be in sync so we can use them to size
   // vectors
-  mesh.comm().verify(mesh.max_node_id());
-  mesh.comm().verify(mesh.max_elem_id());
+  libmesh_assert(mesh.comm().verify(mesh.max_node_id()));
+  libmesh_assert(mesh.comm().verify(mesh.max_elem_id()));
   const dof_id_type par_max_node_id = mesh.parallel_max_node_id();
   const dof_id_type par_max_elem_id = mesh.parallel_max_elem_id();
   libmesh_assert_equal_to (par_max_node_id, mesh.max_node_id());
   libmesh_assert_equal_to (par_max_elem_id, mesh.max_elem_id());
 #endif
 
-  // FIXME - should these be "unsorted_set"s?  O(N) is O(N)...
-  std::vector<bool> local_nodes(mesh.max_node_id(), false);
-  std::vector<bool> semilocal_nodes(mesh.max_node_id(), false);
-  std::vector<bool> semilocal_elems(mesh.max_elem_id(), false);
-
-  // We don't want to delete any element that shares a node
-  // with or is an ancestor of a local element.
-
-  // Using the local_nodes vector rather than e.g. point_neighbors()
-  // gives us correct results even in corner cases, such as where two
-  // elements meet only at a corner.  ;-)  Links between boundary and
-  // interior elements on mixed dimensional meshes also give us
-  // correct ghosting in this way.
-
-  // We also preserve neighbors of local elements - in most cases this
-  // is redundant with the node check, but for non-conforming Tet4
-  // meshes and non-level-one-conforming 2D+3D meshes it is possible
-  // for an element and its coarse neighbor to not share any vertices.
-
-  MeshBase::const_element_iterator l_elem_it = mesh.local_elements_begin(),
-    l_end     = mesh.local_elements_end();
-  for (; l_elem_it != l_end; ++l_elem_it)
-    {
-      const Elem * elem = *l_elem_it;
-      for (unsigned int n=0; n != elem->n_nodes(); ++n)
-        {
-          dof_id_type nodeid = elem->node(n);
-          libmesh_assert_less (nodeid, local_nodes.size());
-          local_nodes[nodeid] = true;
-        }
-
-      for (unsigned int s=0; s != elem->n_sides(); ++s)
-        {
-          const Elem * neighbor = elem->neighbor(s);
-          if (neighbor)
-            semilocal_elems[neighbor->id()] = true;
-        }
-
-      while (elem)
-        {
-          dof_id_type elemid = elem->id();
-          libmesh_assert_less (elemid, semilocal_elems.size());
-          semilocal_elems[elemid] = true;
-
-          for (unsigned int n=0; n != elem->n_nodes(); ++n)
-            semilocal_nodes[elem->node(n)] = true;
-
-          const Elem * parent = elem->parent();
-          // Don't proceed from a boundary mesh to an interior mesh
-          if (parent && parent->dim() != elem->dim())
-            break;
-
-          elem = parent;
-        }
-    }
-
-  // We don't want to delete any element that shares a node
-  // with or is an ancestor of an unpartitioned element either.
-  MeshBase::const_element_iterator
-    u_elem_it = mesh.unpartitioned_elements_begin(),
-    u_end     = mesh.unpartitioned_elements_end();
-
-  for (; u_elem_it != u_end; ++u_elem_it)
-    {
-      const Elem * elem = *u_elem_it;
-      for (unsigned int n=0; n != elem->n_nodes(); ++n)
-        local_nodes[elem->node(n)] = true;
-      while (elem)
-        {
-          semilocal_elems[elem->id()] = true;
-
-          for (unsigned int n=0; n != elem->n_nodes(); ++n)
-            semilocal_nodes[elem->node(n)] = true;
-
-          const Elem * parent = elem->parent();
-          // Don't proceed from a boundary mesh to an interior mesh
-          if (parent && parent->dim() != elem->dim())
-            break;
-
-          elem = parent;
-        }
-    }
-
-  // Flag all the elements that share nodes with
-  // local and unpartitioned elements, along with their ancestors
-  MeshBase::element_iterator nl_elem_it = mesh.not_local_elements_begin(),
-    nl_end     = mesh.not_local_elements_end();
-  for (; nl_elem_it != nl_end; ++nl_elem_it)
-    {
-      const Elem * elem = *nl_elem_it;
-      for (unsigned int n=0; n != elem->n_nodes(); ++n)
-        if (local_nodes[elem->node(n)])
-          {
-            while (elem)
-              {
-                semilocal_elems[elem->id()] = true;
-
-                for (unsigned int nn=0; nn != elem->n_nodes(); ++nn)
-                  semilocal_nodes[elem->node(nn)] = true;
-
-                const Elem * parent = elem->parent();
-                // Don't proceed from a boundary mesh to an interior mesh
-                if (parent && parent->dim() != elem->dim())
-                  break;
-
-                elem = parent;
-              }
-            break;
-          }
-    }
+  std::set<const Elem *, CompareElemIdsByLevel> elements_to_keep;
 
   // Don't delete elements that we were explicitly told not to
-  for(std::set<Elem *>::iterator it = extra_ghost_elem_ids.begin();
-      it != extra_ghost_elem_ids.end();
-      ++it)
+  for (const auto & elem : extra_ghost_elem_ids)
     {
-      const Elem * elem = *it;
-      semilocal_elems[elem->id()] = true;
-      for (unsigned int n=0; n != elem->n_nodes(); ++n)
-        semilocal_nodes[elem->node(n)] = true;
+      std::vector<const Elem *> active_family;
+#ifdef LIBMESH_ENABLE_AMR
+      if (!elem->subactive())
+        elem->active_family_tree(active_family);
+      else
+#endif
+        active_family.push_back(elem);
+
+      for (std::size_t i=0; i != active_family.size(); ++i)
+        elements_to_keep.insert(active_family[i]);
     }
+
+  // See which elements we still need to keep ghosted, given that
+  // we're keeping local and unpartitioned elements.
+  query_ghosting_functors
+    (mesh, mesh.processor_id(),
+     mesh.active_pid_elements_begin(mesh.processor_id()),
+     mesh.active_pid_elements_end(mesh.processor_id()),
+     elements_to_keep);
+  query_ghosting_functors
+    (mesh, DofObject::invalid_processor_id,
+     mesh.active_pid_elements_begin(DofObject::invalid_processor_id),
+     mesh.active_pid_elements_end(DofObject::invalid_processor_id),
+     elements_to_keep);
+
+  // The inactive elements we need to send should have their
+  // immediate children present.
+  connect_children(mesh, mesh.pid_elements_begin(mesh.processor_id()),
+                   mesh.pid_elements_end(mesh.processor_id()),
+                   elements_to_keep);
+  connect_children(mesh,
+                   mesh.pid_elements_begin(DofObject::invalid_processor_id),
+                   mesh.pid_elements_end(DofObject::invalid_processor_id),
+                   elements_to_keep);
+
+  // The elements we need should have their ancestors and their
+  // subactive children present too.
+  connect_families(elements_to_keep);
+
+  // Don't delete nodes that our semilocal elements need
+  std::set<const Node *> connected_nodes;
+  reconnect_nodes(elements_to_keep, connected_nodes);
 
   // Delete all the elements we have no reason to save,
   // starting with the most refined so that the mesh
@@ -1316,45 +1902,47 @@ void MeshCommunication::delete_remote_elements(ParallelMesh & mesh, const std::s
   unsigned int n_levels = MeshTools::n_levels(mesh);
 
   for (int l = n_levels - 1; l >= 0; --l)
-    {
-      MeshBase::element_iterator lev_elem_it = mesh.level_elements_begin(l),
-        lev_end     = mesh.level_elements_end(l);
-      for (; lev_elem_it != lev_end; ++lev_elem_it)
-        {
-          Elem * elem = *lev_elem_it;
-          libmesh_assert (elem);
-          // Make sure we don't leave any invalid pointers
-          if (!semilocal_elems[elem->id()])
-            elem->make_links_to_me_remote();
+    for (auto & elem : as_range(mesh.level_elements_begin(l),
+                                mesh.level_elements_end(l)))
+      {
+        libmesh_assert (elem);
+        // Make sure we don't leave any invalid pointers
+        const bool keep_me = elements_to_keep.count(elem);
 
-          // Subactive neighbor pointers aren't preservable here
-          if (elem->subactive())
-            for (unsigned int s=0; s != elem->n_sides(); ++s)
-              elem->set_neighbor(s, libmesh_nullptr);
+        if (!keep_me)
+          elem->make_links_to_me_remote();
 
-          // delete_elem doesn't currently invalidate element
-          // iterators... that had better not change
-          if (!semilocal_elems[elem->id()])
-            mesh.delete_elem(elem);
-        }
-    }
+        // delete_elem doesn't currently invalidate element
+        // iterators... that had better not change
+        if (!keep_me)
+          mesh.delete_elem(elem);
+      }
 
   // Delete all the nodes we have no reason to save
-  MeshBase::node_iterator node_it  = mesh.nodes_begin(),
-    node_end = mesh.nodes_end();
-  for (node_it = mesh.nodes_begin(); node_it != node_end; ++node_it)
+  for (auto & node : mesh.node_ptr_range())
     {
-      Node * node = *node_it;
       libmesh_assert(node);
-      if (!semilocal_nodes[node->id()])
+      if (!connected_nodes.count(node))
         mesh.delete_node(node);
     }
+
+  // If we had a point locator, it's invalid now that some of the
+  // elements it pointed to have been deleted.
+  mesh.clear_point_locator();
+
+  // Much of our boundary info may have been for now-remote parts of
+  // the mesh, in which case we don't want to keep local copies.
+  mesh.get_boundary_info().regenerate_id_sets();
+
+  // We now have all remote elements and nodes deleted; our ghosting
+  // functors should be ready to delete any now-redundant cached data
+  // they use too.
+  for (auto & gf : as_range(mesh.ghosting_functors_begin(), mesh.ghosting_functors_end()))
+    gf->delete_remote_elements();
 
 #ifdef DEBUG
   MeshTools::libmesh_assert_valid_refinement_tree(mesh);
 #endif
-
-  STOP_LOG("delete_remote_elements()", "MeshCommunication");
 }
 
 } // namespace libMesh

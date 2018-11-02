@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -43,7 +43,22 @@ void DifferentiablePhysics::init_physics (const System & sys)
   _time_evolving.resize(sys.n_vars(), false);
 }
 
+void DifferentiablePhysics::time_evolving (unsigned int var,
+                                           unsigned int order)
+{
+  if (order != 1 && order != 2)
+    libmesh_error_msg("Input order must be 1 or 2!");
 
+  if (_time_evolving.size() <= var)
+    _time_evolving.resize(var+1, 0);
+
+  _time_evolving[var] = order;
+
+  if (order == 1)
+    _first_order_vars.insert(var);
+  else
+    _second_order_vars.insert(var);
+}
 
 bool DifferentiablePhysics::nonlocal_mass_residual(bool request_jacobian,
                                                    DiffContext & c)
@@ -95,7 +110,5 @@ bool DifferentiablePhysics::_eulerian_time_deriv (bool request_jacobian,
   return this->eulerian_residual(request_jacobian, context) &&
     request_jacobian;
 }
-
-
 
 } // namespace libMesh

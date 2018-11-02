@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -16,7 +16,7 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-// C++ inlcludes
+// C++ includes
 
 // Local includes
 #include "libmesh/fe.h"
@@ -62,9 +62,6 @@ Real FE<1,MONOMIAL>::shape(const ElemType,
         val *= xi;
       return val;
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -121,9 +118,6 @@ Real FE<1,MONOMIAL>::shape_deriv(const ElemType,
         val *= xi;
       return val;
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -179,9 +173,6 @@ Real FE<1,MONOMIAL>::shape_second_deriv(const ElemType,
         val *= (index+1) * xi;
       return val;
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 

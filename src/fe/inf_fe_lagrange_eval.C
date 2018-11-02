@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -1277,9 +1277,6 @@ Real lagrange_eval(Real v, Order o_radial, unsigned i)
     default:
       libmesh_error_msg("Lagrange polynomials only defined up to 15.");
     } // switch (o_radial)
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 } // lagrange_eval()
 
 
@@ -2599,9 +2596,6 @@ Real lagrange_eval_deriv(Real v, Order o_radial, unsigned i)
     default:
       libmesh_error_msg("Lagrange polynomials only defined up to 15.");
     } // switch (o_radial)
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 } // lagrange_eval_deriv()
 
 } // anonymous namespace

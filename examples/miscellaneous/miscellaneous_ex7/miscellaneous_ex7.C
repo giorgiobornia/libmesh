@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -25,6 +25,9 @@
 // In this example, LibMesh interfaces directly with PETSc's
 // variational inequality solver through PetscDMNonlinearSolver
 // (available in PETSc-3.3.0 or above).
+
+// libmesh includes
+#include "libmesh/enum_solver_package.h"
 
 // Example include files
 #include "biharmonic.h"
@@ -57,12 +60,12 @@ int main(int argc, char ** argv)
       // Skip higher-dimensional examples on a lower-dimensional libMesh build
       libmesh_example_requires(dim <= LIBMESH_DIM, "2D/3D support");
 
-      Biharmonic * biharmonic;
-      Biharmonic::Create(&biharmonic, init.comm());
-      biharmonic->viewParameters();
-      biharmonic->init();
-      biharmonic->run();
-      Biharmonic::Destroy(&biharmonic);
+      // This example only works with ReplicatedMesh.
+      ReplicatedMesh mesh(init.comm());
+      Biharmonic biharmonic(mesh);
+      biharmonic.viewParameters();
+      biharmonic.init();
+      biharmonic.run();
     }
   return 0;
 }

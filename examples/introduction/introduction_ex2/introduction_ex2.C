@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -50,6 +50,7 @@
 //Basic include file needed for the mesh functionality.
 #include "libmesh/libmesh.h"
 #include "libmesh/mesh.h"
+#include "libmesh/enum_xdr_mode.h"
 // Include file that defines various mesh generation utilities
 #include "libmesh/mesh_generation.h"
 // Include file that defines (possibly multiple) systems of equations.
@@ -58,6 +59,7 @@
 #include "libmesh/linear_implicit_system.h"
 #include "libmesh/transient_system.h"
 #include "libmesh/explicit_system.h"
+#include "libmesh/enum_solver_package.h"
 
 // Bring in everything from the libMesh namespace
 using namespace libMesh;
@@ -70,6 +72,10 @@ int main (int argc, char ** argv)
 
   // Skip this 2D example if libMesh was compiled as 1D-only.
   libmesh_example_requires(2 <= LIBMESH_DIM, "2D support");
+
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
 
   // A brief message to the user to inform her of the
   // exact name of the program being run, and its command line.

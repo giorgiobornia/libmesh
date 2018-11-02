@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -23,7 +23,7 @@
 //
 // This is the fifth example program.  It builds on
 // the previous two examples, and extends the use
-// of the \p UniquePtr as a convenient build method to
+// of the std::unique_ptr as a convenient build method to
 // determine the quadrature rule at run time.
 
 
@@ -65,6 +65,8 @@
 
 // The definition of a geometric element
 #include "libmesh/elem.h"
+#include "libmesh/enum_solver_package.h"
+#include "libmesh/enum_quadrature_type.h"
 
 // Bring in everything from the libMesh namespace
 using namespace libMesh;
@@ -97,8 +99,12 @@ QuadratureType quad_type=INVALID_Q_RULE;
 // Begin the main program.
 int main (int argc, char ** argv)
 {
-  // Initialize libMesh and any dependent libaries, like in example 2.
+  // Initialize libMesh and any dependent libraries, like in example 2.
   LibMeshInit init (argc, argv);
+
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
 
   // Check for proper usage.  The quadrature rule
   // must be given at run time.
@@ -175,9 +181,13 @@ int main (int argc, char ** argv)
   // This function just calls the function exact_solution via exact_solution_wrapper
   AnalyticFunction<> exact_solution_object(exact_solution_wrapper);
 
-  DirichletBoundary dirichlet_bc(boundary_ids,
-                                 variables,
-                                 &exact_solution_object);
+  // In general, when reusing a system-indexed exact solution, we want
+  // to use the default system-ordering constructor for
+  // DirichletBoundary, so we demonstrate that here.  In this case,
+  // though, we have only one variable, so system- and local-
+  // orderings are the same.
+  DirichletBoundary dirichlet_bc
+    (boundary_ids, variables, exact_solution_object);
 
   // We must add the Dirichlet boundary condition _before_
   // we call equation_systems.init()
@@ -207,7 +217,7 @@ int main (int argc, char ** argv)
 
 
 void assemble_poisson(EquationSystems & es,
-                      const std::string & system_name)
+                      const std::string & libmesh_dbg_var(system_name))
 {
   libmesh_assert_equal_to (system_name, "Poisson");
 
@@ -222,60 +232,60 @@ void assemble_poisson(EquationSystems & es,
   FEType fe_type = dof_map.variable_type(0);
 
   // Build a Finite Element object of the specified type.  Since the
-  // \p FEBase::build() member dynamically creates memory we will
-  // store the object as an \p UniquePtr<FEBase>.  Below, the
-  // functionality of \p UniquePtr's is described more detailed in
+  // FEBase::build() member dynamically creates memory we will
+  // store the object as a std::unique_ptr<FEBase>.  Below, the
+  // functionality of std::unique_ptr's is described more detailed in
   // the context of building quadrature rules.
-  UniquePtr<FEBase> fe (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe (FEBase::build(dim, fe_type));
 
   // Now this deviates from example 4.  we create a
   // 5th order quadrature rule of user-specified type
   // for numerical integration.  Note that not all
   // quadrature rules support this order.
-  UniquePtr<QBase> qrule(QBase::build(quad_type, dim, THIRD));
+  std::unique_ptr<QBase> qrule(QBase::build(quad_type, dim, THIRD));
 
-  // Tell the finte element object to use our
-  // quadrature rule.  Note that a \p UniquePtr<QBase> returns
-  // a QBase* pointer to the object it handles with \p get().
-  // However, using \p get(), the \p UniquePtr<QBase> \p qrule is
-  // still in charge of this pointer. I.e., when \p qrule goes
-  // out of scope, it will safely delete the \p QBase object it
+  // Tell the finite element object to use our
+  // quadrature rule.  Note that a std::unique_ptr<QBase> returns
+  // a QBase* pointer to the object it handles with get().
+  // However, using get(), the std::unique_ptr<QBase> qrule is
+  // still in charge of this pointer. I.e., when qrule goes
+  // out of scope, it will safely delete the QBase object it
   // points to.  This behavior may be overridden using
-  // \p UniquePtr<Xyz>::release(), but is currently not
+  // std::unique_ptr<Xyz>::release(), but is currently not
   // recommended.
   fe->attach_quadrature_rule (qrule.get());
 
   // Declare a special finite element object for
   // boundary integration.
-  UniquePtr<FEBase> fe_face (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe_face (FEBase::build(dim, fe_type));
 
   // As already seen in example 3, boundary integration
   // requires a quadrature rule.  Here, however,
   // we use the more convenient way of building this
-  // rule at run-time using \p quad_type.  Note that one
+  // rule at run-time using quad_type.  Note that one
   // could also have initialized the face quadrature rules
-  // with the type directly determined from \p qrule, namely
+  // with the type directly determined from qrule, namely
   // through:
   // \verbatim
-  // UniquePtr<QBase>  qface (QBase::build(qrule->type(),
+  // std::unique_ptr<QBase>  qface (QBase::build(qrule->type(),
   // dim-1,
   // THIRD));
   // \endverbatim
-  // And again: using the \p UniquePtr<QBase> relaxes
-  // the need to delete the object afterwards,
+  // And again: using the std::unique_ptr<QBase> relaxes
+  // the need to delete the object afterward,
   // they clean up themselves.
-  UniquePtr<QBase>  qface (QBase::build(quad_type,
-                                        dim-1,
-                                        THIRD));
+  std::unique_ptr<QBase>  qface (QBase::build(quad_type,
+                                              dim-1,
+                                              THIRD));
 
-  // Tell the finte element object to use our
-  // quadrature rule.  Note that a \p UniquePtr<QBase> returns
-  // a \p QBase* pointer to the object it handles with \p get().
-  // However, using \p get(), the \p UniquePtr<QBase> \p qface is
-  // still in charge of this pointer. I.e., when \p qface goes
-  // out of scope, it will safely delete the \p QBase object it
+  // Tell the finite element object to use our
+  // quadrature rule.  Note that a std::unique_ptr<QBase> returns
+  // a QBase* pointer to the object it handles with get().
+  // However, using get(), the std::unique_ptr<QBase> qface is
+  // still in charge of this pointer. I.e., when qface goes
+  // out of scope, it will safely delete the QBase object it
   // points to.  This behavior may be overridden using
-  // \p UniquePtr<Xyz>::release(), but is not recommended.
+  // std::unique_ptr<Xyz>::release(), but is not recommended.
   fe_face->attach_quadrature_rule (qface.get());
 
   // This is again identical to example 4, and not commented.
@@ -283,9 +293,9 @@ void assemble_poisson(EquationSystems & es,
 
   const std::vector<Point> & q_point = fe->get_xyz();
 
-  const std::vector<std::vector<Real> > & phi = fe->get_phi();
+  const std::vector<std::vector<Real>> & phi = fe->get_phi();
 
-  const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+  const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
   DenseMatrix<Number> Ke;
   DenseVector<Number> Fe;
@@ -293,21 +303,20 @@ void assemble_poisson(EquationSystems & es,
 
   // Now we will loop over all the elements in the mesh.
   // See example 3 for details.
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-  for ( ; el != end_el; ++el)
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      const Elem * elem = *el;
-
       dof_map.dof_indices (elem, dof_indices);
+
+      const unsigned int n_dofs =
+        cast_int<unsigned int>(dof_indices.size());
 
       fe->reinit (elem);
 
-      Ke.resize (dof_indices.size(),
-                 dof_indices.size());
+      libmesh_assert_equal_to (n_dofs, phi.size());
 
-      Fe.resize (dof_indices.size());
+      Ke.resize (n_dofs, n_dofs);
+
+      Fe.resize (n_dofs);
 
       // Now loop over the quadrature points.  This handles
       // the numeric integration.  Note the slightly different
@@ -315,8 +324,8 @@ void assemble_poisson(EquationSystems & es,
       for (unsigned int qp=0; qp<qrule->n_points(); qp++)
         {
           // Add the matrix contribution
-          for (unsigned int i=0; i<phi.size(); i++)
-            for (unsigned int j=0; j<phi.size(); j++)
+          for (unsigned int i=0; i != n_dofs; i++)
+            for (unsigned int j=0; j != n_dofs; j++)
               Ke(i,j) += JxW[qp]*(dphi[i][qp]*dphi[j][qp]);
 
           // fxy is the forcing function for the Poisson equation.
@@ -354,7 +363,7 @@ void assemble_poisson(EquationSystems & es,
 
 
           // Add the RHS contribution
-          for (unsigned int i=0; i<phi.size(); i++)
+          for (unsigned int i=0; i != n_dofs; i++)
             Fe(i) += JxW[qp]*fxy*phi[i][qp];
         }
 
@@ -366,8 +375,8 @@ void assemble_poisson(EquationSystems & es,
 
       // The element matrix and right-hand-side are now built
       // for this element.  Add them to the global matrix and
-      // right-hand-side vector.  The \p SparseMatrix::add_matrix()
-      // and \p NumericVector::add_vector() members do this for us.
+      // right-hand-side vector.  The SparseMatrix::add_matrix()
+      // and NumericVector::add_vector() members do this for us.
       system.matrix->add_matrix (Ke, dof_indices);
       system.rhs->add_vector    (Fe, dof_indices);
 

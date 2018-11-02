@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,10 +20,9 @@
 #ifndef LIBMESH_METIS_PARTITIONER_H
 #define LIBMESH_METIS_PARTITIONER_H
 
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/partitioner.h"
-
-// C++ Includes   -----------------------------------
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
 
 namespace libMesh
 {
@@ -31,38 +30,53 @@ namespace libMesh
 /**
  * The \p MetisPartitioner uses the Metis graph partitioner
  * to partition the elements.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2003
+ * \brief Partitioner which interfaces with the METIS library.
  */
 class MetisPartitioner : public Partitioner
 {
 public:
 
   /**
-   * Constructor.
+   * Ctors, assignment operators, and destructor are all explicitly
+   * defaulted for this class.
    */
-  MetisPartitioner () {}
+  MetisPartitioner () = default;
+  MetisPartitioner (const MetisPartitioner &) = default;
+  MetisPartitioner (MetisPartitioner &&) = default;
+  MetisPartitioner & operator= (const MetisPartitioner &) = default;
+  MetisPartitioner & operator= (MetisPartitioner &&) = default;
+  virtual ~MetisPartitioner() = default;
 
   /**
-   * Creates a new partitioner of this type and returns it in
-   * an \p UniquePtr.
+   * \returns A copy of this partitioner wrapped in a smart pointer.
    */
-  virtual UniquePtr<Partitioner> clone () const libmesh_override
+  virtual std::unique_ptr<Partitioner> clone () const override
   {
-    return UniquePtr<Partitioner>(new MetisPartitioner());
+    return libmesh_make_unique<MetisPartitioner>(*this);
   }
 
-  virtual void attach_weights(ErrorVector * weights) libmesh_override { _weights = weights; }
+  virtual void attach_weights(ErrorVector * weights) override { _weights = weights; }
+
+  /**
+   * Called by the SubdomainPartitioner to partition elements in the range (it, end).
+   */
+  virtual void partition_range(MeshBase & mesh,
+                               MeshBase::element_iterator it,
+                               MeshBase::element_iterator end,
+                               const unsigned int n) override;
 
 protected:
+
   /**
    * Partition the \p MeshBase into \p n subdomains.
    */
   virtual void _do_partition (MeshBase & mesh,
-                              const unsigned int n) libmesh_override;
+                              const unsigned int n) override;
 };
 
-
-
 } // namespace libMesh
-
 
 #endif // LIBMESH_METIS_PARTITIONER_H

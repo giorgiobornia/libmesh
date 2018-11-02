@@ -43,14 +43,14 @@ struct A0 : ElemAssembly
   {
     const unsigned int u_var = 0;
 
-    FEBase * elem_fe = libmesh_nullptr;
+    FEBase * elem_fe = nullptr;
     c.get_element_fe(u_var, elem_fe);
 
     const std::vector<Real> & JxW = elem_fe->get_JxW();
 
     // The velocity shape function gradients at interior
     // quadrature points.
-    const std::vector<std::vector<RealGradient> > & dphi = elem_fe->get_dphi();
+    const std::vector<std::vector<RealGradient>> & dphi = elem_fe->get_dphi();
 
     // The number of local degrees of freedom in each variable
     const unsigned int n_u_dofs = c.get_dof_indices(u_var).size();
@@ -73,14 +73,14 @@ struct A1 : ElemAssembly
   {
     const unsigned int u_var = 0;
 
-    FEBase * elem_fe = libmesh_nullptr;
+    FEBase * elem_fe = nullptr;
     c.get_element_fe(u_var, elem_fe);
 
     const std::vector<Real> & JxW = elem_fe->get_JxW();
 
-    const std::vector<std::vector<Real> > & phi = elem_fe->get_phi();
+    const std::vector<std::vector<Real>> & phi = elem_fe->get_phi();
 
-    const std::vector<std::vector<RealGradient> > & dphi = elem_fe->get_dphi();
+    const std::vector<std::vector<RealGradient>> & dphi = elem_fe->get_dphi();
 
     // The number of local degrees of freedom in each variable
     const unsigned int n_u_dofs = c.get_dof_indices(u_var).size();
@@ -102,14 +102,14 @@ struct A2 : ElemAssembly
   {
     const unsigned int u_var = 0;
 
-    FEBase * elem_fe = libmesh_nullptr;
+    FEBase * elem_fe = nullptr;
     c.get_element_fe(u_var, elem_fe);
 
     const std::vector<Real> & JxW = elem_fe->get_JxW();
 
-    const std::vector<std::vector<Real> > & phi = elem_fe->get_phi();
+    const std::vector<std::vector<Real>> & phi = elem_fe->get_phi();
 
-    const std::vector<std::vector<RealGradient> > & dphi = elem_fe->get_dphi();
+    const std::vector<std::vector<RealGradient>> & dphi = elem_fe->get_dphi();
 
     // The number of local degrees of freedom in each variable
     const unsigned int n_u_dofs = c.get_dof_indices(u_var).size();
@@ -131,12 +131,12 @@ struct F0 : ElemAssembly
   {
     const unsigned int u_var = 0;
 
-    FEBase * elem_fe = libmesh_nullptr;
+    FEBase * elem_fe = nullptr;
     c.get_element_fe(u_var, elem_fe);
 
     const std::vector<Real> & JxW = elem_fe->get_JxW();
 
-    const std::vector<std::vector<Real> > & phi = elem_fe->get_phi();
+    const std::vector<std::vector<Real>> & phi = elem_fe->get_phi();
 
     // The number of local degrees of freedom in each variable
     const unsigned int n_u_dofs = c.get_dof_indices(u_var).size();
@@ -166,12 +166,12 @@ struct OutputAssembly : ElemAssembly
   {
     const unsigned int u_var = 0;
 
-    FEBase * elem_fe = libmesh_nullptr;
+    FEBase * elem_fe = nullptr;
     c.get_element_fe(u_var, elem_fe);
 
     const std::vector<Real> & JxW = elem_fe->get_JxW();
 
-    const std::vector<std::vector<Real> > & phi = elem_fe->get_phi();
+    const std::vector<std::vector<Real>> & phi = elem_fe->get_phi();
 
     // The number of local degrees of freedom in each variable
     const unsigned int n_u_dofs = c.get_dof_indices(u_var).size();

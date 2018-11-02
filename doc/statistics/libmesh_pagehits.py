@@ -9,11 +9,25 @@ from matplotlib.dates import date2num
 # Hits/month, pages, and gigabytes served.
 
 # To get the Google analytics data:
-# .) go to analytics.google.com
-# .) click on libmesh
-# .) click View Report
-# .) Adjust date range to previous month
-# .) Record the number of "Pageviews" in the "Hits" column below
+# .) Go to analytics.google.com.
+# .) There should be (as of July 2017) a "Google Analytics Home" box at the top left of the dashboard.
+# .) Click the "Audience Overview" link at the bottom right corner of this box.
+# .) Adjust date range to previous month.
+# .) Record the number of "Pageviews" in the "Hits" column below.
+
+# The data below are from the libmesh.github.io site, which uses the
+# number UA-24978333-1.
+#
+# Note: we do not have control over the analytics for the
+# https://www.github.com/libMesh/libmesh page. If you look at the page
+# source, analytics code UA-3769691-2 appears, but if I try to add
+# this property in my analytics account, Google assigns me the number
+# UA-24978333-{2,3,...} (where the last digit may change depending on
+# how many times you tried to add/remove this property in the
+# Analytics Dashboard) and there does not seem to be a straightforward
+# way of inserting this code into the source.  There have been some
+# README.md based hacks for doing this in the past, but I don't think
+# they are particularly reliable...
 
 #                    Hits,  pages, GB served
 data = [
@@ -175,6 +189,37 @@ data = [
     'Dec 2015',  11694,      0, 0.0,
     'Jan 2016',  11837,      0, 0.0,
     'Feb 2016',  14102,      0, 0.0,
+    'Mar 2016',  13212,      0, 0.0,
+    'Apr 2016',  13355,      0, 0.0,
+    'May 2016',  12486,      0, 0.0,
+    'Jun 2016',  13973,      0, 0.0,
+    'Jul 2016',  10688,      0, 0.0,
+    'Aug 2016',  10048,      0, 0.0,
+    'Sep 2016',  10847,      0, 0.0,
+    'Oct 2016',  10984,      0, 0.0,
+    'Nov 2016',  12233,      0, 0.0,
+    'Dec 2016',  11430,      0, 0.0,
+    'Jan 2017',  10327,      0, 0.0,
+    'Feb 2017',  11039,      0, 0.0,
+    'Mar 2017',  12986,      0, 0.0,
+    'Apr 2017',   9773,      0, 0.0,
+    'May 2017',  10880,      0, 0.0,
+    'Jun 2017',   9179,      0, 0.0,
+    'Jul 2017',   8344,      0, 0.0,
+    'Aug 2017',   8617,      0, 0.0,
+    'Sep 2017',   8576,      0, 0.0,
+    'Oct 2017',  11255,      0, 0.0,
+    'Nov 2017',  10362,      0, 0.0,
+    'Dec 2017',   7948,      0, 0.0,
+    'Jan 2018',   9376,      0, 0.0,
+    'Feb 2018',   8864,      0, 0.0,
+    'Mar 2018',  10339,      0, 0.0,
+    'Apr 2018',  10958,      0, 0.0,
+    'May 2018',  10151,      0, 0.0,
+    'Jun 2018',   8981,      0, 0.0,
+    'Jul 2018',   8619,      0, 0.0,
+    'Aug 2018',   9226,      0, 0.0,
+    'Sep 2018',   8507,      0, 0.0,
 ]
 
 # Extract number of hits/month
@@ -199,18 +244,21 @@ ax = fig.add_subplot(111)
 
 # Make the bar chart.  We have one number/month, there are about 30
 # days in each month, this defines the bar width...
-ax.bar(date_nums, n_hits_month, width=30, color='b')
+# The color used comes from sns.color_palette("muted").as_hex() They
+# are the "same basic order of hues as the default matplotlib color
+# cycle but more attractive colors."
+ax.bar(date_nums, n_hits_month, width=30, color=u'#4878cf')
 
 # Create title
 fig.suptitle('LibMesh Page Hits/Month (in Thousands)')
 
 # Set up x-tick locations -- August of each year
-ticks_names = ['Aug 2011', 'Aug 2012', 'Aug 2013', 'Aug 2014', 'Aug 2015']
+ticks_names = ['2012', '2013', '2014', '2015', '2016', '2017']
 
 # Get numerical values for the names
 tick_nums = []
 for x in ticks_names:
-  tick_nums.append(date2num(datetime.strptime(x, '%b %Y')))
+  tick_nums.append(date2num(datetime.strptime('Jan ' + x, '%b %Y')))
 
 # Set tick labels and positions
 ax.set_xticks(tick_nums)

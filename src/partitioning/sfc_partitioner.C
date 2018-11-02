@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -17,9 +17,7 @@
 
 
 
-// C++ Includes   -----------------------------------
-
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/libmesh_config.h"
 #include "libmesh/mesh_base.h"
 #include "libmesh/sfc_partitioner.h"
@@ -40,99 +38,87 @@ namespace libMesh
 {
 
 
-// ------------------------------------------------------------
-// SFCPartitioner implementation
-void SFCPartitioner::_do_partition (MeshBase & mesh,
-                                    const unsigned int n)
+void SFCPartitioner::partition_range(MeshBase & mesh,
+                                     MeshBase::element_iterator beg,
+                                     MeshBase::element_iterator end,
+                                     unsigned int n)
 {
+  // Check for easy returns
+  if (beg == end)
+    return;
 
-  libmesh_assert_greater (n, 0);
-
-  // Check for an easy return
   if (n == 1)
     {
-      this->single_partition (mesh);
+      this->single_partition_range (beg, end);
       return;
     }
+
+  libmesh_assert_greater (n, 0);
 
   // What to do if the sfcurves library IS NOT present
 #ifndef LIBMESH_HAVE_SFCURVES
 
-  libmesh_here();
-  libMesh::err << "ERROR: The library has been built without"    << std::endl
-               << "Space Filling Curve support.  Using a linear" << std::endl
-               << "partitioner instead!" << std::endl;
+  libmesh_do_once(
+    libMesh::out << "ERROR: The library has been built without"    << std::endl
+                 << "Space Filling Curve support.  Using a linear" << std::endl
+                 << "partitioner instead!" << std::endl;);
 
   LinearPartitioner lp;
-
-  lp.partition (mesh, n);
+  lp.partition_range (mesh, beg, end, n);
 
   // What to do if the sfcurves library IS present
 #else
 
-  START_LOG("sfc_partition()", "SFCPartitioner");
+  LOG_SCOPE("partition_range()", "SFCPartitioner");
 
-  const dof_id_type n_active_elem = mesh.n_active_elem();
-  const dof_id_type n_elem        = mesh.n_elem();
+  // We don't yet support distributed meshes with this Partitioner
+  if (!mesh.is_serial())
+    libmesh_not_implemented();
 
-  // the forward_map maps the active element id
-  // into a contiguous block of indices
-  std::vector<dof_id_type>
-    forward_map (n_elem, DofObject::invalid_id);
+  const dof_id_type n_range_elem = std::distance(beg, end);
+  const dof_id_type n_elem = mesh.n_elem();
+
+  // The forward_map maps the range's element ids into a contiguous
+  // block of indices.
+  std::vector<dof_id_type> forward_map (n_elem, DofObject::invalid_id);
 
   // the reverse_map maps the contiguous ids back
   // to active elements
-  std::vector<Elem *> reverse_map (n_active_elem, libmesh_nullptr);
+  std::vector<Elem *> reverse_map (n_range_elem, nullptr);
 
-  int size = static_cast<int>(n_active_elem);
-  std::vector<double> x      (size);
-  std::vector<double> y      (size);
-  std::vector<double> z      (size);
-  std::vector<int>    table  (size);
+  std::vector<double> x      (n_range_elem);
+  std::vector<double> y      (n_range_elem);
+  std::vector<double> z      (n_range_elem);
+  std::vector<int>    table  (n_range_elem);
 
+  // Map the range's element ids into a contiguous range.
+  dof_id_type el_num = 0;
 
-  // We need to map the active element ids into a
-  // contiguous range.
-  {
-    MeshBase::element_iterator       elem_it  = mesh.active_elements_begin();
-    const MeshBase::element_iterator elem_end = mesh.active_elements_end();
+  for (auto & elem : as_range(beg, end))
+    {
+      libmesh_assert_less (elem->id(), forward_map.size());
+      libmesh_assert_less (el_num, reverse_map.size());
 
-    dof_id_type el_num = 0;
+      forward_map[elem->id()] = el_num;
+      reverse_map[el_num] = elem;
+      el_num++;
+    }
+  libmesh_assert_equal_to (el_num, n_range_elem);
 
-    for (; elem_it != elem_end; ++elem_it)
-      {
-        libmesh_assert_less ((*elem_it)->id(), forward_map.size());
-        libmesh_assert_less (el_num, reverse_map.size());
+  // Get the centroid for each range element.
+  for (const auto & elem : as_range(beg, end))
+    {
+      libmesh_assert_less (elem->id(), forward_map.size());
 
-        forward_map[(*elem_it)->id()] = el_num;
-        reverse_map[el_num]           = *elem_it;
-        el_num++;
-      }
-    libmesh_assert_equal_to (el_num, n_active_elem);
-  }
+      const Point p = elem->centroid();
 
+      x[forward_map[elem->id()]] = p(0);
+      y[forward_map[elem->id()]] = p(1);
+      z[forward_map[elem->id()]] = p(2);
+    }
 
-  // Get the centroid for each active element
-  {
-    //     const_active_elem_iterator       elem_it (mesh.const_elements_begin());
-    //     const const_active_elem_iterator elem_end(mesh.const_elements_end());
-
-    MeshBase::element_iterator       elem_it  = mesh.active_elements_begin();
-    const MeshBase::element_iterator elem_end = mesh.active_elements_end();
-
-    for (; elem_it != elem_end; ++elem_it)
-      {
-        const Elem * elem = *elem_it;
-
-        libmesh_assert_less (elem->id(), forward_map.size());
-
-        const Point p = elem->centroid();
-
-        x[forward_map[elem->id()]] = p(0);
-        y[forward_map[elem->id()]] = p(1);
-        z[forward_map[elem->id()]] = p(2);
-      }
-  }
+  // We need an integer reference to pass to the Sfc interface.
+  int size = static_cast<int>(n_range_elem);
 
   // build the space-filling curve
   if (_sfc_type == "Hilbert")
@@ -143,48 +129,51 @@ void SFCPartitioner::_do_partition (MeshBase & mesh,
 
   else
     {
-      libmesh_here();
-      libMesh::err << "ERROR: Unknown type: " << _sfc_type << std::endl
+      libMesh::out << "ERROR: Unknown type: " << _sfc_type << std::endl
                    << " Valid types are"                   << std::endl
                    << "  \"Hilbert\""                      << std::endl
                    << "  \"Morton\""                       << std::endl
                    << " "                                  << std::endl
-                   << "Proceeding with a Hilbert curve."   << std::endl;
+                   << "Partitioning with a Hilbert curve." << std::endl;
 
       Sfc::hilbert (&x[0], &y[0], &z[0], &size, &table[0]);
     }
 
 
-  // Assign the partitioning to the active elements
+  // Assign the partitioning to the range elements
   {
-    //      {
-    //        std::ofstream out ("sfc.dat");
-    //        out << "variables=x,y,z" << std::endl;
-    //        out << "zone f=point" << std::endl;
+    // {
+    //   std::ofstream out ("sfc.dat");
+    //   out << "variables=x,y,z" << std::endl;
+    //   out << "zone f=point" << std::endl;
+    //   for (unsigned int i=0; i<n_range_elem; i++)
+    //     out << x[i] << " " << y[i] << " " << z[i] << std::endl;
+    // }
 
-    //        for (unsigned int i=0; i<n_active_elem; i++)
-    //  out << x[i] << " "
-    //      << y[i] << " "
-    //      << z[i] << std::endl;
-    //      }
+    const dof_id_type blksize = (n_range_elem + n - 1) / n;
 
-    const dof_id_type blksize = (n_active_elem+n-1)/n;
-
-    for (dof_id_type i=0; i<n_active_elem; i++)
+    for (dof_id_type i=0; i<n_range_elem; i++)
       {
-        libmesh_assert_less (static_cast<unsigned int>(table[i]-1), reverse_map.size());
+        libmesh_assert_less (static_cast<unsigned int>(table[i] - 1), reverse_map.size());
 
-        Elem * elem = reverse_map[table[i]-1];
+        Elem * elem = reverse_map[table[i] - 1];
 
-        elem->processor_id() = cast_int<processor_id_type>
-          (i/blksize);
+        elem->processor_id() = cast_int<processor_id_type>(i/blksize);
       }
   }
 
-  STOP_LOG("sfc_partition()", "SFCPartitioner");
-
 #endif
+}
 
+
+
+void SFCPartitioner::_do_partition (MeshBase & mesh,
+                                    const unsigned int n)
+{
+  this->partition_range(mesh,
+                        mesh.active_elements_begin(),
+                        mesh.active_elements_end(),
+                        n);
 }
 
 } // namespace libMesh

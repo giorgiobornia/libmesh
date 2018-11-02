@@ -144,7 +144,7 @@ namespace GETPOT_NAMESPACE {
 #endif
 
 /**
- * GetPot - A class for parsing comand line arguments and
+ * GetPot - A class for parsing command line arguments and
  * configuration files.
  *
  * \author Frank R. Schaefer
@@ -283,7 +283,7 @@ public:
   inline const char* operator()(const std::string& VarName, const char* Default, unsigned Idx) const;
 
   /**
-   * access varibles, but error out if not present
+   * access variables, but error out if not present
    * scalar values
    */
   template<typename T>
@@ -323,8 +323,29 @@ public:
 
   inline unsigned vector_variable_size(const char* VarName) const;
   inline unsigned vector_variable_size(const std::string& VarName) const;
+
+  /*
+   * Return a list of all variables set by the current input
+   */
   inline STRING_VECTOR get_variable_names() const;
+
+  /*
+   * Return a list of all sections present in the current input
+   */
   inline STRING_VECTOR get_section_names() const;
+
+  /*
+   * Return a list of all subsections of the given section name in the
+   * current input.
+   *
+   * Subsections will be returned in the order they appear in the
+   * input.
+   *
+   * Subsections which exist multiple times in the input file will
+   * only be returned once, in the position of their first appearance.
+   */
+  inline STRING_VECTOR get_subsection_names(const std::string & section_name) const;
+
   inline std::set<std::string> get_overridden_variables() const;
 
   /**
@@ -474,7 +495,7 @@ private:
     const std::string* get_element(unsigned Idx) const;
 
     /**
-     * data memebers
+     * data members
      */
     std::string name;      // identifier of variable
     STRING_VECTOR value;     // value of variable stored in vector
@@ -501,7 +522,7 @@ private:
    * nominus vector
    */
   int nominus_cursor;  // cursor for nominus_pointers
-  std::vector<unsigned> idx_nominus;     // indecies of 'no minus' arguments
+  std::vector<unsigned> idx_nominus;     // indices of 'no minus' arguments
 
   /**
    * variables (arguments of the form "variable=value")
@@ -801,7 +822,7 @@ GetPot::parse_command_line(const int argc_, const char * const * argv_,
   for (int i=1; i<argc_; i++)
     {
       std::string tmp(argv_[i]);   // recall the problem with temporaries,
-      _apriori_argv.push_back(tmp);       // reference counting in arguement lists ...
+      _apriori_argv.push_back(tmp);       // reference counting in argument lists ...
     }
   _parse_argument_vector(_apriori_argv);
 }
@@ -1051,8 +1072,9 @@ GetPot::operator=(const GetPot& Other)
   for (; it != end; ++it)
     {
       const char* otherstr = *it;
-      char* newcopy = new char[strlen(otherstr)+1];
-      strncpy(newcopy, otherstr, strlen(otherstr)+1);
+      const std::size_t bufsize = strlen(otherstr)+1;
+      char* newcopy = new char[bufsize];
+      strncpy(newcopy, otherstr, bufsize);
       this->_internal_string_container.insert(newcopy);
     }
 
@@ -1186,7 +1208,7 @@ GetPot::_parse_argument_vector(const STRING_VECTOR& ARGV)
       if (equals_pos != std::string::npos)
         {
           // (*) record for later ufo detection
-          //     arguments carriying variables are always treated as 'requested' arguments.
+          //     arguments carrying variables are always treated as 'requested' arguments.
           //     unrequested variables have to be detected with the ufo-variable
           //     detection routine.
           if (request_recording_f)
@@ -1697,8 +1719,9 @@ GetPot::_internal_managed_copy(const std::string& Arg) const
     return *it;
 
   // Otherwise, create a new one
-  char* newcopy = new char[strlen(arg)+1];
-  strncpy(newcopy, arg, strlen(arg)+1);
+  const std::size_t bufsize = strlen(arg)+1;
+  char* newcopy = new char[bufsize];
+  strncpy(newcopy, arg, bufsize);
   _internal_string_container.insert(newcopy);
   return newcopy;
 }
@@ -1765,7 +1788,7 @@ GetPot::search(const char* Option)
     return false;
 
   // (*) second loop from 0 to old cursor position
-  for (unsigned c = 1; c < OldCursor; c++)
+  for (unsigned c = 1; c <= OldCursor; c++)
     {
       if (argv[c] == SearchTerm)
         {
@@ -2572,6 +2595,56 @@ GetPot::get_section_names() const
 
 
 
+inline STRING_VECTOR
+GetPot::get_subsection_names(const std::string & sec_prefix) const
+{
+  // GetPot functions should understand user-provided section names
+  // either with or without a trailing slash.
+  const std::string full_prefix =
+    *sec_prefix.rbegin() == '/' ? sec_prefix : sec_prefix + '/';
+
+  const std::size_t full_prefix_len = full_prefix.size();
+
+  // Subsections-of-subsections are in the section_list, so we'll be
+  // adding subsections multiple times.  Using std::set as an
+  // intermediate data structure helps us check for duplicates with
+  // O(N log N) rather than O(N^2) cost.
+  std::set<std::string> subsections;
+
+  STRING_VECTOR returnval;
+
+  for (STRING_VECTOR::const_iterator it = section_list.begin();
+       it != section_list.end(); ++it)
+    {
+      const std::string & section_name = *it;
+
+      // If this section name begins with the prefix
+      if (section_name.compare(0, full_prefix_len, full_prefix) == 0)
+        {
+          const std::size_t next_slash_len =
+            section_name.find('/', full_prefix_len);
+
+          const std::string subsection_name =
+            section_name.substr(full_prefix_len,
+                                next_slash_len - full_prefix_len);
+
+          // If there is a subsection, and if this is the first time
+          // we've seen it, add the prefix-less, postfix-less
+          // subsection name.
+          if (!subsection_name.empty() &&
+              !subsections.count(subsection_name))
+            {
+              returnval.push_back(subsection_name);
+              subsections.insert(subsection_name);
+            }
+        }
+    }
+
+  return returnval;
+}
+
+
+
 inline std::set<std::string>
 GetPot::get_overridden_variables() const
 {
@@ -2843,7 +2916,7 @@ GetPot::_DBE_get_variable(const std::string& VarName)
 
   prefix = secure_Prefix;
 
-  // error occured => variable name == ""
+  // error occurred => variable name == ""
   ev.original = "<<${ } variable '";
   ev.original += VarName + "' undefined>>";
   return &ev;
@@ -2858,7 +2931,7 @@ GetPot::_DBE_expand(const std::string& expr)
   if (expr[0] == ':')
     return expr.substr(1);
 
-  // ${& expr expr ... } text concatination
+  // ${& expr expr ... } text concatenation
   else if (expr[0] == '&')
     {
       const STRING_VECTOR A = _DBE_get_expr_list(expr.substr(1), 1);
@@ -3238,7 +3311,7 @@ GetPot::_DBE_expand(const std::string& expr)
       double x = _convert_to_type(a[0], 1e37);
 
       // last element is always the default argument
-      if (x == 1e37 || x < 0 || x >= a.size() - 1)
+      if (x == 1e37 || x < 0 || x >= double(a.size() - 1))
         return a[a.size()-1];
 
       // round x to closest integer
@@ -3274,13 +3347,13 @@ GetPot::_DBE_expand(const std::string& expr)
       double x = _convert_to_type(A[1], 1e37);
 
       // last element is always the default argument
-      if (x == 1e37 || x < 0 || x >= A[0].size() - 1)
+      if (x == 1e37 || x < 0 || x >= double(A[0].size() - 1))
         return "<<1st index out of range>>";
 
       if (A.size() > 2)
         {
           double y = _convert_to_type(A[2], 1e37);
-          if (y != 1e37 && y > 0 && y <= A[0].size() - 1 && y > x)
+          if (y != 1e37 && y > 0 && y <= double(A[0].size() - 1) && y > x)
             return A[0].substr(int(x+0.5), int(y+1.5) - int(x+0.5));
 
           else if (y == -1)
@@ -3305,7 +3378,7 @@ GetPot::_DBE_expand(const std::string& expr)
       // error
       if (Var->name == "")
         {
-          // make a copy of the string if an error occured
+          // make a copy of the string if an error occurred
           // (since the error variable is a static variable inside get_variable())
           return std::string(Var->original);
         }
@@ -3313,7 +3386,7 @@ GetPot::_DBE_expand(const std::string& expr)
       double x = _convert_to_type(A[1], 1e37);
 
       // last element is always the default argument
-      if (x == 1e37 || x < 0 || x >= Var->value.size())
+      if (x == 1e37 || x < 0 || x >= double(Var->value.size()))
         return "<<1st index out of range>>";
 
       if (A.size() > 2)
@@ -3321,7 +3394,7 @@ GetPot::_DBE_expand(const std::string& expr)
           double y = _convert_to_type(A[2], 1e37);
           int    begin = int(x+0.5);
           int    end = 0;
-          if (y != 1e37 && y > 0 && y <= Var->value.size() && y > x)
+          if (y != 1e37 && y > 0 && y <= double(Var->value.size()) && y > x)
             end = int(y+1.5);
           else if (y == -1)
             end = int(Var->value.size());
@@ -3340,7 +3413,7 @@ GetPot::_DBE_expand(const std::string& expr)
   const STRING_VECTOR    A = _DBE_get_expr_list(expr, 1);
   const GetPot::variable* B = _DBE_get_variable(A[0]);
 
-  // make a copy of the string if an error occured
+  // make a copy of the string if an error occurred
   // (since the error variable is a static variable inside get_variable())
   if (B->name == "")
     return std::string(B->original);

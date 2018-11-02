@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -54,6 +54,7 @@ Real FE<2,L2_HIERARCHIC>::shape(const Elem * elem,
   switch (elem->type())
     {
     case TRI3:
+    case TRISHELL3:
     case TRI6:
       {
         const Real zeta1 = p(0);
@@ -154,8 +155,11 @@ Real FE<2,L2_HIERARCHIC>::shape(const Elem * elem,
 
       // Hierarchic shape functions on the quadrilateral.
     case QUAD4:
+    case QUADSHELL4:
       libmesh_assert_less (totalorder, 2);
+      libmesh_fallthrough();
     case QUAD8:
+    case QUADSHELL8:
     case QUAD9:
       {
         // Compute quad shape functions as a tensor-product
@@ -255,6 +259,7 @@ Real FE<2,L2_HIERARCHIC>::shape_deriv(const Elem * elem,
     {
       // 1st & 2nd-order Hierarchics.
     case TRI3:
+    case TRISHELL3:
     case TRI6:
       {
         const Real eps = 1.e-6;
@@ -290,8 +295,11 @@ Real FE<2,L2_HIERARCHIC>::shape_deriv(const Elem * elem,
       }
 
     case QUAD4:
+    case QUADSHELL4:
       libmesh_assert_less (totalorder, 2);
+      libmesh_fallthrough();
     case QUAD8:
+    case QUADSHELL8:
     case QUAD9:
       {
         // Compute quad shape functions as a tensor-product

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -19,6 +19,7 @@
 
 // C++ includes
 #include <set>
+#include <array>
 
 // Local includes
 #include "libmesh/libmesh_config.h"
@@ -72,36 +73,13 @@ bool TreeNode<N>::insert (const Elem * elem)
   libmesh_assert(elem);
 
   // We first want to find the corners of the cuboid surrounding the cell.
-  Point min_coord = elem->point(0);
-  Point max_coord = min_coord;
-  for (unsigned i=1; i<elem->n_nodes(); ++i)
-    {
-      Point p = elem->point(i);
-
-      // LIBMESH_DIM gives the number of non-zero components in a Point
-      for (unsigned d=0; d<LIBMESH_DIM; ++d)
-        {
-          if (min_coord(d) > p(d))
-            min_coord(d) = p(d);
-
-          if (max_coord(d) < p(d))
-            max_coord(d) = p(d);
-        }
-    }
+  const BoundingBox bbox = elem->loose_bounding_box();
 
   // Next, find out whether this cuboid has got non-empty intersection
   // with the bounding box of the current tree node.
-  bool intersects = true;
-
-  // LIBMESH_DIM gives the number of non-zero components in a Point
-  for (unsigned int d=0; d<LIBMESH_DIM; d++)
-    {
-      if (max_coord(d) < this->bounding_box.first(d) || min_coord(d) > this->bounding_box.second(d))
-        intersects = false;
-    }
-
+  //
   // If not, we should not care about this element.
-  if (!intersects)
+  if (!this->bounding_box.intersects(bbox))
     return false;
 
   // Only add the element if we are active
@@ -118,8 +96,26 @@ bool TreeNode<N>::insert (const Elem * elem)
 
 #endif
 
+      unsigned int element_count = cast_int<unsigned int>(elements.size());
+      if (!mesh.get_count_lower_dim_elems_in_point_locator())
+        {
+          const std::set<unsigned char> & elem_dimensions = mesh.elem_dimensions();
+          if (elem_dimensions.size() > 1)
+            {
+              element_count = 0;
+              unsigned char highest_dim_elem = *elem_dimensions.rbegin();
+              for (std::size_t i=0; i<elements.size(); i++)
+                {
+                  if (elements[i]->dim() == highest_dim_elem)
+                    {
+                      element_count++;
+                    }
+                }
+            }
+        }
+
       // Refine ourself if we reach the target bin size for a TreeNode.
-      if (elements.size() == tgt_bin_size)
+      if (element_count == tgt_bin_size)
         this->refine();
 
       return true;
@@ -148,18 +144,26 @@ void TreeNode<N>::refine ()
   // A TreeNode<N> has by definition N children
   children.resize(N);
 
+  // Scale up the target bin size in child TreeNodes if we have reached
+  // the maximum number of refinement levels.
+  unsigned int new_target_bin_size = tgt_bin_size;
+  if (level() >= target_bin_size_increase_level)
+    {
+      new_target_bin_size *= 2;
+    }
+
   for (unsigned int c=0; c<N; c++)
     {
       // Create the child and set its bounding box.
-      children[c] = new TreeNode<N> (mesh, tgt_bin_size, this);
+      children[c] = new TreeNode<N> (mesh, new_target_bin_size, this);
       children[c]->set_bounding_box(this->create_bounding_box(c));
 
       // Pass off our nodes to our children
-      for (unsigned int n=0; n<nodes.size(); n++)
+      for (std::size_t n=0; n<nodes.size(); n++)
         children[c]->insert(nodes[n]);
 
       // Pass off our elements to our children
-      for (unsigned int e=0; e<elements.size(); e++)
+      for (std::size_t e=0; e<elements.size(); e++)
         children[c]->insert(elements[e]);
     }
 
@@ -221,7 +225,7 @@ bool TreeNode<N>::bounds_point (const Point & p,
 
 
 template <unsigned int N>
-std::pair<Point, Point>
+BoundingBox
 TreeNode<N>::create_bounding_box (unsigned int c) const
 {
   switch (N)
@@ -244,29 +248,29 @@ TreeNode<N>::create_bounding_box (unsigned int c) const
         switch (c)
           {
           case 0:
-            return std::make_pair (Point(xmin, ymin, zmin),
-                                   Point(xc,   yc,   zc));
+            return BoundingBox (Point(xmin, ymin, zmin),
+                                Point(xc,   yc,   zc));
           case 1:
-            return std::make_pair (Point(xc,   ymin, zmin),
-                                   Point(xmax, yc,   zc));
+            return BoundingBox (Point(xc,   ymin, zmin),
+                                Point(xmax, yc,   zc));
           case 2:
-            return std::make_pair (Point(xmin, yc,   zmin),
-                                   Point(xc,   ymax, zc));
+            return BoundingBox (Point(xmin, yc,   zmin),
+                                Point(xc,   ymax, zc));
           case 3:
-            return std::make_pair (Point(xc,   yc,   zmin),
-                                   Point(xmax, ymax, zc));
+            return BoundingBox (Point(xc,   yc,   zmin),
+                                Point(xmax, ymax, zc));
           case 4:
-            return std::make_pair (Point(xmin, ymin, zc),
-                                   Point(xc,   yc,   zmax));
+            return BoundingBox (Point(xmin, ymin, zc),
+                                Point(xc,   yc,   zmax));
           case 5:
-            return std::make_pair (Point(xc,   ymin, zc),
-                                   Point(xmax, yc,   zmax));
+            return BoundingBox (Point(xc,   ymin, zc),
+                                Point(xmax, yc,   zmax));
           case 6:
-            return std::make_pair (Point(xmin, yc,   zc),
-                                   Point(xc,   ymax, zmax));
+            return BoundingBox (Point(xmin, yc,   zc),
+                                Point(xc,   ymax, zmax));
           case 7:
-            return std::make_pair (Point(xc,   yc,   zc),
-                                   Point(xmax, ymax, zmax));
+            return BoundingBox (Point(xc,   yc,   zc),
+                                Point(xmax, ymax, zmax));
           default:
             libmesh_error_msg("c >= N! : " << c);
           }
@@ -289,17 +293,17 @@ TreeNode<N>::create_bounding_box (unsigned int c) const
         switch (c)
           {
           case 0:
-            return std::make_pair (Point(xmin, ymin),
-                                   Point(xc,   yc));
+            return BoundingBox (Point(xmin, ymin),
+                                Point(xc,   yc));
           case 1:
-            return std::make_pair (Point(xc,   ymin),
-                                   Point(xmax, yc));
+            return BoundingBox (Point(xc,   ymin),
+                                Point(xmax, yc));
           case 2:
-            return std::make_pair (Point(xmin, yc),
-                                   Point(xc,   ymax));
+            return BoundingBox (Point(xmin, yc),
+                                Point(xc,   ymax));
           case 3:
-            return std::make_pair (Point(xc,   yc),
-                                   Point(xmax, ymax));
+            return BoundingBox (Point(xc,   yc),
+                                Point(xmax, ymax));
           default:
             libmesh_error_msg("c >= N!");
           }
@@ -319,11 +323,11 @@ TreeNode<N>::create_bounding_box (unsigned int c) const
         switch (c)
           {
           case 0:
-            return std::make_pair (Point(xmin),
-                                   Point(xc));
+            return BoundingBox (Point(xmin),
+                                Point(xc));
           case 1:
-            return std::make_pair (Point(xc),
-                                   Point(xmax));
+            return BoundingBox (Point(xc),
+                                Point(xmax));
           default:
             libmesh_error_msg("c >= N!");
           }
@@ -334,10 +338,6 @@ TreeNode<N>::create_bounding_box (unsigned int c) const
     default:
       libmesh_error_msg("Only implemented for Octrees, QuadTrees, and Binary Trees!");
     }
-
-  libmesh_error_msg("We'll never get here!");
-  Point min, max;
-  return std::make_pair (min, max);
 }
 
 
@@ -349,14 +349,14 @@ void TreeNode<N>::print_nodes(std::ostream & out_stream) const
     {
       out_stream << "TreeNode Level: " << this->level() << std::endl;
 
-      for (unsigned int n=0; n<nodes.size(); n++)
+      for (std::size_t n=0; n<nodes.size(); n++)
         out_stream << " " << nodes[n]->id();
 
       out_stream << std::endl << std::endl;
     }
   else
     {
-      for (unsigned int child=0; child<children.size(); child++)
+      for (std::size_t child=0; child<children.size(); child++)
         children[child]->print_nodes();
     }
 }
@@ -370,15 +370,14 @@ void TreeNode<N>::print_elements(std::ostream & out_stream) const
     {
       out_stream << "TreeNode Level: " << this->level() << std::endl;
 
-      for (std::vector<const Elem *>::const_iterator pos=elements.begin();
-           pos != elements.end(); ++pos)
-        out_stream << " " << *pos;
+      for (const auto & elem : elements)
+        out_stream << " " << elem;
 
       out_stream << std::endl << std::endl;
     }
   else
     {
-      for (unsigned int child=0; child<children.size(); child++)
+      for (std::size_t child=0; child<children.size(); child++)
         children[child]->print_elements();
     }
 }
@@ -386,7 +385,7 @@ void TreeNode<N>::print_elements(std::ostream & out_stream) const
 
 
 template <unsigned int N>
-void TreeNode<N>::transform_nodes_to_elements (std::vector<std::vector<const Elem *> > & nodes_to_elem)
+void TreeNode<N>::transform_nodes_to_elements (std::vector<std::vector<const Elem *>> & nodes_to_elem)
 {
   if (this->active())
     {
@@ -397,7 +396,7 @@ void TreeNode<N>::transform_nodes_to_elements (std::vector<std::vector<const Ele
       // set to eliminate the duplication.
       std::set<const Elem *> elements_set;
 
-      for (unsigned int n=0; n<nodes.size(); n++)
+      for (std::size_t n=0; n<nodes.size(); n++)
         {
           // the actual global node number we are replacing
           // with the connected elements
@@ -406,7 +405,7 @@ void TreeNode<N>::transform_nodes_to_elements (std::vector<std::vector<const Ele
           libmesh_assert_less (node_number, mesh.n_nodes());
           libmesh_assert_less (node_number, nodes_to_elem.size());
 
-          for (unsigned int e=0; e<nodes_to_elem[node_number].size(); e++)
+          for (std::size_t e=0; e<nodes_to_elem[node_number].size(); e++)
             elements_set.insert(nodes_to_elem[node_number][e]);
         }
 
@@ -419,16 +418,15 @@ void TreeNode<N>::transform_nodes_to_elements (std::vector<std::vector<const Ele
       // than the set.
       elements.reserve(elements_set.size());
 
-      for (std::set<const Elem *>::iterator pos=elements_set.begin();
-           pos != elements_set.end(); ++pos)
+      for (const auto & elem : elements_set)
         {
-          elements.push_back(*pos);
+          elements.push_back(elem);
 
 #ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
 
           // flag indicating this node contains
           // infinite elements
-          if ((*pos)->infinite())
+          if (elem->infinite())
             this->contains_ifems = true;
 
 #endif
@@ -436,7 +434,64 @@ void TreeNode<N>::transform_nodes_to_elements (std::vector<std::vector<const Ele
     }
   else
     {
-      for (unsigned int child=0; child<children.size(); child++)
+      for (std::size_t child=0; child<children.size(); child++)
+        children[child]->transform_nodes_to_elements (nodes_to_elem);
+    }
+
+}
+
+
+
+template <unsigned int N>
+void TreeNode<N>::transform_nodes_to_elements (std::unordered_map<dof_id_type, std::vector<const Elem *>> & nodes_to_elem)
+{
+  if (this->active())
+    {
+      elements.clear();
+
+      // Temporarily use a set. Since multiple nodes
+      // will likely map to the same element we use a
+      // set to eliminate the duplication.
+      std::set<const Elem *> elements_set;
+
+      for (std::size_t n=0; n<nodes.size(); n++)
+        {
+          // the actual global node number we are replacing
+          // with the connected elements
+          const dof_id_type node_number = nodes[n]->id();
+
+          libmesh_assert_less (node_number, mesh.n_nodes());
+
+          auto & my_elems = nodes_to_elem[node_number];
+          elements_set.insert(my_elems.begin(), my_elems.end());
+        }
+
+      // Done with the nodes.
+      std::vector<const Node *>().swap(nodes);
+
+      // Now the set is built.  We can copy this to the
+      // vector.  Note that the resulting vector will
+      // already be sorted, and will require less memory
+      // than the set.
+      elements.reserve(elements_set.size());
+
+      for (const auto & elem : elements_set)
+        {
+          elements.push_back(elem);
+
+#ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
+
+          // flag indicating this node contains
+          // infinite elements
+          if (elem->infinite())
+            this->contains_ifems = true;
+
+#endif
+        }
+    }
+  else
+    {
+      for (std::size_t child=0; child<children.size(); child++)
         children[child]->transform_nodes_to_elements (nodes_to_elem);
     }
 
@@ -454,7 +509,7 @@ unsigned int TreeNode<N>::n_active_bins() const
     {
       unsigned int sum=0;
 
-      for (unsigned int c=0; c<children.size(); c++)
+      for (std::size_t c=0; c<children.size(); c++)
         sum += children[c]->n_active_bins();
 
       return sum;
@@ -475,21 +530,17 @@ TreeNode<N>::find_element (const Point & p,
       // or if the node contains infinite elements
       if (this->bounds_point(p, relative_tol) || this->contains_ifems)
         // Search the active elements in the active TreeNode.
-        for (std::vector<const Elem *>::const_iterator pos=elements.begin();
-             pos != elements.end(); ++pos)
-          if (!allowed_subdomains || allowed_subdomains->count((*pos)->subdomain_id()))
-            if ((*pos)->active() && (*pos)->contains_point(p, relative_tol))
-              return *pos;
+        for (const auto & elem : elements)
+          if (!allowed_subdomains || allowed_subdomains->count(elem->subdomain_id()))
+            if (elem->active() && elem->contains_point(p, relative_tol))
+              return elem;
 
       // The point was not found in any element
-      return libmesh_nullptr;
+      return nullptr;
     }
   else
     return this->find_element_in_children(p,allowed_subdomains,
                                           relative_tol);
-
-  libmesh_error_msg("We'll never get here!");
-  return libmesh_nullptr;
 }
 
 
@@ -502,18 +553,19 @@ const Elem * TreeNode<N>::find_element_in_children (const Point & p,
 {
   libmesh_assert (!this->active());
 
-  std::vector<bool> searched_child(children.size(), false);
+  // value-initialization sets all array members to false
+  auto searched_child = std::array<bool, N>();
 
   // First only look in the children whose bounding box
   // contain the point p.
-  for (unsigned int c=0; c<children.size(); c++)
+  for (std::size_t c=0; c<children.size(); c++)
     if (children[c]->bounds_point(p, relative_tol))
       {
         const Elem * e =
           children[c]->find_element(p,allowed_subdomains,
                                     relative_tol);
 
-        if (e != libmesh_nullptr)
+        if (e != nullptr)
           return e;
 
         // If we get here then a child that bounds the
@@ -529,24 +581,23 @@ const Elem * TreeNode<N>::find_element_in_children (const Point & p,
   // was searched and did not find any elements containing
   // the point p.  So, let's look at the other children
   // but exclude the one we have already searched.
-  for (unsigned int c=0; c<children.size(); c++)
+  for (std::size_t c=0; c<children.size(); c++)
     if (!searched_child[c])
       {
         const Elem * e =
           children[c]->find_element(p,allowed_subdomains,
                                     relative_tol);
 
-        if (e != libmesh_nullptr)
+        if (e != nullptr)
           return e;
       }
 
   // If we get here we have searched all our children.
   // Since this process was started at the root node then
   // we have searched all the elements in the tree without
-  // success.  So, we should return NULL since at this point
+  // success.  So, we should return nullptr since at this point
   // _no_ elements in the tree claim to contain point p.
-
-  return libmesh_nullptr;
+  return nullptr;
 }
 
 

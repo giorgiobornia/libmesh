@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -40,7 +40,7 @@
 
 // Basic include file needed for the mesh functionality.
 #include "libmesh/libmesh.h"
-#include "libmesh/serial_mesh.h"
+#include "libmesh/replicated_mesh.h"
 #include "libmesh/mesh_refinement.h"
 #include "libmesh/gmv_io.h"
 #include "libmesh/equation_systems.h"
@@ -51,16 +51,18 @@
 #include "libmesh/numeric_vector.h"
 #include "libmesh/dense_matrix.h"
 #include "libmesh/dense_vector.h"
-
 #include "libmesh/getpot.h"
+#include "libmesh/enum_solver_package.h"
+#include "libmesh/enum_xdr_mode.h"
+#include "libmesh/enum_norm_type.h"
 
 // This example will solve a linear transient system,
-// so we need to include the \p TransientLinearImplicitSystem definition.
+// so we need to include the TransientLinearImplicitSystem definition.
 #include "libmesh/transient_system.h"
 #include "libmesh/linear_implicit_system.h"
 #include "libmesh/vector_value.h"
 
-// To refine the mesh we need an \p ErrorEstimator
+// To refine the mesh we need an ErrorEstimator
 // object to figure out which elements to refine.
 #include "libmesh/error_vector.h"
 #include "libmesh/kelly_error_estimator.h"
@@ -74,12 +76,14 @@ using namespace libMesh;
 // Function prototype.  This function will assemble the system
 // matrix and right-hand-side at each time step.  Note that
 // since the system is linear we technically do not need to
-// assmeble the matrix at each time step, but we will anyway.
+// assemble the matrix at each time step, but we will anyway.
 // In subsequent examples we will employ adaptive mesh refinement,
 // and with a changing mesh it will be necessary to rebuild the
 // system matrix.
+#ifdef LIBMESH_ENABLE_AMR
 void assemble_cd (EquationSystems & es,
                   const std::string & system_name);
+#endif
 
 // Function prototype.  This function will initialize the system.
 // Initialization functions are optional for systems.  They allow
@@ -117,6 +121,10 @@ int main (int argc, char ** argv)
   // Initialize libMesh.
   LibMeshInit init (argc, argv);
 
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
+
 #ifndef LIBMESH_ENABLE_AMR
   libmesh_example_requires(false, "--enable-amr");
 #else
@@ -131,9 +139,9 @@ int main (int argc, char ** argv)
   // Use commandline parameter to specify if we are to
   // read in an initial solution or generate it ourself
   libMesh::out << "Usage:\n"
-               <<"\t " << argv[0] << " -init_timestep 0\n"
+               <<"\t " << argv[0] << " -init_timestep 0 -n_timesteps 25 [-n_refinements 5]\n"
                << "OR\n"
-               <<"\t " << argv[0] << " -read_solution -init_timestep 26\n"
+               <<"\t " << argv[0] << " -read_solution -init_timestep 26 -n_timesteps 25\n"
                << std::endl;
 
   libMesh::out << "Running: " << argv[0];
@@ -189,8 +197,8 @@ int main (int argc, char ** argv)
 
   // Create a new mesh on the default MPI communicator.
   // We still need some work on automatic parallel restarts with
-  // ParallelMesh
-  SerialMesh mesh(init.comm());
+  // DistributedMesh
+  ReplicatedMesh mesh(init.comm());
 
   // Create an equation systems object.
   EquationSystems equation_systems (mesh);
@@ -289,10 +297,10 @@ int main (int argc, char ** argv)
 
   // Solve the system "Convection-Diffusion".  This will be done by
   // looping over the specified time interval and calling the
-  // \p solve() member at each time step.  This will assemble the
+  // solve() member at each time step.  This will assemble the
   // system and call the linear solver.
 
-  // Since only \p TransientLinearImplicitSystems (and systems
+  // Since only TransientLinearImplicitSystems (and systems
   // derived from them) contain old solutions, to use the
   // old_local_solution later we now need to specify the system
   // type when we ask for it.
@@ -361,25 +369,24 @@ int main (int argc, char ** argv)
             {
               libMesh::out << "  Refining the mesh..." << std::endl;
 
-              // The \p ErrorVector is a particular \p StatisticsVector
+              // The ErrorVector is a particular StatisticsVector
               // for computing error information on a finite element mesh.
               ErrorVector error;
 
-              // The \p ErrorEstimator class interrogates a finite element
+              // The ErrorEstimator class interrogates a finite element
               // solution and assigns to each element a positive error value.
               // This value is used for deciding which elements to refine
               // and which to coarsen.
-              //ErrorEstimator* error_estimator = new KellyErrorEstimator;
               KellyErrorEstimator error_estimator;
 
               // Compute the error for each active element using the provided
-              // \p flux_jump indicator.  Note in general you will need to
+              // flux_jump indicator.  Note in general you will need to
               // provide an error estimator specifically designed for your
               // application.
               error_estimator.estimate_error (system,
                                               error);
 
-              // This takes the error in \p error and decides which elements
+              // This takes the error in error and decides which elements
               // will be coarsened or refined.  Any element within 20% of the
               // maximum error on any element will be refined, and any
               // element within 7% of the minimum error on any element might
@@ -395,10 +402,10 @@ int main (int argc, char ** argv)
               // elements.
               mesh_refinement.refine_and_coarsen_elements();
 
-              // This call reinitializes the \p EquationSystems object for
+              // This call reinitializes the EquationSystems object for
               // the newly refined mesh.  One of the steps in the
-              // reinitialization is projecting the \p solution,
-              // \p old_solution, etc... vectors from the old mesh to
+              // reinitialization is projecting the solution,
+              // old_solution, etc... vectors from the old mesh to
               // the current one.
               equation_systems.reinit ();
             }
@@ -447,7 +454,7 @@ int main (int argc, char ** argv)
 // responsible for applying the initial conditions to
 // the system.
 void init_cd (EquationSystems & es,
-              const std::string & system_name)
+              const std::string & libmesh_dbg_var(system_name))
 {
   // It is a good idea to make sure we are initializing
   // the proper system.
@@ -460,7 +467,7 @@ void init_cd (EquationSystems & es,
   // Project initial conditions at time 0
   es.parameters.set<Real> ("time") = system.time = 0;
 
-  system.project_solution(exact_value, libmesh_nullptr, es.parameters);
+  system.project_solution(exact_value, nullptr, es.parameters);
 }
 
 
@@ -469,10 +476,10 @@ void init_cd (EquationSystems & es,
 // will be called at each time step.  It is responsible
 // for computing the proper matrix entries for the
 // element stiffness matrices and right-hand sides.
-void assemble_cd (EquationSystems & es,
-                  const std::string & system_name)
-{
 #ifdef LIBMESH_ENABLE_AMR
+void assemble_cd (EquationSystems & es,
+                  const std::string & libmesh_dbg_var(system_name))
+{
   // It is a good idea to make sure we are assembling
   // the proper system.
   libmesh_assert_equal_to (system_name, "Convection-Diffusion");
@@ -492,14 +499,14 @@ void assemble_cd (EquationSystems & es,
   FEType fe_type = system.variable_type(0);
 
   // Build a Finite Element object of the specified type.  Since the
-  // \p FEBase::build() member dynamically creates memory we will
-  // store the object as an \p UniquePtr<FEBase>.  This can be thought
+  // FEBase::build() member dynamically creates memory we will
+  // store the object as a std::unique_ptr<FEBase>.  This can be thought
   // of as a pointer that will clean up after itself.
-  UniquePtr<FEBase> fe      (FEBase::build(dim, fe_type));
-  UniquePtr<FEBase> fe_face (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe      (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe_face (FEBase::build(dim, fe_type));
 
   // A Gauss quadrature rule for numerical integration.
-  // Let the \p FEType object decide what order rule is appropriate.
+  // Let the FEType object decide what order rule is appropriate.
   QGauss qrule (dim,   fe_type.default_quadrature_order());
   QGauss qface (dim-1, fe_type.default_quadrature_order());
 
@@ -514,19 +521,19 @@ void assemble_cd (EquationSystems & es,
   const std::vector<Real> & JxW_face = fe_face->get_JxW();
 
   // The element shape functions evaluated at the quadrature points.
-  const std::vector<std::vector<Real> > & phi = fe->get_phi();
-  const std::vector<std::vector<Real> > & psi = fe_face->get_phi();
+  const std::vector<std::vector<Real>> & phi = fe->get_phi();
+  const std::vector<std::vector<Real>> & psi = fe_face->get_phi();
 
   // The element shape function gradients evaluated at the quadrature
   // points.
-  const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+  const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
   // The XY locations of the quadrature points used for face integration
   const std::vector<Point> & qface_points = fe_face->get_xyz();
 
-  // A reference to the \p DofMap object for this system.  The \p DofMap
+  // A reference to the DofMap object for this system.  The DofMap
   // object handles the index translation from node and element numbers
-  // to degree of freedom numbers.  We will talk more about the \p DofMap
+  // to degree of freedom numbers.  We will talk more about the DofMap
   // in future examples.
   const DofMap & dof_map = system.get_dof_map();
 
@@ -556,16 +563,9 @@ void assemble_cd (EquationSystems & es,
   // live on the local processor. We will compute the element
   // matrix and right-hand-side contribution.  Since the mesh
   // will be refined we want to only consider the ACTIVE elements,
-  // hence we use a variant of the \p active_elem_iterator.
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-  for ( ; el != end_el; ++el)
+  // hence we use a variant of the active_elem_iterator.
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      // Store a pointer to the element we are currently
-      // working on.  This allows for nicer syntax later.
-      const Elem * elem = *el;
-
       // Get the degree of freedom indices for the
       // current element.  These define where in the global
       // matrix and right-hand-side this element will
@@ -578,16 +578,19 @@ void assemble_cd (EquationSystems & es,
       // (phi, dphi) for the current element.
       fe->reinit (elem);
 
+      const unsigned int n_dofs =
+        cast_int<unsigned int>(dof_indices.size());
+      libmesh_assert_equal_to (n_dofs, phi.size());
+
       // Zero the element matrix and right-hand side before
       // summing them.  We use the resize member here because
       // the number of degrees of freedom might have changed from
       // the last element.  Note that this will be the case if the
       // element type is different (i.e. the last element was a
       // triangle, now we are on a quadrilateral).
-      Ke.resize (dof_indices.size(),
-                 dof_indices.size());
+      Ke.resize (n_dofs, n_dofs);
 
-      Fe.resize (dof_indices.size());
+      Fe.resize (n_dofs);
 
       // Now we will build the element matrix and right-hand-side.
       // Constructing the RHS requires the solution and its
@@ -602,7 +605,7 @@ void assemble_cd (EquationSystems & es,
           Gradient grad_u_old;
 
           // Compute the old solution & its gradient.
-          for (unsigned int l=0; l<phi.size(); l++)
+          for (unsigned int l=0; l != n_dofs; l++)
             {
               u_old += phi[l][qp]*system.old_solution (dof_indices[l]);
 
@@ -613,7 +616,7 @@ void assemble_cd (EquationSystems & es,
             }
 
           // Now compute the element matrix and RHS contributions.
-          for (unsigned int i=0; i<phi.size(); i++)
+          for (unsigned int i=0; i != n_dofs; i++)
             {
               // The RHS contribution
               Fe(i) += JxW[qp]*(
@@ -629,7 +632,7 @@ void assemble_cd (EquationSystems & es,
                                         diffusivity*(grad_u_old*dphi[i][qp]))
                                 );
 
-              for (unsigned int j=0; j<phi.size(); j++)
+              for (unsigned int j=0; j != n_dofs; j++)
                 {
                   // The matrix contribution
                   Ke(i,j) += JxW[qp]*(
@@ -661,10 +664,12 @@ void assemble_cd (EquationSystems & es,
         // The following loops over the sides of the element.
         // If the element has no neighbor on a side then that
         // side MUST live on a boundary of the domain.
-        for (unsigned int s=0; s<elem->n_sides(); s++)
-          if (elem->neighbor(s) == libmesh_nullptr)
+        for (auto s : elem->side_index_range())
+          if (elem->neighbor_ptr(s) == nullptr)
             {
               fe_face->reinit(elem, s);
+
+              libmesh_assert_equal_to (n_dofs, psi.size());
 
               for (unsigned int qp=0; qp<qface.n_points(); qp++)
                 {
@@ -673,12 +678,12 @@ void assemble_cd (EquationSystems & es,
                                                        system.time);
 
                   // RHS contribution
-                  for (unsigned int i=0; i<psi.size(); i++)
+                  for (unsigned int i=0; i != n_dofs; i++)
                     Fe(i) += penalty*JxW_face[qp]*value*psi[i][qp];
 
                   // Matrix contribution
-                  for (unsigned int i=0; i<psi.size(); i++)
-                    for (unsigned int j=0; j<psi.size(); j++)
+                  for (unsigned int i=0; i != n_dofs; i++)
+                    for (unsigned int j=0; j != n_dofs; j++)
                       Ke(i,j) += penalty*JxW_face[qp]*psi[i][qp]*psi[j][qp];
                 }
             }
@@ -691,18 +696,18 @@ void assemble_cd (EquationSystems & es,
       // solution continuity, i.e. they are not really "free".  We need
       // to constrain those DOFs in terms of non-constrained DOFs to
       // ensure a continuous solution.  The
-      // \p DofMap::constrain_element_matrix_and_vector() method does
+      // DofMap::constrain_element_matrix_and_vector() method does
       // just that.
       dof_map.constrain_element_matrix_and_vector (Ke, Fe, dof_indices);
 
       // The element matrix and right-hand-side are now built
       // for this element.  Add them to the global matrix and
-      // right-hand-side vector.  The \p SparseMatrix::add_matrix()
-      // and \p NumericVector::add_vector() members do this for us.
+      // right-hand-side vector.  The SparseMatrix::add_matrix()
+      // and NumericVector::add_vector() members do this for us.
       system.matrix->add_matrix (Ke, dof_indices);
       system.rhs->add_vector    (Fe, dof_indices);
 
     }
-  // Finished computing the sytem matrix and right-hand side.
-#endif // #ifdef LIBMESH_ENABLE_AMR
+  // Finished computing the system matrix and right-hand side.
 }
+#endif // #ifdef LIBMESH_ENABLE_AMR

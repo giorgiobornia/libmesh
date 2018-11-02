@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,14 +20,10 @@
 #ifndef LIBMESH_MESH_SUBDIVISION_SUPPORT_H
 #define LIBMESH_MESH_SUBDIVISION_SUPPORT_H
 
-
-
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/libmesh.h"
 #include "libmesh/face_tri3_subdivision.h"
 #include "libmesh/elem.h"
-
-// C++ Includes   -----------------------------------
 
 namespace libMesh
 {
@@ -35,12 +31,16 @@ namespace libMesh
 // Forward declarations
 class MeshBase;
 
-// ------------------------------------------------------------
 // MeshTools::Subdivision namespace
 namespace MeshTools
 {
 /**
  * Utility functions for subdivision surface operations on a \p Mesh.
+ *
+ * \author Roman Vetter
+ * \author Norbert Stoop
+ * \date 2014
+ * \brief Support functions for subdivision surface elements.
  */
 namespace Subdivision
 {
@@ -63,7 +63,8 @@ namespace Subdivision
  *        5--4--3
  * \endverbatim
  */
-void find_one_ring(const Tri3Subdivision * elem, std::vector<Node *> & nodes);
+void find_one_ring(const Tri3Subdivision * elem,
+                   std::vector<const Node *> & nodes);
 
 /**
  * Turns a triangulated \p mesh into a subdivision mesh. This

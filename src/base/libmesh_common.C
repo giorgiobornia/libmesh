@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,7 +22,12 @@
 #include "libmesh/print_trace.h"
 
 // C/C++ includes
+#ifdef LIBMESH_HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef LIBMESH_HAVE_UNISTD_H
 #include <unistd.h>  // needed for getpid()
+#endif
 
 #ifdef LIBMESH_HAVE_CSIGNAL
 #  include <csignal>
@@ -50,12 +55,12 @@ void stop(const char * file, int line, const char * date, const char * time)
   if (libMesh::global_n_processors() == 1)
     {
       libMesh::MacroFunctions::here(file, line, date, time);
-#ifdef LIBMESH_HAVE_CSIGNAL
+#if defined(LIBMESH_HAVE_CSIGNAL) && defined(SIGSTOP)
       libMesh::out << "Stopping process " << getpid() << "..." << std::endl;
       std::raise(SIGSTOP);
       libMesh::out << "Continuing process " << getpid() << "..." << std::endl;
 #else
-      libMesh::out << "WARNING:  libmesh_stop() does not work without the <csignal> header file!" << std::endl;
+      libMesh::out << "WARNING:  libmesh_stop() does not work; no operating system support." << std::endl;
 #endif
     }
 }
@@ -76,8 +81,6 @@ void report_error(const char * file, int line, const char * date, const char * t
   reporting_error = true;
 
   if (libMesh::global_n_processors() == 1 ||
-      // Note: support both 'underscore' and 'dash' flavors of the option
-      libMesh::on_command_line("--print_trace") ||
       libMesh::on_command_line("--print-trace"))
     libMesh::print_trace();
   else

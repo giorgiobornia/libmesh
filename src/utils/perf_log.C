@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -15,21 +15,28 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-
+#include "libmesh/perf_log.h"
 
 // C++ includes
+#include <algorithm>
 #include <iostream>
 #include <iomanip>
+#include <cstring>
 #include <ctime>
 #include <unistd.h>
-#include <sys/utsname.h>
 #include <sys/types.h>
-#include <pwd.h>
 #include <vector>
 #include <sstream>
 
+#ifdef LIBMESH_HAVE_SYS_UTSNAME_H
+#include <sys/utsname.h>
+#endif
+
+#ifdef LIBMESH_HAVE_PWD_H
+#include <pwd.h>
+#endif
+
 // Local includes
-#include "libmesh/perf_log.h"
 #include "libmesh/timestamp.h"
 
 namespace libMesh
@@ -37,7 +44,7 @@ namespace libMesh
 
 
 // ------------------------------------------------------------
-// PerfLog class member funcions
+// PerfLog class member functions
 
 bool PerfLog::called = false;
 
@@ -48,7 +55,7 @@ PerfLog::PerfLog(const std::string & ln,
   log_events(le),
   total_time(0.)
 {
-  gettimeofday (&tstart, libmesh_nullptr);
+  gettimeofday (&tstart, nullptr);
 
   if (log_events)
     this->clear();
@@ -60,6 +67,9 @@ PerfLog::~PerfLog()
 {
   if (log_events)
     this->print_log();
+
+  for (const auto & pos : non_temporary_strings)
+    delete [] pos.second;
 }
 
 
@@ -69,16 +79,15 @@ void PerfLog::clear()
   if (log_events)
     {
       //  check that all events are closed
-      for (std::map<std::pair<std::string,std::string>, PerfData>::iterator
-             pos = log.begin(); pos != log.end(); ++pos)
-        if (pos->second.open)
-          libmesh_error_msg("ERROR clearning performance log for class " \
+      for (auto pos : log)
+        if (pos.second.open)
+          libmesh_error_msg("ERROR clearing performance log for class " \
                             << label_name                             \
                             << "\nevent "                             \
-                            << pos->first.second                      \
+                            << pos.first.second                      \
                             << " is still being monitored!");
 
-      gettimeofday (&tstart, libmesh_nullptr);
+      gettimeofday (&tstart, nullptr);
 
       log.clear();
 
@@ -86,6 +95,76 @@ void PerfLog::clear()
         log_stack.pop();
     }
 }
+
+
+
+void PerfLog::push (const std::string & label,
+                    const std::string & header)
+{
+  const char * label_c_str;
+  const char * header_c_str;
+  if (non_temporary_strings.count(label))
+    label_c_str = non_temporary_strings[label];
+  else
+    {
+      char * newcopy = new char [label.size()+1];
+      strcpy(newcopy, label.c_str());
+      label_c_str = newcopy;
+      non_temporary_strings[label] = label_c_str;
+    }
+
+  if (non_temporary_strings.count(header))
+    header_c_str = non_temporary_strings[header];
+  else
+    {
+      char * newcopy = new char [header.size()+1];
+      strcpy(newcopy, header.c_str());
+      header_c_str = newcopy;
+      non_temporary_strings[header] = header_c_str;
+    }
+
+  if (this->log_events)
+    this->fast_push(label_c_str, header_c_str);
+}
+
+
+
+void PerfLog::push (const char * label,
+                    const char * header)
+{
+  this->push(std::string(label), std::string(header));
+}
+
+
+
+
+
+void PerfLog::pop (const std::string & label,
+                   const std::string & header)
+{
+
+  const char * label_c_str = non_temporary_strings[label];
+  const char * header_c_str = non_temporary_strings[header];
+
+  // This could happen if users are *mixing* string and char* APIs for
+  // the same label/header combination.  For perfect backwards
+  // compatibility we should handle that, but there's just no fast way
+  // to do so.
+  libmesh_assert(label_c_str);
+  libmesh_assert(header_c_str);
+
+  if (this->log_events)
+    this->fast_pop(label_c_str, header_c_str);
+}
+
+
+
+void PerfLog::pop (const char * label,
+                   const char * header)
+{
+  this->pop(std::string(label), std::string(header));
+}
+
 
 
 std::string PerfLog::get_info_header() const
@@ -96,9 +175,11 @@ std::string PerfLog::get_info_header() const
     {
       std::string date = Utility::get_timestamp();
 
+#ifdef LIBMESH_HAVE_SYS_UTSNAME_H
       // Get system information
       struct utsname sysInfo;
       uname(&sysInfo);
+#endif
 
       // Get user information
       //
@@ -147,12 +228,28 @@ std::string PerfLog::get_info_header() const
           nprocs_stream  << "| Num Processors: " << libMesh::global_n_processors();
         }
 
-      time_stream    << "| Time:           " << date                   ;
-      os_stream      << "| OS:             " << sysInfo.sysname        ;
-      host_stream    << "| HostName:       " << sysInfo.nodename       ;
-      osrel_stream   << "| OS Release:     " << sysInfo.release        ;
-      osver_stream   << "| OS Version:     " << sysInfo.version        ;
-      machine_stream << "| Machine:        " << sysInfo.machine        ;
+      time_stream    << "| Time:           ";
+      os_stream      << "| OS:             ";
+      host_stream    << "| HostName:       ";
+      osrel_stream   << "| OS Release:     ";
+      osver_stream   << "| OS Version:     ";
+      machine_stream << "| Machine:        ";
+
+      time_stream << date;
+#ifdef LIBMESH_HAVE_SYS_UTSNAME_H
+      os_stream      << sysInfo.sysname     ;
+      host_stream    << sysInfo.nodename    ;
+      osrel_stream   << sysInfo.release     ;
+      osver_stream   << sysInfo.version     ;
+      machine_stream << sysInfo.machine     ;
+#else
+      os_stream      << "Unknown";
+      host_stream    << "Unknown";
+      osrel_stream   << "Unknown";
+      osver_stream   << "Unknown";
+      machine_stream << "Unknown";
+
+#endif
       user_stream    << "| Username:       ";
 #ifdef LIBMESH_HAVE_GETPWUID
       if (p && p->pw_name)
@@ -174,13 +271,13 @@ std::string PerfLog::get_info_header() const
 
       // Find the longest string in all the streams
       unsigned int max_length = 0;
-      for (unsigned int i=0; i<v.size(); ++i)
+      for (std::size_t i=0; i<v.size(); ++i)
         if (v[i]->str().size() > max_length)
           max_length = cast_int<unsigned int>
             (v[i]->str().size());
 
       // Find the longest string in the parsed_libmesh_configure_info
-      for (unsigned i=0; i<parsed_libmesh_configure_info.size(); ++i)
+      for (std::size_t i=0; i<parsed_libmesh_configure_info.size(); ++i)
         if (parsed_libmesh_configure_info[i].size() > max_length)
           max_length = cast_int<unsigned int>
             (parsed_libmesh_configure_info[i].size());
@@ -191,7 +288,7 @@ std::string PerfLog::get_info_header() const
           << '\n';
 
       // Loop over all the strings and add end formatting
-      for (unsigned int i=0; i<v.size(); ++i)
+      for (std::size_t i=0; i<v.size(); ++i)
         {
           if (v[i]->str().size())
             oss << v[i]->str()
@@ -214,7 +311,7 @@ std::string PerfLog::get_info_header() const
 
       // Loop over the parsed_libmesh_configure_info and add end formatting.  The magic
       // number 3 below accounts for the leading 'pipe' character and indentation
-      for (unsigned i=1; i<parsed_libmesh_configure_info.size(); ++i)
+      for (std::size_t i=1; i<parsed_libmesh_configure_info.size(); ++i)
         {
           oss << "|  "
               << parsed_libmesh_configure_info[i]
@@ -247,7 +344,7 @@ std::string PerfLog::get_perf_info() const
       // Stop timing for this event.
       struct timeval tstop;
 
-      gettimeofday (&tstop, libmesh_nullptr);
+      gettimeofday (&tstop, nullptr);
 
       const double elapsed_time = (static_cast<double>(tstop.tv_sec  - tstart.tv_sec) +
                                    static_cast<double>(tstop.tv_usec - tstart.tv_usec)*1.e-6);
@@ -263,15 +360,12 @@ std::string PerfLog::get_perf_info() const
       const unsigned int pct_active_col_width = 9;
       const unsigned int pct_active_incl_sub_col_width = 9;
 
-      // Iterator to be used to loop over the map of timed events
-      std::map<std::pair<std::string,std::string>, PerfData>::const_iterator pos;
-
       // Reset the event column width based on the longest event name plus
       // a possible 2-character indentation, plus a space.
-      for (pos = log.begin(); pos != log.end(); ++pos)
-        if (pos->first.second.size()+3 > event_col_width)
+      for (auto pos : log)
+        if (std::strlen(pos.first.second)+3 > event_col_width)
           event_col_width = cast_int<unsigned int>
-            (pos->first.second.size()+3);
+            (std::strlen(pos.first.second)+3);
 
       // Set the total width of the column
       const unsigned int total_col_width =
@@ -381,9 +475,17 @@ std::string PerfLog::get_perf_info() const
 
       std::string last_header("");
 
-      for (pos = log.begin(); pos != log.end(); ++pos)
+      // Make a new log to sort entries alphabetically
+      std::map<std::pair<std::string, std::string>, PerfData> string_log;
+
+      for (auto char_data : log)
+        string_log[std::make_pair(char_data.first.first,
+                                  char_data.first.second)] =
+          char_data.second;
+
+      for (auto pos : string_log)
         {
-          const PerfData & perf_data = pos->second;
+          const PerfData & perf_data = pos.second;
 
           // Only print the event if the count is non-zero.
           if (perf_data.count != 0)
@@ -401,17 +503,17 @@ std::string PerfLog::get_perf_info() const
               summed_percentage     += perf_percent;
 
               // Print the event name
-              if (pos->first.first == "")
+              if (pos.first.first == "")
                 oss << "| "
                     << std::setw(event_col_width)
                     << std::left
-                    << pos->first.second;
+                    << pos.first.second;
 
               else
                 {
-                  if (last_header != pos->first.first)
+                  if (last_header != pos.first.first)
                     {
-                      last_header = pos->first.first;
+                      last_header = pos.first.first;
 
                       // print blank line followed by header name
                       // (account for additional space before the
@@ -421,14 +523,14 @@ std::string PerfLog::get_perf_info() const
                           << "|\n| "
                           << std::setw(total_col_width-1)
                           << std::left
-                          << pos->first.first
+                          << pos.first.first
                           << "|\n";
                     }
 
                   oss << "|   "
                       << std::setw(event_col_width-2)
                       << std::left
-                      << pos->first.second;
+                      << pos.first.second;
                 }
 
 
@@ -593,7 +695,26 @@ void PerfLog::print_log() const
 
 PerfData PerfLog::get_perf_data(const std::string & label, const std::string & header)
 {
-  return log[std::make_pair(header, label)];
+  if (non_temporary_strings.count(label) &&
+      non_temporary_strings.count(header))
+    {
+      const char * label_c_str = non_temporary_strings[label];
+      const char * header_c_str = non_temporary_strings[header];
+      return log[std::make_pair(header_c_str, label_c_str)];
+    }
+
+  auto iter = std::find_if
+    (log.begin(), log.end(),
+     [&label, &header] (log_type::const_reference a)
+     {
+       return
+       !std::strcmp(header.c_str(), a.first.first) &&
+       !std::strcmp(label.c_str(), a.first.second);
+     });
+
+  libmesh_assert(iter != log.end());
+
+  return iter->second;
 }
 
 void PerfLog::start_event(const std::string & label,

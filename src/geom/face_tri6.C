@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -15,12 +15,12 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-// C++ includes
-
 // Local includes
 #include "libmesh/side.h"
 #include "libmesh/edge_edge3.h"
 #include "libmesh/face_tri6.h"
+#include "libmesh/enum_io_package.h"
+#include "libmesh/enum_order.h"
 
 namespace libMesh
 {
@@ -30,7 +30,12 @@ namespace libMesh
 
 // ------------------------------------------------------------
 // Tri6 class static member initializations
-const unsigned int Tri6::side_nodes_map[3][3] =
+const int Tri6::num_nodes;
+const int Tri6::num_sides;
+const int Tri6::num_children;
+const int Tri6::nodes_per_side;
+
+const unsigned int Tri6::side_nodes_map[Tri6::num_sides][Tri6::nodes_per_side] =
   {
     {0, 1, 3}, // Side 0
     {1, 2, 4}, // Side 1
@@ -40,7 +45,7 @@ const unsigned int Tri6::side_nodes_map[3][3] =
 
 #ifdef LIBMESH_ENABLE_AMR
 
-const float Tri6::_embedding_matrix[4][6][6] =
+const float Tri6::_embedding_matrix[Tri6::num_children][Tri6::num_nodes][Tri6::num_nodes] =
   {
     // embedding matrix for child 0
     {
@@ -117,13 +122,17 @@ bool Tri6::is_node_on_side(const unsigned int n,
                            const unsigned int s) const
 {
   libmesh_assert_less (s, n_sides());
-  for (unsigned int i = 0; i != 3; ++i)
-    if (side_nodes_map[s][i] == n)
-      return true;
-  return false;
+  return std::find(std::begin(side_nodes_map[s]),
+                   std::end(side_nodes_map[s]),
+                   n) != std::end(side_nodes_map[s]);
 }
 
-
+std::vector<unsigned>
+Tri6::nodes_on_side(const unsigned int s) const
+{
+  libmesh_assert_less(s, n_sides());
+  return {std::begin(side_nodes_map[s]), std::end(side_nodes_map[s])};
+}
 
 bool Tri6::has_affine_map() const
 {
@@ -143,6 +152,13 @@ bool Tri6::has_affine_map() const
 
 
 
+Order Tri6::default_order() const
+{
+  return SECOND;
+}
+
+
+
 dof_id_type Tri6::key (const unsigned int s) const
 {
   libmesh_assert_less (s, this->n_sides());
@@ -152,50 +168,55 @@ dof_id_type Tri6::key (const unsigned int s) const
     case 0:
 
       return
-        this->compute_key (this->node(3));
+        this->compute_key (this->node_id(3));
 
     case 1:
 
       return
-        this->compute_key (this->node(4));
+        this->compute_key (this->node_id(4));
 
     case 2:
 
       return
-        this->compute_key (this->node(5));
+        this->compute_key (this->node_id(5));
 
     default:
       libmesh_error_msg("Invalid side s = " << s);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0;
 }
 
 
 
-UniquePtr<Elem> Tri6::build_side (const unsigned int i,
-                                  bool proxy) const
+unsigned int Tri6::which_node_am_i(unsigned int side,
+                                   unsigned int side_node) const
+{
+  libmesh_assert_less (side, this->n_sides());
+  libmesh_assert_less (side_node, Tri6::nodes_per_side);
+
+  return Tri6::side_nodes_map[side][side_node];
+}
+
+
+
+std::unique_ptr<Elem> Tri6::build_side_ptr (const unsigned int i,
+                                            bool proxy)
 {
   libmesh_assert_less (i, this->n_sides());
 
   if (proxy)
-    return UniquePtr<Elem>(new Side<Edge3,Tri6>(this,i));
+    return libmesh_make_unique<Side<Edge3,Tri6>>(this,i);
 
   else
     {
-      Elem * edge = new Edge3;
+      std::unique_ptr<Elem> edge = libmesh_make_unique<Edge3>();
       edge->subdomain_id() = this->subdomain_id();
 
       // Set the nodes
       for (unsigned n=0; n<edge->n_nodes(); ++n)
-        edge->set_node(n) = this->get_node(Tri6::side_nodes_map[i][n]);
+        edge->set_node(n) = this->node_ptr(Tri6::side_nodes_map[i][n]);
 
-      return UniquePtr<Elem>(edge);
+      return edge;
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return UniquePtr<Elem>();
 }
 
 
@@ -215,37 +236,37 @@ void Tri6::connectivity(const unsigned int sf,
           {
           case 0:
             // linear sub-triangle 0
-            conn[0] = this->node(0)+1;
-            conn[1] = this->node(3)+1;
-            conn[2] = this->node(5)+1;
-            conn[3] = this->node(5)+1;
+            conn[0] = this->node_id(0)+1;
+            conn[1] = this->node_id(3)+1;
+            conn[2] = this->node_id(5)+1;
+            conn[3] = this->node_id(5)+1;
 
             return;
 
           case 1:
             // linear sub-triangle 1
-            conn[0] = this->node(3)+1;
-            conn[1] = this->node(1)+1;
-            conn[2] = this->node(4)+1;
-            conn[3] = this->node(4)+1;
+            conn[0] = this->node_id(3)+1;
+            conn[1] = this->node_id(1)+1;
+            conn[2] = this->node_id(4)+1;
+            conn[3] = this->node_id(4)+1;
 
             return;
 
           case 2:
             // linear sub-triangle 2
-            conn[0] = this->node(5)+1;
-            conn[1] = this->node(4)+1;
-            conn[2] = this->node(2)+1;
-            conn[3] = this->node(2)+1;
+            conn[0] = this->node_id(5)+1;
+            conn[1] = this->node_id(4)+1;
+            conn[2] = this->node_id(2)+1;
+            conn[3] = this->node_id(2)+1;
 
             return;
 
           case 3:
             // linear sub-triangle 3
-            conn[0] = this->node(3)+1;
-            conn[1] = this->node(4)+1;
-            conn[2] = this->node(5)+1;
-            conn[3] = this->node(5)+1;
+            conn[0] = this->node_id(3)+1;
+            conn[1] = this->node_id(4)+1;
+            conn[2] = this->node_id(5)+1;
+            conn[3] = this->node_id(5)+1;
 
             return;
 
@@ -258,12 +279,12 @@ void Tri6::connectivity(const unsigned int sf,
       {
         // VTK_QUADRATIC_TRIANGLE has same numbering as libmesh TRI6
         conn.resize(6);
-        conn[0] = this->node(0);
-        conn[1] = this->node(1);
-        conn[2] = this->node(2);
-        conn[3] = this->node(3);
-        conn[4] = this->node(4);
-        conn[5] = this->node(5);
+        conn[0] = this->node_id(0);
+        conn[1] = this->node_id(1);
+        conn[2] = this->node_id(2);
+        conn[3] = this->node_id(3);
+        conn[4] = this->node_id(4);
+        conn[5] = this->node_id(5);
         return;
 
         // Used to write out linear sub-triangles for VTK...
@@ -273,33 +294,33 @@ void Tri6::connectivity(const unsigned int sf,
           {
           case 0:
           // linear sub-triangle 0
-          conn[0] = this->node(0);
-          conn[1] = this->node(3);
-          conn[2] = this->node(5);
+          conn[0] = this->node_id(0);
+          conn[1] = this->node_id(3);
+          conn[2] = this->node_id(5);
 
           return;
 
           case 1:
           // linear sub-triangle 1
-          conn[0] = this->node(3);
-          conn[1] = this->node(1);
-          conn[2] = this->node(4);
+          conn[0] = this->node_id(3);
+          conn[1] = this->node_id(1);
+          conn[2] = this->node_id(4);
 
           return;
 
           case 2:
           // linear sub-triangle 2
-          conn[0] = this->node(5);
-          conn[1] = this->node(4);
-          conn[2] = this->node(2);
+          conn[0] = this->node_id(5);
+          conn[1] = this->node_id(4);
+          conn[2] = this->node_id(2);
 
           return;
 
           case 3:
           // linear sub-triangle 3
-          conn[0] = this->node(3);
-          conn[1] = this->node(4);
-          conn[2] = this->node(5);
+          conn[0] = this->node_id(3);
+          conn[1] = this->node_id(4);
+          conn[2] = this->node_id(5);
 
           return;
 
@@ -316,44 +337,81 @@ void Tri6::connectivity(const unsigned int sf,
 
 
 
+BoundingBox Tri6::loose_bounding_box () const
+{
+  // This might have curved edges, or might be a curved surface in
+  // 3-space, in which case the full bounding box can be larger than
+  // the bounding box of just the nodes.
+  //
+  //
+  // FIXME - I haven't yet proven the formula below to be correct for
+  // quadratics in 2D - RHS
+  Point pmin, pmax;
+
+  for (unsigned d=0; d<LIBMESH_DIM; ++d)
+    {
+      Real center = this->point(0)(d);
+      for (unsigned int p=1; p != 6; ++p)
+        center += this->point(p)(d);
+      center /= 6;
+
+      Real hd = std::abs(center - this->point(0)(d));
+      for (unsigned int p=1; p != 6; ++p)
+        hd = std::max(hd, std::abs(center - this->point(p)(d)));
+
+      pmin(d) = center - hd;
+      pmax(d) = center + hd;
+    }
+
+  return BoundingBox(pmin, pmax);
+}
+
+
+
 Real Tri6::volume () const
 {
+  // Make copies of our points.  It makes the subsequent calculations a bit
+  // shorter and avoids dereferencing the same pointer multiple times.
+  Point
+    x0 = point(0), x1 = point(1), x2 = point(2),
+    x3 = point(3), x4 = point(4), x5 = point(5);
+
   // Construct constant data vectors.
   // \vec{x}_{\xi}  = \vec{a1}*xi + \vec{b1}*eta + \vec{c1}
   // \vec{x}_{\eta} = \vec{a2}*xi + \vec{b2}*eta + \vec{c2}
   Point
-    a1 =  4.*point(0) + 4.*point(1) - 8.*point(3),
-    b1 =  4.*point(0) - 4.*point(3) + 4.*point(4) - 4.*point(5),
-    c1 = -3.*point(0) - 1.*point(1) + 4.*point(3),
-    a2 =  b1,
-    b2 =  4.*point(0) + 4.*point(2) - 8.*point(5),
-    c2 = -3.*point(0) - 1.*point(2) + 4.*point(5);
+    a1 =  4*x0 + 4*x1 - 8*x3,
+    b1 =  4*x0 - 4*x3 + 4*x4 - 4*x5, /*=a2*/
+    c1 = -3*x0 - 1*x1 + 4*x3,
+    b2 =  4*x0 + 4*x2 - 8*x5,
+    c2 = -3*x0 - 1*x2 + 4*x5;
 
   // If a1 == b1 == a2 == b2 == 0, this is a TRI6 with straight sides,
   // and we can use the TRI3 formula to compute the volume.
   if (a1.relative_fuzzy_equals(Point(0,0,0)) &&
       b1.relative_fuzzy_equals(Point(0,0,0)) &&
       b2.relative_fuzzy_equals(Point(0,0,0)))
-    return 0.5 * c1.cross(c2).norm();
+    return 0.5 * cross_norm(c1, c2);
 
   // 7-point rule, exact for quintics.
   const unsigned int N = 7;
 
   // Parameters of the quadrature rule
-  Real
-    w1 = Real(31)/480 + std::sqrt(15.0L)/2400,
-    w2 = Real(31)/480 - std::sqrt(15.0L)/2400,
-    q1 = Real(2)/7 + std::sqrt(15.0L)/21,
-    q2 = Real(2)/7 - std::sqrt(15.0L)/21;
+  const static Real
+    w1 = Real(31)/480 + Real(std::sqrt(15.0L)/2400),
+    w2 = Real(31)/480 - Real(std::sqrt(15.0L)/2400),
+    q1 = Real(2)/7 + Real(std::sqrt(15.0L)/21),
+    q2 = Real(2)/7 - Real(std::sqrt(15.0L)/21);
 
-  const Real xi[N]  = {Real(1)/3,  q1, q1,     1-2*q1, q2, q2,     1-2*q2};
-  const Real eta[N] = {Real(1)/3,  q1, 1-2*q1, q1,     q2, 1-2*q2, q2};
-  const Real wts[N] = {Real(9)/80, w1, w1,     w1,     w2, w2,     w2};
+  const static Real xi[N]  = {Real(1)/3,  q1, q1,     1-2*q1, q2, q2,     1-2*q2};
+  const static Real eta[N] = {Real(1)/3,  q1, 1-2*q1, q1,     q2, 1-2*q2, q2};
+  const static Real wts[N] = {Real(9)/80, w1, w1,     w1,     w2, w2,     w2};
 
   // Approximate the area with quadrature
   Real vol=0.;
   for (unsigned int q=0; q<N; ++q)
-    vol += wts[q] * (xi[q]*a1 + eta[q]*b1 + c1).cross(xi[q]*a2 + eta[q]*b2 + c2).norm();
+    vol += wts[q] * cross_norm(xi[q]*a1 + eta[q]*b1 + c1,
+                               xi[q]*b1 + eta[q]*b2 + c2);
 
   return vol;
 }
@@ -371,7 +429,7 @@ unsigned short int Tri6::second_order_adjacent_vertex (const unsigned int n,
 
 
 
-const unsigned short int Tri6::_second_order_adjacent_vertices[3][2] =
+const unsigned short int Tri6::_second_order_adjacent_vertices[Tri6::num_sides][2] =
   {
     {0, 1}, // vertices adjacent to node 3
     {1, 2}, // vertices adjacent to node 4
@@ -392,7 +450,7 @@ Tri6::second_order_child_vertex (const unsigned int n) const
 
 
 
-const unsigned short int Tri6::_second_order_vertex_child_number[6] =
+const unsigned short int Tri6::_second_order_vertex_child_number[Tri6::num_nodes] =
   {
     99,99,99, // Vertices
     0,1,0     // Edges
@@ -400,7 +458,7 @@ const unsigned short int Tri6::_second_order_vertex_child_number[6] =
 
 
 
-const unsigned short int Tri6::_second_order_vertex_child_index[6] =
+const unsigned short int Tri6::_second_order_vertex_child_index[Tri6::num_nodes] =
   {
     99,99,99, // Vertices
     1,2,2     // Edges

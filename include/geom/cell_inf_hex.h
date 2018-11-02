@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -35,9 +35,13 @@ namespace libMesh
  * The \f$ 6^{th} \f$ side is theoretically located at infinity,
  * and therefore not accounted for.
  * However, one could say that the \f$ 6^{th} \f$ side actually
- * @e does exist in the mesh, since the outer nodes are located
+ * does exist in the mesh, since the outer nodes are located
  * at a specific distance from the mesh origin (and therefore
  * define a side).  Still, this face is not to be used!
+ *
+ * \author Daniel Dreyer
+ * \date 2003
+ * \brief The base class for all 3D infinite hexahedral element types.
  */
 class InfHex : public InfCell
 {
@@ -52,14 +56,20 @@ public:
   {
     // Make sure the interior parent isn't undefined
     if (LIBMESH_DIM > 3)
-      this->set_interior_parent(libmesh_nullptr);
+      this->set_interior_parent(nullptr);
   }
 
+  InfHex (InfHex &&) = delete;
+  InfHex (const InfHex &) = delete;
+  InfHex & operator= (const InfHex &) = delete;
+  InfHex & operator= (InfHex &&) = delete;
+  virtual ~InfHex() = default;
+
   /**
-   * @returns the \p Point associated with local \p Node \p i,
+   * \returns The \p Point associated with local \p Node \p i,
    * in master element rather than physical coordinates.
    */
-  virtual Point master_point (const unsigned int i) const libmesh_override
+  virtual Point master_point (const unsigned int i) const override
   {
     libmesh_assert_less(i, this->n_nodes());
     return Point(_master_points[i][0],
@@ -68,46 +78,53 @@ public:
   }
 
   /**
-   * @returns 5.  Infinite elements have one side less
+   * \returns 5.  Infinite elements have one side less
    * than their conventional counterparts, since one
    * side is supposed to be located at infinity.
    */
-  virtual unsigned int n_sides() const libmesh_override { return 5; }
+  virtual unsigned int n_sides() const override { return 5; }
 
   /**
-   * @returns 8.  All infinite hexahedrals (in our
+   * \returns 8.  All infinite hexahedra (in our
    * setting) have 8 vertices.
    */
-  virtual unsigned int n_vertices() const libmesh_override { return 8; }
+  virtual unsigned int n_vertices() const override { return 8; }
 
   /**
-   * @returns 8.  All infinite hexahedrals have 8 edges,
+   * \returns \p true if the specified (local) node number is a
+   * "mid-edge" node on an infinite element edge.
+   */
+  virtual bool is_mid_infinite_edge_node(const unsigned int i) const
+    override { return (i > 3 && i < 8); }
+
+  /**
+   * \returns 8.  All infinite hexahedra have 8 edges,
    * 4 lying in the base, and 4 perpendicular to the base.
    */
-  virtual unsigned int n_edges() const libmesh_override { return 8; }
+  virtual unsigned int n_edges() const override { return 8; }
 
   /**
-   * @returns 5.  All hexahedrals have 5 faces.
+   * \returns 5.  All infinite hexahedra have 5 faces.
    */
-  virtual unsigned int n_faces() const libmesh_override { return 5; }
+  virtual unsigned int n_faces() const override { return 5; }
 
   /**
-   * @returns 4
+   * \returns 4.
    */
-  virtual unsigned int n_children() const libmesh_override { return 4; }
+  virtual unsigned int n_children() const override { return 4; }
 
-  /*
-   * @returns true iff the specified child is on the
-   * specified side
+  /**
+   * \returns \p true if the specified child is on the
+   * specified side.
    */
   virtual bool is_child_on_side(const unsigned int c,
-                                const unsigned int s) const libmesh_override;
+                                const unsigned int s) const override;
 
-  /*
-   * @returns true iff the specified edge is on the specified side
+  /**
+   * \returns \p true if the specified edge is on the specified side.
    */
   virtual bool is_edge_on_side(const unsigned int e,
-                               const unsigned int s) const libmesh_override;
+                               const unsigned int s) const override;
 
   /**
    * Don't hide Elem::key() defined in the base class.
@@ -115,30 +132,43 @@ public:
   using Elem::key;
 
   /**
-   * @returns an id associated with the \p s side of this element.
+   * \returns An id associated with the \p s side of this element.
    * The id is not necessarily unique, but should be close.  This is
    * particularly useful in the \p MeshBase::find_neighbors() routine.
    */
-  virtual dof_id_type key (const unsigned int s) const libmesh_override;
+  virtual dof_id_type key (const unsigned int s) const override;
 
   /**
-   * @returns a primitive (4-noded) quad or infquad for
+   * \returns \p InfHex8::side_nodes_map[side][side_node] after doing some range checking.
+   */
+  virtual unsigned int which_node_am_i(unsigned int side,
+                                       unsigned int side_node) const override;
+
+  /**
+   * \returns A primitive (4-noded) quad or infquad for
    * face i.
    */
-  virtual UniquePtr<Elem> side (const unsigned int i) const libmesh_override;
+  virtual std::unique_ptr<Elem> side_ptr (const unsigned int i) override;
 
   /**
-   * Based on the quality metric q specified by the user,
-   * returns a quantitative assessment of element quality.
+   * \returns A quantitative assessment of element quality based on
+   * the metric \p q specified by the user.
    */
-  virtual Real quality (const ElemQuality q) const libmesh_override;
+  virtual Real quality (const ElemQuality q) const override;
 
   /**
-   * Returns the suggested quality bounds for
-   * the hex based on quality measure q.  These are
-   * the values suggested by the CUBIT User's Manual.
+   * \returns The suggested quality bounds for the hex based on
+   * quality measure \p q.  These are the values suggested by the
+   * CUBIT User's Manual.
    */
-  virtual std::pair<Real, Real> qual_bounds (const ElemQuality q) const libmesh_override;
+  virtual std::pair<Real, Real> qual_bounds (const ElemQuality q) const override;
+
+  /**
+   * \returns \p true when this element contains the point
+   * \p p.  Customized for infinite elements, since knowledge
+   * about the envelope can be helpful.
+   */
+  virtual bool contains_point (const Point & p, Real tol=TOLERANCE) const override;
 
 protected:
 

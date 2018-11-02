@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -27,6 +27,7 @@
 #include "libmesh/dense_vector.h"
 #include "libmesh/vector_value.h"
 #include "libmesh/point.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
 
 // FParser includes
 #include "libmesh/fparser_ad.hh"
@@ -42,24 +43,64 @@
 #include <string>
 #include <vector>
 
-namespace libMesh {
+namespace libMesh
+{
 
+/**
+ * A Function generated (via FParser) by parsing a mathematical
+ * expression. All overridden virtual functions are documented in
+ * function_base.h.
+ *
+ * \author Roy Stogner
+ * \date 2012
+ * \brief A Function defined by a std::string.
+ */
 template <typename Output=Number, typename OutputGradient=Gradient>
 class ParsedFunction : public FunctionBase<Output>
 {
 public:
   explicit
   ParsedFunction (const std::string & expression,
-                  const std::vector<std::string> * additional_vars=libmesh_nullptr,
-                  const std::vector<Output> * initial_vals=libmesh_nullptr);
+                  const std::vector<std::string> * additional_vars=nullptr,
+                  const std::vector<Output> * initial_vals=nullptr);
 
-  // Re-parse with new expression
+  /**
+   * This class cannot be (default) copy assigned because the
+   * underlying FunctionParserADBase class does not define a custom
+   * copy assignment operator, and manually manages memory.
+   */
+  ParsedFunction & operator= (const ParsedFunction &) = delete;
+
+  /**
+   * The remaining special functions can be defaulted for this class.
+   *
+   * \note Despite the fact that the underlying FunctionParserADBase
+   * class is not move-assignable or move-constructible, it is still
+   * possible for _this_ class to be move-assigned and
+   * move-constructed, because FunctionParserADBase objects only
+   * appear within std::vectors in this class, and std::vectors can
+   * generally still be move-assigned and move-constructed even when
+   * their contents cannot. There are some allocator-specific
+   * exceptions to this, but it should be guaranteed to work for
+   * std::allocator in C++14 and beyond. See also:
+   * https://stackoverflow.com/q/42051917/659433
+   */
+  ParsedFunction (const ParsedFunction &) = default;
+  ParsedFunction (ParsedFunction &&) = default;
+  ParsedFunction & operator= (ParsedFunction &&) = default;
+  virtual ~ParsedFunction () = default;
+
+  /**
+   * Re-parse with new expression.
+   */
   void reparse (const std::string & expression);
 
   virtual Output operator() (const Point & p,
-                             const Real time = 0);
+                             const Real time = 0) override;
 
-  // Query if the automatic derivative generation was successful
+  /**
+   * Query if the automatic derivative generation was successful.
+   */
   virtual bool has_derivatives() { return _valid_derivatives; }
 
   virtual Output dot(const Point & p,
@@ -70,79 +111,89 @@ public:
 
   virtual void operator() (const Point & p,
                            const Real time,
-                           DenseVector<Output> & output);
+                           DenseVector<Output> & output) override;
 
-  /**
-   * @returns the vector component \p i at coordinate
-   * \p p and time \p time.
-   */
   virtual Output component (unsigned int i,
                             const Point & p,
-                            Real time);
+                            Real time) override;
 
   const std::string & expression() { return _expression; }
 
   /**
-   * @returns the address of a parsed variable so you can supply a parameterized value
+   * \returns The address of a parsed variable so you can supply a parameterized value.
    */
   virtual Output & getVarAddress(const std::string & variable_name);
 
-  virtual UniquePtr<FunctionBase<Output> > clone() const;
+  virtual std::unique_ptr<FunctionBase<Output>> clone() const override;
 
   /**
-   * @returns the value of an inline variable.  Will *only* be correct
-   * if the inline variable value is independent of input variables,
-   * if the inline variable is not redefined within any subexpression,
-   * and if the inline variable takes the same value within any
-   * subexpressions where it appears.
+   * \returns The value of an inline variable.
+   *
+   * \note Will *only* be correct if the inline variable value is
+   * independent of input variables, if the inline variable is not
+   * redefined within any subexpression, and if the inline variable
+   * takes the same value within any subexpressions where it appears.
    */
   Output get_inline_value(const std::string & inline_var_name) const;
 
   /**
-   * Changes the value of an inline variable.  Forever after the
-   * variable value will take the given constant, independent of input
-   * variables, in every subexpression where it is already defined.
-   * Currently only works if the inline variable is not redefined
-   * within any one subexpression.
+   * Changes the value of an inline variable.
+   *
+   * \note Forever after, the variable value will take the given
+   * constant, independent of input variables, in every subexpression
+   * where it is already defined.
+   *
+   * \note Currently only works if the inline variable is not
+   * redefined within any one subexpression.
    */
   void set_inline_value(const std::string & inline_var_name,
                         Output newval);
 
 protected:
-  // Re-parse with minor changes to expression
+  /**
+   * Re-parse with minor changes to expression.
+   */
   void partial_reparse (const std::string & expression);
 
-  // Helper function for parsing out variable names
+  /**
+   * Helper function for parsing out variable names.
+   */
   std::size_t find_name (const std::string & varname,
                          const std::string & expr) const;
 
-  // Helper function for determining time-dependence of expression
+  /**
+   * \returns \p true if the expression is time-dependent, false otherwise.
+   */
   bool expression_is_time_dependent( const std::string & expression ) const;
 
 private:
-  // Set the _spacetime argument vector
+  /**
+   * Set the _spacetime argument vector.
+   */
   void set_spacetime(const Point & p,
                      const Real time = 0);
 
-  // Evaluate the ith FunctionParser and check the result
+  /**
+   * Evaluate the ith FunctionParser and check the result.
+   */
   inline Output eval(FunctionParserADBase<Output> & parser,
                      const std::string & libmesh_dbg_var(function_name),
                      unsigned int libmesh_dbg_var(component_idx)) const;
 
   std::string _expression;
   std::vector<std::string> _subexpressions;
-  std::vector<FunctionParserADBase<Output> > parsers;
+  std::vector<FunctionParserADBase<Output>> parsers;
   std::vector<Output> _spacetime;
 
   // derivative functions
-  std::vector<FunctionParserADBase<Output> > dx_parsers;
+  std::vector<FunctionParserADBase<Output>> dx_parsers;
 #if LIBMESH_DIM > 1
-  std::vector<FunctionParserADBase<Output> > dy_parsers;
+  std::vector<FunctionParserADBase<Output>> dy_parsers;
 #endif
 #if LIBMESH_DIM > 2
-  std::vector<FunctionParserADBase<Output> > dz_parsers;
+  std::vector<FunctionParserADBase<Output>> dz_parsers;
 #endif
-  std::vector<FunctionParserADBase<Output> > dt_parsers;
+  std::vector<FunctionParserADBase<Output>> dt_parsers;
   bool _valid_derivatives;
 
   // Variables/values that can be parsed and handled by the function parser
@@ -190,7 +241,7 @@ ParsedFunction<Output,OutputGradient>::reparse (const std::string & expression)
   // If additional vars were passed, append them to the string
   // that we send to the function parser. Also add them to the
   // end of our spacetime vector
-  for (unsigned int i=0; i < _additional_vars.size(); ++i)
+  for (std::size_t i=0; i < _additional_vars.size(); ++i)
     {
       variables += "," + _additional_vars[i];
       // Initialize extra variables to the vector passed in or zero
@@ -262,7 +313,7 @@ ParsedFunction<Output,OutputGradient>::operator()
 }
 
 /**
- * @returns the vector component \p i at coordinate
+ * \returns The vector component \p i at coordinate
  * \p p and time \p time.
  */
 template <typename Output, typename OutputGradient>
@@ -282,7 +333,7 @@ ParsedFunction<Output,OutputGradient>::component (unsigned int i,
 }
 
 /**
- * @returns the address of a parsed variable so you can supply a parameterized value
+ * \returns The address of a parsed variable so you can supply a parameterized value
  */
 template <typename Output, typename OutputGradient>
 inline
@@ -302,11 +353,12 @@ ParsedFunction<Output,OutputGradient>::getVarAddress (const std::string & variab
 
 template <typename Output, typename OutputGradient>
 inline
-UniquePtr<FunctionBase<Output> >
+std::unique_ptr<FunctionBase<Output>>
 ParsedFunction<Output,OutputGradient>::clone() const
 {
-  return UniquePtr<FunctionBase<Output> >
-    (new ParsedFunction(_expression, &_additional_vars, &_initial_vals));
+  return libmesh_make_unique<ParsedFunction>(_expression,
+                                             &_additional_vars,
+                                             &_initial_vals);
 }
 
 template <typename Output, typename OutputGradient>
@@ -319,11 +371,10 @@ ParsedFunction<Output,OutputGradient>::get_inline_value (const std::string & inl
 #ifndef NDEBUG
   bool found_var_name = false;
 #endif
-  Output old_var_value;
+  Output old_var_value(0.);
 
-  for (unsigned int s=0; s != _subexpressions.size(); ++s)
+  for (const auto & subexpression : _subexpressions)
     {
-      const std::string & subexpression = _subexpressions[s];
       const std::size_t varname_i =
         find_name(inline_var_name, subexpression);
       if (varname_i == std::string::npos)
@@ -335,7 +386,7 @@ ParsedFunction<Output,OutputGradient>::get_inline_value (const std::string & inl
       libmesh_assert_not_equal_to(assignment_i, std::string::npos);
 
       libmesh_assert_equal_to(subexpression[assignment_i+1], '=');
-      for (unsigned int i = varname_i+1; i != assignment_i; ++i)
+      for (std::size_t i = varname_i+1; i != assignment_i; ++i)
         libmesh_assert_equal_to(subexpression[i], ' ');
 
       std::size_t end_assignment_i =
@@ -395,9 +446,8 @@ ParsedFunction<Output,OutputGradient>::set_inline_value (const std::string & inl
 #ifndef NDEBUG
   bool found_var_name = false;
 #endif
-  for (unsigned int s=0; s != _subexpressions.size(); ++s)
+  for (auto & subexpression : _subexpressions)
     {
-      const std::string & subexpression = _subexpressions[s];
       const std::size_t varname_i =
         find_name(inline_var_name, subexpression);
       if (varname_i == std::string::npos)
@@ -412,7 +462,7 @@ ParsedFunction<Output,OutputGradient>::set_inline_value (const std::string & inl
       libmesh_assert_not_equal_to(assignment_i, std::string::npos);
 
       libmesh_assert_equal_to(subexpression[assignment_i+1], '=');
-      for (unsigned int i = varname_i+1; i != assignment_i; ++i)
+      for (std::size_t i = varname_i+1; i != assignment_i; ++i)
         libmesh_assert_equal_to(subexpression[i], ' ');
 
       std::size_t end_assignment_i =
@@ -431,17 +481,17 @@ ParsedFunction<Output,OutputGradient>::set_inline_value (const std::string & inl
 #endif
                         << subexpression.substr(end_assignment_i,
                                                 std::string::npos);
-      _subexpressions[s] = new_subexpression.str();
+      subexpression = new_subexpression.str();
     }
 
   libmesh_assert(found_var_name);
 
   std::string new_expression;
 
-  for (unsigned int s=0; s != _subexpressions.size(); ++s)
+  for (const auto & subexpression : _subexpressions)
     {
       new_expression += '{';
-      new_expression += _subexpressions[s];
+      new_expression += subexpression;
       new_expression += '}';
     }
 
@@ -570,7 +620,7 @@ ParsedFunction<Output,OutputGradient>::expression_is_time_dependent( const std::
 
   // By definition, time is "t" for FunctionBase-based objects, so we just need to
   // see if this expression has the variable "t" in it.
-  if( this->find_name( std::string("t"), expression ) != std::string::npos )
+  if (this->find_name(std::string("t"), expression) != std::string::npos)
     is_time_dependent = true;
 
   return is_time_dependent;
@@ -614,8 +664,8 @@ ParsedFunction<Output,OutputGradient>::eval (FunctionParserADBase<Output> & pars
                    << " of expression '"
                    << function_name
                    << "' with arguments:\n";
-      for (unsigned int j=0; j<_spacetime.size(); ++j)
-        libMesh::err << '\t' << _spacetime[j] << '\n';
+      for (const auto & item : _spacetime)
+        libMesh::err << '\t' << item << '\n';
       libMesh::err << '\n';
 
       // Currently no API to report error messages, we'll do it manually
@@ -664,10 +714,22 @@ template <typename Output=Number>
 class ParsedFunction : public FunctionBase<Output>
 {
 public:
-  ParsedFunction (std::string /* expression */) : _dummy(0)
+  ParsedFunction (const std::string & /* expression */,
+                  const std::vector<std::string> * = nullptr,
+                  const std::vector<Output> * = nullptr) : _dummy(0)
   {
     libmesh_not_implemented();
   }
+
+  /**
+   * When !LIBMESH_HAVE_FPARSER, this class is not implemented, so
+   * let's make that explicit by deleting the special functions.
+   */
+  ParsedFunction (ParsedFunction &&) = delete;
+  ParsedFunction (const ParsedFunction &) = delete;
+  ParsedFunction & operator= (const ParsedFunction &) = delete;
+  ParsedFunction & operator= (ParsedFunction &&) = delete;
+  virtual ~ParsedFunction () = default;
 
   virtual Output operator() (const Point &,
                              const Real /* time */ = 0)
@@ -680,9 +742,9 @@ public:
   virtual void init() {}
   virtual void clear() {}
   virtual Output & getVarAddress(const std::string & /*variable_name*/) { return _dummy; }
-  virtual UniquePtr<FunctionBase<Output> > clone() const
+  virtual std::unique_ptr<FunctionBase<Output>> clone() const
   {
-    return UniquePtr<FunctionBase<Output> > (new ParsedFunction<Output>(""));
+    return libmesh_make_unique<ParsedFunction<Output>>("");
   }
 private:
   Output _dummy;

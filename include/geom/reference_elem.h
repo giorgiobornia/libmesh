@@ -22,9 +22,15 @@
 
 // Local includes
 #include "libmesh/libmesh_common.h"
-#include "libmesh/enum_elem_type.h"
 
-// C++ includes
+#ifdef LIBMESH_FORWARD_DECLARE_ENUMS
+namespace libMesh
+{
+enum ElemType : int;
+}
+#else
+#include "libmesh/enum_elem_type.h"
+#endif
 
 namespace libMesh
 {
@@ -38,14 +44,15 @@ class Elem;
  *
  * \author Benjamin S. Kirk
  * \date 2013
+ * \brief Namespace providing access to reference geometric element types.
  */
 namespace ReferenceElem
 {
 /**
- * @returns a constant reference to the reference element of
+ * \returns A constant reference to the reference element of
  * the user-requested type.
  */
-const Elem & get (const ElemType Type);
+const Elem & get (const ElemType type_in);
 
 } // namespace ReferenceElem
 

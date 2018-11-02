@@ -6,6 +6,16 @@
 #include <cppunit/TestCase.h>
 #include <libmesh/restore_warnings.h>
 
+// THE CPPUNIT_TEST_SUITE_END macro expands to code that involves
+// std::auto_ptr, which in turn produces -Wdeprecated-declarations
+// warnings.  These can be ignored in GCC as long as we wrap the
+// offending code in appropriate pragmas.  We can't get away with a
+// single ignore_warnings.h inclusion at the beginning of this file,
+// since the libmesh headers pull in a restore_warnings.h at some
+// point.  We also don't bother restoring warnings at the end of this
+// file since it's not a header.
+#include <libmesh/ignore_warnings.h>
+
 class FParserAutodiffTest : public CppUnit::TestCase
 {
 public:
@@ -13,6 +23,7 @@ public:
 
   CPPUNIT_TEST ( runTests );
   CPPUNIT_TEST ( registerDerivativeTest );
+  CPPUNIT_TEST ( registerDerivativeRepeatTest );
 
   CPPUNIT_TEST_SUITE_END ();
 
@@ -20,53 +31,66 @@ private:
 
   class ADTest {
   public:
-    ADTest(const std::string & _func, double _min, double _max, double _dx = 1e-6, double _reltol = 1e-5, int _steps = 20, double _abstol = 1e-10) :
-        func(_func),
-        min(_min),
-        max(_max),
-        dx(_dx),
-        reltol(_reltol),
-        abstol(_abstol),
-        steps(_steps)
+    ADTest(const std::string & _func,
+           double _min, double _max, double _dx = 1e-6,
+           double _reltol = 1e-5, int _steps = 20, double _abstol = 1e-10) :
+      func(_func),
+      min(_min),
+      max(_max),
+      dx(_dx),
+      reltol(_reltol),
+      abstol(_abstol),
+      steps(_steps)
     {
       CPPUNIT_ASSERT_MESSAGE ("Failed to parse test function", F.Parse(func, "x") == -1);
       dF.Parse(func, "x");
       dFopt.Parse(func, "x");
+      dFaopt.Parse(func, "x");
 
       CPPUNIT_ASSERT_MESSAGE ("Failed to take derivative of function", dF.AutoDiff("x") == -1);
 
       dFopt.Optimize();
       CPPUNIT_ASSERT_MESSAGE ("Failed to take derivative of optimized function", dFopt.AutoDiff("x") == -1);
+
+      dFaopt.SetADFlags(FunctionParserAD::ADAutoOptimize, true);
+      CPPUNIT_ASSERT_MESSAGE ("Failed to take derivative of auto-optimized function", dFaopt.AutoDiff("x") == -1);
     }
 
     bool run()
     {
       double x1, x2, vdF, vF1, vF2, fd;
       for (double x = min; x <= max; x += (max-min) / double(steps))
-      {
-        x1 = x - dx/2.0;
-        x2 = x + dx/2.0;
-
-        vF1 = F.Eval(&x1);
-        vF2 = F.Eval(&x2);
-        fd = (vF2-vF1) / dx;
-
-        // CPPUNIT_ASSERT(std::abs(fd - vdF) > tol)
-        // CPPUNIT_ASSERT(std::abs(fd - vdFopt) > tol)
-        vdF = dF.Eval(&x);
-        if (std::abs(vdF) > abstol && std::abs((fd - vdF)/vdF) > reltol && std::abs(fd - vdF)> abstol)
         {
-          std::cout << "Error in " << func << ": " << fd << "!=" << vdF << " at x=" << x << '\n';
-          return false;
-        }
+          x1 = x - dx/2.0;
+          x2 = x + dx/2.0;
 
-        vdF = dFopt.Eval(&x);
-        if (std::abs(vdF) > abstol && std::abs((fd - vdF)/vdF) > reltol && std::abs(fd - vdF)> abstol)
-        {
-          std::cout << "Error in opt " << func << ": " << fd << "!=" << vdF << " at x=" << x << '\n';
-          return false;
+          vF1 = F.Eval(&x1);
+          vF2 = F.Eval(&x2);
+          fd = (vF2-vF1) / dx;
+
+          // CPPUNIT_ASSERT(std::abs(fd - vdF) > tol)
+          // CPPUNIT_ASSERT(std::abs(fd - vdFopt) > tol)
+          vdF = dF.Eval(&x);
+          if (std::abs(vdF) > abstol && std::abs((fd - vdF)/vdF) > reltol && std::abs(fd - vdF)> abstol)
+            {
+              std::cout << "Error in " << func << ": " << fd << "!=" << vdF << " at x=" << x << '\n';
+              return false;
+            }
+
+          vdF = dFopt.Eval(&x);
+          if (std::abs(vdF) > abstol && std::abs((fd - vdF)/vdF) > reltol && std::abs(fd - vdF)> abstol)
+            {
+              std::cout << "Error in opt " << func << ": " << fd << "!=" << vdF << " at x=" << x << '\n';
+              return false;
+            }
+
+          vdF = dFaopt.Eval(&x);
+          if (std::abs(vdF) > abstol && std::abs((fd - vdF)/vdF) > reltol && std::abs(fd - vdF)> abstol)
+            {
+              std::cout << "Error in auto opt " << func << ": " << fd << "!=" << vdF << " at x=" << x << '\n';
+              return false;
+            }
         }
-      }
 
       return true;
     }
@@ -76,7 +100,7 @@ private:
     double min, max, dx, reltol, abstol;
     int steps;
 
-    FunctionParserAD F, dF, dFopt;
+    FunctionParserAD F, dF, dFopt, dFaopt;
   };
 
   std::vector<ADTest> tests;
@@ -104,6 +128,8 @@ public:
     tests.push_back(ADTest("atan2(x,1) + atan2(2,x)", -0.99, 0.99));
     tests.push_back(ADTest("0.767^sin(x)", -1.5, 1.5));
     tests.push_back(ADTest("A := sin(x) + tanh(x); A + sqrt(A) - x", -1.5, 1.5));
+    tests.push_back(ADTest("3*sin(2*x)*sin(2*x)", -5.0, 5.0, 1e-7, 1e-5, 100));
+    tests.push_back(ADTest("erf(0.5*x)", -2., 2., 1e-6, 1e-5, 100));
   }
 
   void runTests()
@@ -121,6 +147,7 @@ public:
   {
     FunctionParserAD R;
     std::string func = "x*a";
+    R.SetADFlags(FunctionParserAD::ADCacheDerivatives, true);
 
     // Parse the input expression into bytecode
     R.Parse(func, "x,a");
@@ -149,11 +176,53 @@ public:
     for (x = -1.0; x < 1.0; x+=0.3726)
       for (a = -1.0; a < 1.0; a+=0.2642)
         for (y = -1.0; y < 1.0; y+=0.3156)
-        {
-          CPPUNIT_ASSERT_DOUBLES_EQUAL(R.Eval(p), x*a, 1.e-12);
-          CPPUNIT_ASSERT_DOUBLES_EQUAL(dR.Eval(p), a+x*y, 1.e-12);
-          CPPUNIT_ASSERT_DOUBLES_EQUAL(d2R.Eval(p), 2*y, 1.e-12);
-        }
+          {
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(R.Eval(p), x*a, 1.e-12);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(dR.Eval(p), a+x*y, 1.e-12);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(d2R.Eval(p), 2*y, 1.e-12);
+          }
+  }
+
+  void registerDerivativeRepeatTest()
+  {
+    // now do the same functional form but with a different mapping to see if the cache
+    // signature was correctly updated
+    FunctionParserAD R;
+    std::string func = "x*a";
+    R.SetADFlags(FunctionParserAD::ADCacheDerivatives, true);
+
+    // Parse the input expression into bytecode
+    R.Parse(func, "x,a");
+
+    // add a new variable y but do not map it to the da/dx derivative!
+    R.AddVariable("y");
+    R.RegisterDerivative("a", "x", "a");
+
+    // parameter vector
+    double p[3];
+    double & x = p[0];
+    double & a = p[1];
+    double & y = p[2];
+
+    FunctionParserAD dR(R);
+    CPPUNIT_ASSERT_EQUAL (dR.AutoDiff("x"), -1);
+    dR.Optimize();
+    // dR = a + x*a
+
+    FunctionParserAD d2R(dR);
+    CPPUNIT_ASSERT_EQUAL (d2R.AutoDiff("x"), -1);
+    d2R.Optimize();
+    // d2R = 2*a + x*a
+
+    // we probe the parsers and check if they agree with the reference solution
+    for (x = -1.0; x < 1.0; x+=0.3726)
+      for (a = -1.0; a < 1.0; a+=0.2642)
+        for (y = -1.0; y < 1.0; y+=0.3156)
+          {
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(R.Eval(p), x*a, 1.e-12);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(dR.Eval(p), a+x*a, 1.e-12);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(d2R.Eval(p), 2*a+x*a, 1.e-12);
+          }
   }
 };
 

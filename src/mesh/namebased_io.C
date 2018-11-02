@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -28,10 +28,7 @@
 #include "libmesh/libmesh_logging.h"
 #include "libmesh/mesh_base.h"
 #include "libmesh/mesh_communication.h"
-
 #include "libmesh/namebased_io.h"
-
-#include "libmesh/diva_io.h"
 #include "libmesh/exodusII_io.h"
 #include "libmesh/gmv_io.h"
 #include "libmesh/tecplot_io.h"
@@ -45,13 +42,11 @@
 #include "libmesh/gmsh_io.h"
 #include "libmesh/fro_io.h"
 #include "libmesh/xdr_io.h"
-#include "libmesh/legacy_xdr_io.h"
 #include "libmesh/vtk_io.h"
 #include "libmesh/abaqus_io.h"
 #include "libmesh/checkpoint_io.h"
-
 #include "libmesh/equation_systems.h"
-
+#include "libmesh/enum_xdr_mode.h"
 
 
 namespace libMesh
@@ -93,7 +88,7 @@ void NameBasedIO::read (const std::string & name)
       if (!in.good())
         libmesh_error_msg("ERROR: cannot locate specified file:\n\t" << full_name.str());
     }
-  else if(name.rfind(".cp")) {} // Do error checking in the reader
+  else if (name.rfind(".cp")) {} // Do error checking in the reader
   else
     {
       std::ifstream in (name.c_str());
@@ -154,7 +149,7 @@ void NameBasedIO::read (const std::string & name)
         Nemesis_IO(mymesh).read (name);
       else if (name.rfind(".cp") < name.size())
         {
-          if(name.rfind(".cpa") < name.size())
+          if (name.rfind(".cpa") < name.size())
             CheckpointIO(mymesh, false).read(name);
           else
             CheckpointIO(mymesh, true).read(name);
@@ -164,13 +159,13 @@ void NameBasedIO::read (const std::string & name)
   // Serial mesh formats
   else
     {
-      START_LOG("read()", "NameBasedIO");
-
       // Read the file based on extension.  Only processor 0
       // needs to read the mesh.  It will then broadcast it and
       // the other processors will pick it up
       if (mymesh.processor_id() == 0)
         {
+          LOG_SCOPE("read()", "NameBasedIO");
+
           std::ostringstream pid_suffix;
           pid_suffix << '_' << getpid();
           // Nasty hack for reading/writing zipped files
@@ -182,10 +177,9 @@ void NameBasedIO::read (const std::string & name)
               new_name += pid_suffix.str();
               std::string system_string = "bunzip2 -f -k -c ";
               system_string += name + " > " + new_name;
-              START_LOG("system(bunzip2)", "NameBasedIO");
+              LOG_SCOPE("system(bunzip2)", "NameBasedIO");
               if (std::system(system_string.c_str()))
                 libmesh_file_error(system_string);
-              STOP_LOG("system(bunzip2)", "NameBasedIO");
 #else
               libmesh_error_msg("ERROR: need bzip2/bunzip2 to open .bz2 file " << name);
 #endif
@@ -197,10 +191,9 @@ void NameBasedIO::read (const std::string & name)
               new_name += pid_suffix.str();
               std::string system_string = "xz -f -d -k -c ";
               system_string += name + " > " + new_name;
-              START_LOG("system(xz -d)", "XdrIO");
+              LOG_SCOPE("system(xz -d)", "XdrIO");
               if (std::system(system_string.c_str()))
                 libmesh_file_error(system_string);
-              STOP_LOG("system(xz -d)", "XdrIO");
 #else
               libmesh_error_msg("ERROR: need xz to open .xz file " << name);
 #endif
@@ -216,9 +209,6 @@ void NameBasedIO::read (const std::string & name)
                    (new_name.rfind(".ogl")  < new_name.size()) ||
                    (new_name.rfind(".oogl") < new_name.size()))
             OFFIO(mymesh).read (new_name);
-
-          else if (new_name.rfind(".mgf") < new_name.size())
-            LegacyXdrIO(mymesh,true).read_mgf (new_name);
 
           else if (new_name.rfind(".unv") < new_name.size())
             UNVIO(mymesh).read (new_name);
@@ -275,9 +265,6 @@ void NameBasedIO::read (const std::string & name)
           if (name.size() - name.rfind(".xz") == 3)
             std::remove(new_name.c_str());
         }
-
-
-      STOP_LOG("read()", "NameBasedIO");
 
       // Send the mesh & bcs (which are now only on processor 0) to the other
       // processors
@@ -351,12 +338,8 @@ void NameBasedIO::write (const std::string & name)
               io.write (new_name);
             }
 
-        else if (new_name.rfind(".ugrid") < new_name.size())
-          DivaIO(mymesh).write(new_name);
         else if (new_name.rfind(".e") < new_name.size())
           ExodusII_IO(mymesh).write(new_name);
-        else if (new_name.rfind(".mgf")  < new_name.size())
-          LegacyXdrIO(mymesh,true).write_mgf(new_name);
 
         else if (new_name.rfind(".unv") < new_name.size())
           UNVIO(mymesh).write (new_name);
@@ -407,7 +390,7 @@ void NameBasedIO::write (const std::string & name)
       // Nasty hack for reading/writing zipped files
       if (name.size() - name.rfind(".bz2") == 4)
         {
-          START_LOG("system(bzip2)", "NameBasedIO");
+          LOG_SCOPE("system(bzip2)", "NameBasedIO");
           if (mymesh.processor_id() == 0)
             {
               std::string system_string = "bzip2 -f -c ";
@@ -417,11 +400,10 @@ void NameBasedIO::write (const std::string & name)
               std::remove(new_name.c_str());
             }
           mymesh.comm().barrier();
-          STOP_LOG("system(bzip2)", "NameBasedIO");
         }
       if (name.size() - name.rfind(".xz") == 3)
         {
-          START_LOG("system(xz)", "NameBasedIO");
+          LOG_SCOPE("system(xz)", "NameBasedIO");
           if (mymesh.processor_id() == 0)
             {
               std::string system_string = "xz -f -c ";
@@ -431,7 +413,6 @@ void NameBasedIO::write (const std::string & name)
               std::remove(new_name.c_str());
             }
           mymesh.comm().barrier();
-          STOP_LOG("system(xz)", "NameBasedIO");
         }
     }
 

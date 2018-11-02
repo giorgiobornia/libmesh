@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -17,18 +17,19 @@
 
 
 
-// Local includes
 #include "libmesh/libmesh_config.h"
+
 #ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
 
-
-// Local includes cont'd
+// Local includes
 #include "libmesh/face_inf_quad4.h"
 #include "libmesh/fe_interface.h"
 #include "libmesh/fe_type.h"
 #include "libmesh/side.h"
 #include "libmesh/edge_edge2.h"
 #include "libmesh/edge_inf_edge2.h"
+#include "libmesh/enum_io_package.h"
+#include "libmesh/enum_order.h"
 
 namespace libMesh
 {
@@ -37,7 +38,12 @@ namespace libMesh
 
 // ------------------------------------------------------------
 // InfQuad4 class static member initializations
-const unsigned int InfQuad4::side_nodes_map[3][2] =
+const int InfQuad4::num_nodes;
+const int InfQuad4::num_sides;
+const int InfQuad4::num_children;
+const int InfQuad4::nodes_per_side;
+
+const unsigned int InfQuad4::side_nodes_map[InfQuad4::num_sides][InfQuad4::nodes_per_side] =
   {
     {0, 1}, // Side 0
     {1, 3}, // Side 1
@@ -48,7 +54,7 @@ const unsigned int InfQuad4::side_nodes_map[3][2] =
 
 #ifdef LIBMESH_ENABLE_AMR
 
-const float InfQuad4::_embedding_matrix[2][4][4] =
+const float InfQuad4::_embedding_matrix[InfQuad4::num_children][InfQuad4::num_nodes][InfQuad4::num_nodes] =
   {
     // embedding matrix for child 0
     {
@@ -98,10 +104,16 @@ bool InfQuad4::is_node_on_side(const unsigned int n,
                                const unsigned int s) const
 {
   libmesh_assert_less (s, n_sides());
-  for (unsigned int i = 0; i != 2; ++i)
-    if (side_nodes_map[s][i] == n)
-      return true;
-  return false;
+  return std::find(std::begin(side_nodes_map[s]),
+                   std::end(side_nodes_map[s]),
+                   n) != std::end(side_nodes_map[s]);
+}
+
+std::vector<unsigned>
+InfQuad4::nodes_on_side(const unsigned int s) const
+{
+  libmesh_assert_less(s, n_sides());
+  return {std::begin(side_nodes_map[s]), std::end(side_nodes_map[s])};
 }
 
 bool InfQuad4::contains_point (const Point & p, Real tol) const
@@ -120,16 +132,16 @@ bool InfQuad4::contains_point (const Point & p, Real tol) const
 
   /*
    * determine the minimal distance of the base from the origin
-   * use size_sq() instead of size(), it is slightly faster
+   * use norm_sq() instead of norm(), it is slightly faster
    */
-  const Real min_distance_sq = std::min((Point(this->point(0)-my_origin)).size_sq(),
-                                        (Point(this->point(1)-my_origin)).size_sq());
+  const Real min_distance_sq = std::min((Point(this->point(0)-my_origin)).norm_sq(),
+                                        (Point(this->point(1)-my_origin)).norm_sq());
 
   /*
    * work with 1% allowable deviation.  Can still fall
    * back to the InfFE::inverse_map()
    */
-  const Real conservative_p_dist_sq = 1.01 * (Point(p-my_origin).size_sq());
+  const Real conservative_p_dist_sq = 1.01 * (Point(p-my_origin).norm_sq());
 
   if (conservative_p_dist_sq < min_distance_sq)
     {
@@ -163,8 +175,15 @@ bool InfQuad4::contains_point (const Point & p, Real tol) const
 
 
 
-UniquePtr<Elem> InfQuad4::build_side (const unsigned int i,
-                                      bool proxy) const
+Order InfQuad4::default_order() const
+{
+  return FIRST;
+}
+
+
+
+std::unique_ptr<Elem> InfQuad4::build_side_ptr (const unsigned int i,
+                                                bool proxy)
 {
   // libmesh_assert_less (i, this->n_sides());
 
@@ -174,12 +193,12 @@ UniquePtr<Elem> InfQuad4::build_side (const unsigned int i,
         {
           // base
         case 0:
-          return UniquePtr<Elem>(new Side<Edge2,InfQuad4>(this,i));
+          return libmesh_make_unique<Side<Edge2,InfQuad4>>(this,i);
 
           // ifem edges
         case 1:
         case 2:
-          return UniquePtr<Elem>(new Side<InfEdge2,InfQuad4>(this,i));
+          return libmesh_make_unique<Side<InfEdge2,InfQuad4>>(this,i);
 
         default:
           libmesh_error_msg("Invalid side i = " << i);
@@ -188,14 +207,14 @@ UniquePtr<Elem> InfQuad4::build_side (const unsigned int i,
 
   else
     {
-      // Create NULL pointer to be initialized, returned later.
-      Elem * edge = libmesh_nullptr;
+      // Return value
+      std::unique_ptr<Elem> edge;
 
       switch (i)
         {
         case 0:
           {
-            edge = new Edge2;
+            edge = libmesh_make_unique<Edge2>();
             break;
           }
 
@@ -203,7 +222,7 @@ UniquePtr<Elem> InfQuad4::build_side (const unsigned int i,
         case 1:
         case 2:
           {
-            edge = new InfEdge2;
+            edge = libmesh_make_unique<InfEdge2>();
             break;
           }
 
@@ -215,13 +234,10 @@ UniquePtr<Elem> InfQuad4::build_side (const unsigned int i,
 
       // Set the nodes
       for (unsigned n=0; n<edge->n_nodes(); ++n)
-        edge->set_node(n) = this->get_node(InfQuad4::side_nodes_map[i][n]);
+        edge->set_node(n) = this->node_ptr(InfQuad4::side_nodes_map[i][n]);
 
-      return UniquePtr<Elem>(edge);
+      return edge;
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return UniquePtr<Elem>();
 }
 
 
@@ -238,18 +254,19 @@ void InfQuad4::connectivity(const unsigned int libmesh_dbg_var(sf),
     {
     case TECPLOT:
       {
-        conn[0] = this->node(0)+1;
-        conn[1] = this->node(1)+1;
-        conn[2] = this->node(3)+1;
-        conn[3] = this->node(2)+1;
+        conn[0] = this->node_id(0)+1;
+        conn[1] = this->node_id(1)+1;
+        conn[2] = this->node_id(3)+1;
+        conn[3] = this->node_id(2)+1;
         return;
       }
     case VTK:
       {
-        conn[0] = this->node(0);
-        conn[1] = this->node(1);
-        conn[2] = this->node(3);
-        conn[3] = this->node(2);
+        conn[0] = this->node_id(0);
+        conn[1] = this->node_id(1);
+        conn[2] = this->node_id(3);
+        conn[3] = this->node_id(2);
+        return;
       }
     default:
       libmesh_error_msg("Unsupported IO package " << iop);

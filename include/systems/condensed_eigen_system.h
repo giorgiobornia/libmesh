@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -29,8 +29,6 @@
 #include "libmesh/eigen_system.h"
 #include "libmesh/sparse_matrix.h"
 
-// C++ includes
-
 namespace libMesh
 {
 
@@ -40,6 +38,10 @@ namespace libMesh
  * we want to remove certain degrees of freedom from the system.
  * This is useful, for example, in the case that one wants to solve
  * eigenvalue problems with Dirichlet boundary conditions.
+ *
+ * \author David Knezevic
+ * \date 2011
+ * \brief Extends EigenSystem to allow certain DOFs to be condensed out.
  */
 class CondensedEigenSystem : public EigenSystem
 {
@@ -64,46 +66,55 @@ public:
   typedef EigenSystem Parent;
 
   /**
-   * @returns a clever pointer to the system.
+   * \returns A reference to *this.
    */
   sys_type & system () { return *this; }
 
   /**
    * Loop over the dofs on each processor to initialize the list
    * of non-condensed dofs. These are the dofs in the system that
-   * are not contained in \p global_dirichlet_dofs_set.
+   * are not contained in \p global_dirichlet_dofs_set and are not
+   * subject to constraints due to adaptive mesh hanging nodes,
+   * periodic boundary conditions, or Dirichlet boundary conditions.
+   *
+   * Most users will not need to use the \p global_condensed_dofs_set
+   * argument; simply call initialize_condensed_dofs() after any time
+   * the EquationSystems (and therefore its constraint equations) gets
+   * initialized or reinitialized.
    */
-  void initialize_condensed_dofs(std::set<unsigned int> & global_dirichlet_dofs_set);
+  void initialize_condensed_dofs(const std::set<dof_id_type> &
+                                 global_condensed_dofs_set =
+                                 std::set<dof_id_type>());
 
   /**
-   * @return the global number of non-condensed dofs in the system.
+   * \returns The global number of non-condensed dofs in the system.
    */
-  unsigned int n_global_non_condensed_dofs() const;
+  dof_id_type n_global_non_condensed_dofs() const;
 
   /**
    * Override to solve the condensed eigenproblem with
    * the dofs in local_non_condensed_dofs_vector
    * stripped out of the system matrices on each processor.
    */
-  virtual void solve() libmesh_override;
+  virtual void solve() override;
 
   /**
-   * Overload get_eigenpair to retrieve the eigenpair for
+   * Override \p get_eigenpair() to retrieve the eigenpair for
    * the condensed eigensolve. We only set the non-condensed
    * entries of the solution vector (the condensed
    * entries are set to zero by default).
    */
-  virtual std::pair<Real, Real> get_eigenpair(unsigned int i) libmesh_override;
+  virtual std::pair<Real, Real> get_eigenpair(dof_id_type i) override;
 
   /**
    * The (condensed) system matrix for standard eigenvalue problems.
    */
-  UniquePtr< SparseMatrix<Number> > condensed_matrix_A;
+  std::unique_ptr<SparseMatrix<Number>> condensed_matrix_A;
 
   /**
    * A second (condensed) system matrix for generalized eigenvalue problems.
    */
-  UniquePtr< SparseMatrix<Number> > condensed_matrix_B;
+  std::unique_ptr<SparseMatrix<Number>> condensed_matrix_B;
 
   /**
    * Vector storing the local dof indices that will not be condensed.

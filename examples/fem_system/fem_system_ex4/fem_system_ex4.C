@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -43,6 +43,9 @@
 #include "libmesh/mesh_refinement.h"
 #include "libmesh/parsed_function.h"
 #include "libmesh/uniform_refinement_estimator.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
+#include "libmesh/enum_solver_package.h"
+#include "libmesh/enum_norm_type.h"
 
 // The systems and solvers we may use
 #include "heatsystem.h"
@@ -59,12 +62,19 @@ int main (int argc, char ** argv)
   // Initialize libMesh.
   LibMeshInit init (argc, argv);
 
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
+
 #ifndef LIBMESH_ENABLE_AMR
   libmesh_example_requires(false, "--enable-amr");
 #else
 
   // This doesn't converge with Eigen BICGSTAB for some reason...
   libmesh_example_requires(libMesh::default_solver_package() != EIGEN_SOLVERS, "--enable-petsc");
+
+  // This doesn't converge without at least double precision
+  libmesh_example_requires(sizeof(Real) > 4, "--disable-singleprecision");
 
   // Parse the input file
   GetPot infile("fem_system_ex4.in");
@@ -138,16 +148,9 @@ int main (int argc, char ** argv)
   // of different dimensionality to belong to different subdomains.
   // Our interior elements defaulted to subdomain id 0, so we'll set
   // boundary elements to subdomain 1.
-  {
-    const MeshBase::element_iterator end_el = mesh.elements_end();
-    for (MeshBase::element_iterator el = mesh.elements_begin();
-         el != end_el; ++el)
-      {
-        Elem * elem = *el;
-        if (elem->dim() < dim)
-          elem->subdomain_id() = 1;
-      }
-  }
+  for (auto & elem : mesh.element_ptr_range())
+    if (elem->dim() < dim)
+      elem->subdomain_id() = 1;
 
   mesh_refinement.uniformly_refine(coarserefinements);
 
@@ -162,8 +165,7 @@ int main (int argc, char ** argv)
     equation_systems.add_system<HeatSystem> ("Heat");
 
   // Solve this as a steady system
-  system.time_solver =
-    UniquePtr<TimeSolver>(new SteadySolver(system));
+  system.time_solver = libmesh_make_unique<SteadySolver>(system);
 
   // Initialize the system
   equation_systems.init ();
@@ -197,7 +199,7 @@ int main (int argc, char ** argv)
 
       ErrorVector error;
 
-      UniquePtr<ErrorEstimator> error_estimator;
+      std::unique_ptr<ErrorEstimator> error_estimator;
 
       // To solve to a tolerance in this problem we
       // need a better estimator than Kelly

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -26,12 +26,17 @@
 
 #include "libmesh/perf_log.h"
 
+// Two-level macro substitution trick, used to construct a unique
+// variable name for a given line.
+#define TOKENPASTE(x, y) x ## y
+#define TOKENPASTE2(x, y) TOKENPASTE(x, y)
+
 namespace libMesh
 {
 
 
 // Forward declaration, required when included
-// in perf_log.{C,h} because the preceeding
+// in perf_log.{C,h} because the preceding
 // #include "libmesh/perf_log.h" is ineffective.
 // Multiple inclusion avoidance problem...
 // LIBMESH_PERF_LOG_H already #define'd, but the
@@ -43,6 +48,44 @@ class PerfLog;
  * with \p --enable-perflog then it will log key functions.
  */
 extern PerfLog perflog;
+
+
+/**
+ * Used for logging something that naturally lasts as long as some
+ * enclosing scope, such as the current function.  Makes it very easy
+ * to handle multiple return scenarios, since the event is popped in
+ * the destructor.  Should not be used directly, instead use the
+ * LOG_SCOPE macro, which resolves to nothing at compile time if
+ * logging is disabled.
+ *
+ * \author John Peterson
+ * \date 2016
+ */
+struct PerfItem
+{
+  PerfItem(const char * label,
+           const char * header,
+           bool enabled=true) :
+    _label(label),
+    _header(header),
+    _enabled(enabled)
+  {
+    if (_enabled)
+      libMesh::perflog.fast_push(label, header);
+  }
+
+  ~PerfItem()
+  {
+    if (_enabled)
+      libMesh::perflog.fast_pop(_label, _header);
+  }
+
+private:
+  const char * _label;
+  const char * _header;
+  bool _enabled;
+};
+
 
 
 } // namespace libMesh
@@ -57,8 +100,12 @@ extern PerfLog perflog;
 
 #  define START_LOG(a,b)   { libMesh::perflog.push(a,b); }
 #  define STOP_LOG(a,b)    { libMesh::perflog.pop(a,b); }
+#ifdef LIBMESH_ENABLE_DEPRECATED
 #  define PALIBMESH_USE_LOG(a,b)   { libmesh_deprecated(); }
 #  define RESTART_LOG(a,b) { libmesh_deprecated(); }
+#endif
+#  define LOG_SCOPE(a,b)   libMesh::PerfItem TOKENPASTE2(perf_item_, __LINE__)(a,b);
+#  define LOG_SCOPE_IF(a,b,enabled)   libMesh::PerfItem TOKENPASTE2(perf_item_, __LINE__)(a,b,enabled);
 
 #else
 
@@ -66,6 +113,8 @@ extern PerfLog perflog;
 #  define STOP_LOG(a,b)    {}
 #  define PALIBMESH_USE_LOG(a,b)   {}
 #  define RESTART_LOG(a,b) {}
+#  define LOG_SCOPE(a,b)   {}
+#  define LOG_SCOPE_IF(a,b,enabled) {}
 
 #endif
 

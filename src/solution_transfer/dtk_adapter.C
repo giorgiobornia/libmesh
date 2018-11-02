@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -29,15 +29,17 @@
 #include "libmesh/elem.h"
 #include "libmesh/equation_systems.h"
 
+#include "libmesh/ignore_warnings.h"
 #include <DTK_MeshTypes.hpp>
 #include <Teuchos_Comm.hpp>
+#include "libmesh/restore_warnings.h"
 
 #include <vector>
 
 namespace libMesh
 {
 
-DTKAdapter::DTKAdapter(Teuchos::RCP<const Teuchos::Comm<int> > in_comm, EquationSystems & in_es):
+DTKAdapter::DTKAdapter(Teuchos::RCP<const Teuchos::Comm<int>> in_comm, EquationSystems & in_es):
   comm(in_comm),
   es(in_es),
   mesh(in_es.get_mesh()),
@@ -55,15 +57,13 @@ DTKAdapter::DTKAdapter(Teuchos::RCP<const Teuchos::Comm<int> > in_comm, Equation
   {
     unsigned int i = 0;
 
-    for(std::set<unsigned int>::iterator it = semi_local_nodes.begin();
-        it != semi_local_nodes.end();
-        ++it)
+    for (const auto & id : semi_local_nodes)
       {
-        const Node & node = mesh.node(*it);
+        const Node & node = mesh.node_ref(id);
 
         vertices[i] = node.id();
 
-        for(unsigned int j=0; j<dim; j++)
+        for (unsigned int j=0; j<dim; j++)
           coordinates[(j*num_local_nodes) + i] = node(j);
 
         i++;
@@ -71,8 +71,8 @@ DTKAdapter::DTKAdapter(Teuchos::RCP<const Teuchos::Comm<int> > in_comm, Equation
   }
 
   // Currently assuming all elements are the same!
-  DataTransferKit::DTK_ElementTopology element_topology = get_element_topology(mesh.elem(0));
-  unsigned int n_nodes_per_elem = mesh.elem(0)->n_nodes();
+  DataTransferKit::DTK_ElementTopology element_topology = get_element_topology(mesh.elem_ptr(0));
+  unsigned int n_nodes_per_elem = mesh.elem_ptr(0)->n_nodes();
 
   unsigned int n_local_elem = mesh.n_local_elem();
 
@@ -83,16 +83,13 @@ DTKAdapter::DTKAdapter(Teuchos::RCP<const Teuchos::Comm<int> > in_comm, Equation
   {
     unsigned int i = 0;
 
-    MeshBase::const_element_iterator end = mesh.local_elements_end();
-    for(MeshBase::const_element_iterator it = mesh.local_elements_begin();
-        it != end;
-        ++it)
+    for (const auto & elem : as_range(mesh.local_elements_begin(),
+                                      mesh.local_elements_end()))
       {
-        const Elem & elem = *(*it);
-        elements[i] = elem.id();
+        elements[i] = elem->id();
 
-        for(unsigned int j=0; j<n_nodes_per_elem; j++)
-          connectivity[(j*n_local_elem)+i] = elem.node(j);
+        for (unsigned int j=0; j<n_nodes_per_elem; j++)
+          connectivity[(j*n_local_elem)+i] = elem->node_id(j);
 
         i++;
       }
@@ -103,7 +100,7 @@ DTKAdapter::DTKAdapter(Teuchos::RCP<const Teuchos::Comm<int> > in_comm, Equation
     permutation_list[i] = i;
 
   /*
-    if(this->processor_id() == 1)
+    if (this->processor_id() == 1)
     sleep(1);
 
     libMesh::out<<"n_nodes_per_elem: "<<n_nodes_per_elem<<std::endl;
@@ -114,7 +111,7 @@ DTKAdapter::DTKAdapter(Teuchos::RCP<const Teuchos::Comm<int> > in_comm, Equation
     {
     libMesh::err<<this->processor_id()<<" Vertices: ";
 
-    for(unsigned int i=0; i<vertices.size(); i++)
+    for (std::size_t i=0; i<vertices.size(); i++)
     libMesh::err<<vertices[i]<<" ";
 
     libMesh::err<<std::endl;
@@ -124,7 +121,7 @@ DTKAdapter::DTKAdapter(Teuchos::RCP<const Teuchos::Comm<int> > in_comm, Equation
     {
     libMesh::err<<this->processor_id()<<" Coordinates: ";
 
-    for(unsigned int i=0; i<coordinates.size(); i++)
+    for (std::size_t i=0; i<coordinates.size(); i++)
     libMesh::err<<coordinates[i]<<" ";
 
     libMesh::err<<std::endl;
@@ -134,7 +131,7 @@ DTKAdapter::DTKAdapter(Teuchos::RCP<const Teuchos::Comm<int> > in_comm, Equation
     {
     libMesh::err<<this->processor_id()<<" Connectivity: ";
 
-    for(unsigned int i=0; i<connectivity.size(); i++)
+    for (std::size_t i=0; i<connectivity.size(); i++)
     libMesh::err<<connectivity[i]<<" ";
 
     libMesh::err<<std::endl;
@@ -144,7 +141,7 @@ DTKAdapter::DTKAdapter(Teuchos::RCP<const Teuchos::Comm<int> > in_comm, Equation
     {
     libMesh::err<<this->processor_id()<<" Permutation_List: ";
 
-    for(unsigned int i=0; i<permutation_list.size(); i++)
+    for (std::size_t i=0; i<permutation_list.size(); i++)
     libMesh::err<<permutation_list[i]<<" ";
 
     libMesh::err<<std::endl;
@@ -162,7 +159,7 @@ DTKAdapter::DTKAdapter(Teuchos::RCP<const Teuchos::Comm<int> > in_comm, Equation
                                                         permutation_list));
 
   // We only have 1 element topology in this grid so we make just one mesh block
-  Teuchos::ArrayRCP<Teuchos::RCP<MeshContainerType> > mesh_blocks(1);
+  Teuchos::ArrayRCP<Teuchos::RCP<MeshContainerType>> mesh_blocks(1);
   mesh_blocks[0] = mesh_container;
 
   // Create the MeshManager
@@ -175,7 +172,7 @@ DTKAdapter::DTKAdapter(Teuchos::RCP<const Teuchos::Comm<int> > in_comm, Equation
 DTKAdapter::RCP_Evaluator
 DTKAdapter::get_variable_evaluator(std::string var_name)
 {
-  if(evaluators.find(var_name) == evaluators.end()) // We haven't created an evaluator for the variable yet
+  if (evaluators.find(var_name) == evaluators.end()) // We haven't created an evaluator for the variable yet
     {
       System * sys = find_sys(var_name);
 
@@ -186,10 +183,10 @@ DTKAdapter::get_variable_evaluator(std::string var_name)
   return evaluators[var_name];
 }
 
-Teuchos::RCP<DataTransferKit::FieldManager<DTKAdapter::FieldContainerType> >
+Teuchos::RCP<DataTransferKit::FieldManager<DTKAdapter::FieldContainerType>>
 DTKAdapter::get_values_to_fill(std::string var_name)
 {
-  if(values_to_fill.find(var_name) == values_to_fill.end())
+  if (values_to_fill.find(var_name) == values_to_fill.end())
     {
       Teuchos::ArrayRCP<double> data_space(num_local_nodes);
       Teuchos::RCP<FieldContainerType> field_container = Teuchos::rcp(new FieldContainerType(data_space, 1));
@@ -209,16 +206,16 @@ DTKAdapter::update_variable_values(std::string var_name)
 
   unsigned int i=0;
   // Loop over the values (one for each node) and assign the value of this variable at each node
-  for(FieldContainerType::iterator it=values->begin(); it != values->end(); ++it)
+  for (const auto & value : *values)
     {
       unsigned int node_num = vertices[i];
-      const Node & node = mesh.node(node_num);
+      const Node & node = mesh.node_ref(node_num);
 
-      if(node.processor_id() == sys->processor_id())
+      if (node.processor_id() == sys->processor_id())
         {
           // The 0 is for the component... this only works for LAGRANGE!
           dof_id_type dof = node.dof_number(sys->number(), var_num, 0);
-          sys->solution->set(dof, *it);
+          sys->solution->set(dof, value);
         }
 
       i++;
@@ -236,12 +233,12 @@ DTKAdapter::update_variable_values(std::string var_name)
 System *
 DTKAdapter::find_sys(std::string var_name)
 {
-  System * sys = libmesh_nullptr;
+  System * sys = nullptr;
 
   // Find the system this variable is from
-  for(unsigned int i=0; i<es.n_systems(); i++)
+  for (unsigned int i=0; i<es.n_systems(); i++)
     {
-      if(es.get_system(i).has_variable(var_name))
+      if (es.get_system(i).has_variable(var_name))
         {
           sys = &es.get_system(i);
           break;
@@ -258,17 +255,17 @@ DTKAdapter::get_element_topology(const Elem * elem)
 {
   ElemType type = elem->type();
 
-  if(type == EDGE2)
+  if (type == EDGE2)
     return DataTransferKit::DTK_LINE_SEGMENT;
-  else if(type == TRI3)
+  else if (type == TRI3)
     return DataTransferKit::DTK_TRIANGLE;
-  else if(type == QUAD4)
+  else if (type == QUAD4)
     return DataTransferKit::DTK_QUADRILATERAL;
-  else if(type == TET4)
+  else if (type == TET4)
     return DataTransferKit::DTK_TETRAHEDRON;
-  else if(type == HEX8)
+  else if (type == HEX8)
     return DataTransferKit::DTK_HEXAHEDRON;
-  else if(type == PYRAMID5)
+  else if (type == PYRAMID5)
     return DataTransferKit::DTK_PYRAMID;
 
   libmesh_error_msg("Element type not supported by DTK!");
@@ -277,16 +274,9 @@ DTKAdapter::get_element_topology(const Elem * elem)
 void
 DTKAdapter::get_semi_local_nodes(std::set<unsigned int> & semi_local_nodes)
 {
-  MeshBase::const_element_iterator end = mesh.local_elements_end();
-  for(MeshBase::const_element_iterator it = mesh.local_elements_begin();
-      it != end;
-      ++it)
-    {
-      const Elem & elem = *(*it);
-
-      for(unsigned int j=0; j<elem.n_nodes(); j++)
-        semi_local_nodes.insert(elem.node(j));
-    }
+  for (const auto & elem : as_range(mesh.local_elements_begin(), mesh.local_elements_end()))
+    for (unsigned int j=0; j<elem->n_nodes(); j++)
+      semi_local_nodes.insert(elem->node_id(j));
 }
 
 } // namespace libMesh

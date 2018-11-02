@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -16,11 +16,6 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-// C++ includes
-#include <iostream>
-#include <iomanip>
-#include <sstream>
-
 // Local Includes
 #include "libmesh/adjoint_residual_error_estimator.h"
 #include "libmesh/error_vector.h"
@@ -30,7 +25,12 @@
 #include "libmesh/system.h"
 #include "libmesh/system_norm.h"
 #include "libmesh/qoi_set.h"
+#include "libmesh/enum_error_estimator_type.h"
 
+// C++ includes
+#include <iostream>
+#include <iomanip>
+#include <sstream>
 
 namespace libMesh
 {
@@ -48,12 +48,20 @@ AdjointResidualErrorEstimator::AdjointResidualErrorEstimator () :
 
 
 
+ErrorEstimatorType
+AdjointResidualErrorEstimator::type() const
+{
+  return ADJOINT_RESIDUAL;
+}
+
+
+
 void AdjointResidualErrorEstimator::estimate_error (const System & _system,
                                                     ErrorVector & error_per_cell,
                                                     const NumericVector<Number> * solution_vector,
                                                     bool estimate_parent_error)
 {
-  START_LOG("estimate_error()", "AdjointResidualErrorEstimator");
+  LOG_SCOPE("estimate_error()", "AdjointResidualErrorEstimator");
 
   // The current mesh
   const MeshBase & mesh = _system.get_mesh();
@@ -88,7 +96,7 @@ void AdjointResidualErrorEstimator::estimate_error (const System & _system,
   ErrorMap total_dual_errors_per_cell;
   // Allocate ErrorVectors to this map if we're going to use it
   if (!error_norm_is_identity)
-    for(unsigned int v = 0; v < n_vars; v++)
+    for (unsigned int v = 0; v < n_vars; v++)
       {
         primal_errors_per_cell[std::make_pair(&_system, v)] = new ErrorVector;
         dual_errors_per_cell[std::make_pair(&_system, v)] = new ErrorVector;
@@ -99,7 +107,7 @@ void AdjointResidualErrorEstimator::estimate_error (const System & _system,
   ErrorVector total_dual_error_per_cell;
 
   // Have we been asked to weight the variable error contributions in any specific manner
-  if(!error_norm_is_identity) // If we do
+  if (!error_norm_is_identity) // If we do
     {
       // Estimate the primal problem error for each variable
       _primal_error_estimator->estimate_errors
@@ -113,7 +121,7 @@ void AdjointResidualErrorEstimator::estimate_error (const System & _system,
     }
 
   // Sum and weight the dual error estimate based on our QoISet
-  for (unsigned int i = 0; i != _system.qoi.size(); ++i)
+  for (unsigned int i = 0, n_qois = _system.n_qois(); i != n_qois; ++i)
     {
       if (_qoi_set.has_index(i))
         {
@@ -125,7 +133,7 @@ void AdjointResidualErrorEstimator::estimate_error (const System & _system,
           adjointsolutionvecs[&_system] = &_system.get_adjoint_solution(i);
 
           // Have we been asked to weight the variable error contributions in any specific manner
-          if(!error_norm_is_identity) // If we have
+          if (!error_norm_is_identity) // If we have
             {
               _dual_error_estimator->estimate_errors
                 (_system.get_equation_systems(), dual_errors_per_cell, &adjointsolutionvecs,
@@ -141,7 +149,7 @@ void AdjointResidualErrorEstimator::estimate_error (const System & _system,
           std::size_t error_size;
 
           // Get the size of the first ErrorMap vector; this will give us the number of elements
-          if(!error_norm_is_identity) // If in non default weights case
+          if (!error_norm_is_identity) // If in non default weights case
             {
               error_size = dual_errors_per_cell[std::make_pair(&_system, 0)]->size();
             }
@@ -151,10 +159,10 @@ void AdjointResidualErrorEstimator::estimate_error (const System & _system,
             }
 
           // Resize the ErrorVector(s)
-          if(!error_norm_is_identity)
+          if (!error_norm_is_identity)
             {
               // Loop over variables
-              for(unsigned int v = 0; v < n_vars; v++)
+              for (unsigned int v = 0; v < n_vars; v++)
                 {
                   libmesh_assert(!total_dual_errors_per_cell[std::make_pair(&_system, v)]->size() ||
                                  total_dual_errors_per_cell[std::make_pair(&_system, v)]->size() == error_size) ;
@@ -171,10 +179,10 @@ void AdjointResidualErrorEstimator::estimate_error (const System & _system,
           for (std::size_t e = 0; e != error_size; ++e)
             {
               // Have we been asked to weight the variable error contributions in any specific manner
-              if(!error_norm_is_identity) // If we have
+              if (!error_norm_is_identity) // If we have
                 {
                   // Loop over variables
-                  for(unsigned int v = 0; v < n_vars; v++)
+                  for (unsigned int v = 0; v < n_vars; v++)
                     {
                       // Now fill in total_dual_error ErrorMap with the weight
                       (*total_dual_errors_per_cell[std::make_pair(&_system, v)])[e] +=
@@ -195,10 +203,10 @@ void AdjointResidualErrorEstimator::estimate_error (const System & _system,
   // Do some debugging plots if requested
   if (!error_plot_suffix.empty())
     {
-      if(!error_norm_is_identity) // If we have
+      if (!error_norm_is_identity) // If we have
         {
           // Loop over variables
-          for(unsigned int v = 0; v < n_vars; v++)
+          for (unsigned int v = 0; v < n_vars; v++)
             {
               std::ostringstream primal_out;
               std::ostringstream dual_out;
@@ -241,16 +249,16 @@ void AdjointResidualErrorEstimator::estimate_error (const System & _system,
 
   // Weight the primal error by the dual error using the system norm object
   // FIXME: we ought to thread this
-  for (unsigned int i=0; i != error_per_cell.size(); ++i)
+  for (std::size_t i=0; i != error_per_cell.size(); ++i)
     {
       // Have we been asked to weight the variable error contributions in any specific manner
-      if(!error_norm_is_identity) // If we do
+      if (!error_norm_is_identity) // If we do
         {
           // Create Error Vectors to pass to calculate_norm
           std::vector<Real> cell_primal_error;
           std::vector<Real> cell_dual_error;
 
-          for(unsigned int v = 0; v < n_vars; v++)
+          for (unsigned int v = 0; v < n_vars; v++)
             {
               cell_primal_error.push_back((*primal_errors_per_cell[std::make_pair(&_system, v)])[i]);
               cell_dual_error.push_back((*total_dual_errors_per_cell[std::make_pair(&_system, v)])[i]);
@@ -268,14 +276,12 @@ void AdjointResidualErrorEstimator::estimate_error (const System & _system,
 
   // Deallocate the ErrorMap contents if we allocated them earlier
   if (!error_norm_is_identity)
-    for(unsigned int v = 0; v < n_vars; v++)
+    for (unsigned int v = 0; v < n_vars; v++)
       {
         delete primal_errors_per_cell[std::make_pair(&_system, v)];
         delete dual_errors_per_cell[std::make_pair(&_system, v)];
         delete total_dual_errors_per_cell[std::make_pair(&_system, v)];
       }
-
-  STOP_LOG("estimate_error()", "AdjointResidualErrorEstimator");
 }
 
 } // namespace libMesh

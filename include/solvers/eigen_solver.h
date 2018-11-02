@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -26,14 +26,26 @@
 
 // Local includes
 #include "libmesh/libmesh_common.h"
-#include "libmesh/enum_solver_package.h"
-#include "libmesh/enum_eigen_solver_type.h"
 #include "libmesh/reference_counted_object.h"
 #include "libmesh/libmesh.h"
 #include "libmesh/parallel_object.h"
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
+#include "libmesh/enum_solver_package.h" // SLEPC_SOLVERS
+
+#ifdef LIBMESH_FORWARD_DECLARE_ENUMS
+namespace libMesh
+{
+enum EigenSolverType : int;
+enum EigenProblemType : int;
+enum PositionOfSpectrum : int;
+}
+#else
+#include "libmesh/enum_solver_package.h"
+#include "libmesh/enum_eigen_solver_type.h"
+#endif
 
 // C++ includes
+#include <memory>
 
 namespace libMesh
 {
@@ -47,10 +59,13 @@ class SolverConfiguration;
 /**
  * This class provides an interface to solvers for eigenvalue
  * problems.
+ *
+ * \author Steffen Peterson
+ * \date 2005
+ * \brief Base class which defines the interface for solving eigenproblems.
  */
-
 template <typename T>
-class EigenSolver : public ReferenceCountedObject<EigenSolver<T> >,
+class EigenSolver : public ReferenceCountedObject<EigenSolver<T>>,
                     public ParallelObject
 {
 public:
@@ -58,8 +73,7 @@ public:
   /**
    *  Constructor. Initializes Solver data structures
    */
-  EigenSolver (const Parallel::Communicator & comm_in
-               LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
+  EigenSolver (const Parallel::Communicator & comm_in);
 
   /**
    * Destructor.
@@ -70,16 +84,35 @@ public:
    * Builds an \p EigenSolver using the linear solver package specified by
    * \p solver_package
    */
-  static UniquePtr<EigenSolver<T> > build(const Parallel::Communicator & comm_in
-                                          LIBMESH_CAN_DEFAULT_TO_COMMWORLD,
-                                          const SolverPackage solver_package = SLEPC_SOLVERS);
+  static std::unique_ptr<EigenSolver<T>> build(const Parallel::Communicator & comm_in,
+                                               const SolverPackage solver_package = SLEPC_SOLVERS);
 
   /**
-   * @returns true if the data structures are
+   * \returns \p true if the data structures are
    * initialized, false otherwise.
    */
   bool initialized () const { return _is_initialized; }
 
+  /**
+   * \returns \p The value of the flag which controls whether libmesh
+   * closes the eigenproblem matrices before solving. \p true by
+   * default.
+   */
+  bool get_close_matrix_before_solve() const
+  {
+    libmesh_experimental();
+    return _close_matrix_before_solve;
+  }
+
+  /**
+   * Set the flag which controls whether libmesh closes the
+   * eigenproblem matrices before solving.
+   */
+  void set_close_matrix_before_solve(bool val)
+  {
+    libmesh_experimental();
+    _close_matrix_before_solve = val;
+  }
 
   /**
    * Release all memory and clear data structures.
@@ -92,17 +125,17 @@ public:
   virtual void init () = 0;
 
   /**
-   * Returns the type of eigensolver to use.
+   * \returns The type of eigensolver to use.
    */
   EigenSolverType eigen_solver_type () const { return _eigen_solver_type; }
 
   /**
-   * Returns the type of the eigen problem.
+   * \returns The type of the eigen problem.
    */
   EigenProblemType eigen_problem_type () const { return _eigen_problem_type;}
 
   /**
-   * Returns the position of the spectrum to compute.
+   * \returns The position of the spectrum to compute.
    */
   PositionOfSpectrum position_of_spectrum () const
   { return _position_of_spectrum;}
@@ -125,10 +158,14 @@ public:
   void set_position_of_spectrum (PositionOfSpectrum pos)
   {_position_of_spectrum= pos;}
 
+  void set_position_of_spectrum (Real pos);
+  void set_position_of_spectrum (Real pos, PositionOfSpectrum target);
+
   /**
-   * Solves the standard eigen problem when matrix_A is a
-   * \p SparseMatrix, and returns the number of converged
-   * eigenpairs and the number of iterations.
+   * Solves the standard eigenproblem involving the SparseMatrix \p matrix_A.
+   *
+   * \returns The number of converged eigenpairs and the number of
+   * iterations.
    */
   virtual std::pair<unsigned int, unsigned int> solve_standard (SparseMatrix<T> & matrix_A,
                                                                 int nev,
@@ -137,9 +174,10 @@ public:
                                                                 const unsigned int m_its) = 0;
 
   /**
-   * Solves the standard eigen problem when matrix_A is a
-   * \p ShellMatrix, and returns the number of converged
-   * eigenpairs and the number of iterations.
+   * Solves the standard eigenproblem involving the ShellMatrix \p matrix_A.
+   *
+   * \returns The number of converged eigenpairs and the number of
+   * iterations.
    */
   virtual std::pair<unsigned int, unsigned int> solve_standard (ShellMatrix<T> & matrix_A,
                                                                 int nev,
@@ -149,10 +187,11 @@ public:
 
 
   /**
-   * Solves the generalized eigen problem when both matrix_A
-   * and matrix_B are of type \p SparseMatrix and returns the
-   * number of converged eigenpairs and the number
-   * of iterations.
+   * Solves the generalized eigenproblem involving SparseMatrices \p matrix_A
+   * and \p matrix_B.
+   *
+   * \returns The number of converged eigenpairs and the number of
+   * iterations.
    */
   virtual std::pair<unsigned int, unsigned int> solve_generalized (SparseMatrix<T> & matrix_A,
                                                                    SparseMatrix<T> & matrix_B,
@@ -162,8 +201,11 @@ public:
                                                                    const unsigned int m_its) = 0;
 
   /**
-   * Solves the generalized eigen problem when matrix_A is
-   * a ShellMatrix and matrix_B is a SparseMatrix.
+   * Solves the generalized eigenproblem with ShellMatrix \p matrix_A
+   * and SparseMatrix \p matrix_B.
+   *
+   * \returns The number of converged eigenpairs and the number of
+   * iterations.
    */
   virtual std::pair<unsigned int, unsigned int> solve_generalized (ShellMatrix<T> & matrix_A,
                                                                    SparseMatrix<T> & matrix_B,
@@ -173,8 +215,11 @@ public:
                                                                    const unsigned int m_its) = 0;
 
   /**
-   * Solves the generalized eigen problem when matrix_A is
-   * a SparseMatrix and matrix_B is a ShellMatrix.
+   * Solves the generalized eigenproblem with SparseMatrix \p matrix_A
+   * and ShellMatrix \p matrix_B.
+   *
+   * \returns The number of converged eigenpairs and the number of
+   * iterations.
    */
   virtual std::pair<unsigned int, unsigned int> solve_generalized (SparseMatrix<T> & matrix_A,
                                                                    ShellMatrix<T> & matrix_B,
@@ -184,8 +229,11 @@ public:
                                                                    const unsigned int m_its) = 0;
 
   /**
-   * Solves the generalized eigen problem when both matrix_A
-   * and matrix_B are of type ShellMatrix.
+   * Solves the generalized eigenproblem involving ShellMatrices \p
+   * matrix_A and \p matrix_B.
+   *
+   * \returns The number of converged eigenpairs and the number of
+   * iterations.
    */
   virtual std::pair<unsigned int, unsigned int> solve_generalized (ShellMatrix<T> & matrix_A,
                                                                    ShellMatrix<T> & matrix_B,
@@ -196,22 +244,28 @@ public:
 
 
   /**
-   * Returns the \p ith eigenvalue (real and imaginary part),
-   * and copies the \ ith eigen vector to the solution vector.
+   * \returns The \p ith eigenvalue (real and imaginary part),
+   * and copies the \p ith eigenvector into the \p solution vector.
    */
-  virtual std::pair<Real, Real> get_eigenpair (unsigned int i,
+  virtual std::pair<Real, Real> get_eigenpair (dof_id_type i,
                                                NumericVector<T> & solution) = 0;
 
   /**
-   * Returns the \p ith eigenvalue (real and imaginary part).
-   * Same as above function, except it does copy the eigenvector.
+   * \returns The \p ith eigenvalue (real and imaginary part).
+   *
+   * Same as above function, except it does not copy the eigenvector.
    */
-  virtual std::pair<Real, Real> get_eigenvalue (unsigned int i) = 0;
+  virtual std::pair<Real, Real> get_eigenvalue (dof_id_type i) = 0;
 
   /**
    * Attach a deflation space defined by a single vector.
    */
   virtual void attach_deflation_space(NumericVector<T> & deflation_vector) = 0;
+
+  /**
+   * Provide one basis vector for the initial guess
+   */
+  virtual void set_initial_space(NumericVector<T> & initial_space_in) = 0;
 
   /**
    * Set the solver configuration object.
@@ -246,32 +300,10 @@ protected:
    */
   SolverConfiguration * _solver_configuration;
 
+  Real _target_val;
+
+  bool _close_matrix_before_solve;
 };
-
-
-
-
-/*----------------------- inline functions ----------------------------------*/
-template <typename T>
-inline
-EigenSolver<T>::EigenSolver (const Parallel::Communicator & comm_in) :
-  ParallelObject(comm_in),
-  _eigen_solver_type    (ARNOLDI),
-  _eigen_problem_type   (NHEP),
-  _position_of_spectrum (LARGEST_MAGNITUDE),
-  _is_initialized       (false),
-  _solver_configuration(libmesh_nullptr)
-{
-}
-
-
-
-template <typename T>
-inline
-EigenSolver<T>::~EigenSolver ()
-{
-  this->clear ();
-}
 
 } // namespace libMesh
 

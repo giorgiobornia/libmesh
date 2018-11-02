@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -26,11 +26,14 @@
 namespace libMesh
 {
 
-
 /**
  * The \p Cell is an abstract element type that lives in
  * three dimensions.  A cell could be a tetrahedron, a hexahedron,
  * a pyramid, a prism, etc...
+ *
+ * \author Benjamin S. Kirk
+ * \date 2002
+ * \brief The base class for all 3D geometric element types.
  */
 class Cell : public Elem
 {
@@ -46,18 +49,30 @@ public:
         Node ** nodelinkdata) :
     Elem (nn, ns, p, elemlinkdata, nodelinkdata) {}
 
+  Cell (Cell &&) = delete;
+  Cell (const Cell &) = delete;
+  Cell & operator= (const Cell &) = delete;
+  Cell & operator= (Cell &&) = delete;
+  virtual ~Cell() = default;
+
   /**
-   * @returns 3, the dimensionality of the object.
+   * \returns 3, the dimensionality of the object.
    */
-  virtual unsigned int dim () const libmesh_override { return 3; }
+  virtual unsigned short dim () const override { return 3; }
+
+  /**
+   * \returns A bounding box (not necessarily the minimal bounding box)
+   * containing the geometric element.
+   */
+  virtual BoundingBox loose_bounding_box () const override;
 
 #ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
 
   /**
-   * @returns \p false.  All classes derived from \p Cell
+   * \returns \p false.  All classes derived from \p Cell
    * are finite elements.
    */
-  virtual bool infinite () const libmesh_override { return false; }
+  virtual bool infinite () const override { return false; }
 
 #endif
 };

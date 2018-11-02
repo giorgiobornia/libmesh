@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,18 +22,18 @@
 
 #include "libmesh/libmesh_config.h"
 
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/libmesh_common.h"
 #include "libmesh/point.h"
 
-// C++ Includes   -----------------------------------
-#include LIBMESH_INCLUDE_UNORDERED_MULTIMAP
+// C++ Includes
+#include <unordered_map>
 #include <vector>
 
 namespace libMesh
 {
 
-// Forward Declarations -----------------------------
+// Forward Declarations
 class Elem;
 class MeshBase;
 class Node;
@@ -44,11 +44,15 @@ class Node;
  * The key is a hash of the Point location.
  * For efficiency we will use a hashed multimap if it is
  * available, otherwise a regular multimap.
+ *
+ * \author Roy Stogner
+ * \date 2008
+ * \brief std::map-like data structure using hashed Points for keys.
  */
 template <typename T>
 class LocationMap
 {
-  typedef LIBMESH_BEST_UNORDERED_MULTIMAP<unsigned int, T *> map_type;
+  typedef std::unordered_multimap<unsigned int, T *> map_type;
 public:
   void init(MeshBase &);
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -17,12 +17,12 @@
 
 
 
-// C++ includes
-
 // Local Includes
 #include "libmesh/optimization_solver.h"
 #include "libmesh/tao_optimization_solver.h"
 #include "libmesh/nlopt_optimization_solver.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
+#include "libmesh/enum_solver_package.h"
 
 namespace libMesh
 {
@@ -31,14 +31,14 @@ template <typename T>
 inline
 OptimizationSolver<T>::OptimizationSolver (sys_type & s) :
   ParallelObject(s),
-  objective_object(libmesh_nullptr),
-  gradient_object(libmesh_nullptr),
-  hessian_object(libmesh_nullptr),
-  equality_constraints_object(libmesh_nullptr),
-  equality_constraints_jacobian_object(libmesh_nullptr),
-  inequality_constraints_object(libmesh_nullptr),
-  inequality_constraints_jacobian_object(libmesh_nullptr),
-  lower_and_upper_bounds_object(libmesh_nullptr),
+  objective_object(nullptr),
+  gradient_object(nullptr),
+  hessian_object(nullptr),
+  equality_constraints_object(nullptr),
+  equality_constraints_jacobian_object(nullptr),
+  inequality_constraints_object(nullptr),
+  inequality_constraints_jacobian_object(nullptr),
+  lower_and_upper_bounds_object(nullptr),
   max_objective_function_evaluations(500),
   objective_function_relative_tolerance(1.e-4),
   verbose(false),
@@ -58,7 +58,7 @@ OptimizationSolver<T>::~OptimizationSolver ()
 
 
 template <typename T>
-UniquePtr<OptimizationSolver<T> >
+std::unique_ptr<OptimizationSolver<T>>
 OptimizationSolver<T>::build(sys_type & s, const SolverPackage solver_package)
 {
   // Prevent unused variables warnings when Tao is not available
@@ -70,20 +70,17 @@ OptimizationSolver<T>::build(sys_type & s, const SolverPackage solver_package)
 
 #if defined(LIBMESH_HAVE_PETSC_TAO) && !defined(LIBMESH_USE_COMPLEX_NUMBERS)
     case PETSC_SOLVERS:
-      return UniquePtr<OptimizationSolver<T> >(new TaoOptimizationSolver<T>(s));
+      return libmesh_make_unique<TaoOptimizationSolver<T>>(s);
 #endif // #if defined(LIBMESH_HAVE_PETSC_TAO) && !defined(LIBMESH_USE_COMPLEX_NUMBERS)
 
 #if defined(LIBMESH_HAVE_NLOPT) && !defined(LIBMESH_USE_COMPLEX_NUMBERS)
     case NLOPT_SOLVERS:
-      return UniquePtr<OptimizationSolver<T> >(new NloptOptimizationSolver<T>(s));
+      return libmesh_make_unique<NloptOptimizationSolver<T>>(s);
 #endif // #if defined(LIBMESH_HAVE_NLOPT) && !defined(LIBMESH_USE_COMPLEX_NUMBERS)
 
     default:
       libmesh_error_msg("ERROR:  Unrecognized solver package: " << solver_package);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return UniquePtr<OptimizationSolver<T> >();
 }
 
 

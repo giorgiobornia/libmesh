@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,9 +22,8 @@
 
 // Local includes
 #include "libmesh/libmesh_common.h"
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
 #include "libmesh/compare_types.h"
-#include "libmesh/enum_elem_type.h"
 #include "libmesh/fe_abstract.h"
 #include "libmesh/fe_transformation_base.h"
 #include "libmesh/point.h"
@@ -36,7 +35,7 @@
 // C++ includes
 #include <cstddef>
 #include <vector>
-
+#include <memory>
 
 namespace libMesh
 {
@@ -79,20 +78,6 @@ class InfFE;
  * object of any of the derived classes which is compatible with
  * OutputType.
  *
- * Note that the amount of virtual members is kept to a minimum,
- * and the sophisticated template scheme of \p FE is quite
- * likely to offer acceptably fast code.
- *
- * All calls to static members of the \p FE classes should be
- * requested through the \p FEInterface.  This interface class
- * offers sort-of runtime polymorphism for the templated finite
- * element classes.  Even internal library classes, like \p DofMap,
- * request the number of dof's through this interface class.
- * Note that this also enables the co-existence of various
- * element-based schemes.
- * This class is well 'at the heart' of the library, so
- * things in here should better remain unchanged.
- *
  * \author Benjamin S. Kirk
  * \date 2002
  */
@@ -118,14 +103,14 @@ public:
 
   /**
    * Builds a specific finite element type.  A \p
-   * UniquePtr<FEGenericBase> is returned to prevent a memory leak. This
+   * std::unique_ptr<FEGenericBase> is returned to prevent a memory leak. This
    * way the user need not remember to delete the object.
    *
    * The build call will fail if the OutputType of this class is not
    * compatible with the output required for the requested \p type
    */
-  static UniquePtr<FEGenericBase> build (const unsigned int dim,
-                                         const FEType & type);
+  static std::unique_ptr<FEGenericBase> build (const unsigned int dim,
+                                               const FEType & type);
 
   /**
    * Convenient typedefs for gradients of output, hessians of output,
@@ -146,14 +131,14 @@ public:
 
   /**
    * Builds a specific infinite element type.  A \p
-   * UniquePtr<FEGenericBase> is returned to prevent a memory leak. This
+   * std::unique_ptr<FEGenericBase> is returned to prevent a memory leak. This
    * way the user need not remember to delete the object.
    *
    * The build call will fail if the OutputShape of this class is not
    * compatible with the output required for the requested \p type
    */
-  static UniquePtr<FEGenericBase> build_InfFE (const unsigned int dim,
-                                               const FEType & type);
+  static std::unique_ptr<FEGenericBase> build_InfFE (const unsigned int dim,
+                                                     const FEType & type);
 
 #endif
 
@@ -216,188 +201,188 @@ public:
 #endif // LIBMESH_ENABLE_PERIODIC
 
   /**
-   * @returns the shape function values at the quadrature points
+   * \returns The shape function values at the quadrature points
    * on the element.
    */
-  const std::vector<std::vector<OutputShape> > & get_phi() const
+  const std::vector<std::vector<OutputShape>> & get_phi() const
   { libmesh_assert(!calculations_started || calculate_phi);
     calculate_phi = true; return phi; }
 
   /**
-   * @returns the shape function derivatives at the quadrature
+   * \returns The shape function derivatives at the quadrature
    * points.
    */
-  const std::vector<std::vector<OutputGradient> > & get_dphi() const
+  const std::vector<std::vector<OutputGradient>> & get_dphi() const
   { libmesh_assert(!calculations_started || calculate_dphi);
     calculate_dphi = calculate_dphiref = true; return dphi; }
 
   /**
-   * @returns the curl of the shape function at the quadrature
+   * \returns The curl of the shape function at the quadrature
    * points.
    */
-  const std::vector<std::vector<OutputShape> > & get_curl_phi() const
+  const std::vector<std::vector<OutputShape>> & get_curl_phi() const
   { libmesh_assert(!calculations_started || calculate_curl_phi);
     calculate_curl_phi = calculate_dphiref = true; return curl_phi; }
 
   /**
-   * @returns the divergence of the shape function at the quadrature
+   * \returns The divergence of the shape function at the quadrature
    * points.
    */
-  const std::vector<std::vector<OutputDivergence> > & get_div_phi() const
+  const std::vector<std::vector<OutputDivergence>> & get_div_phi() const
   { libmesh_assert(!calculations_started || calculate_div_phi);
     calculate_div_phi = calculate_dphiref = true; return div_phi; }
 
   /**
-   * @returns the shape function x-derivative at the quadrature
+   * \returns The shape function x-derivative at the quadrature
    * points.
    */
-  const std::vector<std::vector<OutputShape> > & get_dphidx() const
+  const std::vector<std::vector<OutputShape>> & get_dphidx() const
   { libmesh_assert(!calculations_started || calculate_dphi);
     calculate_dphi = calculate_dphiref = true; return dphidx; }
 
   /**
-   * @returns the shape function y-derivative at the quadrature
+   * \returns The shape function y-derivative at the quadrature
    * points.
    */
-  const std::vector<std::vector<OutputShape> > & get_dphidy() const
+  const std::vector<std::vector<OutputShape>> & get_dphidy() const
   { libmesh_assert(!calculations_started || calculate_dphi);
     calculate_dphi = calculate_dphiref = true; return dphidy; }
 
   /**
-   * @returns the shape function z-derivative at the quadrature
+   * \returns The shape function z-derivative at the quadrature
    * points.
    */
-  const std::vector<std::vector<OutputShape> > & get_dphidz() const
+  const std::vector<std::vector<OutputShape>> & get_dphidz() const
   { libmesh_assert(!calculations_started || calculate_dphi);
     calculate_dphi = calculate_dphiref = true; return dphidz; }
 
   /**
-   * @returns the shape function xi-derivative at the quadrature
+   * \returns The shape function xi-derivative at the quadrature
    * points.
    */
-  const std::vector<std::vector<OutputShape> > & get_dphidxi() const
+  const std::vector<std::vector<OutputShape>> & get_dphidxi() const
   { libmesh_assert(!calculations_started || calculate_dphiref);
     calculate_dphiref = true; return dphidxi; }
 
   /**
-   * @returns the shape function eta-derivative at the quadrature
+   * \returns The shape function eta-derivative at the quadrature
    * points.
    */
-  const std::vector<std::vector<OutputShape> > & get_dphideta() const
+  const std::vector<std::vector<OutputShape>> & get_dphideta() const
   { libmesh_assert(!calculations_started || calculate_dphiref);
     calculate_dphiref = true; return dphideta; }
 
   /**
-   * @returns the shape function zeta-derivative at the quadrature
+   * \returns The shape function zeta-derivative at the quadrature
    * points.
    */
-  const std::vector<std::vector<OutputShape> > & get_dphidzeta() const
+  const std::vector<std::vector<OutputShape>> & get_dphidzeta() const
   { libmesh_assert(!calculations_started || calculate_dphiref);
     calculate_dphiref = true; return dphidzeta; }
 
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
 
   /**
-   * @returns the shape function second derivatives at the quadrature
+   * \returns The shape function second derivatives at the quadrature
    * points.
    */
-  const std::vector<std::vector<OutputTensor> > & get_d2phi() const
+  const std::vector<std::vector<OutputTensor>> & get_d2phi() const
   { libmesh_assert(!calculations_started || calculate_d2phi);
     calculate_d2phi = calculate_dphiref = true; return d2phi; }
 
   /**
-   * @returns the shape function second derivatives at the quadrature
+   * \returns The shape function second derivatives at the quadrature
    * points.
    */
-  const std::vector<std::vector<OutputShape> > & get_d2phidx2() const
+  const std::vector<std::vector<OutputShape>> & get_d2phidx2() const
   { libmesh_assert(!calculations_started || calculate_d2phi);
     calculate_d2phi = calculate_dphiref = true; return d2phidx2; }
 
   /**
-   * @returns the shape function second derivatives at the quadrature
+   * \returns The shape function second derivatives at the quadrature
    * points.
    */
-  const std::vector<std::vector<OutputShape> > & get_d2phidxdy() const
+  const std::vector<std::vector<OutputShape>> & get_d2phidxdy() const
   { libmesh_assert(!calculations_started || calculate_d2phi);
     calculate_d2phi = calculate_dphiref = true; return d2phidxdy; }
 
   /**
-   * @returns the shape function second derivatives at the quadrature
+   * \returns The shape function second derivatives at the quadrature
    * points.
    */
-  const std::vector<std::vector<OutputShape> > & get_d2phidxdz() const
+  const std::vector<std::vector<OutputShape>> & get_d2phidxdz() const
   { libmesh_assert(!calculations_started || calculate_d2phi);
     calculate_d2phi = calculate_dphiref = true; return d2phidxdz; }
 
   /**
-   * @returns the shape function second derivatives at the quadrature
+   * \returns The shape function second derivatives at the quadrature
    * points.
    */
-  const std::vector<std::vector<OutputShape> > & get_d2phidy2() const
+  const std::vector<std::vector<OutputShape>> & get_d2phidy2() const
   { libmesh_assert(!calculations_started || calculate_d2phi);
     calculate_d2phi =  calculate_dphiref = true; return d2phidy2; }
 
   /**
-   * @returns the shape function second derivatives at the quadrature
+   * \returns The shape function second derivatives at the quadrature
    * points.
    */
-  const std::vector<std::vector<OutputShape> > & get_d2phidydz() const
+  const std::vector<std::vector<OutputShape>> & get_d2phidydz() const
   { libmesh_assert(!calculations_started || calculate_d2phi);
     calculate_d2phi = calculate_dphiref = true; return d2phidydz; }
 
   /**
-   * @returns the shape function second derivatives at the quadrature
+   * \returns The shape function second derivatives at the quadrature
    * points.
    */
-  const std::vector<std::vector<OutputShape> > & get_d2phidz2() const
+  const std::vector<std::vector<OutputShape>> & get_d2phidz2() const
   { libmesh_assert(!calculations_started || calculate_d2phi);
     calculate_d2phi = calculate_dphiref = true; return d2phidz2; }
 
   /**
-   * @returns the shape function second derivatives at the quadrature
+   * \returns The shape function second derivatives at the quadrature
    * points, in reference coordinates
    */
-  const std::vector<std::vector<OutputShape> > & get_d2phidxi2() const
+  const std::vector<std::vector<OutputShape>> & get_d2phidxi2() const
   { libmesh_assert(!calculations_started || calculate_d2phi);
     calculate_d2phi = calculate_dphiref = true; return d2phidxi2; }
 
   /**
-   * @returns the shape function second derivatives at the quadrature
+   * \returns The shape function second derivatives at the quadrature
    * points, in reference coordinates
    */
-  const std::vector<std::vector<OutputShape> > & get_d2phidxideta() const
+  const std::vector<std::vector<OutputShape>> & get_d2phidxideta() const
   { libmesh_assert(!calculations_started || calculate_d2phi);
     calculate_d2phi = calculate_dphiref = true; return d2phidxideta; }
 
   /**
-   * @returns the shape function second derivatives at the quadrature
+   * \returns The shape function second derivatives at the quadrature
    * points, in reference coordinates
    */
-  const std::vector<std::vector<OutputShape> > & get_d2phidxidzeta() const
+  const std::vector<std::vector<OutputShape>> & get_d2phidxidzeta() const
   { libmesh_assert(!calculations_started || calculate_d2phi);
     calculate_d2phi = calculate_dphiref = true; return d2phidxidzeta; }
 
   /**
-   * @returns the shape function second derivatives at the quadrature
+   * \returns The shape function second derivatives at the quadrature
    * points, in reference coordinates
    */
-  const std::vector<std::vector<OutputShape> > & get_d2phideta2() const
+  const std::vector<std::vector<OutputShape>> & get_d2phideta2() const
   { libmesh_assert(!calculations_started || calculate_d2phi);
     calculate_d2phi = calculate_dphiref = true; return d2phideta2; }
 
   /**
-   * @returns the shape function second derivatives at the quadrature
+   * \returns The shape function second derivatives at the quadrature
    * points, in reference coordinates
    */
-  const std::vector<std::vector<OutputShape> > & get_d2phidetadzeta() const
+  const std::vector<std::vector<OutputShape>> & get_d2phidetadzeta() const
   { libmesh_assert(!calculations_started || calculate_d2phi);
     calculate_d2phi = calculate_dphiref = true; return d2phidetadzeta; }
 
   /**
-   * @returns the shape function second derivatives at the quadrature
+   * \returns The shape function second derivatives at the quadrature
    * points, in reference coordinates
    */
-  const std::vector<std::vector<OutputShape> > & get_d2phidzeta2() const
+  const std::vector<std::vector<OutputShape>> & get_d2phidzeta2() const
   { libmesh_assert(!calculations_started || calculate_d2phi);
     calculate_d2phi = calculate_dphiref = true; return d2phidzeta2; }
 
@@ -406,13 +391,13 @@ public:
 #ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
 
   /**
-   * @returns the global first derivative of the phase term
+   * \returns The global first derivative of the phase term
    * which is used in infinite elements, evaluated at the
    * quadrature points.
    *
    * In case of the general finite element class \p FE this
    * field is initialized to all zero, so that the variational
-   * formulation for an @e infinite element returns correct element
+   * formulation for an infinite element produces correct element
    * matrices for a mesh using both finite and infinite elements.
    */
   const std::vector<OutputGradient> & get_dphase() const
@@ -420,22 +405,22 @@ public:
 
 
   /**
-   * @returns the multiplicative weight at each quadrature point.
+   * \returns The multiplicative weight at each quadrature point.
    * This weight is used for certain infinite element weak
-   * formulations, so that @e weighted Sobolev spaces are
+   * formulations, so that weighted Sobolev spaces are
    * used for the trial function space.  This renders the
    * variational form easily computable.
    *
    * In case of the general finite element class \p FE this
    * field is initialized to all ones, so that the variational
-   * formulation for an @e infinite element returns correct element
+   * formulation for an infinite element produces correct element
    * matrices for a mesh using both finite and infinite elements.
    */
   const std::vector<Real> & get_Sobolev_weight() const
   { return weight; }
 
   /**
-   * @returns the first global derivative of the multiplicative
+   * \returns The first global derivative of the multiplicative
    * weight at each quadrature point. See \p get_Sobolev_weight()
    * for details.  In case of \p FE initialized to all zero.
    */
@@ -484,6 +469,12 @@ protected:
 #endif
 
   /**
+   * Determine which values are to be calculated, for both the FE
+   * itself and for the FEMap.
+   */
+  void determine_calculations();
+
+  /**
    * After having updated the jacobian and the transformation
    * from local to global coordinates in \p FEAbstract::compute_map(),
    * the first derivatives of the shape functions are
@@ -499,57 +490,57 @@ protected:
    * Object that handles computing shape function values, gradients, etc
    * in the physical domain.
    */
-  UniquePtr<FETransformationBase<OutputType> > _fe_trans;
+  std::unique_ptr<FETransformationBase<OutputType>> _fe_trans;
 
   /**
    * Shape function values.
    */
-  std::vector<std::vector<OutputShape> >   phi;
+  std::vector<std::vector<OutputShape>>   phi;
 
   /**
    * Shape function derivative values.
    */
-  std::vector<std::vector<OutputGradient> >  dphi;
+  std::vector<std::vector<OutputGradient>>  dphi;
 
   /**
    * Shape function curl values. Only defined for vector types.
    */
-  std::vector<std::vector<OutputShape> > curl_phi;
+  std::vector<std::vector<OutputShape>> curl_phi;
 
   /**
    * Shape function divergence values. Only defined for vector types.
    */
-  std::vector<std::vector<OutputDivergence> > div_phi;
+  std::vector<std::vector<OutputDivergence>> div_phi;
 
   /**
    * Shape function derivatives in the xi direction.
    */
-  std::vector<std::vector<OutputShape> >   dphidxi;
+  std::vector<std::vector<OutputShape>>   dphidxi;
 
   /**
    * Shape function derivatives in the eta direction.
    */
-  std::vector<std::vector<OutputShape> >   dphideta;
+  std::vector<std::vector<OutputShape>>   dphideta;
 
   /**
    * Shape function derivatives in the zeta direction.
    */
-  std::vector<std::vector<OutputShape> >   dphidzeta;
+  std::vector<std::vector<OutputShape>>   dphidzeta;
 
   /**
    * Shape function derivatives in the x direction.
    */
-  std::vector<std::vector<OutputShape> >   dphidx;
+  std::vector<std::vector<OutputShape>>   dphidx;
 
   /**
    * Shape function derivatives in the y direction.
    */
-  std::vector<std::vector<OutputShape> >   dphidy;
+  std::vector<std::vector<OutputShape>>   dphidy;
 
   /**
    * Shape function derivatives in the z direction.
    */
-  std::vector<std::vector<OutputShape> >   dphidz;
+  std::vector<std::vector<OutputShape>>   dphidz;
 
 
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
@@ -557,67 +548,67 @@ protected:
   /**
    * Shape function second derivative values.
    */
-  std::vector<std::vector<OutputTensor> >  d2phi;
+  std::vector<std::vector<OutputTensor>>  d2phi;
 
   /**
    * Shape function second derivatives in the xi direction.
    */
-  std::vector<std::vector<OutputShape> >   d2phidxi2;
+  std::vector<std::vector<OutputShape>>   d2phidxi2;
 
   /**
    * Shape function second derivatives in the xi-eta direction.
    */
-  std::vector<std::vector<OutputShape> >   d2phidxideta;
+  std::vector<std::vector<OutputShape>>   d2phidxideta;
 
   /**
    * Shape function second derivatives in the xi-zeta direction.
    */
-  std::vector<std::vector<OutputShape> >   d2phidxidzeta;
+  std::vector<std::vector<OutputShape>>   d2phidxidzeta;
 
   /**
    * Shape function second derivatives in the eta direction.
    */
-  std::vector<std::vector<OutputShape> >   d2phideta2;
+  std::vector<std::vector<OutputShape>>   d2phideta2;
 
   /**
    * Shape function second derivatives in the eta-zeta direction.
    */
-  std::vector<std::vector<OutputShape> >   d2phidetadzeta;
+  std::vector<std::vector<OutputShape>>   d2phidetadzeta;
 
   /**
    * Shape function second derivatives in the zeta direction.
    */
-  std::vector<std::vector<OutputShape> >   d2phidzeta2;
+  std::vector<std::vector<OutputShape>>   d2phidzeta2;
 
   /**
    * Shape function second derivatives in the x direction.
    */
-  std::vector<std::vector<OutputShape> >   d2phidx2;
+  std::vector<std::vector<OutputShape>>   d2phidx2;
 
   /**
    * Shape function second derivatives in the x-y direction.
    */
-  std::vector<std::vector<OutputShape> >   d2phidxdy;
+  std::vector<std::vector<OutputShape>>   d2phidxdy;
 
   /**
    * Shape function second derivatives in the x-z direction.
    */
-  std::vector<std::vector<OutputShape> >   d2phidxdz;
+  std::vector<std::vector<OutputShape>>   d2phidxdz;
 
   /**
    * Shape function second derivatives in the y direction.
    */
-  std::vector<std::vector<OutputShape> >   d2phidy2;
+  std::vector<std::vector<OutputShape>>   d2phidy2;
 
   /**
    * Shape function second derivatives in the y-z direction.
    */
-  std::vector<std::vector<OutputShape> >   d2phidydz;
+  std::vector<std::vector<OutputShape>>   d2phidydz;
 
   /**
    * Shape function second derivatives in the z direction.
    */
-  std::vector<std::vector<OutputShape> >   d2phidz2;
+  std::vector<std::vector<OutputShape>>   d2phidz2;
 
 #endif
 
@@ -631,23 +622,23 @@ protected:
 
 
   /**
-   * Used for certain @e infinite element families:
+   * Used for certain infinite element families:
    * the first derivatives of the phase term in global coordinates,
-   * over @e all quadrature points.
+   * over all quadrature points.
    */
   std::vector<OutputGradient> dphase;
 
   /**
-   * Used for certain @e infinite element families:
+   * Used for certain infinite element families:
    * the global derivative of the additional radial weight \f$ 1/{r^2} \f$,
-   * over @e all quadrature points.
+   * over all quadrature points.
    */
   std::vector<RealGradient> dweight;
 
   /**
-   * Used for certain @e infinite element families:
+   * Used for certain infinite element families:
    * the additional radial weight \f$ 1/{r^2} \f$ in local coordinates,
-   * over @e all quadrature points.
+   * over all quadrature points.
    */
   std::vector<Real>  weight;
 

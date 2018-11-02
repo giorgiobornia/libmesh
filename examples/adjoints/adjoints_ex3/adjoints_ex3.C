@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -66,30 +66,27 @@
 
 // Libmesh includes
 #include "libmesh/equation_systems.h"
-
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
 #include "libmesh/twostep_time_solver.h"
 #include "libmesh/euler_solver.h"
 #include "libmesh/euler2_solver.h"
 #include "libmesh/steady_solver.h"
-
 #include "libmesh/newton_solver.h"
 #include "libmesh/numeric_vector.h"
 #include "libmesh/petsc_diff_solver.h"
-
 #include "libmesh/mesh.h"
 #include "libmesh/mesh_tools.h"
 #include "libmesh/mesh_base.h"
 #include "libmesh/mesh_refinement.h"
-
 #include "libmesh/system.h"
 #include "libmesh/system_norm.h"
-
 #include "libmesh/adjoint_residual_error_estimator.h"
 #include "libmesh/const_fem_function.h"
 #include "libmesh/error_vector.h"
 #include "libmesh/fem_function_base.h"
 #include "libmesh/getpot.h"
 #include "libmesh/gmv_io.h"
+#include "libmesh/exodusII_io.h"
 #include "libmesh/kelly_error_estimator.h"
 #include "libmesh/parameter_vector.h"
 #include "libmesh/patch_recovery_error_estimator.h"
@@ -99,6 +96,8 @@
 #include "libmesh/uniform_refinement_estimator.h"
 #include "libmesh/qoi_set.h"
 #include "libmesh/weighted_patch_recovery_error_estimator.h"
+#include "libmesh/enum_solver_package.h"
+#include "libmesh/enum_xdr_mode.h"
 
 // Local includes
 #include "coupled_system.h"
@@ -146,8 +145,7 @@ std::string numbered_filename(unsigned int t_step, // The timestep count
   return file_name.str();
 }
 
-// Write tecplot, gmv and xda/xdr output
-
+// Possibly write tecplot, gmv, xda/xdr, and exodus output files.
 void write_output(EquationSystems & es,
                   unsigned int t_step, // The timestep count
                   unsigned int a_step, // The adaptive step count
@@ -215,6 +213,36 @@ void write_output(EquationSystems & es,
                WRITE, EquationSystems::WRITE_DATA |
                EquationSystems::WRITE_ADDITIONAL_DATA);
     }
+
+#ifdef LIBMESH_HAVE_EXODUS_API
+  if (param.output_exodus)
+    {
+      // We write out one file per adaptive step. The files are named in
+      // the following way:
+      // foo.e
+      // foo.e-s002
+      // foo.e-s003
+      // ...
+      // so that, if you open the first one with Paraview, it actually
+      // opens the entire sequence of adapted files.
+      std::ostringstream file_name_exodus;
+
+      file_name_exodus << solution_type << ".e";
+      if (a_step > 0)
+        file_name_exodus << "-s"
+                         << std::setw(3)
+                         << std::setfill('0')
+                         << std::right
+                         << a_step + 1;
+
+      // We write each adaptive step as a pseudo "time" step, where the
+      // time simply matches the (1-based) adaptive step we are on.
+      ExodusII_IO(mesh).write_timestep(file_name_exodus.str(),
+                                       es,
+                                       1,
+                                       /*time=*/a_step + 1);
+    }
+#endif
 }
 
 void write_output_headers(FEMParameters & param)
@@ -248,8 +276,10 @@ void write_output_solvedata(EquationSystems & es,
                             unsigned int tv_usec)
 {
   MeshBase & mesh = es.get_mesh();
-  unsigned int n_active_elem = mesh.n_active_elem();
-  unsigned int n_active_dofs = es.n_active_dofs();
+
+  // Query parallel_object_only() methods *outside* if(pid==0)
+  const std::size_t n_active_elem = mesh.n_active_elem();
+  const std::size_t n_active_dofs = es.n_active_dofs();
 
   if (mesh.processor_id() == 0)
     {
@@ -501,18 +531,14 @@ void set_system_parameters(FEMSystem & system,
           timesolver->upper_tolerance  = param.timesolver_upper_tolerance;
           timesolver->component_norm   = SystemNorm(param.timesolver_norm);
 
-          timesolver->core_time_solver =
-            UniquePtr<UnsteadySolver>(innersolver);
-          system.time_solver =
-            UniquePtr<UnsteadySolver>(timesolver);
+          timesolver->core_time_solver.reset(innersolver);
+          system.time_solver.reset(timesolver);
         }
       else
-        system.time_solver =
-          UniquePtr<TimeSolver>(innersolver);
+        system.time_solver.reset(innersolver);
     }
   else
-    system.time_solver =
-      UniquePtr<TimeSolver>(new SteadySolver(system));
+    system.time_solver.reset(new SteadySolver(system));
 
   system.time_solver->reduce_deltat_on_diffsolver_failure =
     param.deltat_reductions;
@@ -529,7 +555,7 @@ void set_system_parameters(FEMSystem & system,
     {
 #ifdef LIBMESH_HAVE_PETSC
       PetscDiffSolver *solver = new PetscDiffSolver(system);
-      system.time_solver->diff_solver() = UniquePtr<DiffSolver>(solver);
+      system.time_solver->diff_solver().reset(solver);
 #else
       libmesh_error_msg("This example requires libMesh to be compiled with PETSc support.");
 #endif
@@ -537,7 +563,7 @@ void set_system_parameters(FEMSystem & system,
   else
     {
       NewtonSolver *solver = new NewtonSolver(system);
-      system.time_solver->diff_solver() = UniquePtr<DiffSolver>(solver);
+      system.time_solver->diff_solver().reset(solver);
 
       solver->quiet                       = param.solver_quiet;
       solver->verbose                     = !param.solver_quiet;
@@ -563,8 +589,8 @@ void set_system_parameters(FEMSystem & system,
 
 #ifdef LIBMESH_ENABLE_AMR
 
-UniquePtr<MeshRefinement> build_mesh_refinement(MeshBase & mesh,
-                                                FEMParameters & param)
+std::unique_ptr<MeshRefinement> build_mesh_refinement(MeshBase & mesh,
+                                                      FEMParameters & param)
 {
   MeshRefinement * mesh_refinement = new MeshRefinement(mesh);
   mesh_refinement->coarsen_by_parents() = true;
@@ -574,24 +600,24 @@ UniquePtr<MeshRefinement> build_mesh_refinement(MeshBase & mesh,
   mesh_refinement->coarsen_fraction()  = param.coarsen_fraction;
   mesh_refinement->coarsen_threshold() = param.coarsen_threshold;
 
-  return UniquePtr<MeshRefinement>(mesh_refinement);
+  return std::unique_ptr<MeshRefinement>(mesh_refinement);
 }
 
 #endif // LIBMESH_ENABLE_AMR
 
 // This function builds the Kelly error indicator. This indicator can be used
 // for comparisons of adjoint and non-adjoint based error indicators
-UniquePtr<ErrorEstimator> build_error_estimator(FEMParameters & /* param */)
+std::unique_ptr<ErrorEstimator> build_error_estimator(FEMParameters & /* param */)
 {
-  return UniquePtr<ErrorEstimator>(new KellyErrorEstimator);
+  return libmesh_make_unique<KellyErrorEstimator>();
 }
 
 // Functions to build the adjoint based error indicators
-// The error_non_pressure and error_pressure constributions are estimated using
+// The error_non_pressure and error_pressure contributions are estimated using
 // the build_error_estimator_component_wise function below
-UniquePtr<ErrorEstimator>
+std::unique_ptr<ErrorEstimator>
 build_error_estimator_component_wise (FEMParameters & param,
-                                      std::vector<std::vector<Real> > & term_weights,
+                                      std::vector<std::vector<Real>> & term_weights,
                                       std::vector<FEMNormType> & primal_error_norm_type,
                                       std::vector<FEMNormType> & dual_error_norm_type)
 {
@@ -611,7 +637,7 @@ build_error_estimator_component_wise (FEMParameters & param,
   // Using the user filled error norm type vector, we pass the type of norm to be used for
   // the error in each variable, we can have different types of norms for the primal and
   // dual variables
-  unsigned int size = primal_error_norm_type.size();
+  std::size_t size = primal_error_norm_type.size();
 
   libmesh_assert_equal_to (size, dual_error_norm_type.size());
   for (unsigned int i = 0; i != size; ++i)
@@ -623,7 +649,7 @@ build_error_estimator_component_wise (FEMParameters & param,
   // Now we set the right weights for each term in the error estimate, using the user provided
   // term_weights matrix
   libmesh_assert_equal_to (size, term_weights.size());
-  for (unsigned int i = 0; i != term_weights.size(); ++i)
+  for (unsigned int i = 0; i != size; ++i)
     {
       libmesh_assert_equal_to (size, term_weights[i].size());
       adjoint_residual_estimator->error_norm.set_weight(i, term_weights[i][i]);
@@ -632,14 +658,14 @@ build_error_estimator_component_wise (FEMParameters & param,
           adjoint_residual_estimator->error_norm.set_off_diagonal_weight(i, j, term_weights[i][j]);
     }
 
-  return UniquePtr<ErrorEstimator>(adjoint_residual_estimator);
+  return std::unique_ptr<ErrorEstimator>(adjoint_residual_estimator);
 }
 
 // The error_convection_diffusion_x and error_convection_diffusion_y are the nonlinear contributions which
 // are computed using the build_weighted_error_estimator_component_wise below
-UniquePtr<ErrorEstimator>
+std::unique_ptr<ErrorEstimator>
 build_weighted_error_estimator_component_wise (FEMParameters & param,
-                                               std::vector<std::vector<Real> > & term_weights,
+                                               std::vector<std::vector<Real>> & term_weights,
                                                std::vector<FEMNormType> & primal_error_norm_type,
                                                std::vector<FEMNormType> & dual_error_norm_type,
                                                std::vector<FEMFunctionBase<Number> *> coupled_system_weight_functions)
@@ -664,7 +690,7 @@ build_weighted_error_estimator_component_wise (FEMParameters & param,
 
   // We pass the pointers to the user specified weight functions to the patch recovery
   // error estimator objects declared above
-  unsigned int size = primal_error_norm_type.size();
+  std::size_t size = primal_error_norm_type.size();
 
   libmesh_assert(coupled_system_weight_functions.size() == size);
   libmesh_assert(dual_error_norm_type.size() == size);
@@ -679,7 +705,7 @@ build_weighted_error_estimator_component_wise (FEMParameters & param,
   // Now we set the right weights for each term in the error estimate, using the user provided
   // term_weights matrix
   libmesh_assert_equal_to (size, term_weights.size());
-  for (unsigned int i = 0; i != term_weights.size(); ++i)
+  for (unsigned int i = 0; i != size; ++i)
     {
       libmesh_assert_equal_to (size, term_weights[i].size());
       adjoint_residual_estimator->error_norm.set_weight(i, term_weights[i][i]);
@@ -688,7 +714,7 @@ build_weighted_error_estimator_component_wise (FEMParameters & param,
           adjoint_residual_estimator->error_norm.set_off_diagonal_weight(i, j, term_weights[i][j]);
     }
 
-  return UniquePtr<ErrorEstimator>(adjoint_residual_estimator);
+  return std::unique_ptr<ErrorEstimator>(adjoint_residual_estimator);
 }
 
 // The main program.
@@ -702,8 +728,8 @@ int main (int argc, char ** argv)
   libmesh_example_requires(false, "--enable-amr");
 #else
 
-  // This doesn't converge with Eigen BICGSTAB for some reason...
-  libmesh_example_requires(libMesh::default_solver_package() != EIGEN_SOLVERS, "--enable-petsc");
+  // This doesn't converge with Eigen BICGSTAB or with Trilinos for some reason...
+  libmesh_example_requires(libMesh::default_solver_package() == PETSC_SOLVERS, "--enable-petsc");
 
   libMesh::out << "Started " << argv[0] << std::endl;
 
@@ -725,10 +751,10 @@ int main (int argc, char ** argv)
 
   // Create a mesh with the given dimension, distributed
   // across the default MPI communicator.
-  Mesh mesh(init.comm(), param.dimension);
+  Mesh mesh(init.comm(), cast_int<unsigned char>(param.dimension));
 
   // And an object to refine it
-  UniquePtr<MeshRefinement> mesh_refinement =
+  std::unique_ptr<MeshRefinement> mesh_refinement =
     build_mesh_refinement(mesh, param);
 
   // And an EquationSystems to run on it
@@ -820,7 +846,7 @@ int main (int argc, char ** argv)
 
       // Hard coded assert to ensure that the actual numbers we are getting are what they should be
       if (a_step == param.max_adaptivesteps)
-        libmesh_assert_less(std::abs(QoI_0_computed - 0.0833), 2.e-4);
+        libmesh_assert_less(std::abs(QoI_0_computed - 0.0833), 2.5e-4);
 
       // You dont need to compute error estimates and refine at the last
       // adaptive step, only before that
@@ -840,7 +866,7 @@ int main (int argc, char ** argv)
           libMesh::out<< "Solving the adjoint problem" <<std::endl;
           system.adjoint_solve();
 
-          // Now that we have solved the adjoint, set the adjoint_already_solved boolean to true, so we dont solve unneccesarily in the error estimator
+          // Now that we have solved the adjoint, set the adjoint_already_solved boolean to true, so we dont solve unnecessarily in the error estimator
           system.set_adjoint_already_solved(true);
 
           // To plot the adjoint solution, we swap it with the primal solution
@@ -881,7 +907,7 @@ int main (int argc, char ** argv)
           dual_norm_type_vector_non_pressure.push_back(L2);
           dual_norm_type_vector_non_pressure.push_back(H1_SEMINORM);
 
-          std::vector<std::vector<Real> >
+          std::vector<std::vector<Real>>
             weights_matrix_non_pressure(system.n_vars(),
                                         std::vector<Real>(system.n_vars(), 0.0));
           weights_matrix_non_pressure[0][0] = 1.;
@@ -890,7 +916,7 @@ int main (int argc, char ** argv)
 
           // We build the error estimator to estimate the contributions
           // to the QoI error from the non pressure term
-          UniquePtr<ErrorEstimator> error_estimator_non_pressure =
+          std::unique_ptr<ErrorEstimator> error_estimator_non_pressure =
             build_error_estimator_component_wise (param,
                                                   weights_matrix_non_pressure,
                                                   primal_norm_type_vector_non_pressure,
@@ -921,7 +947,7 @@ int main (int argc, char ** argv)
           dual_norm_type_vector_with_pressure.push_back(L2);
           dual_norm_type_vector_with_pressure.push_back(L2);
 
-          std::vector<std::vector<Real> >
+          std::vector<std::vector<Real>>
             weights_matrix_with_pressure (system.n_vars(),
                                           std::vector<Real>(system.n_vars(), 0.0));
           weights_matrix_with_pressure[0][2] = 1.;
@@ -931,7 +957,7 @@ int main (int argc, char ** argv)
 
           // We build the error estimator to estimate the contributions
           // to the QoI error from the pressure term
-          UniquePtr<ErrorEstimator> error_estimator_with_pressure =
+          std::unique_ptr<ErrorEstimator> error_estimator_with_pressure =
             build_error_estimator_component_wise (param,
                                                   weights_matrix_with_pressure,
                                                   primal_norm_type_vector_with_pressure,
@@ -961,7 +987,7 @@ int main (int argc, char ** argv)
           // Note that we need the error of the dual concentration in L2
           dual_norm_type_vector_convection_diffusion_x.push_back(L2);
 
-          std::vector<std::vector<Real> >
+          std::vector<std::vector<Real>>
             weights_matrix_convection_diffusion_x (system.n_vars(),
                                                    std::vector<Real>(system.n_vars(), 0.0));
           weights_matrix_convection_diffusion_x[0][3] = 1.;
@@ -988,7 +1014,7 @@ int main (int argc, char ** argv)
 
           // Build the error estimator to estimate the contributions
           // to the QoI error from the convection diffusion x term
-          UniquePtr<ErrorEstimator> error_estimator_convection_diffusion_x =
+          std::unique_ptr<ErrorEstimator> error_estimator_convection_diffusion_x =
             build_weighted_error_estimator_component_wise (param,
                                                            weights_matrix_convection_diffusion_x,
                                                            primal_norm_type_vector_convection_diffusion_x,
@@ -1024,7 +1050,7 @@ int main (int argc, char ** argv)
           // Note that we need the error of the dual concentration in L2
           dual_norm_type_vector_convection_diffusion_y.push_back(L2);
 
-          std::vector<std::vector<Real> >
+          std::vector<std::vector<Real>>
             weights_matrix_convection_diffusion_y (system.n_vars(),
                                                    std::vector<Real>(system.n_vars(), 0.0));
           weights_matrix_convection_diffusion_y[1][3] = 1.;
@@ -1043,8 +1069,8 @@ int main (int argc, char ** argv)
           coupled_system_weight_functions_y.push_back(&convdiffy3);
 
           // Build the error estimator to estimate the contributions
-          // to the QoI error from the convection diffsion y term
-          UniquePtr<ErrorEstimator> error_estimator_convection_diffusion_y =
+          // to the QoI error from the convection diffusion y term
+          std::unique_ptr<ErrorEstimator> error_estimator_convection_diffusion_y =
             build_weighted_error_estimator_component_wise (param,
                                                            weights_matrix_convection_diffusion_y,
                                                            primal_norm_type_vector_convection_diffusion_y,
@@ -1064,17 +1090,15 @@ int main (int argc, char ** argv)
 
               // Now combine the contribs from the pressure and non
               // pressure terms to get the complete estimate
-              for (unsigned int i = 0; i < error.size(); i++)
-                {
-                  error[i] = error_non_pressure[i] + error_with_pressure[i] + error_convection_diffusion_x[i] + error_convection_diffusion_y[i];
-                }
+              for (std::size_t i = 0; i < error.size(); i++)
+                error[i] = error_non_pressure[i] + error_with_pressure[i] + error_convection_diffusion_x[i] + error_convection_diffusion_y[i];
             }
           else
             {
               libMesh::out << "Using Kelly Estimator" << std::endl;
 
               // Build the Kelly error estimator
-              UniquePtr<ErrorEstimator> error_estimator = build_error_estimator(param);
+              std::unique_ptr<ErrorEstimator> error_estimator = build_error_estimator(param);
 
               // Estimate the error
               error_estimator->estimate_error(system, error);

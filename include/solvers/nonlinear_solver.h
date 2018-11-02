@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,15 +22,24 @@
 
 // Local includes
 #include "libmesh/libmesh_common.h"
-#include "libmesh/enum_solver_package.h"
 #include "libmesh/reference_counted_object.h"
 #include "libmesh/nonlinear_implicit_system.h"
 #include "libmesh/libmesh.h"
 #include "libmesh/parallel_object.h"
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
+
+#ifdef LIBMESH_FORWARD_DECLARE_ENUMS
+namespace libMesh
+{
+enum SolverPackage : int;
+}
+#else
+#include "libmesh/enum_solver_package.h"
+#endif
 
 // C++ includes
 #include <cstddef>
+#include <memory>
 
 namespace libMesh
 {
@@ -42,15 +51,14 @@ template <typename T> class Preconditioner;
 class SolverConfiguration;
 
 /**
- * This class provides a uniform interface for nonlinear solvers.  This base
- * class is overloaded to provide nonlinear solvers from different packages
- * like PETSC.
+ * This base class can be inherited from to provide interfaces to
+ * nonlinear solvers from different packages like PETSc and Trilinos.
  *
  * \author Benjamin Kirk
  * \date 2005
  */
 template <typename T>
-class NonlinearSolver : public ReferenceCountedObject<NonlinearSolver<T> >,
+class NonlinearSolver : public ReferenceCountedObject<NonlinearSolver<T>>,
                         public ParallelObject
 {
 public:
@@ -74,11 +82,11 @@ public:
    * Builds a \p NonlinearSolver using the nonlinear solver package specified by
    * \p solver_package
    */
-  static UniquePtr<NonlinearSolver<T> > build(sys_type & s,
-                                              const SolverPackage solver_package = libMesh::default_solver_package());
+  static std::unique_ptr<NonlinearSolver<T>> build(sys_type & s,
+                                                   const SolverPackage solver_package = libMesh::default_solver_package());
 
   /**
-   * @returns true if the data structures are
+   * \returns \p true if the data structures are
    * initialized, false otherwise.
    */
   bool initialized () const { return _is_initialized; }
@@ -92,7 +100,7 @@ public:
    * Initialize data structures if not done so already.
    * May assign a name to the solver in some implementations
    */
-  virtual void init (const char * name = libmesh_nullptr) = 0;
+  virtual void init (const char * name = nullptr) = 0;
 
   /**
    * Solves the nonlinear system.
@@ -115,9 +123,11 @@ public:
   virtual int get_total_linear_iterations() = 0;
 
   /**
-   * If called *during* the solve(), for example by the user-specified
-   * residual or Jacobian function, returns the current nonlinear iteration
-   * number.  Must be redefined in derived classes.
+   * \returns The current nonlinear iteration number if called
+   * *during* the solve(), for example by the user-specified residual
+   * or Jacobian function.
+   *
+   * Must be overridden in derived classes.
    */
   virtual unsigned get_current_nonlinear_iteration_number() const = 0;
 
@@ -136,6 +146,19 @@ public:
   NonlinearImplicitSystem::ComputeResidual * residual_object;
 
   /**
+   * Object that computes the residual \p R(X) of the nonlinear system
+   * at the input iterate \p X for the purpose of forming a finite-differenced Jacobian.
+   */
+  NonlinearImplicitSystem::ComputeResidual * fd_residual_object;
+
+  /**
+   * Object that computes the residual \p R(X) of the nonlinear system
+   * at the input iterate \p X for the purpose of forming Jacobian-vector products
+   * via finite differencing.
+   */
+  NonlinearImplicitSystem::ComputeResidual * mffd_residual_object;
+
+  /**
    * Function that computes the Jacobian \p J(X) of the nonlinear system
    * at the input iterate \p X.
    */
@@ -152,8 +175,9 @@ public:
   /**
    * Function that computes either the residual \f$ R(X) \f$ or the
    * Jacobian \f$ J(X) \f$ of the nonlinear system at the input
-   * iterate \f$ X \f$.  Note that either \p R or \p J could be
-   * \p NULL.
+   * iterate \f$ X \f$.
+   *
+   * \note Either \p R or \p J could be \p nullptr.
    */
   void (* matvec) (const NumericVector<Number> & X,
                    NumericVector<Number> * R,
@@ -163,8 +187,9 @@ public:
   /**
    * Object that computes either the residual \f$ R(X) \f$ or the
    * Jacobian \f$ J(X) \f$ of the nonlinear system at the input
-   * iterate \f$ X \f$.  Note that either \p R or \p J could be
-   * \p NULL.
+   * iterate \f$ X \f$.
+   *
+   * \note Either \p R or \p J could be \p nullptr.
    */
   NonlinearImplicitSystem::ComputeResidualandJacobian * residual_and_jacobian_object;
 
@@ -194,6 +219,20 @@ public:
    * (e.g., PETSc's KSP).
    */
   NonlinearImplicitSystem::ComputeVectorSubspace * nullspace_object;
+
+  /**
+   * Function that computes a basis for the transpose Jacobian's nullspace --
+   * when solving a degenerate problem iteratively, if the solver supports it
+   * (e.g., PETSc's KSP), it is used to remove contributions outside of R(jac)
+   */
+  void (* transpose_nullspace) (std::vector<NumericVector<Number> *> & sp, sys_type & S);
+
+  /**
+   * A callable object that computes a basis for the transpose Jacobian's nullspace --
+   * when solving a degenerate problem iteratively, if the solver supports it
+   * (e.g., PETSc's KSP), it is used to remove contributions outside of R(jac)
+   */
+  NonlinearImplicitSystem::ComputeVectorSubspace * transpose_nullspace_object;
 
   /**
    * Function that computes a basis for the Jacobian's near nullspace --
@@ -236,12 +275,12 @@ public:
   NonlinearImplicitSystem::ComputePostCheck * postcheck_object;
 
   /**
-   * @returns a constant reference to the system we are solving.
+   * \returns A constant reference to the system we are solving.
    */
   const sys_type & system () const { return _system; }
 
   /**
-   * @returns a writeable reference to the system we are solving.
+   * \returns A writable reference to the system we are solving.
    */
   sys_type & system () { return _system; }
 
@@ -282,7 +321,7 @@ public:
    * Users should increase any of these tolerances that they want to use for a
    * stopping condition.
    *
-   * Note that not all NonlinearSolvers support relative_step_tolerance!
+   * \note Not all NonlinearSolvers support \p relative_step_tolerance!
    */
   Real absolute_step_tolerance;
   Real relative_step_tolerance;
@@ -346,21 +385,25 @@ template <typename T>
 inline
 NonlinearSolver<T>::NonlinearSolver (sys_type & s) :
   ParallelObject               (s),
-  residual                     (libmesh_nullptr),
-  residual_object              (libmesh_nullptr),
-  jacobian                     (libmesh_nullptr),
-  jacobian_object              (libmesh_nullptr),
-  matvec                       (libmesh_nullptr),
-  residual_and_jacobian_object (libmesh_nullptr),
-  bounds                       (libmesh_nullptr),
-  bounds_object                (libmesh_nullptr),
-  nullspace                    (libmesh_nullptr),
-  nullspace_object             (libmesh_nullptr),
-  nearnullspace                (libmesh_nullptr),
-  nearnullspace_object         (libmesh_nullptr),
-  user_presolve                (libmesh_nullptr),
-  postcheck                    (libmesh_nullptr),
-  postcheck_object             (libmesh_nullptr),
+  residual                     (nullptr),
+  residual_object              (nullptr),
+  fd_residual_object           (nullptr),
+  mffd_residual_object         (nullptr),
+  jacobian                     (nullptr),
+  jacobian_object              (nullptr),
+  matvec                       (nullptr),
+  residual_and_jacobian_object (nullptr),
+  bounds                       (nullptr),
+  bounds_object                (nullptr),
+  nullspace                    (nullptr),
+  nullspace_object             (nullptr),
+  transpose_nullspace          (nullptr),
+  transpose_nullspace_object   (nullptr),
+  nearnullspace                (nullptr),
+  nearnullspace_object         (nullptr),
+  user_presolve                (nullptr),
+  postcheck                    (nullptr),
+  postcheck_object             (nullptr),
   max_nonlinear_iterations(0),
   max_function_evaluations(0),
   absolute_residual_tolerance(0),
@@ -373,8 +416,8 @@ NonlinearSolver<T>::NonlinearSolver (sys_type & s) :
   converged(false),
   _system(s),
   _is_initialized (false),
-  _preconditioner (libmesh_nullptr),
-  _solver_configuration(libmesh_nullptr)
+  _preconditioner (nullptr),
+  _solver_configuration(nullptr)
 {
 }
 

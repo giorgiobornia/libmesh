@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -50,7 +50,7 @@ namespace libMesh
 //   {}
 
 //   /**
-//    * Evaluate the radial basis function at the reqested location.
+//    * Evaluate the radial basis function at the requested location.
 //    */
 //   Real operator()(Real rad) const
 //   {
@@ -66,6 +66,10 @@ namespace libMesh
 
 /**
  * Wendland's compactly supported Radial Basis Functions.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2013
+ * \brief Interface for evaluating Wendland's radial basis functions.
  */
 template <unsigned int SpaceDim, unsigned int Continuity>
 class WendlandRBF
@@ -83,7 +87,7 @@ public:
   { libmesh_experimental(); }
 
   /**
-   * Evaluate the radial basis function at the reqested location.
+   * Evaluate the radial basis function at the requested location.
    */
   Real operator()(Real /* rad */) const { libmesh_not_implemented(); return 0.; }
 };

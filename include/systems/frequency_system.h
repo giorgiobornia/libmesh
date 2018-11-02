@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -40,7 +40,7 @@ namespace libMesh
  * for frequency-dependent (linear) systems.
  * Generally two solution flavors are possible:
  *
- * - @e fast solution of moderately-sized systems:
+ * - Fast solution of moderately-sized systems:
  *   For moderate numbers of dof, it is possible to keep
  *   frequency-independent matrices in memory.  For this,
  *   simply provide multiple frequencies prior to \p ini().
@@ -49,13 +49,13 @@ namespace libMesh
  *   these contributions to give the frequency-dependent overall
  *   matrix, respectively. For details see the examples section.
  *
- * - solution of @e large systems:
+ * - Solution of large systems:
  *   When there is not enough space to keep the frequency-independent
  *   contributions in memory, the user need only provide a function
  *   \p _solve_fptr which assembles the overall, frequency-dependent
  *   matrix for the current frequency given in the parameter section
- *   of \p EquationSystems<FrequencySystem> named \p current \p frequency.
- *   For this to work, only provide @e one frequency.
+ *   of \p EquationSystems<FrequencySystem> named "current frequency".
+ *   For this to work, only provide one frequency.
  *
  * \author Daniel Dreyer
  * \date 2003
@@ -82,7 +82,7 @@ public:
    * The frequencies belong to the \p EquationSystems
    * object.
    */
-  virtual void clear () libmesh_override;
+  virtual void clear () override;
 
   /**
    * The full clear method also clears the frequencies
@@ -95,29 +95,29 @@ public:
    * Assemble the linear system.  Does not
    * actually call the solver.
    */
-  virtual void assemble () libmesh_override;
+  virtual void assemble () override;
 
   /**
    * Solves the system for all frequencies.
    */
-  virtual void solve () libmesh_override;
+  virtual void solve () override;
 
   /**
    * Solves the linear system for the
    * \f$ [ \texttt{n\_start, n\_stop} ]^{th} \f$
    * frequencies. The solution vectors are stored in automatically
    * allocated vectors named \p solution_nnnn.  For access to these vectors,
-   * see \p System. When calling this, the frequency range should better
-   * be already set.
+   * see \p System. When calling this, the frequency range should
+   * already be set.
    */
   void solve (const unsigned int n_start,
               const unsigned int n_stop);
 
   /**
-   * @returns \p "Frequency".  Helps in identifying
+   * \returns \p "Frequency".  Helps in identifying
    * the system type in an equation system file.
    */
-  virtual std::string system_type () const libmesh_override { return "Frequency"; }
+  virtual std::string system_type () const override { return "Frequency"; }
 
 
   //--------------------------------------------------------
@@ -136,8 +136,8 @@ public:
    * to a separate \p NumericVector.  This feature
    * can be disabled with \p allocate_solution_duplicates=false.
    */
-  void set_frequencies_by_steps (const Real base_freq,
-                                 const Real freq_step=0.,
+  void set_frequencies_by_steps (const Number base_freq,
+                                 const Number freq_step=0.,
                                  const unsigned int n_freq=1,
                                  const bool allocate_solution_duplicates=true);
 
@@ -150,8 +150,8 @@ public:
    * to a separate \p NumericVector.  This feature
    * can be disabled with \p allocate_solution_duplicates=false.
    */
-  void set_frequencies_by_range (const Real min_freq,
-                                 const Real max_freq,
+  void set_frequencies_by_range (const Number min_freq,
+                                 const Number max_freq,
                                  const unsigned int n_freq,
                                  const bool allocate_solution_duplicates=true);
 
@@ -165,15 +165,19 @@ public:
   void set_frequencies (const std::vector<Real> & frequencies,
                         const bool allocate_solution_duplicates=true);
 
+
+  void set_frequencies (const std::vector<Number> & frequencies,
+                        const bool allocate_solution_duplicates=true);
+
   /**
-   * @returns the number of frequencies to solve
+   * \returns The number of frequencies to solve
    */
   unsigned int n_frequencies () const;
 
   /**
    * Register a required user function to use in assembling/solving the system.
-   * It is intended to compute @e frequency-dependent data.  For proper
-   * work of \p FrequencySystem, at least @e this function has to be provided
+   * It is intended to compute frequency-dependent data.  For proper
+   * work of \p FrequencySystem, at least this function has to be provided
    * by the user.
    */
   void attach_solve_function(void fptr(EquationSystems & es,
@@ -186,19 +190,19 @@ public:
                          const std::string & name);
 
   /**
-   * @returns the number of iterations and the final residual.
+   * \returns The number of iterations and the final residual.
    */
   std::pair<unsigned int, Real> get_rval (unsigned int n) const;
 
   /**
-   * @returns a string of the form \p "frequency_x", where \p x is
+   * \returns A string of the form \p "frequency_x", where \p x is
    * the integer \p n.  Useful for identifying frequencies and
    * solution vectors in the parameters set of \p _equation_systems.
    */
   std::string form_freq_param_name(const unsigned int n) const;
 
   /**
-   * @returns a string of the form \p "solution_x", where \p x is
+   * \returns A string of the form \p "solution_x", where \p x is
    * the integer \p n.  Useful for identifying frequencies and
    * solution vectors in the vectors map of \p System.
    */
@@ -211,10 +215,10 @@ protected:
   /**
    * Initializes the member data fields associated with
    * the system, so that, e.g., \p assemble() may be used.
-   * The frequenices have to be set @e prior to calling
+   * The frequencies have to be set prior to calling
    * \p init().
    */
-  virtual void init_data () libmesh_override;
+  virtual void init_data () override;
 
   /**
    * Sets the current frequency to the \p n-th entry in the vector
@@ -263,7 +267,7 @@ protected:
    * The number of iterations and the final residual
    * when the Ax=b is solved for multiple frequencies.
    */
-  std::vector<std::pair<unsigned int, Real> > vec_rval;
+  std::vector<std::pair<unsigned int, Real>> vec_rval;
 
 };
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -27,12 +27,14 @@
 
 #include "libmesh/mesh.h"
 
+#include "libmesh/ignore_warnings.h"
 #include <DTK_MeshContainer.hpp>
 #include <DTK_FieldEvaluator.hpp>
 #include <DTK_FieldContainer.hpp>
 
 #include <Teuchos_RCP.hpp>
 #include <Teuchos_ArrayRCP.hpp>
+#include "libmesh/restore_warnings.h"
 
 #include <string>
 
@@ -55,7 +57,7 @@ template <typename T> class NumericVector;
  * \author Derek Gaston
  * \date 2013
  */
-class DTKEvaluator : public DataTransferKit::FieldEvaluator<int,DataTransferKit::FieldContainer<double> >
+class DTKEvaluator : public DataTransferKit::FieldEvaluator<int,DataTransferKit::FieldContainer<double>>
 {
 public:
   typedef DataTransferKit::MeshContainer<int> MeshContainerType;
@@ -64,7 +66,7 @@ public:
   DTKEvaluator(System & in_sys, std::string var_name);
 
   virtual FieldContainerType evaluate(const Teuchos::ArrayRCP<int> & elements,
-                                      const Teuchos::ArrayRCP<double> & coords) libmesh_override;
+                                      const Teuchos::ArrayRCP<double> & coords) override;
 
 protected:
   System & sys;

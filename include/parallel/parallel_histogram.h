@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -35,11 +35,17 @@
 namespace libMesh
 {
 
-namespace Parallel {
+namespace Parallel
+{
 
 /**
- * Defines a histogram to be used in parallel in conjuction with
+ * Defines a histogram to be used in parallel in conjunction with
  * a \p BinSorter.
+ *
+ * \author Benjamin S. Kirk
+ * \author John W. Peterson
+ * \date 2007
+ * \brief Used in conjunction with a BinSorter for parallel sorting.
  */
 template <typename KeyType, typename IdxType=unsigned int>
 class Histogram : public ParallelObject
@@ -49,44 +55,62 @@ class Histogram : public ParallelObject
 
 public:
 
-  // Constructor
+  /**
+   * Constructor.
+   */
   explicit
   Histogram (const Parallel::Communicator & comm,
              const std::vector<KeyType> & d);
 
-  // The actual function which sorts the data into
-  // nbins.  Currently based on the global min and
-  // max which you must provide e.g. by using MPI.
+  /**
+   * The actual function which sorts the data into
+   * nbins.  Currently based on the global min and
+   * max which you must provide e.g. by using MPI.
+   */
   void make_histogram (const IdxType nbins,
                        KeyType max,
                        KeyType min);
 
-  // Build the histogram across all processors and store the
-  // result in the input vector \p hist
+  /**
+   * Build the histogram across all processors and store the
+   * result in the input vector \p hist.
+   */
   void build_histogram ();
 
-  // Return the raw histogram data to the user
+  /**
+   * \returns The raw histogram data to the user.
+   */
   const std::vector<IdxType> & get_histogram() const;
 
-  // The number of bins in the histogram
+  /**
+   * The number of bins in the histogram.
+   */
   IdxType n_bins () const;
 
-  // Returns the size of local bin b
+  /**
+   * \returns The size of local bin \p bin.
+   */
   IdxType local_bin_size (const IdxType bin) const;
 
-  // Returns the size of global bin b
-  // Requires that the user first call \p build_histogram()
+  /**
+   * \returns The size of global bin \p bin.
+   *
+   * Requires that the user first call \p build_histogram().
+   */
   IdxType global_bin_size (const IdxType bin) const;
 
-  // Returns the lower boundary of bin \p bin
+  /**
+   * \returns The lower boundary of bin \p bin.
+   */
   double lower_bound (const IdxType bin) const;
 
-  // Returns the upper boundary of bin \p bin
+  /**
+   * \returns The upper boundary of bin \p bin.
+   */
   double upper_bound (const IdxType bin) const;
 
 
 private:
-
 
   const std::vector<KeyType> & data;
   std::vector<IdxType> hist;        // The actual histogram
@@ -96,8 +120,6 @@ private:
 
 
 
-
-//--------------------------------------------------------------------------
 template <typename KeyType, typename IdxType>
 inline
 const std::vector<IdxType> & Histogram<KeyType,IdxType>::get_histogram () const

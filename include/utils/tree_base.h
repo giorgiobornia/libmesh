@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -47,6 +47,10 @@ namespace Trees
  * from the current processor.  This experimental capability may be
  * useful if you do not wish to include off-processor elements in the
  * search for a Point.
+ *
+ * \author Daniel Dreyer
+ * \date 2003
+ * \brief Base class for different Tree types.
  */
 enum BuildType {NODES=0,
                 ELEMENTS,
@@ -84,17 +88,17 @@ public:
   virtual void print_elements(std::ostream & out=libMesh::out) const = 0;
 
   /**
-   * @returns the number of active bins.
+   * \returns The number of active bins.
    */
   virtual unsigned int n_active_bins() const = 0;
 
   /**
-   * @returns a pointer to the element containing point p,
+   * \returns A pointer to the element containing point p,
    * optionally restricted to a set of allowed subdomains,
    * optionally using a non-zero relative tolerance for searches.
    */
   virtual const Elem * find_element(const Point & p,
-                                    const std::set<subdomain_id_type> * allowed_subdomains = libmesh_nullptr,
+                                    const std::set<subdomain_id_type> * allowed_subdomains = nullptr,
                                     Real relative_tol = TOLERANCE) const = 0;
 
 protected:

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -41,7 +41,7 @@ class AbaqusIO : public MeshInput<MeshBase>
 {
 public:
   /**
-   * Constructor.  Takes a writeable reference to a mesh object.
+   * Constructor.  Takes a writable reference to a mesh object.
    */
   explicit
   AbaqusIO (MeshBase & mesh);
@@ -54,12 +54,14 @@ public:
   /**
    * This method implements reading a mesh from a specified file.
    */
-  virtual void read (const std::string & name) libmesh_override;
+  virtual void read (const std::string & name) override;
 
   /**
-   * Default false.  Abaqus files have only nodesets in them by
-   * default.  Set this flag to true if you want libmesh to automatically
-   * generate sidesets from Abaqus' nodesets.
+   * Default false. Set this flag to true if you want libmesh to
+   * automatically generate sidesets from Abaqus' nodesets. If the
+   * Abaqus file already contains some sidesets, we ignore this flag
+   * and don't generate sidesets, because the algorithm to do so
+   * currently does not take into account existing sidesets.
    */
   bool build_sidesets_from_nodesets;
 
@@ -67,14 +69,14 @@ private:
   /**
    * The type of data structure used to store Node and Elemset IDs.
    */
-  typedef std::map<std::string, std::vector<dof_id_type> > container_t;
+  typedef std::map<std::string, std::vector<dof_id_type>> container_t;
 
   /**
    * Type of the data structure for storing the (elem ID, side) pairs
    * defining sidesets.  These come from the *Surface sections of the
    * input file.
    */
-  typedef std::map<std::string, std::vector<std::pair<dof_id_type, unsigned> > > sideset_container_t;
+  typedef std::map<std::string, std::vector<std::pair<dof_id_type, unsigned>>> sideset_container_t;
 
   /**
    * This function parses a block of nodes in the Abaqus file once
@@ -99,7 +101,17 @@ private:
    * The input to the function in this case would be foo, the
    * output would be bar
    */
-  std::string parse_label(std::string line, std::string label_name);
+  std::string parse_label(std::string line, std::string label_name) const;
+
+  /**
+   * \returns \p true if the input string is a generated elset or nset,
+   * false otherwise.
+   *
+   * The input string is assumed to already be in all upper
+   * case. Generated nsets are assumed to have the following format:
+   * *Nset, nset=Set-1, generate
+   */
+  bool detect_generated_set(std::string upper) const;
 
   /**
    * This function reads all the IDs for the current node or element
@@ -107,6 +119,14 @@ private:
    * name as key.
    */
   void read_ids(std::string set_name, container_t & container);
+
+  /**
+   * This function handles "generated" nset and elset sections.  These
+   * are denoted by having the comma-separated "GENERATE" keyword in
+   * their definition, e.g.
+   * *Nset, nset=Set-1, generate
+   */
+  void generate_ids(std::string set_name, container_t & container);
 
   /**
    * This function is called after all the elements have been
@@ -140,7 +160,7 @@ private:
 
   /**
    * This function assigns boundary IDs to node sets based on the
-   * alphabetical order in which the sets are labelled in the Abaqus
+   * alphabetical order in which the sets are labeled in the Abaqus
    * file.  We choose the alphabetical ordering simply because
    * Abaqus does not provide a numerical one within the file.
    */
@@ -161,9 +181,11 @@ private:
   void process_and_discard_comments();
 
   /**
-   * Returns the maximum geometric element dimension encountered while
-   * reading the Mesh.  Only valid after the elements have been read
-   * in and the elems_of_dimension array has been populated.
+   * \returns The maximum geometric element dimension encountered while
+   * reading the Mesh.
+   *
+   * Only valid after the elements have been read in and the
+   * elems_of_dimension array has been populated.
    */
   unsigned char max_elem_dimension_seen();
 
@@ -196,7 +218,8 @@ private:
 
   /**
    * Map from abaqus node number -> sequential, 0-based libmesh node numbering.
-   * Note that in every Abaqus file I've ever seen the node numbers were 1-based,
+   *
+   * \note In every Abaqus file I've ever seen the node numbers were 1-based,
    * sequential, and all in order, so that this map is probably overkill.
    * Nevertheless, it is the most general solution in case we come across a
    * weird Abaqus file some day.

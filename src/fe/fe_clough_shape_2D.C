@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -16,21 +16,25 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-// C++ inlcludes
+// C++ includes
 
 // Local includes
 #include "libmesh/fe.h"
 #include "libmesh/elem.h"
 
 
-// Anonymous namespace for persistant variables.
+// Anonymous namespace for persistent variables.
 // This allows us to cache the global-to-local mapping transformation
 // FIXME: This should also screw up multithreading royally
 namespace
 {
 using namespace libMesh;
 
+// Keep track of which element was most recently used to generate
+// cached data
 static dof_id_type old_elem_id = DofObject::invalid_id;
+static const Elem * old_elem_ptr = nullptr;
+
 // Coefficient naming: d(1)d(2n) is the coefficient of the
 // global shape function corresponding to value 1 in terms of the
 // local shape function corresponding to normal derivative 2
@@ -66,11 +70,13 @@ void clough_compute_coefs(const Elem * elem)
   // horribly with more than one thread.
   libmesh_assert_equal_to (libMesh::n_threads(), 1);
 
-  // Coefficients are cached from old elements
-  if (elem->id() == old_elem_id)
+  // Coefficients are cached from old elements; we rely on that cache
+  // except in dbg mode
+#ifndef DEBUG
+  if (elem->id() == old_elem_id &&
+      elem == old_elem_ptr)
     return;
-
-  old_elem_id = elem->id();
+#endif
 
   const Order mapping_order        (elem->default_order());
   const ElemType mapping_elem_type (elem->type());
@@ -176,7 +182,7 @@ void clough_compute_coefs(const Elem * elem)
   N21x /= Nlength; N21y /= Nlength;
 
   //  for (int i=0; i != 6; ++i) {
-  //    libMesh::err << elem->node(i) << ' ';
+  //    libMesh::err << elem->node_id(i) << ' ';
   //  }
   //  libMesh::err << std::endl;
 
@@ -191,9 +197,9 @@ void clough_compute_coefs(const Elem * elem)
 
   if (elem->point(2) < elem->point(1))
     {
-      //      libMesh::err << "Flipping nodes " << elem->node(2);
-      //      libMesh::err << " and " << elem->node(1);
-      //      libMesh::err << " around node " << elem->node(4);
+      //      libMesh::err << "Flipping nodes " << elem->node_id(2);
+      //      libMesh::err << " and " << elem->node_id(1);
+      //      libMesh::err << " around node " << elem->node_id(4);
       //      libMesh::err << std::endl;
       N1x = -N1x; N1y = -N1y;
       N12x = -N12x; N12y = -N12y;
@@ -201,16 +207,16 @@ void clough_compute_coefs(const Elem * elem)
     }
   else
     {
-      //      libMesh::err << "Not flipping nodes " << elem->node(2);
-      //      libMesh::err << " and " << elem->node(1);
-      //      libMesh::err << " around node " << elem->node(4);
+      //      libMesh::err << "Not flipping nodes " << elem->node_id(2);
+      //      libMesh::err << " and " << elem->node_id(1);
+      //      libMesh::err << " around node " << elem->node_id(4);
       //      libMesh::err << std::endl;
     }
   if (elem->point(0) < elem->point(2))
     {
-      //      libMesh::err << "Flipping nodes " << elem->node(0);
-      //      libMesh::err << " and " << elem->node(2);
-      //      libMesh::err << " around node " << elem->node(5);
+      //      libMesh::err << "Flipping nodes " << elem->node_id(0);
+      //      libMesh::err << " and " << elem->node_id(2);
+      //      libMesh::err << " around node " << elem->node_id(5);
       //      libMesh::err << std::endl;
       //      libMesh::err << N2x << ' ' << N2y << std::endl;
       N2x = -N2x; N2y = -N2y;
@@ -220,16 +226,16 @@ void clough_compute_coefs(const Elem * elem)
     }
   else
     {
-      //      libMesh::err << "Not flipping nodes " << elem->node(0);
-      //      libMesh::err << " and " << elem->node(2);
-      //      libMesh::err << " around node " << elem->node(5);
+      //      libMesh::err << "Not flipping nodes " << elem->node_id(0);
+      //      libMesh::err << " and " << elem->node_id(2);
+      //      libMesh::err << " around node " << elem->node_id(5);
       //      libMesh::err << std::endl;
     }
   if (elem->point(1) < elem->point(0))
     {
-      //      libMesh::err << "Flipping nodes " << elem->node(1);
-      //      libMesh::err << " and " << elem->node(0);
-      //      libMesh::err << " around node " << elem->node(3);
+      //      libMesh::err << "Flipping nodes " << elem->node_id(1);
+      //      libMesh::err << " and " << elem->node_id(0);
+      //      libMesh::err << " around node " << elem->node_id(3);
       //      libMesh::err << std::endl;
       N3x = -N3x;
       N3y = -N3y;
@@ -238,9 +244,9 @@ void clough_compute_coefs(const Elem * elem)
     }
   else
     {
-      //      libMesh::err << "Not flipping nodes " << elem->node(1);
-      //      libMesh::err << " and " << elem->node(0);
-      //      libMesh::err << " around node " << elem->node(3);
+      //      libMesh::err << "Not flipping nodes " << elem->node_id(1);
+      //      libMesh::err << " and " << elem->node_id(0);
+      //      libMesh::err << " around node " << elem->node_id(3);
       //      libMesh::err << std::endl;
     }
 
@@ -412,6 +418,45 @@ void clough_compute_coefs(const Elem * elem)
   // Calculate midpoint derivative adjustments to nodal value
   // interpolant functions
 
+#ifdef DEBUG
+  // The cached factors should equal our calculations if we're still
+  // operating on the cached element
+  if (elem->id() == old_elem_id &&
+      elem == old_elem_ptr)
+    {
+      libmesh_assert_equal_to(d1d2n, -(d1d2ndx * N2x + d1d2ndy * N2y) / d2nd2ndn);
+      libmesh_assert_equal_to(d1d3n, -(d1d3ndx * N3x + d1d3ndy * N3y) / d3nd3ndn);
+      libmesh_assert_equal_to(d2d3n, -(d2d3ndx * N3x + d2d3ndy * N3y) / d3nd3ndn);
+      libmesh_assert_equal_to(d2d1n, -(d2d1ndx * N1x + d2d1ndy * N1y) / d1nd1ndn);
+      libmesh_assert_equal_to(d3d1n, -(d3d1ndx * N1x + d3d1ndy * N1y) / d1nd1ndn);
+      libmesh_assert_equal_to(d3d2n, -(d3d2ndx * N2x + d3d2ndy * N2y) / d2nd2ndn);
+      libmesh_assert_equal_to(d1xd1x, 1. / (d1xd1dx - d1xd1dy * d1yd1dx / d1yd1dy));
+      libmesh_assert_equal_to(d1xd1y, 1. / (d1yd1dx - d1xd1dx * d1yd1dy / d1xd1dy));
+      libmesh_assert_equal_to(d1yd1y, 1. / (d1yd1dy - d1yd1dx * d1xd1dy / d1xd1dx));
+      libmesh_assert_equal_to(d1yd1x, 1. / (d1xd1dy - d1yd1dy * d1xd1dx / d1yd1dx));
+      libmesh_assert_equal_to(d2xd2x, 1. / (d2xd2dx - d2xd2dy * d2yd2dx / d2yd2dy));
+      libmesh_assert_equal_to(d2xd2y, 1. / (d2yd2dx - d2xd2dx * d2yd2dy / d2xd2dy));
+      libmesh_assert_equal_to(d2yd2y, 1. / (d2yd2dy - d2yd2dx * d2xd2dy / d2xd2dx));
+      libmesh_assert_equal_to(d2yd2x, 1. / (d2xd2dy - d2yd2dy * d2xd2dx / d2yd2dx));
+      libmesh_assert_equal_to(d3xd3x, 1. / (d3xd3dx - d3xd3dy * d3yd3dx / d3yd3dy));
+      libmesh_assert_equal_to(d3xd3y, 1. / (d3yd3dx - d3xd3dx * d3yd3dy / d3xd3dy));
+      libmesh_assert_equal_to(d3yd3y, 1. / (d3yd3dy - d3yd3dx * d3xd3dy / d3xd3dx));
+      libmesh_assert_equal_to(d3yd3x, 1. / (d3xd3dy - d3yd3dy * d3xd3dx / d3yd3dx));
+      libmesh_assert_equal_to(d1xd2n, -(d1xd1x * d1xd2ndn + d1xd1y * d1yd2ndn) / d2nd2ndn);
+      libmesh_assert_equal_to(d1yd2n, -(d1yd1y * d1yd2ndn + d1yd1x * d1xd2ndn) / d2nd2ndn);
+      libmesh_assert_equal_to(d1xd3n, -(d1xd1x * d1xd3ndn + d1xd1y * d1yd3ndn) / d3nd3ndn);
+      libmesh_assert_equal_to(d1yd3n, -(d1yd1y * d1yd3ndn + d1yd1x * d1xd3ndn) / d3nd3ndn);
+      libmesh_assert_equal_to(d2xd3n, -(d2xd2x * d2xd3ndn + d2xd2y * d2yd3ndn) / d3nd3ndn);
+      libmesh_assert_equal_to(d2yd3n, -(d2yd2y * d2yd3ndn + d2yd2x * d2xd3ndn) / d3nd3ndn);
+      libmesh_assert_equal_to(d2xd1n, -(d2xd2x * d2xd1ndn + d2xd2y * d2yd1ndn) / d1nd1ndn);
+      libmesh_assert_equal_to(d2yd1n, -(d2yd2y * d2yd1ndn + d2yd2x * d2xd1ndn) / d1nd1ndn);
+      libmesh_assert_equal_to(d3xd1n, -(d3xd3x * d3xd1ndn + d3xd3y * d3yd1ndn) / d1nd1ndn);
+      libmesh_assert_equal_to(d3yd1n, -(d3yd3y * d3yd1ndn + d3yd3x * d3xd1ndn) / d1nd1ndn);
+      libmesh_assert_equal_to(d3xd2n, -(d3xd3x * d3xd2ndn + d3xd3y * d3yd2ndn) / d2nd2ndn);
+      libmesh_assert_equal_to(d3yd2n, -(d3yd3y * d3yd2ndn + d3yd3x * d3xd2ndn) / d2nd2ndn);
+    }
+#endif
+
   d1d2n = -(d1d2ndx * N2x + d1d2ndy * N2y) / d2nd2ndn;
   d1d3n = -(d1d3ndx * N3x + d1d3ndy * N3y) / d3nd3ndn;
   d2d3n = -(d2d3ndx * N3x + d2d3ndy * N3y) / d3nd3ndn;
@@ -468,6 +513,9 @@ void clough_compute_coefs(const Elem * elem)
   d3yd1n = -(d3yd3y * d3yd1ndn + d3yd3x * d3xd1ndn) / d1nd1ndn;
   d3xd2n = -(d3xd3x * d3xd2ndn + d3xd3y * d3yd2ndn) / d2nd2ndn;
   d3yd2n = -(d3yd3y * d3yd2ndn + d3yd3x * d3xd2ndn) / d2nd2ndn;
+
+  old_elem_id = elem->id();
+  old_elem_ptr = elem;
 
   // Cross your fingers
   //  libMesh::err << d1nd1ndn << ' ';
@@ -1073,9 +1121,6 @@ Real clough_raw_shape_second_deriv(const unsigned int basis_num,
       libmesh_error_msg("Invalid shape function derivative j = " <<
                         deriv_type);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -1513,9 +1558,6 @@ Real clough_raw_shape_deriv(const unsigned int basis_num,
       libmesh_error_msg("Invalid shape function derivative j = " <<
                         deriv_type);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 Real clough_raw_shape(const unsigned int basis_num,
@@ -1746,9 +1788,6 @@ Real clough_raw_shape(const unsigned int basis_num,
       libmesh_error_msg("Invalid shape function index i = " <<
                         basis_num);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -1947,9 +1986,6 @@ Real FE<2,CLOUGH>::shape(const Elem * elem,
     default:
       libmesh_error_msg("ERROR: Unsupported polynomial order = " << order);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -2144,9 +2180,6 @@ Real FE<2,CLOUGH>::shape_deriv(const Elem * elem,
     default:
       libmesh_error_msg("ERROR: Unsupported polynomial order = " << order);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -2324,9 +2357,6 @@ Real FE<2,CLOUGH>::shape_second_deriv(const Elem * elem,
     default:
       libmesh_error_msg("ERROR: Unsupported polynomial order = " << order);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 } // namespace libMesh

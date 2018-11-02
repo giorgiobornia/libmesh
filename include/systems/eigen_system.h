@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -29,8 +29,6 @@
 #include "libmesh/system.h"
 #include "libmesh/eigen_solver.h"
 
-// C++ includes
-
 namespace libMesh
 {
 
@@ -42,8 +40,12 @@ template <typename T> class SparseMatrix;
  * This class provides a specific system class.  It aims
  * at solving eigenvalue problems.  Currently, this class
  * is able  to handle standard eigenvalue problems
- * \p A*x=lambda*x  and generalited eigenvalue problems
+ * \p A*x=lambda*x  and generalized eigenvalue problems
  * \p A*x=lambda*B*x.
+ *
+ * \author Steffen Peterson
+ * \date 2005
+ * \brief Base class for defining systems of equations for eigenproblems.
  */
 class EigenSystem : public System
 {
@@ -73,7 +75,7 @@ public:
   typedef System Parent;
 
   /**
-   * @returns a clever pointer to the system.
+   * \returns A reference to *this.
    */
   sys_type & system () { return *this; }
 
@@ -81,48 +83,48 @@ public:
    * Clear all the data structures associated with
    * the system.
    */
-  virtual void clear () libmesh_override;
+  virtual void clear () override;
 
   /**
    * Reinitializes the member data fields associated with
    * the system, so that, e.g., \p assemble() may be used.
    */
-  virtual void reinit () libmesh_override;
+  virtual void reinit () override;
 
   /**
    * Assembles & solves the eigen system.
    */
-  virtual void solve () libmesh_override;
+  virtual void solve () override;
 
   /**
    * Assembles the system matrix.
    */
-  virtual void assemble () libmesh_override;
+  virtual void assemble () override;
 
   /**
-   * Returns real and imaginary part of the ith eigenvalue and copies
+   * \returns Real and imaginary part of the ith eigenvalue and copies
    * the respective eigen vector to the solution vector.
    */
-  virtual std::pair<Real, Real> get_eigenpair (unsigned int i);
+  virtual std::pair<Real, Real> get_eigenpair (dof_id_type i);
 
   /**
-   * @returns \p "Eigen".  Helps in identifying
+   * \returns \p "Eigen".  Helps in identifying
    * the system type in an equation system file.
    */
-  virtual std::string system_type () const libmesh_override { return "Eigen"; }
+  virtual std::string system_type () const override { return "Eigen"; }
 
   /**
-   * @returns the number of matrices handled by this system
+   * \returns The number of matrices handled by this system
    */
-  virtual unsigned int n_matrices () const libmesh_override;
+  virtual unsigned int n_matrices () const override;
 
   /**
-   * @returns the number of converged eigenpairs.
+   * \returns The number of converged eigenpairs.
    */
   unsigned int get_n_converged () const {return _n_converged_eigenpairs;}
 
   /**
-   * @returns the number of eigen solver iterations.
+   * \returns The number of eigen solver iterations.
    */
   unsigned int get_n_iterations () const {return _n_iterations;}
 
@@ -132,12 +134,12 @@ public:
   void set_eigenproblem_type (EigenProblemType ept);
 
   /**
-   * @returns the eigen problem type.
+   * \returns The eigen problem type.
    */
   EigenProblemType get_eigenproblem_type () const {return _eigen_problem_type;}
 
   /**
-   * @returns true if the underlying problem is generalized
+   * \returns \p true if the underlying problem is generalized
    * , false otherwise.
    */
   bool generalized () const { return _is_generalized_eigenproblem; }
@@ -145,18 +147,18 @@ public:
   /**
    * The system matrix for standard eigenvalue problems.
    */
-  SparseMatrix<Number> * matrix_A;
+  std::unique_ptr<SparseMatrix<Number>> matrix_A;
 
   /**
    * A second system matrix for generalized eigenvalue problems.
    */
-  SparseMatrix<Number> * matrix_B;
+  std::unique_ptr<SparseMatrix<Number>> matrix_B;
 
   /**
-   * The EigenSolver, definig which interface, i.e solver
+   * The EigenSolver, defining which interface, i.e solver
    * package to use.
    */
-  UniquePtr<EigenSolver<Number> > eigen_solver;
+  std::unique_ptr<EigenSolver<Number>> eigen_solver;
 
 
 protected:
@@ -166,7 +168,7 @@ protected:
    * Initializes the member data fields associated with
    * the system, so that, e.g., \p assemble() may be used.
    */
-  virtual void init_data () libmesh_override;
+  virtual void init_data () override;
 
   /**
    * Initializes the matrices associated with the system
@@ -219,7 +221,7 @@ private:
 inline
 unsigned int EigenSystem::n_matrices () const
 {
-  if(_is_generalized_eigenproblem)
+  if (_is_generalized_eigenproblem)
     return 2;
 
   return 1;

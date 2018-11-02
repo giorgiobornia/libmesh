@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,18 +20,21 @@
 #include <limits>
 
 // Local includes
-#include "libmesh/elem.h"
-#include "libmesh/error_vector.h"
-#include "libmesh/libmesh_logging.h"
-
 #include "libmesh/dof_map.h"
+#include "libmesh/elem.h"
+#include "libmesh/enum_xdr_mode.h"
+#include "libmesh/error_vector.h"
 #include "libmesh/equation_systems.h"
 #include "libmesh/explicit_system.h"
+#include "libmesh/libmesh_logging.h"
 #include "libmesh/mesh_base.h"
 #include "libmesh/numeric_vector.h"
-#include "libmesh/gmv_io.h"
-#include "libmesh/tecplot_io.h"
+
 #include "libmesh/exodusII_io.h"
+#include "libmesh/gmv_io.h"
+#include "libmesh/nemesis_io.h"
+#include "libmesh/tecplot_io.h"
+#include "libmesh/xdr_io.h"
 
 namespace libMesh
 {
@@ -42,7 +45,7 @@ namespace libMesh
 // ErrorVector class member functions
 ErrorVectorReal ErrorVector::minimum() const
 {
-  START_LOG ("minimum()", "ErrorVector");
+  LOG_SCOPE ("minimum()", "ErrorVector");
 
   const dof_id_type n = cast_int<dof_id_type>(this->size());
   ErrorVectorReal min = std::numeric_limits<ErrorVectorReal>::max();
@@ -54,7 +57,6 @@ ErrorVectorReal ErrorVector::minimum() const
       if (this->is_active_elem(i))
         min = std::min (min, (*this)[i]);
     }
-  STOP_LOG ("minimum()", "ErrorVector");
 
   // ErrorVectors are for positive values
   libmesh_assert_greater_equal (min, 0.);
@@ -66,7 +68,7 @@ ErrorVectorReal ErrorVector::minimum() const
 
 Real ErrorVector::mean() const
 {
-  START_LOG ("mean()", "ErrorVector");
+  LOG_SCOPE ("mean()", "ErrorVector");
 
   const dof_id_type n = cast_int<dof_id_type>(this->size());
 
@@ -80,8 +82,6 @@ Real ErrorVector::mean() const
 
         nnz++;
       }
-
-  STOP_LOG ("mean()", "ErrorVector");
 
   return the_mean;
 }
@@ -104,7 +104,7 @@ Real ErrorVector::median()
   sv.reserve (n);
 
   for (dof_id_type i=0; i<n; i++)
-    if(this->is_active_elem(i))
+    if (this->is_active_elem(i))
       sv.push_back((*this)[i]);
 
   return sv.median();
@@ -127,7 +127,7 @@ Real ErrorVector::variance(const Real mean_in) const
 {
   const dof_id_type n = cast_int<dof_id_type>(this->size());
 
-  START_LOG ("variance()", "ErrorVector");
+  LOG_SCOPE ("variance()", "ErrorVector");
 
   Real the_variance = 0;
   dof_id_type nnz = 0;
@@ -141,8 +141,6 @@ Real ErrorVector::variance(const Real mean_in) const
         nnz++;
       }
 
-  STOP_LOG ("variance()", "ErrorVector");
-
   return the_variance;
 }
 
@@ -151,7 +149,7 @@ Real ErrorVector::variance(const Real mean_in) const
 
 std::vector<dof_id_type> ErrorVector::cut_below(Real cut) const
 {
-  START_LOG ("cut_below()", "ErrorVector");
+  LOG_SCOPE ("cut_below()", "ErrorVector");
 
   const dof_id_type n = cast_int<dof_id_type>(this->size());
 
@@ -167,8 +165,6 @@ std::vector<dof_id_type> ErrorVector::cut_below(Real cut) const
           }
       }
 
-  STOP_LOG ("cut_below()", "ErrorVector");
-
   return cut_indices;
 }
 
@@ -177,7 +173,7 @@ std::vector<dof_id_type> ErrorVector::cut_below(Real cut) const
 
 std::vector<dof_id_type> ErrorVector::cut_above(Real cut) const
 {
-  START_LOG ("cut_above()", "ErrorVector");
+  LOG_SCOPE ("cut_above()", "ErrorVector");
 
   const dof_id_type n = cast_int<dof_id_type>(this->size());
 
@@ -193,8 +189,6 @@ std::vector<dof_id_type> ErrorVector::cut_above(Real cut) const
           }
       }
 
-  STOP_LOG ("cut_above()", "ErrorVector");
-
   return cut_indices;
 }
 
@@ -206,8 +200,7 @@ bool ErrorVector::is_active_elem (dof_id_type i) const
 
   if (_mesh)
     {
-      libmesh_assert(_mesh->elem(i));
-      return _mesh->elem(i)->active();
+      return _mesh->elem_ptr(i)->active();
     }
   else
     return ((*this)[i] != 0.);
@@ -217,13 +210,24 @@ bool ErrorVector::is_active_elem (dof_id_type i) const
 void ErrorVector::plot_error(const std::string & filename,
                              const MeshBase & oldmesh) const
 {
-  UniquePtr<MeshBase> meshptr = oldmesh.clone();
+  std::unique_ptr<MeshBase> meshptr = oldmesh.clone();
   MeshBase & mesh = *meshptr;
 
-  // The all_first_order routine requires that renumbering be allowed
-  mesh.allow_renumbering(true);
-
+  // The all_first_order routine will prepare_for_use(), which would
+  // break our ordering if elements get changed.
+  mesh.allow_renumbering(false);
   mesh.all_first_order();
+
+#ifdef LIBMESH_ENABLE_AMR
+  // We don't want p elevation when plotting a single constant value
+  // per element
+  for (auto & elem : mesh.element_ptr_range())
+    {
+      elem->set_p_refinement_flag(Elem::DO_NOTHING);
+      elem->set_p_level(0);
+    }
+#endif // LIBMESH_ENABLE_AMR
+
   EquationSystems temp_es (mesh);
   ExplicitSystem & error_system
     = temp_es.add_system<ExplicitSystem> ("Error");
@@ -231,17 +235,10 @@ void ErrorVector::plot_error(const std::string & filename,
   temp_es.init();
 
   const DofMap & error_dof_map = error_system.get_dof_map();
-
-  MeshBase::const_element_iterator       el     =
-    mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el =
-    mesh.active_local_elements_end();
   std::vector<dof_id_type> dof_indices;
 
-  for ( ; el != end_el; ++el)
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      const Elem * elem = *el;
-
       error_dof_map.dof_indices(elem, dof_indices);
 
       const dof_id_type elem_id = elem->id();
@@ -279,20 +276,43 @@ void ErrorVector::plot_error(const std::string & filename,
       TecplotIO (mesh).write_equation_systems
         (filename, temp_es);
     }
+#if defined(LIBMESH_HAVE_EXODUS_API) && defined(LIBMESH_HAVE_NEMESIS_API)
+  else if ((filename.rfind(".nem") < filename.size()) ||
+           (filename.rfind(".n") < filename.size()))
+    {
+      Nemesis_IO io(mesh);
+      io.write(filename);
+      io.write_element_data(temp_es);
+    }
+#endif
 #ifdef LIBMESH_HAVE_EXODUS_API
-  else if( (filename.rfind(".exo") < filename.size()) ||
-           (filename.rfind(".e") < filename.size()) )
+  else if ((filename.rfind(".exo") < filename.size()) ||
+           (filename.rfind(".e") < filename.size()))
     {
       ExodusII_IO io(mesh);
       io.write(filename);
       io.write_element_data(temp_es);
     }
 #endif
+  else if (filename.rfind(".xda") < filename.size())
+    {
+      XdrIO(mesh).write("mesh-"+filename);
+      temp_es.write("soln-"+filename,WRITE,
+                    EquationSystems::WRITE_DATA |
+                    EquationSystems::WRITE_ADDITIONAL_DATA);
+    }
+  else if (filename.rfind(".xdr") < filename.size())
+    {
+      XdrIO(mesh,true).write("mesh-"+filename);
+      temp_es.write("soln-"+filename,ENCODE,
+                    EquationSystems::WRITE_DATA |
+                    EquationSystems::WRITE_ADDITIONAL_DATA);
+    }
   else
     {
       libmesh_here();
       libMesh::err << "Warning: ErrorVector::plot_error currently only"
-                   << " supports .gmv and .plt and .exo/.e (if enabled) output;" << std::endl;
+                   << " supports .gmv, .plt, .xdr/.xda, and .exo/.e (if enabled) output;" << std::endl;
       libMesh::err << "Could not recognize filename: " << filename
                    << std::endl;
     }

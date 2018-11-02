@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -30,9 +30,11 @@ namespace libMesh
  * second order (in time) DifferentiableSystems.
  * There are two parameters
  * \f$\gamma\f$ and \f$\beta\f$ (defaulting to 0.5 and 0.25,
- * respectively). Note that projectors are included for the
- * initial velocity and acceleration; the initial displacement
- * can be set by calling System::project_solution().
+ * respectively).
+ *
+ * \note Projectors are included for the initial velocity and
+ * acceleration; the initial displacement can be set by calling
+ * System::project_solution().
  *
  * This class is part of the new DifferentiableSystem framework,
  * which is still experimental.  Users of this framework should
@@ -67,14 +69,14 @@ public:
    * UnsteadySolver::solve(), but adaptive mesh refinement and/or adaptive
    * time step selection may require some solve() steps to be repeated.
    */
-  virtual void advance_timestep () libmesh_override;
+  virtual void advance_timestep () override;
 
   /**
    * This method advances the adjoint solution to the previous
    * timestep, after an adjoint_solve() has been performed.  This will
    * be done before every UnsteadySolver::adjoint_solve().
    */
-  virtual void adjoint_advance_timestep () libmesh_override;
+  virtual void adjoint_advance_timestep () override;
 
   /**
    * This method uses the specified initial displacement and velocity
@@ -91,7 +93,7 @@ public:
    * with continuous derivatives.
    */
   void project_initial_accel (FunctionBase<Number> * f,
-                              FunctionBase<Gradient> * g = libmesh_nullptr);
+                              FunctionBase<Gradient> * g = nullptr);
 
   /**
    * Allow the user to (re)set whether the initial acceleration is available.
@@ -104,14 +106,14 @@ public:
   /**
    * Error convergence order: 2 for \f$\gamma=0.5\f$, 1 otherwise
    */
-  virtual Real error_order() const libmesh_override;
+  virtual Real error_order() const override;
 
   /**
    * This method solves for the solution at the next timestep.
    * Usually we will only need to solve one (non)linear system per timestep,
    * but more complex subclasses may override this.
    */
-  virtual void solve () libmesh_override;
+  virtual void solve () override;
 
   /**
    * This method uses the DifferentiablePhysics'
@@ -120,7 +122,7 @@ public:
    * it uses will depend on theta.
    */
   virtual bool element_residual (bool request_jacobian,
-                                 DiffContext &) libmesh_override;
+                                 DiffContext &) override;
 
   /**
    * This method uses the DifferentiablePhysics'
@@ -129,7 +131,7 @@ public:
    * What combination it uses will depend on theta.
    */
   virtual bool side_residual (bool request_jacobian,
-                              DiffContext &) libmesh_override;
+                              DiffContext &) override;
 
   /**
    * This method uses the DifferentiablePhysics'
@@ -138,8 +140,22 @@ public:
    * What combination it uses will depend on theta.
    */
   virtual bool nonlocal_residual (bool request_jacobian,
-                                  DiffContext &) libmesh_override;
+                                  DiffContext &) override;
 
+
+  /**
+   * Setter for \f$ \beta \f$
+   */
+  void set_beta ( Real beta )
+  { _beta = beta; }
+
+  /**
+   * Setter for \f$ \gamma \f$.
+   *
+   * \note The method is second order only for \f$ \gamma = 1/2 \f$.
+   */
+  void set_gamma ( Real gamma )
+  { _gamma = gamma; }
 
 protected:
 
@@ -179,7 +195,8 @@ protected:
                                   ResFuncType mass,
                                   ResFuncType damping,
                                   ResFuncType time_deriv,
-                                  ResFuncType constraint);
+                                  ResFuncType constraint,
+                                  ReinitFuncType reinit);
 };
 
 } // namespace libMesh

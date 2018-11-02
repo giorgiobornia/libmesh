@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -34,7 +34,8 @@ namespace libMesh
 
 /**
  * This class combines any number of shell matrices to a single shell
- * matrix, acting as the sum of the matrices.
+ * matrix by summing them together. All overridden virtual functions
+ * are documented in shell_matrix.h.
  *
  * \author Tim Kroeger
  * \date 2008
@@ -44,59 +45,41 @@ class SumShellMatrix : public ShellMatrix<T>
 {
 public:
   /**
-   * Constructor; initializes an empty sum.  Note that an empty sum is
-   * not a valid object in that a call to \p m() or \p n() will result
-   * in an error.  However, an empty sum is allowed to be multiplied
-   * with a vector and will give the expected result.
+   * Constructor; initializes an empty sum.
+   *
+   * \note An empty sum is not a valid object since a call to \p m()
+   * or \p n() will result in an error.  However, an empty sum is
+   * allowed to be multiplied with a vector and will give the expected
+   * result.
    */
-  SumShellMatrix (const Parallel::Communicator & comm_in
-                  LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
+  SumShellMatrix (const Parallel::Communicator & comm_in);
 
   /**
    * Constructor that passes a vector of shell matrices.
    */
   explicit
   SumShellMatrix (const std::vector<ShellMatrix<T> *> & mat,
-                  const Parallel::Communicator & comm_in
-                  LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
+                  const Parallel::Communicator & comm_in);
 
   /**
    * Destructor.
    */
   virtual ~SumShellMatrix ();
 
-  /**
-   * @returns \p m, the row-dimension of the matrix where the marix is
-   * \f$ M \times N \f$.
-   */
-  virtual numeric_index_type m () const libmesh_override;
+  virtual numeric_index_type m () const override;
 
-  /**
-   * @returns \p n, the column-dimension of the matrix where the marix
-   * is \f$ M \times N \f$.
-   */
-  virtual numeric_index_type n () const libmesh_override;
+  virtual numeric_index_type n () const override;
 
-  /**
-   * Multiplies the matrix with \p arg and stores the result in \p
-   * dest.
-   */
   virtual void vector_mult (NumericVector<T> & dest,
-                            const NumericVector<T> & arg) const libmesh_override;
+                            const NumericVector<T> & arg) const override;
 
-  /**
-   * Multiplies the matrix with \p arg and adds the result to \p dest.
-   */
   virtual void vector_mult_add (NumericVector<T> & dest,
-                                const NumericVector<T> & arg) const libmesh_override;
+                                const NumericVector<T> & arg) const override;
+
+  virtual void get_diagonal (NumericVector<T> & dest) const override;
 
   /**
-   * Copies the diagonal part of the matrix into \p dest.
-   */
-  virtual void get_diagonal (NumericVector<T> & dest) const libmesh_override;
-
-  /**
-   * A vector of the summands.
+   * A vector of pointers to the summands.
    */
   std::vector<ShellMatrix<T> *> matrices;
 };

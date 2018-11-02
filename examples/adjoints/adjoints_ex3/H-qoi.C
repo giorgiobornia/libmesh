@@ -19,18 +19,18 @@ void CoupledSystemQoI::side_qoi_derivative (DiffContext & context,
 {
   FEMContext & c = cast_ref<FEMContext &>(context);
 
-  FEBase * side_fe = libmesh_nullptr;
+  FEBase * side_fe = nullptr;
   c.get_side_fe(0, side_fe);
 
   // Element Jacobian * quadrature weights for interior integration
   const std::vector<Real> & JxW = side_fe->get_JxW();
 
   // Side basis functions
-  const std::vector<std::vector<Real> > & phi = side_fe->get_phi();
+  const std::vector<std::vector<Real>> & phi = side_fe->get_phi();
   const std::vector<Point > & q_point = side_fe->get_xyz();
 
   // The number of local degrees of freedom in each variable
-  const unsigned int n_u_dofs = c.get_dof_indices(1).size();
+  const unsigned int n_u_dofs = c.n_dof_indices(1);
 
   DenseSubVector<Number> & Qu = c.get_qoi_derivatives(0, 0);
   DenseSubVector<Number> & QC = c.get_qoi_derivatives(0, 3);
@@ -83,7 +83,7 @@ void CoupledSystemQoI::side_qoi(DiffContext & context,
 
   // First we get some references to cell-specific data that
   // will be used to assemble the linear system.
-  FEBase * side_fe = libmesh_nullptr;
+  FEBase * side_fe = nullptr;
   c.get_side_fe(0, side_fe);
 
   // Element Jacobian * quadrature weights for interior integration

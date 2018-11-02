@@ -1,4 +1,5 @@
-// Copyright (C) 2002-2007  Benjamin S. Kirk
+// The libMesh Finite Element Library.
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -12,7 +13,7 @@
 
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
-// Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+// Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
 
 
 
@@ -220,7 +221,7 @@ namespace libMesh
 //   if (zn == 0)
 //     libMesh::out << "  Writing ";
 
-//   for (unsigned int i=0; i<write_vars.size(); i++)
+//   for (std::size_t i=0; i<write_vars.size(); i++)
 //     {
 //       // Number of the variable to write
 //       const unsigned int v = write_vars[i];
@@ -497,15 +498,9 @@ void PltLoader::write_dat (const std::string & name,
                 for (unsigned int j=0; j<this->jmax(z); j++)
                   for (unsigned int i=0; i<this->imax(z); i++)
                     {
-                      // GCC 2.95.3 has scientific in the ios class instead
-                      // of in namespace std::
-#ifndef LIBMESH_BROKEN_IOSTREAM
                       out_stream << std::scientific
                                  << _data[z][v][l++] << " ";
-#else
-                      out_stream << std::ios::scientific
-                                 << _data[z][v][l++] << " ";
-#endif
+
                       // Throw in a newline every 5 entries to
                       // avoid really long lines.
                       if (l%5 == 0)
@@ -545,16 +540,9 @@ void PltLoader::write_dat (const std::string & name,
                 for (unsigned int i=0; i<this->imax(z); i++)
                   {
                     for (unsigned int v=0; v<this->n_vars(); v++)
-
-                      // GCC 2.95.3 has scientific in the ios class instead
-                      // of in namespace std::
-#ifndef LIBMESH_BROKEN_IOSTREAM
                       out_stream << std::scientific
                                  << _data[z][v][l] << " ";
-#else
-                    out_stream << std::ios::scientific
-                               << _data[z][v][l] << " ";
-#endif
+
                     out_stream << '\n';
 
                     l++;

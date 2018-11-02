@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -29,7 +29,9 @@ void QGaussLobatto::init_2D(const ElemType type_in,
   switch (type_in)
     {
     case QUAD4:
+    case QUADSHELL4:
     case QUAD8:
+    case QUADSHELL8:
     case QUAD9:
       {
         // We compute the 2D quadrature rule as a tensor

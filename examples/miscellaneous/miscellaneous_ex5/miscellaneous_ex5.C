@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -30,7 +30,6 @@
 #include "libmesh/libmesh.h"
 #include "libmesh/mesh.h"
 #include "libmesh/equation_systems.h"
-#include "libmesh/mesh_data.h"
 #include "libmesh/mesh_generation.h"
 #include "libmesh/mesh_modification.h"
 #include "libmesh/elem.h"
@@ -53,8 +52,8 @@
 #include "libmesh/kelly_error_estimator.h"
 #include "libmesh/discontinuity_measure.h"
 #include "libmesh/string_to_enum.h"
-
 #include "libmesh/exact_solution.h"
+#include "libmesh/enum_solver_package.h"
 //#define QORDER TWENTYSIXTH
 
 // Bring in everything from the libMesh namespace
@@ -139,7 +138,7 @@ Gradient exact_derivative(const Point & p,
 // conditions and the flux integrals, which will be handled
 // via an interior penalty method.
 void assemble_ellipticdg(EquationSystems & es,
-                         const std::string & system_name)
+                         const std::string & libmesh_dbg_var(system_name))
 {
   libMesh::out << " assembling elliptic dg system... ";
   libMesh::out.flush();
@@ -159,9 +158,9 @@ void assemble_ellipticdg(EquationSystems & es,
   const Real penalty = es.parameters.get<Real> ("penalty");
   std::string refinement_type = es.parameters.get<std::string> ("refinement");
 
-  // A reference to the \p DofMap object for this system.  The \p DofMap
+  // A reference to the DofMap object for this system.  The DofMap
   // object handles the index translation from node and element numbers
-  // to degree of freedom numbers.  We will talk more about the \p DofMap
+  // to degree of freedom numbers.  We will talk more about the DofMap
   const DofMap & dof_map = ellipticdg_system.get_dof_map();
 
   // Get a constant reference to the Finite Element type
@@ -169,12 +168,12 @@ void assemble_ellipticdg(EquationSystems & es,
   FEType fe_type = ellipticdg_system.variable_type(0);
 
   // Build a Finite Element object of the specified type.  Since the
-  // \p FEBase::build() member dynamically creates memory we will
-  // store the object as an \p UniquePtr<FEBase>.  This can be thought
+  // FEBase::build() member dynamically creates memory we will
+  // store the object as a std::unique_ptr<FEBase>.  This can be thought
   // of as a pointer that will clean up after itself.
-  UniquePtr<FEBase> fe  (FEBase::build(dim, fe_type));
-  UniquePtr<FEBase> fe_elem_face(FEBase::build(dim, fe_type));
-  UniquePtr<FEBase> fe_neighbor_face(FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe  (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe_elem_face(FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe_neighbor_face(FEBase::build(dim, fe_type));
 
   // Quadrature rules for numerical integration.
 #ifdef QORDER
@@ -198,18 +197,18 @@ void assemble_ellipticdg(EquationSystems & es,
   // will be used to assemble the linear system.
   // Data for interior volume integrals
   const std::vector<Real> & JxW = fe->get_JxW();
-  const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+  const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
   // Data for surface integrals on the element boundary
-  const std::vector<std::vector<Real> > &  phi_face = fe_elem_face->get_phi();
-  const std::vector<std::vector<RealGradient> > & dphi_face = fe_elem_face->get_dphi();
+  const std::vector<std::vector<Real>> &  phi_face = fe_elem_face->get_phi();
+  const std::vector<std::vector<RealGradient>> & dphi_face = fe_elem_face->get_dphi();
   const std::vector<Real> & JxW_face = fe_elem_face->get_JxW();
   const std::vector<Point> & qface_normals = fe_elem_face->get_normals();
   const std::vector<Point> & qface_points = fe_elem_face->get_xyz();
 
   // Data for surface integrals on the neighbor boundary
-  const std::vector<std::vector<Real> > &  phi_neighbor_face = fe_neighbor_face->get_phi();
-  const std::vector<std::vector<RealGradient> > & dphi_neighbor_face = fe_neighbor_face->get_dphi();
+  const std::vector<std::vector<Real>> &  phi_neighbor_face = fe_neighbor_face->get_phi();
+  const std::vector<std::vector<RealGradient>> & dphi_neighbor_face = fe_neighbor_face->get_dphi();
 
   // Define data structures to contain the element interior matrix
   // and right-hand-side vector contribution.  Following
@@ -219,7 +218,7 @@ void assemble_ellipticdg(EquationSystems & es,
   DenseVector<Number> Fe;
 
   // Data structures to contain the element and neighbor boundary matrix
-  // contribution. This matrices will do the coupling beetwen the dofs of
+  // contribution. This matrices will do the coupling between the dofs of
   // the element and those of his neighbors.
   // Ken: matrix coupling elem and neighbor dofs
   DenseMatrix<Number> Kne;
@@ -235,21 +234,15 @@ void assemble_ellipticdg(EquationSystems & es,
   // Now we will loop over all the elements in the mesh.  We will
   // compute first the element interior matrix and right-hand-side contribution
   // and then the element and neighbors boundary matrix contributions.
-  MeshBase::const_element_iterator el = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-  for ( ; el != end_el; ++el)
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      // Store a pointer to the element we are currently
-      // working on.  This allows for nicer syntax later.
-      const Elem * elem = *el;
-
       // Get the degree of freedom indices for the
       // current element.  These define where in the global
       // matrix and right-hand-side this element will
       // contribute to.
       dof_map.dof_indices (elem, dof_indices);
-      const unsigned int n_dofs = dof_indices.size();
+      const unsigned int n_dofs =
+        cast_int<unsigned int>(dof_indices.size());
 
       // Compute the element-specific data for the current
       // element.  This involves computing the location of the
@@ -265,27 +258,27 @@ void assemble_ellipticdg(EquationSystems & es,
       Fe.resize (n_dofs);
 
       // Now we will build the element interior matrix.  This involves
-      // a double loop to integrate the test funcions (i) against
+      // a double loop to integrate the test functions (i) against
       // the trial functions (j).
       for (unsigned int qp=0; qp<qrule.n_points(); qp++)
         for (unsigned int i=0; i<n_dofs; i++)
           for (unsigned int j=0; j<n_dofs; j++)
             Ke(i,j) += JxW[qp]*(dphi[i][qp]*dphi[j][qp]);
 
-      // Now we adress boundary conditions.
+      // Now we address boundary conditions.
       // We consider Dirichlet bc imposed via the interior penalty method
       // The following loops over the sides of the element.
       // If the element has no neighbor on a side then that
       // side MUST live on a boundary of the domain.
-      for (unsigned int side=0; side<elem->n_sides(); side++)
+      for (auto side : elem->side_index_range())
         {
-          if (elem->neighbor(side) == libmesh_nullptr)
+          if (elem->neighbor_ptr(side) == nullptr)
             {
               // Pointer to the element face
               fe_elem_face->reinit(elem, side);
 
-              UniquePtr<Elem> elem_side (elem->build_side(side));
-              // h elemet dimension to compute the interior penalty penalty parameter
+              std::unique_ptr<const Elem> elem_side (elem->build_side_ptr(side));
+              // h element dimension to compute the interior penalty penalty parameter
               const unsigned int elem_b_order = static_cast<unsigned int> (fe_elem_face->get_order());
               const double h_elem = elem->volume()/elem_side->volume() * 1./pow(elem_b_order, 2.);
 
@@ -325,7 +318,7 @@ void assemble_ellipticdg(EquationSystems & es,
             {
               // Store a pointer to the neighbor we are currently
               // working on.
-              const Elem * neighbor = elem->neighbor(side);
+              const Elem * neighbor = elem->neighbor_ptr(side);
 
               // Get the global id of the element and the neighbor
               const unsigned int elem_id = elem->id();
@@ -342,7 +335,7 @@ void assemble_ellipticdg(EquationSystems & es,
                   (neighbor->level() < elem->level()))
                 {
                   // Pointer to the element side
-                  UniquePtr<Elem> elem_side (elem->build_side(side));
+                  std::unique_ptr<const Elem> elem_side (elem->build_side_ptr(side));
 
                   // h dimension to compute the interior penalty penalty parameter
                   const unsigned int elem_b_order = static_cast<unsigned int>(fe_elem_face->get_order());
@@ -385,7 +378,8 @@ void assemble_ellipticdg(EquationSystems & es,
                   // matrix this neighbor will contribute to.
                   std::vector<dof_id_type> neighbor_dof_indices;
                   dof_map.dof_indices (neighbor, neighbor_dof_indices);
-                  const unsigned int n_neighbor_dofs = neighbor_dof_indices.size();
+                  const unsigned int n_neighbor_dofs =
+                    cast_int<unsigned int>(neighbor_dof_indices.size());
 
                   // Zero the element and neighbor side matrix before
                   // summing them.  We use the resize member here because
@@ -400,7 +394,7 @@ void assemble_ellipticdg(EquationSystems & es,
 
                   // Now we will build the element and neighbor
                   // boundary matrices.  This involves
-                  // a double loop to integrate the test funcions
+                  // a double loop to integrate the test functions
                   // (i) against the trial functions (j).
                   for (unsigned int qp=0; qp<qface.n_points(); qp++)
                     {
@@ -476,7 +470,7 @@ void assemble_ellipticdg(EquationSystems & es,
 
                   // The element and neighbor boundary matrix are now built
                   // for this side.  Add them to the global matrix
-                  // The \p SparseMatrix::add_matrix() members do this for us.
+                  // The SparseMatrix::add_matrix() members do this for us.
                   ellipticdg_system.matrix->add_matrix(Kne, neighbor_dof_indices, dof_indices);
                   ellipticdg_system.matrix->add_matrix(Ken, dof_indices, neighbor_dof_indices);
                   ellipticdg_system.matrix->add_matrix(Kee, dof_indices);
@@ -486,8 +480,8 @@ void assemble_ellipticdg(EquationSystems & es,
         }
       // The element interior matrix and right-hand-side are now built
       // for this element.  Add them to the global matrix and
-      // right-hand-side vector.  The \p SparseMatrix::add_matrix()
-      // and \p NumericVector::add_vector() members do this for us.
+      // right-hand-side vector.  The SparseMatrix::add_matrix()
+      // and NumericVector::add_vector() members do this for us.
       ellipticdg_system.matrix->add_matrix(Ke, dof_indices);
       ellipticdg_system.rhs->add_vector(Fe, dof_indices);
     }
@@ -500,6 +494,10 @@ void assemble_ellipticdg(EquationSystems & es,
 int main (int argc, char** argv)
 {
   LibMeshInit init(argc, argv);
+
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
 
   // Skip adaptive examples on a non-adaptive libMesh build
 #ifndef LIBMESH_ENABLE_AMR

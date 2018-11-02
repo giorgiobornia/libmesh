@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -24,16 +24,12 @@
 #include "libmesh/libmesh_common.h"
 #include "libmesh/elem.h"
 
-// C++ includes
-#include <cstddef>
-
 namespace libMesh
 {
 
 // Forward declarations
 class Point;
 class Node;
-
 
 /**
  * This defines the \p Side class.  A \p Side is basically a proxy
@@ -44,7 +40,9 @@ class Node;
  * Similarly, you cannot access the neighbors of a side since it
  * does not store any.
  *
- * \author  Benjamin S. Kirk
+ * \author Benjamin S. Kirk
+ * \date 2004
+ * \brief Proxy class for efficiently representing an Elem's side.
  */
 template <class SideType, class ParentType>
 class Side : public SideType
@@ -64,35 +62,41 @@ public:
     // libmesh_assert_less (_side_number, this->parent()->n_sides());
     libmesh_assert_equal_to ((this->dim()+1), this->parent()->dim());
 
-    for (unsigned int n=0; n != this->n_nodes(); ++n)
-      this->_nodes[n] = this->parent()->get_node
+    for (auto n : this->node_index_range())
+      this->_nodes[n] = this->parent()->node_ptr
         (ParentType::side_nodes_map[_side_number][n]);
   }
 
+  Side (Side &&) = delete;
+  Side (const Side &) = delete;
+  Side & operator= (const Side &) = delete;
+  Side & operator= (Side &&) = delete;
+  virtual ~Side() = default;
+
   /**
-   * Setting a side node changes the node on the parent
+   * Setting a side node changes the node on the parent.
    */
-  virtual Node * & set_node (const unsigned int i) libmesh_override
+  virtual Node * & set_node (const unsigned int i) override
   {
     libmesh_assert_less (i, this->n_nodes());
     return this->parent()->set_node (ParentType::side_nodes_map[_side_number][i]);
   }
 
   /**
-   * Sides effectively do not have sides
+   * Sides do not have sides.
    */
-  virtual unsigned int n_sides () const libmesh_override
+  virtual unsigned int n_sides () const override
   { return 0; }
 
   virtual bool is_child_on_side(const unsigned int,
-                                const unsigned int) const libmesh_override
+                                const unsigned int) const override
   { libmesh_not_implemented(); return false; }
 
 
 private:
 
   /**
-   * The side on the parent element
+   * The side on the parent element.
    */
   const unsigned int _side_number;
 };
@@ -107,7 +111,7 @@ private:
  * parent element (the element for which the side is created).  Similarly, you
  * cannot access the neighbors of a side since it does not store any.
  *
- * \author  Roy H. Stogner
+ * \author Roy H. Stogner
  */
 template <class EdgeType, class ParentType>
 class SideEdge : public EdgeType
@@ -126,30 +130,29 @@ public:
     libmesh_assert_less (_edge_number, this->parent()->n_edges());
     libmesh_assert_equal_to (this->dim(), 1);
 
-    for (unsigned int n=0; n != this->n_nodes(); ++n)
-      this->_nodes[n] = this->parent()->get_node
+    for (auto n : this->node_index_range())
+      this->_nodes[n] = this->parent()->node_ptr
         (ParentType::edge_nodes_map[_edge_number][n]);
   }
 
   /**
-   * Setting an edge node changes the node on the parent
+   * Setting an edge node changes the node on the parent.
    */
-  virtual Node * & set_node (const unsigned int i) libmesh_override
+  virtual Node * & set_node (const unsigned int i) override
   {
     libmesh_assert_less (i, this->n_nodes());
     return this->parent()->set_node (ParentType::edge_nodes_map[_edge_number][i]);
   }
 
   /**
-   * @returns 0. Edges effectively do not have sides, so
-   * don't even ask!
+   * \returns 0. Edges do not have sides, so don't even ask!
    */
-  virtual unsigned int n_sides () const libmesh_override { return 0; }
+  virtual unsigned int n_sides () const override { return 0; }
 
 private:
 
   /**
-   * The side on the parent element
+   * The side on the parent element.
    */
   const unsigned int _edge_number;
 };

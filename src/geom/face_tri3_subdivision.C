@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -15,11 +15,10 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-// C++ includes
-
 // Local includes
 #include "libmesh/face_tri3_subdivision.h"
 #include "libmesh/mesh_subdivision_support.h"
+#include "libmesh/enum_order.h"
 
 namespace libMesh
 {
@@ -47,6 +46,14 @@ Tri3Subdivision::Tri3Subdivision(Elem * p) : Tri3(p), _subdivision_updated(true)
 }
 
 
+
+Order Tri3Subdivision::default_order() const
+{
+  return FOURTH;
+}
+
+
+
 void Tri3Subdivision::prepare_subdivision_properties()
 {
   /*
@@ -58,10 +65,10 @@ void Tri3Subdivision::prepare_subdivision_properties()
   unsigned int irregular_idx = 0;
   for (unsigned int i = 0; i < 3; ++i)
     {
-      if (this->get_node(i)->valence() != 6)
+      if (this->node_ptr(i)->valence() != 6)
         {
           irregular_idx = i;
-          if (this->get_node(MeshTools::Subdivision::next[i])->valence() != 6 || this->get_node(MeshTools::Subdivision::prev[i])->valence() != 6)
+          if (this->node_ptr(MeshTools::Subdivision::next[i])->valence() != 6 || this->node_ptr(MeshTools::Subdivision::prev[i])->valence() != 6)
             libmesh_error_msg("Error: The mesh contains elements with more than one irregular vertex!");
         }
     }
@@ -69,24 +76,24 @@ void Tri3Subdivision::prepare_subdivision_properties()
   /*
    * Rotate ordered vertices such that ordered_nodes[0] is the
    * irregular vertex. Doing this once in advance lets the evaluation
-   * of subdivision interpolation be much more efficient afterwards.
+   * of subdivision interpolation be much more efficient afterward.
    */
   switch (irregular_idx)
     {
     case 0:
-      _ordered_nodes[0] = this->get_node(0);
-      _ordered_nodes[1] = this->get_node(1);
-      _ordered_nodes[2] = this->get_node(2);
+      _ordered_nodes[0] = this->node_ptr(0);
+      _ordered_nodes[1] = this->node_ptr(1);
+      _ordered_nodes[2] = this->node_ptr(2);
       break;
     case 1:
-      _ordered_nodes[0] = this->get_node(1);
-      _ordered_nodes[1] = this->get_node(2);
-      _ordered_nodes[2] = this->get_node(0);
+      _ordered_nodes[0] = this->node_ptr(1);
+      _ordered_nodes[1] = this->node_ptr(2);
+      _ordered_nodes[2] = this->node_ptr(0);
       break;
     case 2:
-      _ordered_nodes[0] = this->get_node(2);
-      _ordered_nodes[1] = this->get_node(0);
-      _ordered_nodes[2] = this->get_node(1);
+      _ordered_nodes[0] = this->node_ptr(2);
+      _ordered_nodes[1] = this->node_ptr(0);
+      _ordered_nodes[2] = this->node_ptr(1);
       break;
     default:
       libmesh_error_msg("Unrecognized irregular_idx = " << irregular_idx);

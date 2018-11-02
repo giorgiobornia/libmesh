@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,16 +22,18 @@
 #ifdef LIBMESH_HAVE_EIGEN
 
 
-// C++ includes
-
 // Local Includes
 #include "libmesh/eigen_sparse_linear_solver.h"
 #include "libmesh/libmesh_logging.h"
 #include "libmesh/string_to_enum.h"
 #include "libmesh/solver_configuration.h"
+#include "libmesh/enum_preconditioner_type.h"
+#include "libmesh/enum_solver_type.h"
 
 // GMRES is an "unsupported" iterative solver in Eigen.
+#include "libmesh/ignore_warnings.h"
 #include <unsupported/Eigen/IterativeSolvers>
+#include "libmesh/restore_warnings.h"
 
 namespace libMesh
 {
@@ -84,7 +86,7 @@ EigenSparseLinearSolver<T>::solve (SparseMatrix<T> & matrix_in,
                                    const double tol,
                                    const unsigned int m_its)
 {
-  START_LOG("solve()", "EigenSparseLinearSolver");
+  LOG_SCOPE("solve()", "EigenSparseLinearSolver");
   this->init ();
 
   // Make sure the data passed in are really Eigen types
@@ -142,8 +144,7 @@ EigenSparseLinearSolver<T>::solve (SparseMatrix<T> & matrix_in,
         // solver.
         if (this->_solver_configuration)
           {
-            std::map<std::string, int>::iterator it =
-              this->_solver_configuration->int_valued_data.find("gmres_restart");
+            auto it = this->_solver_configuration->int_valued_data.find("gmres_restart");
 
             if (it != this->_solver_configuration->int_valued_data.end())
               solver.set_restart(it->second);
@@ -178,7 +179,7 @@ EigenSparseLinearSolver<T>::solve (SparseMatrix<T> & matrix_in,
         // Build the SparseLU solver object.  Note, there is one other
         // sparse direct solver available in Eigen:
         //
-        // Eigen::SparseQR<EigenSM, Eigen::AMDOrdering<int> > solver;
+        // Eigen::SparseQR<EigenSM, Eigen::AMDOrdering<int>> solver;
         //
         // I've tested it, and it works, but it is much slower than
         // SparseLU.  The main benefit of SparseQR is that it can
@@ -214,8 +215,6 @@ EigenSparseLinearSolver<T>::solve (SparseMatrix<T> & matrix_in,
 
         this->_solver_type = BICGSTAB;
 
-        STOP_LOG("solve()", "EigenSparseLinearSolver");
-
         return this->solve (matrix,
                             solution,
                             rhs,
@@ -224,7 +223,6 @@ EigenSparseLinearSolver<T>::solve (SparseMatrix<T> & matrix_in,
       }
     }
 
-  STOP_LOG("solve()", "EigenSparseLinearSolver");
   return retval;
 }
 
@@ -238,8 +236,7 @@ EigenSparseLinearSolver<T>::adjoint_solve (SparseMatrix<T> & matrix_in,
                                            const double tol,
                                            const unsigned int m_its)
 {
-
-  START_LOG("adjoint_solve()", "EigenSparseLinearSolver");
+  LOG_SCOPE("adjoint_solve()", "EigenSparseLinearSolver");
 
   libmesh_experimental();
   EigenSparseMatrix<T> mat_trans(this->comm());
@@ -250,8 +247,6 @@ EigenSparseLinearSolver<T>::adjoint_solve (SparseMatrix<T> & matrix_in,
                                                       rhs_in,
                                                       tol,
                                                       m_its);
-
-  STOP_LOG("adjoint_solve()", "EigenSparseLinearSolver");
 
   return retval;
 }
@@ -296,7 +291,7 @@ void EigenSparseLinearSolver<T>::set_eigen_preconditioner_type ()
   // switch (this->_preconditioner_type)
   //   {
   //   case IDENTITY_PRECOND:
-  //     _precond_type = libmesh_nullptr; return;
+  //     _precond_type = nullptr; return;
 
   //   case ILU_PRECOND:
   //     _precond_type = ILUPrecond; return;
@@ -322,8 +317,7 @@ void EigenSparseLinearSolver<T>::set_eigen_preconditioner_type ()
 template <typename T>
 LinearConvergenceReason EigenSparseLinearSolver<T>::get_converged_reason() const
 {
-  std::map<Eigen::ComputationInfo, LinearConvergenceReason>::iterator it =
-    _convergence_reasons.find(_comp_info);
+  auto it = _convergence_reasons.find(_comp_info);
 
   // If later versions of Eigen start returning new enumerations,
   // we'll need to add them to the map...

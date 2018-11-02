@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -307,11 +307,14 @@ unsigned int l2_lagrange_n_dofs(const ElemType t, const Order o)
             return 2;
 
           case TRI3:
+          case TRISHELL3:
           case TRI6:
             return 3;
 
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             return 4;
 
@@ -358,6 +361,7 @@ unsigned int l2_lagrange_n_dofs(const ElemType t, const Order o)
             return 6;
 
           case QUAD8:
+          case QUADSHELL8:
             return 8;
 
           case QUAD9:
@@ -407,9 +411,6 @@ unsigned int l2_lagrange_n_dofs(const ElemType t, const Order o)
     default:
       libmesh_error_msg("ERROR: Invalid Order " << Utility::enum_to_string(o) << " selected for L2_LAGRANGE FE family!");
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0;
 }
 
 } // anonymous namespace

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -30,13 +30,14 @@
 namespace libMesh
 {
 
-
-
-
 /**
  * The \p InfCell is an abstract element type that lives in
  * three dimensions.  An infinite cell could be an infinite hexahedron,
  * or an infinite prism.
+ *
+ * \author Daniel Dreyer
+ * \date 2003
+ * \brief The base class for all 3D infinite geometric element types.
  */
 class InfCell : public Elem
 {
@@ -53,21 +54,27 @@ public:
     Elem (nn, ns, p, elemlinkdata, nodelinkdata)
   {}
 
-  /**
-   * @returns 3, the dimensionality of the object.
-   */
-  virtual unsigned int dim () const libmesh_override { return 3; }
+  InfCell (InfCell &&) = delete;
+  InfCell (const InfCell &) = delete;
+  InfCell & operator= (const InfCell &) = delete;
+  InfCell & operator= (InfCell &&) = delete;
+  virtual ~InfCell() = default;
 
   /**
-   * @returns \p true.  All classes derived from \p InfCell
+   * \returns 3, the dimensionality of the object.
+   */
+  virtual unsigned short dim () const override { return 3; }
+
+  /**
+   * \returns \p true.  All classes derived from \p InfCell
    * are infinite elements.
    */
-  virtual bool infinite () const libmesh_override { return true; }
+  virtual bool infinite () const override { return true; }
 
   /**
-   * @returns the origin of this infinite element.
+   * \returns The origin of this infinite element.
    */
-  virtual Point origin () const libmesh_override
+  virtual Point origin () const override
   {
     return (this->point(0)*2 - this->point(this->n_vertices()/2));
   }

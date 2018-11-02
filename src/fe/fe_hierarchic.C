@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -111,16 +111,24 @@ unsigned int hierarchic_n_dofs(const ElemType t, const Order o)
     case EDGE3:
       return (o+1);
     case QUAD4:
+    case QUADSHELL4:
       libmesh_assert_less (o, 2);
+      libmesh_fallthrough();
     case QUAD8:
+    case QUADSHELL8:
     case QUAD9:
       return ((o+1)*(o+1));
     case HEX8:
       libmesh_assert_less (o, 2);
+      libmesh_fallthrough();
     case HEX20:
       libmesh_assert_less (o, 2);
+      libmesh_fallthrough();
     case HEX27:
       return ((o+1)*(o+1)*(o+1));
+    case TRI3:
+      libmesh_assert_less (o, 2);
+      libmesh_fallthrough();
     case TRI6:
       return ((o+1)*(o+2)/2);
     case INVALID_ELEM:
@@ -128,9 +136,6 @@ unsigned int hierarchic_n_dofs(const ElemType t, const Order o)
     default:
       libmesh_error_msg("ERROR: Invalid ElemType " << Utility::enum_to_string(t) << " selected for HIERARCHIC FE family!");
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0;
 } // hierarchic_n_dofs()
 
 
@@ -158,6 +163,10 @@ unsigned int hierarchic_n_dofs_at_node(const ElemType t,
         default:
           libmesh_error_msg("ERROR: Invalid node ID " << n << " selected for EDGE2/3!");
         }
+    case TRI3:
+      libmesh_assert_less (n, 3);
+      libmesh_assert_less (o, 2);
+      libmesh_fallthrough();
     case TRI6:
       switch (n)
         {
@@ -176,9 +185,12 @@ unsigned int hierarchic_n_dofs_at_node(const ElemType t,
           libmesh_error_msg("ERROR: Invalid node ID " << n << " selected for TRI6!");
         }
     case QUAD4:
+    case QUADSHELL4:
       libmesh_assert_less (n, 4);
       libmesh_assert_less (o, 2);
+      libmesh_fallthrough();
     case QUAD8:
+    case QUADSHELL8:
     case QUAD9:
       switch (n)
         {
@@ -204,9 +216,11 @@ unsigned int hierarchic_n_dofs_at_node(const ElemType t,
     case HEX8:
       libmesh_assert_less (n, 8);
       libmesh_assert_less (o, 2);
+      libmesh_fallthrough();
     case HEX20:
       libmesh_assert_less (n, 20);
       libmesh_assert_less (o, 2);
+      libmesh_fallthrough();
     case HEX27:
       switch (n)
         {
@@ -255,9 +269,6 @@ unsigned int hierarchic_n_dofs_at_node(const ElemType t,
     default:
       libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0;
 } // hierarchic_n_dofs_at_node()
 
 
@@ -275,11 +286,14 @@ unsigned int hierarchic_n_dofs_per_elem(const ElemType t,
     case EDGE3:
       return (o-1);
     case TRI3:
+    case TRISHELL3:
     case QUAD4:
+    case QUADSHELL4:
       return 0;
     case TRI6:
       return ((o-1)*(o-2)/2);
     case QUAD8:
+    case QUADSHELL8:
     case QUAD9:
       return ((o-1)*(o-1));
     case HEX8:
@@ -293,9 +307,6 @@ unsigned int hierarchic_n_dofs_per_elem(const ElemType t,
     default:
       libmesh_error_msg("ERROR: Bad ElemType = " << Utility::enum_to_string(t) << " for " << Utility::enum_to_string(o) << " order approximation!");
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0;
 } // hierarchic_n_dofs_per_elem()
 
 } // anonymous namespace

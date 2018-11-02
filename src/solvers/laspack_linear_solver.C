@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,12 +22,13 @@
 #if defined(LIBMESH_HAVE_LASPACK)
 
 
-// C++ includes
-
 // Local Includes
 #include "libmesh/laspack_linear_solver.h"
 #include "libmesh/libmesh_logging.h"
 #include "libmesh/string_to_enum.h"
+#include "libmesh/enum_solver_type.h"
+#include "libmesh/enum_preconditioner_type.h"
+#include "libmesh/enum_convergence_flags.h"
 
 namespace libMesh
 {
@@ -112,7 +113,7 @@ LaspackLinearSolver<T>::solve (SparseMatrix<T> & matrix_in,
                                const double tol,
                                const unsigned int m_its)
 {
-  START_LOG("solve()", "LaspackLinearSolver");
+  LOG_SCOPE("solve()", "LaspackLinearSolver");
   this->init ();
 
   // Make sure the data passed in are really in Laspack types
@@ -272,7 +273,6 @@ LaspackLinearSolver<T>::solve (SparseMatrix<T> & matrix_in,
       libmesh_error_msg("Exiting after LASPACK Error!");
     }
 
-  STOP_LOG("solve()", "LaspackLinearSolver");
   // Get the convergence step # and residual
   return std::make_pair(GetLastNoIter(), GetLastAccuracy());
 }
@@ -287,7 +287,7 @@ LaspackLinearSolver<T>::adjoint_solve (SparseMatrix<T> & matrix_in,
                                        const double tol,
                                        const unsigned int m_its)
 {
-  START_LOG("adjoint_solve()", "LaspackLinearSolver");
+  LOG_SCOPE("adjoint_solve()", "LaspackLinearSolver");
   this->init ();
 
   // Make sure the data passed in are really in Laspack types
@@ -447,7 +447,6 @@ LaspackLinearSolver<T>::adjoint_solve (SparseMatrix<T> & matrix_in,
       libmesh_error_msg("Exiting after LASPACK Error!");
     }
 
-  STOP_LOG("adjoint_solve()", "LaspackLinearSolver");
   // Get the convergence step # and residual
   return std::make_pair(GetLastNoIter(), GetLastAccuracy());
 }
@@ -490,7 +489,7 @@ void LaspackLinearSolver<T>::set_laspack_preconditioner_type ()
   switch (this->_preconditioner_type)
     {
     case IDENTITY_PRECOND:
-      _precond_type = libmesh_nullptr; return;
+      _precond_type = nullptr; return;
 
     case ILU_PRECOND:
       _precond_type = ILUPrecond; return;
@@ -516,7 +515,15 @@ void LaspackLinearSolver<T>::set_laspack_preconditioner_type ()
 template <typename T>
 void LaspackLinearSolver<T>::print_converged_reason() const
 {
-  libMesh::out << "print_converged_reason() is currently only supported"
+  switch (LASResult())
+    {
+    case LASOK :
+      libMesh::out << "Laspack converged.\n";
+      break;
+    default    :
+      libMesh::out << "Laspack diverged.\n";
+    }
+  libMesh::out << "Detailed reporting is currently only supported"
                << "with Petsc 2.3.1 and later." << std::endl;
 }
 
@@ -525,7 +532,11 @@ void LaspackLinearSolver<T>::print_converged_reason() const
 template <typename T>
 LinearConvergenceReason LaspackLinearSolver<T>::get_converged_reason() const
 {
-  libmesh_not_implemented();
+  switch (LASResult())
+    {
+    case LASOK : return CONVERGED_RTOL_NORMAL;
+    default    : return DIVERGED_NULL;
+    }
 }
 
 

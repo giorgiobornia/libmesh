@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -29,7 +29,7 @@
 namespace libMesh
 {
 
-// Forward Delcarations
+// Forward declarations
 template <typename T> class DenseVectorBase;
 
 /**
@@ -54,9 +54,14 @@ protected:
 
 public:
   /**
-   * Destructor. Empty.
+   * The 5 special functions can be defaulted for this class, as it
+   * does not manage any memory itself.
    */
-  virtual ~DenseMatrixBase() {}
+  DenseMatrixBase (DenseMatrixBase &&) = default;
+  DenseMatrixBase (const DenseMatrixBase &) = default;
+  DenseMatrixBase & operator= (const DenseMatrixBase &) = default;
+  DenseMatrixBase & operator= (DenseMatrixBase &&) = default;
+  virtual ~DenseMatrixBase() = default;
 
   /**
    * Set every element in the matrix to 0.  You must redefine
@@ -66,7 +71,7 @@ public:
   virtual void zero() = 0;
 
   /**
-   * @returns the \p (i,j) element of the matrix.
+   * \returns The \p (i,j) element of the matrix.
    * Since internal data representations may differ, you
    * must redefine this function.
    */
@@ -74,7 +79,7 @@ public:
                const unsigned int j) const = 0;
 
   /**
-   * @returns the \p (i,j) element of the matrix as a writeable reference.
+   * \returns The \p (i,j) element of the matrix as a writable reference.
    * Since internal data representations may differ, you
    * must redefine this function.
    */
@@ -92,12 +97,12 @@ public:
   virtual void right_multiply (const DenseMatrixBase<T> & M3) = 0;
 
   /**
-   * @returns the row-dimension of the matrix.
+   * \returns The row-dimension of the matrix.
    */
   unsigned int m() const { return _m; }
 
   /**
-   * @returns the column-dimension of the matrix.
+   * \returns The column-dimension of the matrix.
    */
   unsigned int n() const { return _n; }
 

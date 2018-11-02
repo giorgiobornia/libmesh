@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -15,20 +15,19 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-// Local includes
 #include "libmesh/libmesh_config.h"
 
 #ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
 
-// C++ includes
-
-// Local includes cont'd
+// Local includes
 #include "libmesh/cell_inf_prism12.h"
 #include "libmesh/edge_edge3.h"
 #include "libmesh/edge_inf_edge2.h"
 #include "libmesh/face_tri6.h"
 #include "libmesh/face_inf_quad6.h"
 #include "libmesh/side.h"
+#include "libmesh/enum_io_package.h"
+#include "libmesh/enum_order.h"
 
 namespace libMesh
 {
@@ -36,7 +35,14 @@ namespace libMesh
 
 // ------------------------------------------------------------
 // InfPrism12 class static member initializations
-const unsigned int InfPrism12::side_nodes_map[4][6] =
+const int InfPrism12::num_nodes;
+const int InfPrism12::num_sides;
+const int InfPrism12::num_edges;
+const int InfPrism12::num_children;
+const int InfPrism12::nodes_per_side;
+const int InfPrism12::nodes_per_edge;
+
+const unsigned int InfPrism12::side_nodes_map[InfPrism12::num_sides][InfPrism12::nodes_per_side] =
   {
     { 0, 1, 2, 6, 7, 8},  // Side 0
     { 0, 1, 3, 4, 6, 9},  // Side 1
@@ -44,14 +50,14 @@ const unsigned int InfPrism12::side_nodes_map[4][6] =
     { 2, 0, 5, 3, 8, 11}  // Side 3
   };
 
-const unsigned int InfPrism12::edge_nodes_map[6][3] =
+const unsigned int InfPrism12::edge_nodes_map[InfPrism12::num_edges][InfPrism12::nodes_per_edge] =
   {
-    { 0, 1, 6},  // Side 0
-    { 1, 2, 7},  // Side 1
-    { 0, 2, 8},  // Side 2
-    { 0, 3, 99}, // Side 3
-    { 1, 4, 99}, // Side 4
-    { 2, 5, 99}  // Side 5
+    {0, 1,  6}, // Side 0
+    {1, 2,  7}, // Side 1
+    {0, 2,  8}, // Side 2
+    {0, 3, 99}, // Side 3
+    {1, 4, 99}, // Side 4
+    {2, 5, 99}  // Side 5
   };
 
 
@@ -85,24 +91,47 @@ bool InfPrism12::is_node_on_side(const unsigned int n,
                                  const unsigned int s) const
 {
   libmesh_assert_less (s, n_sides());
-  for (unsigned int i = 0; i != 6; ++i)
-    if (side_nodes_map[s][i] == n)
-      return true;
-  return false;
+  return std::find(std::begin(side_nodes_map[s]),
+                   std::end(side_nodes_map[s]),
+                   n) != std::end(side_nodes_map[s]);
+}
+
+std::vector<unsigned>
+InfPrism12::nodes_on_side(const unsigned int s) const
+{
+  libmesh_assert_less(s, n_sides());
+  return {std::begin(side_nodes_map[s]), std::end(side_nodes_map[s])};
 }
 
 bool InfPrism12::is_node_on_edge(const unsigned int n,
                                  const unsigned int e) const
 {
   libmesh_assert_less (e, n_edges());
-  for (unsigned int i = 0; i != 3; ++i)
-    if (edge_nodes_map[e][i] == n)
-      return true;
-  return false;
+  return std::find(std::begin(edge_nodes_map[e]),
+                   std::end(edge_nodes_map[e]),
+                   n) != std::end(edge_nodes_map[e]);
 }
 
-UniquePtr<Elem> InfPrism12::build_side (const unsigned int i,
-                                        bool proxy) const
+Order InfPrism12::default_order() const
+{
+  return SECOND;
+}
+
+unsigned int InfPrism12::which_node_am_i(unsigned int side,
+                                         unsigned int side_node) const
+{
+  libmesh_assert_less (side, this->n_sides());
+
+  // Never more than 6 nodes per side.
+  libmesh_assert_less(side_node, 6);
+
+  return InfPrism12::side_nodes_map[side][side_node];
+}
+
+
+
+std::unique_ptr<Elem> InfPrism12::build_side_ptr (const unsigned int i,
+                                                  bool proxy)
 {
   libmesh_assert_less (i, this->n_sides());
 
@@ -112,13 +141,13 @@ UniquePtr<Elem> InfPrism12::build_side (const unsigned int i,
         {
           // base
         case 0:
-          return UniquePtr<Elem>(new Side<Tri6,InfPrism12>(this,i));
+          return libmesh_make_unique<Side<Tri6,InfPrism12>>(this,i);
 
           // ifem sides
         case 1:
         case 2:
         case 3:
-          return UniquePtr<Elem>(new Side<InfQuad6,InfPrism12>(this,i));
+          return libmesh_make_unique<Side<InfQuad6,InfPrism12>>(this,i);
 
         default:
           libmesh_error_msg("Invalid side i = " << i);
@@ -127,14 +156,14 @@ UniquePtr<Elem> InfPrism12::build_side (const unsigned int i,
 
   else
     {
-      // Create NULL pointer to be initialized, returned later.
-      Elem * face = libmesh_nullptr;
+      // Return value
+      std::unique_ptr<Elem> face;
 
       switch (i)
         {
         case 0: // the triangular face at z=-1, base face
           {
-            face = new Tri6;
+            face = libmesh_make_unique<Tri6>();
             break;
           }
 
@@ -142,7 +171,7 @@ UniquePtr<Elem> InfPrism12::build_side (const unsigned int i,
         case 2: // the other quad face
         case 3: // the quad face at x=0
           {
-            face = new InfQuad6;
+            face = libmesh_make_unique<InfQuad6>();
             break;
           }
 
@@ -154,24 +183,22 @@ UniquePtr<Elem> InfPrism12::build_side (const unsigned int i,
 
       // Set the nodes
       for (unsigned n=0; n<face->n_nodes(); ++n)
-        face->set_node(n) = this->get_node(InfPrism12::side_nodes_map[i][n]);
+        face->set_node(n) = this->node_ptr(InfPrism12::side_nodes_map[i][n]);
 
-      return UniquePtr<Elem>(face);
+      return face;
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return UniquePtr<Elem>();
 }
 
 
-UniquePtr<Elem> InfPrism12::build_edge (const unsigned int i) const
+std::unique_ptr<Elem> InfPrism12::build_edge_ptr (const unsigned int i)
 {
   libmesh_assert_less (i, this->n_edges());
 
   if (i < 3) // base edges
-    return UniquePtr<Elem>(new SideEdge<Edge3,InfPrism12>(this,i));
+    return libmesh_make_unique<SideEdge<Edge3,InfPrism12>>(this,i);
+
   // infinite edges
-  return UniquePtr<Elem>(new SideEdge<InfEdge2,InfPrism12>(this,i));
+  return libmesh_make_unique<SideEdge<InfEdge2,InfPrism12>>(this,i);
 }
 
 
@@ -193,53 +220,53 @@ void InfPrism12::connectivity(const unsigned int sc,
           case 0:
 
             // guess this is a collapsed hex8
-            conn[0] = this->node(0)+1;
-            conn[1] = this->node(6)+1;
-            conn[2] = this->node(8)+1;
-            conn[3] = this->node(8)+1;
-            conn[4] = this->node(3)+1;
-            conn[5] = this->node(9)+1;
-            conn[6] = this->node(11)+1;
-            conn[7] = this->node(11)+1;
+            conn[0] = this->node_id(0)+1;
+            conn[1] = this->node_id(6)+1;
+            conn[2] = this->node_id(8)+1;
+            conn[3] = this->node_id(8)+1;
+            conn[4] = this->node_id(3)+1;
+            conn[5] = this->node_id(9)+1;
+            conn[6] = this->node_id(11)+1;
+            conn[7] = this->node_id(11)+1;
 
             return;
 
           case 1:
 
-            conn[0] = this->node(6)+1;
-            conn[1] = this->node(7)+1;
-            conn[2] = this->node(8)+1;
-            conn[3] = this->node(8)+1;
-            conn[4] = this->node(9)+1;
-            conn[5] = this->node(10)+1;
-            conn[6] = this->node(11)+1;
-            conn[7] = this->node(11)+1;
+            conn[0] = this->node_id(6)+1;
+            conn[1] = this->node_id(7)+1;
+            conn[2] = this->node_id(8)+1;
+            conn[3] = this->node_id(8)+1;
+            conn[4] = this->node_id(9)+1;
+            conn[5] = this->node_id(10)+1;
+            conn[6] = this->node_id(11)+1;
+            conn[7] = this->node_id(11)+1;
 
             return;
 
           case 2:
 
-            conn[0] = this->node(6)+1;
-            conn[1] = this->node(1)+1;
-            conn[2] = this->node(7)+1;
-            conn[3] = this->node(7)+1;
-            conn[4] = this->node(9)+1;
-            conn[5] = this->node(4)+1;
-            conn[6] = this->node(10)+1;
-            conn[7] = this->node(10)+1;
+            conn[0] = this->node_id(6)+1;
+            conn[1] = this->node_id(1)+1;
+            conn[2] = this->node_id(7)+1;
+            conn[3] = this->node_id(7)+1;
+            conn[4] = this->node_id(9)+1;
+            conn[5] = this->node_id(4)+1;
+            conn[6] = this->node_id(10)+1;
+            conn[7] = this->node_id(10)+1;
 
             return;
 
           case 3:
 
-            conn[0] = this->node(8)+1;
-            conn[1] = this->node(7)+1;
-            conn[2] = this->node(2)+1;
-            conn[3] = this->node(2)+1;
-            conn[4] = this->node(11)+1;
-            conn[5] = this->node(10)+1;
-            conn[6] = this->node(5)+1;
-            conn[7] = this->node(5)+1;
+            conn[0] = this->node_id(8)+1;
+            conn[1] = this->node_id(7)+1;
+            conn[2] = this->node_id(2)+1;
+            conn[3] = this->node_id(2)+1;
+            conn[4] = this->node_id(11)+1;
+            conn[5] = this->node_id(10)+1;
+            conn[6] = this->node_id(5)+1;
+            conn[7] = this->node_id(5)+1;
 
             return;
 
@@ -268,7 +295,7 @@ unsigned short int InfPrism12::second_order_adjacent_vertex (const unsigned int 
 
 
 
-const unsigned short int InfPrism12::_second_order_adjacent_vertices[6][2] =
+const unsigned short int InfPrism12::_second_order_adjacent_vertices[InfPrism12::num_edges][2] =
   {
     { 0,  1}, // vertices adjacent to node 6
     { 1,  2}, // vertices adjacent to node 7
@@ -294,7 +321,7 @@ InfPrism12::second_order_child_vertex (const unsigned int n) const
 
 
 
-const unsigned short int InfPrism12::_second_order_vertex_child_number[12] =
+const unsigned short int InfPrism12::_second_order_vertex_child_number[InfPrism12::num_nodes] =
   {
     99,99,99,99,99,99, // Vertices
     0,1,0,             // Edges
@@ -303,7 +330,7 @@ const unsigned short int InfPrism12::_second_order_vertex_child_number[12] =
 
 
 
-const unsigned short int InfPrism12::_second_order_vertex_child_index[12] =
+const unsigned short int InfPrism12::_second_order_vertex_child_index[InfPrism12::num_nodes] =
   {
     99,99,99,99,99,99, // Vertices
     1,2,2,             // Edges
@@ -314,7 +341,7 @@ const unsigned short int InfPrism12::_second_order_vertex_child_index[12] =
 
 #ifdef LIBMESH_ENABLE_AMR
 
-const float InfPrism12::_embedding_matrix[4][12][12] =
+const float InfPrism12::_embedding_matrix[InfPrism12::num_children][InfPrism12::num_nodes][InfPrism12::num_nodes] =
   {
     // embedding matrix for child 0
     {

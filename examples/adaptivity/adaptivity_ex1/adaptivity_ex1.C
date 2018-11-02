@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -49,6 +49,7 @@
 #include "libmesh/error_vector.h"
 #include "libmesh/kelly_error_estimator.h"
 #include "libmesh/mesh_refinement.h"
+#include "libmesh/enum_solver_package.h"
 
 // Bring in everything from the libMesh namespace
 using namespace libMesh;
@@ -64,6 +65,10 @@ int main(int argc, char ** argv)
   // object goes out of scope, other libraries and resources are
   // finalized.
   LibMeshInit init (argc, argv);
+
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
 
   // Skip adaptive examples on a non-adaptive libMesh build
 #ifndef LIBMESH_ENABLE_AMR
@@ -179,6 +184,9 @@ int main(int argc, char ** argv)
 void assemble_1D(EquationSystems & es,
                  const std::string & system_name)
 {
+  // Ignore unused parameter warnings when !LIBMESH_ENABLE_AMR.
+  libmesh_ignore(es);
+  libmesh_ignore(system_name);
 
 #ifdef LIBMESH_ENABLE_AMR
 
@@ -204,10 +212,10 @@ void assemble_1D(EquationSystems & es,
   FEType fe_type = dof_map.variable_type(0);
 
   // Build a finite element object of the specified type. The build
-  // function dynamically allocates memory so we use an UniquePtr in this case.
-  // An UniquePtr is a pointer that cleans up after itself. See examples 3 and 4
-  // for more details on UniquePtr.
-  UniquePtr<FEBase> fe(FEBase::build(dim, fe_type));
+  // function dynamically allocates memory so we use a std::unique_ptr in this case.
+  // A std::unique_ptr is a pointer that cleans up after itself. See examples 3 and 4
+  // for more details on std::unique_ptr.
+  std::unique_ptr<FEBase> fe(FEBase::build(dim, fe_type));
 
   // Tell the finite element object to use fifth order Gaussian quadrature
   QGauss qrule(dim, FIFTH);
@@ -220,10 +228,10 @@ void assemble_1D(EquationSystems & es,
   const std::vector<Real> & JxW = fe->get_JxW();
 
   // The element shape functions evaluated at the quadrature points.
-  const std::vector<std::vector<Real> > & phi = fe->get_phi();
+  const std::vector<std::vector<Real>> & phi = fe->get_phi();
 
   // The element shape function gradients evaluated at the quadrature points.
-  const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+  const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
   // Declare a dense matrix and dense vector to hold the element matrix
   // and right-hand-side contribution
@@ -239,15 +247,8 @@ void assemble_1D(EquationSystems & es,
   // the matrix and right-hand-side contribution from each element. Use a
   // const_element_iterator to loop over the elements. We make
   // el_end const as it is used only for the stopping condition of the loop.
-  MeshBase::const_element_iterator el = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator el_end = mesh.active_local_elements_end();
-
-  // Note that ++el is preferred to el++ when using loops with iterators
-  for ( ; el != el_end; ++el)
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      // It is convenient to store a pointer to the current element
-      const Elem * elem = *el;
-
       // Get the degree of freedom indices for the current element.
       // These define where in the global matrix and right-hand-side this
       // element will contribute to.
@@ -259,7 +260,9 @@ void assemble_1D(EquationSystems & es,
       fe->reinit(elem);
 
       // Store the number of local degrees of freedom contained in this element
-      const int n_dofs = dof_indices.size();
+      const unsigned int n_dofs =
+        cast_int<unsigned int>(dof_indices.size());
+      libmesh_assert_equal_to (n_dofs, phi.size());
 
       // We resize and zero out Ke and Fe (resize() also clears the matrix and
       // vector). In this example, all elements in the mesh are EDGE3's, so
@@ -274,11 +277,11 @@ void assemble_1D(EquationSystems & es,
         {
           // Now build the element matrix and right-hand-side using loops to
           // integrate the test functions (i) against the trial functions (j).
-          for (unsigned int i=0; i<phi.size(); i++)
+          for (unsigned int i=0; i != n_dofs; i++)
             {
               Fe(i) += JxW[qp]*phi[i][qp];
 
-              for (unsigned int j=0; j<phi.size(); j++)
+              for (unsigned int j=0; j != n_dofs; j++)
                 {
                   Ke(i,j) += JxW[qp]*(1.e-3*dphi[i][qp]*dphi[j][qp] +
                                       phi[i][qp]*phi[j][qp]);
@@ -297,12 +300,12 @@ void assemble_1D(EquationSystems & es,
       // Loop over the sides of this element. For a 1D element, the "sides"
       // are defined as the nodes on each edge of the element, i.e. 1D elements
       // have 2 sides.
-      for (unsigned int s=0; s<elem->n_sides(); s++)
+      for (auto s : elem->side_index_range())
         {
-          // If this element has a NULL neighbor, then it is on the edge of the
+          // If this element has a nullptr neighbor, then it is on the edge of the
           // mesh and we need to enforce a boundary condition using the penalty
           // method.
-          if (elem->neighbor(s) == libmesh_nullptr)
+          if (elem->neighbor_ptr(s) == nullptr)
             {
               Ke(s,s) += penalty;
               Fe(s)   += 0*penalty;

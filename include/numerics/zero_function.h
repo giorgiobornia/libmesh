@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,20 +20,36 @@
 
 // Local includes
 #include "libmesh/const_function.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
 
-// C++ includes
+namespace libMesh
+{
 
-namespace libMesh {
-
+/**
+ * ConstFunction that simply returns 0.
+ *
+ * \author Roy Stogner
+ * \date 2012
+ * \brief ConstFunction that simply returns 0.
+ */
 template <typename Output=Number>
 class ZeroFunction : public ConstFunction<Output>
 {
 public:
   ZeroFunction () : ConstFunction<Output>(0) {}
 
-  virtual UniquePtr<FunctionBase<Output> > clone() const libmesh_override
+  /**
+   * The 5 special functions can be defaulted for this class.
+   */
+  ZeroFunction (ZeroFunction &&) = default;
+  ZeroFunction (const ZeroFunction &) = default;
+  ZeroFunction & operator= (const ZeroFunction &) = default;
+  ZeroFunction & operator= (ZeroFunction &&) = default;
+  virtual ~ZeroFunction () = default;
+
+  virtual std::unique_ptr<FunctionBase<Output>> clone() const override
   {
-    return UniquePtr<FunctionBase<Output> >(new ZeroFunction<Output>());
+    return libmesh_make_unique<ZeroFunction<Output>>();
   }
 };
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -92,6 +92,7 @@
 #include "libmesh/elem.h"
 #include "libmesh/rb_data_serialization.h"
 #include "libmesh/rb_data_deserialization.h"
+#include "libmesh/enum_solver_package.h"
 
 // local includes
 #include "rb_classes.h"
@@ -111,6 +112,10 @@ int main (int argc, char ** argv)
 {
   // Initialize libMesh.
   LibMeshInit init (argc, argv);
+
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
 
 #if !defined(LIBMESH_HAVE_XDR)
   // We need XDR support to write out reduced bases
@@ -150,9 +155,9 @@ int main (int argc, char ** argv)
 
   // Create a mesh, with dimension to be overridden by build_cube, on
   // the default MPI communicator.  We currently have to create a
-  // SerialMesh here due to a reduced_basis regression with
-  // ParallelMesh
-  SerialMesh mesh(init.comm());
+  // ReplicatedMesh here due to a reduced_basis regression with
+  // DistributedMesh
+  ReplicatedMesh mesh(init.comm());
 
   MeshTools::Generation::build_cube (mesh,
                                      n_elem_xy, n_elem_xy, n_elem_z,
@@ -234,10 +239,10 @@ int main (int argc, char ** argv)
       if (store_basis_functions)
         {
           // Write out the basis functions
-          eim_construction.get_rb_evaluation().write_out_basis_functions(
-            eim_construction.get_explicit_system(), "eim_data");
-          rb_construction.get_rb_evaluation().write_out_basis_functions(
-            rb_construction, "rb_data");
+          eim_construction.get_rb_evaluation().write_out_basis_functions(eim_construction.get_explicit_system(),
+                                                                         "eim_data");
+          rb_construction.get_rb_evaluation().write_out_basis_functions(rb_construction,
+                                                                        "rb_data");
         }
     }
   else // Perform the Online stage of the RB method
@@ -278,7 +283,7 @@ int main (int argc, char ** argv)
         {
           // read in the data from files
           eim_rb_eval.read_in_basis_functions(
-            eim_construction.get_explicit_system(), "eim_data");
+                                              eim_construction.get_explicit_system(), "eim_data");
           rb_eval.read_in_basis_functions(rb_construction, "rb_data");
 
           eim_construction.load_rb_solution();
@@ -298,13 +303,8 @@ void transform_mesh_and_plot(EquationSystems & es,
   // Loop over the mesh nodes and move them!
   MeshBase & mesh = es.get_mesh();
 
-  MeshBase::node_iterator       node_it  = mesh.nodes_begin();
-  const MeshBase::node_iterator node_end = mesh.nodes_end();
-
-  for ( ; node_it != node_end; node_it++)
+  for (auto & node : mesh.node_ptr_range())
     {
-      Node * node = *node_it;
-
       Real x = (*node)(0);
       Real z = (*node)(2);
 

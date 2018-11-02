@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -48,10 +48,10 @@ int main (int argc, char ** argv)
   LibMeshInit init(argc, argv);
 
   if (argc < 4)
-    libMesh::out << "Usage: ./prog -d DIM filename" << std::endl;
+    libmesh_error_msg("Usage: ./prog -d DIM filename");
 
   // Variables to get us started
-  const unsigned int dim = atoi(argv[2]);
+  const unsigned char dim = cast_int<unsigned char>(atoi(argv[2]));
 
   std::string meshname  (argv[3]);
 
@@ -63,7 +63,7 @@ int main (int argc, char ** argv)
 
   GMVIO(mesh).write ("out_0.gmv");
 
-  mesh.elem(0)->set_refinement_flag (Elem::REFINE);
+  mesh.elem_ref(0).set_refinement_flag (Elem::REFINE);
 
   MeshRefinement mesh_refinement (mesh);
 
@@ -140,12 +140,12 @@ void assemble(EquationSystems & es,
   // about the geometry of the problem and the quadrature rule
   FEType fe_type (FIRST);
 
-  UniquePtr<FEBase> fe(FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe(FEBase::build(dim, fe_type));
   QGauss qrule(dim, FIFTH);
 
   fe->attach_quadrature_rule (&qrule);
 
-  UniquePtr<FEBase> fe_face(FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe_face(FEBase::build(dim, fe_type));
   QGauss qface(dim-1, FIFTH);
 
   fe_face->attach_quadrature_rule(&qface);
@@ -158,11 +158,11 @@ void assemble(EquationSystems & es,
   const std::vector<Real> & JxW_face                   = fe_face->get_JxW();
   const std::vector<Real> & JxW                        = fe->get_JxW();
   const std::vector<Point> & q_point                   = fe->get_xyz();
-  const std::vector<std::vector<Real> > & phi          = fe->get_phi();
-  const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+  const std::vector<std::vector<Real>> & phi          = fe->get_phi();
+  const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
-  std::vector<unsigned int> dof_indices_U;
-  std::vector<unsigned int> dof_indices_V;
+  std::vector<dof_id_type> dof_indices_U;
+  std::vector<dof_id_type> dof_indices_V;
   const DofMap & dof_map = system.get_dof_map();
 
   DenseMatrix<Number> Kuu;
@@ -172,13 +172,8 @@ void assemble(EquationSystems & es,
 
   Real vol=0., area=0.;
 
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-  for (; el != end_el; ++el)
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      const Elem * elem = *el;
-
       // recompute the element-specific data for the current element
       fe->reinit (elem);
 
@@ -188,23 +183,23 @@ void assemble(EquationSystems & es,
       dof_map.dof_indices(elem, dof_indices_U, 0);
       dof_map.dof_indices(elem, dof_indices_V, 1);
 
+      const unsigned int n_phi = cast_int<unsigned int>(phi.size());
+
       // zero the element matrix and vector
-      Kuu.resize (phi.size(),
-                  phi.size());
+      Kuu.resize (n_phi, n_phi);
 
-      Kvv.resize (phi.size(),
-                  phi.size());
+      Kvv.resize (n_phi, n_phi);
 
-      Fu.resize (phi.size());
-      Fv.resize (phi.size());
+      Fu.resize (n_phi);
+      Fv.resize (n_phi);
 
       // standard stuff...  like in code 1.
       for (unsigned int gp=0; gp<qrule.n_points(); gp++)
         {
-          for (unsigned int i=0; i<phi.size(); ++i)
+          for (unsigned int i=0; i<n_phi; ++i)
             {
               // this is tricky.  ig is the _global_ dof index corresponding
-              // to the _global_ vertex number elem->node(i).  Note that
+              // to the _global_ vertex number elem->node_id(i).  Note that
               // in general these numbers will not be the same (except for
               // the case of one unknown per node on one subdomain) so
               // we need to go through the dof_map
@@ -219,7 +214,7 @@ void assemble(EquationSystems & es,
               Fu(i) += JxW[gp]*f*phi[i][gp];
               Fv(i) += JxW[gp]*f*phi[i][gp];
 
-              for (unsigned int j=0; j<phi.size(); ++j)
+              for (unsigned int j=0; j != n_phi; ++j)
                 {
 
                   Kuu(i,j) += JxW[gp]*((phi[i][gp])*(phi[j][gp]));
@@ -235,14 +230,14 @@ void assemble(EquationSystems & es,
       // You can't compute "area" (perimeter) if you are in 2D
       if (dim == 3)
         {
-          for (unsigned int side=0; side<elem->n_sides(); side++)
-            if (elem->neighbor(side) == libmesh_nullptr)
+          for (auto side : elem->side_index_range())
+            if (elem->neighbor_ptr(side) == nullptr)
               {
                 fe_face->reinit (elem, side);
 
                 //fe_face->print_info();
 
-                for (unsigned int gp=0; gp<JxW_face.size(); gp++)
+                for (std::size_t gp=0; gp<JxW_face.size(); gp++)
                   area += JxW_face[gp];
               }
         }

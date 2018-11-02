@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -37,17 +37,19 @@ namespace libMesh
 {
 
 /**
- * Distributed vector. Provides an interface for simple
- * parallel, distributed vectors. Offers some collective
- * communication capabilities.  Note that the class will
- * sill function without MPI, but only on one processor.
- * This lets us keep the parallel details behind the scenes.
+ * This class provides a simple parallel, distributed vector datatype
+ * which is specific to libmesh. Offers some collective communication
+ * capabilities.
+ *
+ * \note The class will sill function without MPI, but only on one
+ * processor. All overridden virtual functions are documented in
+ * numeric_vector.h.
  *
  * \author Benjamin S. Kirk
  * \date 2003
  */
 template <typename T>
-class DistributedVector libmesh_final : public NumericVector<T>
+class DistributedVector final : public NumericVector<T>
 {
 public:
 
@@ -87,229 +89,98 @@ public:
                      const ParallelType ptype = AUTOMATIC);
 
   /**
-   * Destructor, deallocates memory. Made virtual to allow
-   * for derived classes to behave properly.
+   * Copy assignment operator. We cannot default this (although it
+   * essentially implements the default behavior) because the
+   * compiler-generated default attempts to automatically call the
+   * base class (NumericVector) copy assignment operator, which we
+   * have chosen to make pure virtual for other design reasons.
    */
-  ~DistributedVector ();
+  DistributedVector & operator= (const DistributedVector &);
 
   /**
-   * Call the assemble functions
+   * The 5 special functions can be defaulted for this class, as it
+   * does not manage any memory itself.
    */
-  virtual void close () libmesh_override;
+  DistributedVector (DistributedVector &&) = default;
+  DistributedVector (const DistributedVector &) = default;
+  DistributedVector & operator= (DistributedVector &&) = default;
+  virtual ~DistributedVector () = default;
 
-  /**
-   * @returns the \p DistributedVector to a pristine state.
-   */
-  virtual void clear () libmesh_override;
+  virtual void close () override;
 
-  /**
-   * Set all entries to zero. Equivalent to \p v = 0, but more obvious and
-   * faster.
-   */
-  virtual void zero () libmesh_override;
+  virtual void clear () override;
 
-  /**
-   * Creates a vector which has the same type, size and partitioning
-   * as this vector, but whose data is all zero.  Returns it in an \p
-   * UniquePtr.
-   */
-  virtual UniquePtr<NumericVector<T> > zero_clone () const libmesh_override;
+  virtual void zero () override;
 
-  /**
-   * Creates a copy of this vector and returns it in an \p UniquePtr.
-   */
-  virtual UniquePtr<NumericVector<T> > clone () const libmesh_override;
+  virtual std::unique_ptr<NumericVector<T>> zero_clone () const override;
 
-  /**
-   * Change the dimension of the vector to \p N. The reserved memory for
-   * this vector remains unchanged if possible, to make things faster, but
-   * this may waste some memory, so take this in the back of your head.
-   * However, if \p N==0 all memory is freed, i.e. if you want to resize
-   * the vector and release the memory not needed, you have to first call
-   * \p init(0) and then \p init(N). This cited behaviour is analogous
-   * to that of the STL containers.
-   *
-   * On \p fast==false, the vector is filled by
-   * zeros.
-   */
+  virtual std::unique_ptr<NumericVector<T>> clone () const override;
+
   virtual void init (const numeric_index_type N,
                      const numeric_index_type n_local,
-                     const bool         fast=false,
-                     const ParallelType ptype=AUTOMATIC) libmesh_override;
+                     const bool fast=false,
+                     const ParallelType ptype=AUTOMATIC) override;
 
-  /**
-   * call init with n_local = N,
-   */
   virtual void init (const numeric_index_type N,
-                     const bool         fast=false,
-                     const ParallelType ptype=AUTOMATIC) libmesh_override;
+                     const bool fast=false,
+                     const ParallelType ptype=AUTOMATIC) override;
 
-  /**
-   * Create a vector that holds tha local indices plus those specified
-   * in the \p ghost argument.
-   */
-  virtual void init (const numeric_index_type /*N*/,
-                     const numeric_index_type /*n_local*/,
-                     const std::vector<numeric_index_type> & /*ghost*/,
-                     const bool /*fast*/ = false,
-                     const ParallelType = AUTOMATIC) libmesh_override;
+  virtual void init (const numeric_index_type N,
+                     const numeric_index_type n_local,
+                     const std::vector<numeric_index_type> & ghost,
+                     const bool fast = false,
+                     const ParallelType = AUTOMATIC) override;
 
-  /**
-   * Creates a vector that has the same dimension and storage type as
-   * \p other, including ghost dofs.
-   */
   virtual void init (const NumericVector<T> & other,
-                     const bool fast = false) libmesh_override;
+                     const bool fast = false) override;
 
-  /**
-   * \f$U(0-N) = s\f$: fill all components.
-   */
-  virtual NumericVector<T> & operator= (const T s) libmesh_override;
+  virtual NumericVector<T> & operator= (const T s) override;
 
-  /**
-   *  \f$U = V\f$: copy all components.
-   */
-  virtual NumericVector<T> & operator= (const NumericVector<T> & v) libmesh_override;
+  virtual NumericVector<T> & operator= (const NumericVector<T> & v) override;
 
-  /**
-   *  \f$U = V\f$: copy all components.
-   */
-  DistributedVector<T> & operator= (const DistributedVector<T> & v);
+  virtual NumericVector<T> & operator= (const std::vector<T> & v) override;
 
-  /**
-   *  \f$U = V\f$: copy all components.
-   */
-  virtual NumericVector<T> & operator= (const std::vector<T> & v) libmesh_override;
+  virtual Real min () const override;
 
-  /**
-   * @returns the minimum element in the vector.
-   * In case of complex numbers, this returns the minimum
-   * Real part.
-   */
-  virtual Real min () const libmesh_override;
+  virtual Real max () const override;
 
-  /**
-   * @returns the maximum element in the vector.
-   * In case of complex numbers, this returns the maximum
-   * Real part.
-   */
-  virtual Real max () const libmesh_override;
+  virtual T sum() const override;
 
-  /**
-   * @returns the sum of all values in the vector
-   */
-  virtual T sum() const libmesh_override;
+  virtual Real l1_norm () const override;
 
-  /**
-   * @returns the \f$l_1\f$-norm of the vector, i.e.
-   * the sum of the absolute values.
-   */
-  virtual Real l1_norm () const libmesh_override;
+  virtual Real l2_norm () const override;
 
-  /**
-   * @returns the \f$l_2\f$-norm of the vector, i.e.
-   * the square root of the sum of the
-   * squares of the elements.
-   */
-  virtual Real l2_norm () const libmesh_override;
+  virtual Real linfty_norm () const override;
 
-  /**
-   * @returns the maximum absolute value of the
-   * elements of this vector, which is the
-   * \f$l_\infty\f$-norm of a vector.
-   */
-  virtual Real linfty_norm () const libmesh_override;
+  virtual numeric_index_type size () const override;
 
-  /**
-   * @returns dimension of the vector. This
-   * function was formerly called \p n(), but
-   * was renamed to get the \p DistributedVector class
-   * closer to the C++ standard library's
-   * \p std::vector container.
-   */
-  virtual numeric_index_type size () const libmesh_override;
+  virtual numeric_index_type local_size() const override;
 
-  /**
-   * @returns the local size of the vector
-   * (index_stop-index_start)
-   */
-  virtual numeric_index_type local_size() const libmesh_override;
+  virtual numeric_index_type first_local_index() const override;
 
-  /**
-   * @returns the index of the first vector element
-   * actually stored on this processor
-   */
-  virtual numeric_index_type first_local_index() const libmesh_override;
+  virtual numeric_index_type last_local_index() const override;
 
-  /**
-   * @returns the index of the last vector element
-   * actually stored on this processor
-   */
-  virtual numeric_index_type last_local_index() const libmesh_override;
+  virtual T operator() (const numeric_index_type i) const override;
 
-  /**
-   * Access components, returns \p U(i).
-   */
-  virtual T operator() (const numeric_index_type i) const libmesh_override;
+  virtual NumericVector<T> & operator += (const NumericVector<T> & v) override;
 
-  /**
-   * Addition operator.
-   * Fast equivalent to \p U.add(1, V).
-   */
-  virtual NumericVector<T> & operator += (const NumericVector<T> & v) libmesh_override;
+  virtual NumericVector<T> & operator -= (const NumericVector<T> & v) override;
 
-  /**
-   * Subtraction operator.
-   * Fast equivalent to \p U.add(-1, V).
-   */
-  virtual NumericVector<T> & operator -= (const NumericVector<T> & v) libmesh_override;
+  virtual NumericVector<T> & operator /= (const NumericVector<T> & v) override;
 
-  /**
-   * Pointwise Division operator. ie divide every entry in this vector by the entry in v
-   */
-  virtual NumericVector<T> & operator /= (NumericVector<T> & v) libmesh_override;
+  virtual void reciprocal() override;
 
-  /**
-   * Replace each entry v_i of this vector by its reciprocal, 1/v_i.
-   */
-  virtual void reciprocal() libmesh_override;
+  virtual void conjugate() override;
 
-  /**
-   * Replace each entry v_i = real(v_i) + imag(v_i)
-   * of this vector by its complex conjugate, real(v_i) - imag(v_i)
-   */
-  virtual void conjugate() libmesh_override;
+  virtual void set (const numeric_index_type i, const T value) override;
 
-  /**
-   * v(i) = value
-   */
-  virtual void set (const numeric_index_type i, const T value) libmesh_override;
+  virtual void add (const numeric_index_type i, const T value) override;
 
-  /**
-   * v(i) += value
-   */
-  virtual void add (const numeric_index_type i, const T value) libmesh_override;
+  virtual void add (const T s) override;
 
-  /**
-   * \f$U(0-LIBMESH_DIM)+=s\f$.
-   * Addition of \p s to all components. Note
-   * that \p s is a scalar and not a vector.
-   */
-  virtual void add (const T s) libmesh_override;
+  virtual void add (const NumericVector<T> & V) override;
 
-  /**
-   * \f$U+=V\f$.
-   * Simple vector addition, equal to the
-   * \p operator +=.
-   */
-  virtual void add (const NumericVector<T> & V) libmesh_override;
-
-  /**
-   * \f$U+=a*V\f$.
-   * Simple vector addition, equal to the
-   * \p operator +=.
-   */
-  virtual void add (const T a, const NumericVector<T> & v) libmesh_override;
+  virtual void add (const T a, const NumericVector<T> & v) override;
 
   /**
    * We override one NumericVector<T>::add_vector() method but don't
@@ -317,117 +188,66 @@ public:
    */
   using NumericVector<T>::add_vector;
 
-  /**
-   * \f$U+=A*V\f$.
-   * Add the product of a Sparse matrix \p A
-   * and a Numeric vector \p V to this Numeric vector.
-   * @e Not @e implemented.
-   */
   virtual void add_vector (const NumericVector<T> &,
-                           const SparseMatrix<T> &) libmesh_override
+                           const SparseMatrix<T> &) override
   { libmesh_not_implemented(); }
 
-  /**
-   * \f$U+=A^T*V\f$.
-   * Add the product of the transpose of a Sparse matrix \p A_trans
-   * and a Numeric vector \p V to this Numeric vector.
-   * @e Not @e implemented.
-   */
   virtual void add_vector_transpose (const NumericVector<T> &,
-                                     const SparseMatrix<T> &) libmesh_override
+                                     const SparseMatrix<T> &) override
   { libmesh_not_implemented(); }
 
-  /**
-   * Scale each element of the
-   * vector by the given factor.
-   */
-  virtual void scale (const T factor) libmesh_override;
+  virtual void scale (const T factor) override;
 
-  /**
-   * v = abs(v)... that is, each entry in v is replaced
-   * by its absolute value.
-   */
-  virtual void abs() libmesh_override;
+  virtual void abs() override;
 
-  /**
-   * Computes the dot product, p = U.V
-   */
-  virtual T dot(const NumericVector<T> & V) const libmesh_override;
+  virtual T dot(const NumericVector<T> & V) const override;
 
-  /**
-   * Creates a copy of the global vector in the
-   * local vector \p v_local.
-   */
-  virtual void localize (std::vector<T> & v_local) const libmesh_override;
+  virtual void localize (std::vector<T> & v_local) const override;
 
-  /**
-   * Same, but fills a \p NumericVector<T> instead of
-   * a \p std::vector.
-   */
-  virtual void localize (NumericVector<T> & v_local) const libmesh_override;
+  virtual void localize (NumericVector<T> & v_local) const override;
 
-  /**
-   * Creates a local vector \p v_local containing
-   * only information relevant to this processor, as
-   * defined by the \p send_list.
-   */
   virtual void localize (NumericVector<T> & v_local,
-                         const std::vector<numeric_index_type> & send_list) const libmesh_override;
+                         const std::vector<numeric_index_type> & send_list) const override;
 
-  /**
-   * Updates a local vector with selected values from neighboring
-   * processors, as defined by \p send_list.
-   */
+  virtual void localize (std::vector<T> & v_local,
+                         const std::vector<numeric_index_type> & indices) const override;
+
   virtual void localize (const numeric_index_type first_local_idx,
                          const numeric_index_type last_local_idx,
-                         const std::vector<numeric_index_type> & send_list) libmesh_override;
+                         const std::vector<numeric_index_type> & send_list) override;
 
-  /**
-   * Creates a local copy of the global vector in
-   * \p v_local only on processor \p proc_id.  By
-   * default the data is sent to processor 0.  This method
-   * is useful for outputting data from one processor.
-   */
   virtual void localize_to_one (std::vector<T> & v_local,
-                                const processor_id_type proc_id=0) const libmesh_override;
+                                const processor_id_type proc_id=0) const override;
 
-  /**
-   * Computes the pointwise (i.e. component-wise) product of \p vec1
-   * and \p vec2 and stores the result in \p *this.
-   */
   virtual void pointwise_mult (const NumericVector<T> & vec1,
-                               const NumericVector<T> & vec2) libmesh_override;
+                               const NumericVector<T> & vec2) override;
 
-  /**
-   * Swaps the vector data and metadata
-   */
-  virtual void swap (NumericVector<T> & v) libmesh_override;
+  virtual void swap (NumericVector<T> & v) override;
 
 private:
 
   /**
-   * Actual vector datatype
-   * to hold vector entries
+   * Actual vector datatype to hold vector entries.
    */
   std::vector<T> _values;
 
   /**
-   * The global vector size
+   * The global vector size.
    */
   numeric_index_type _global_size;
 
   /**
-   * The local vector size
+   * The local vector size.
    */
   numeric_index_type _local_size;
 
   /**
-   * The first component stored locally
+   * The first component stored locally.
    */
   numeric_index_type _first_local_index;
 
   /**
-   * The last component (+1) stored locally
+   * The last component (+1) stored locally.
    */
   numeric_index_type _last_local_index;
 };
@@ -485,15 +305,6 @@ DistributedVector<T>::DistributedVector (const Parallel::Communicator & comm_in,
   : NumericVector<T>(comm_in, ptype)
 {
   this->init(n, n_local, ghost, false, ptype);
-}
-
-
-
-template <typename T>
-inline
-DistributedVector<T>::~DistributedVector ()
-{
-  this->clear ();
 }
 
 
@@ -660,23 +471,23 @@ void DistributedVector<T>::zero ()
 
 template <typename T>
 inline
-UniquePtr<NumericVector<T> > DistributedVector<T>::zero_clone () const
+std::unique_ptr<NumericVector<T>> DistributedVector<T>::zero_clone () const
 {
   NumericVector<T> * cloned_vector = new DistributedVector<T>(this->comm());
   cloned_vector->init(*this);
-  return UniquePtr<NumericVector<T> >(cloned_vector);
+  return std::unique_ptr<NumericVector<T>>(cloned_vector);
 }
 
 
 
 template <typename T>
 inline
-UniquePtr<NumericVector<T> > DistributedVector<T>::clone () const
+std::unique_ptr<NumericVector<T>> DistributedVector<T>::clone () const
 {
   NumericVector<T> * cloned_vector = new DistributedVector<T>(this->comm());
   cloned_vector->init(*this, true);
   *cloned_vector = *this;
-  return UniquePtr<NumericVector<T> >(cloned_vector);
+  return std::unique_ptr<NumericVector<T>>(cloned_vector);
 }
 
 

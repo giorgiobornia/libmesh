@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -15,12 +15,11 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-// C++ includes
-
 // Local includes
 #include "libmesh/face_tri.h"
 #include "libmesh/edge_edge2.h"
 #include "libmesh/face_tri3.h"
+#include "libmesh/enum_elem_quality.h"
 
 namespace libMesh
 {
@@ -53,31 +52,42 @@ dof_id_type Tri::key (const unsigned int s) const
 {
   libmesh_assert_less (s, this->n_sides());
 
-  return this->compute_key(this->node(Tri3::side_nodes_map[s][0]),
-                           this->node(Tri3::side_nodes_map[s][1]));
+  return this->compute_key(this->node_id(Tri3::side_nodes_map[s][0]),
+                           this->node_id(Tri3::side_nodes_map[s][1]));
+}
+
+
+
+unsigned int Tri::which_node_am_i(unsigned int side,
+                                  unsigned int side_node) const
+{
+  libmesh_assert_less (side, this->n_sides());
+  libmesh_assert_less (side_node, 2);
+
+  return Tri3::side_nodes_map[side][side_node];
 }
 
 
 
 dof_id_type Tri::key () const
 {
-  return this->compute_key(this->node(0),
-                           this->node(1),
-                           this->node(2));
+  return this->compute_key(this->node_id(0),
+                           this->node_id(1),
+                           this->node_id(2));
 }
 
 
 
-UniquePtr<Elem> Tri::side (const unsigned int i) const
+std::unique_ptr<Elem> Tri::side_ptr (const unsigned int i)
 {
   libmesh_assert_less (i, this->n_sides());
 
-  Elem * edge = new Edge2;
+  std::unique_ptr<Elem> edge = libmesh_make_unique<Edge2>();
 
   for (unsigned n=0; n<edge->n_nodes(); ++n)
-    edge->set_node(n) = this->get_node(Tri3::side_nodes_map[i][n]);
+    edge->set_node(n) = this->node_ptr(Tri3::side_nodes_map[i][n]);
 
-  return UniquePtr<Elem>(edge);
+  return edge;
 }
 
 
@@ -104,13 +114,13 @@ Real Tri::quality (const ElemQuality q) const
     case DISTORTION:
     case STRETCH:
       {
-        const Node * p1 = this->get_node(0);
-        const Node * p2 = this->get_node(1);
-        const Node * p3 = this->get_node(2);
+        const Point & p1 = this->point(0);
+        const Point & p2 = this->point(1);
+        const Point & p3 = this->point(2);
 
-        Point v1 = (*p2) - (*p1);
-        Point v2 = (*p3) - (*p1);
-        Point v3 = (*p3) - (*p2);
+        Point v1 = p2 - p1;
+        Point v2 = p3 - p1;
+        Point v3 = p3 - p2;
         const Real l1 = v1.norm();
         const Real l2 = v2.norm();
         const Real l3 = v3.norm();
@@ -134,7 +144,7 @@ Real Tri::quality (const ElemQuality q) const
   /**
    * I don't know what to do for this metric.
    * Maybe the base class knows.  We won't get
-   * here because of the defualt case above.
+   * here because of the default case above.
    */
   return Elem::quality(q);
 

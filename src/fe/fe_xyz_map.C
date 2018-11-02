@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -25,7 +25,7 @@ void FEXYZMap::compute_face_map(int dim, const std::vector<Real> & qw, const Ele
 {
   libmesh_assert(side);
 
-  START_LOG("compute_face_map()", "FEXYZMap");
+  LOG_SCOPE("compute_face_map()", "FEXYZMap");
 
   // The number of quadrature points.
   const unsigned int n_qp = cast_int<unsigned int>(qw.size());
@@ -58,7 +58,9 @@ void FEXYZMap::compute_face_map(int dim, const std::vector<Real> & qw, const Ele
           }
 
         // compute x, dxdxi at the quadrature points
-        for (unsigned int i=0; i<this->psi_map.size(); i++) // sum over the nodes
+        for (unsigned int i=0,
+             n_psi_map = cast_int<unsigned int>(this->psi_map.size());
+             i != n_psi_map; i++) // sum over the nodes
           {
             const Point & side_point = side->point(i);
 
@@ -139,7 +141,9 @@ void FEXYZMap::compute_face_map(int dim, const std::vector<Real> & qw, const Ele
           }
 
         // compute x, dxdxi at the quadrature points
-        for (unsigned int i=0; i<this->psi_map.size(); i++) // sum over the nodes
+        for (unsigned int i=0,
+             n_psi_map = cast_int<unsigned int>(this->psi_map.size());
+             i != n_psi_map; i++) // sum over the nodes
           {
             const Point & side_point = side->point(i);
 
@@ -213,10 +217,6 @@ void FEXYZMap::compute_face_map(int dim, const std::vector<Real> & qw, const Ele
       libmesh_error_msg("Invalid dim = " << dim);
 
     } // switch(dim)
-
-  STOP_LOG("compute_face_map()", "FEXYZMap");
-
-  return;
 }
 
 } // namespace libMesh

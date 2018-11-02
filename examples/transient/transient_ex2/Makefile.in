@@ -102,7 +102,11 @@ ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ac_cxx_rtti.m4 \
 	$(top_srcdir)/m4/all_static.m4 \
 	$(top_srcdir)/m4/ax_boost_base.m4 \
+	$(top_srcdir)/m4/ax_check_compile_flag.m4 \
+	$(top_srcdir)/m4/ax_compiler_vendor.m4 \
 	$(top_srcdir)/m4/ax_cxx_compile_stdcxx_11.m4 \
+	$(top_srcdir)/m4/ax_gcc_archflag.m4 \
+	$(top_srcdir)/m4/ax_gcc_x86_cpuid.m4 \
 	$(top_srcdir)/m4/ax_openmp.m4 $(top_srcdir)/m4/ax_pthread.m4 \
 	$(top_srcdir)/m4/ax_split_version.m4 \
 	$(top_srcdir)/m4/ax_tls.m4 $(top_srcdir)/m4/backtrace.m4 \
@@ -112,16 +116,16 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ac_cxx_rtti.m4 \
 	$(top_srcdir)/m4/config_summary.m4 \
 	$(top_srcdir)/m4/coverage.m4 $(top_srcdir)/m4/cppunit.m4 \
 	$(top_srcdir)/m4/curl.m4 $(top_srcdir)/m4/cxx11.m4 \
-	$(top_srcdir)/m4/demangle.m4 $(top_srcdir)/m4/dlopen.m4 \
-	$(top_srcdir)/m4/eigen.m4 $(top_srcdir)/m4/errno_test.m4 \
-	$(top_srcdir)/m4/exodus.m4 $(top_srcdir)/m4/feexcept.m4 \
-	$(top_srcdir)/m4/fparser.m4 $(top_srcdir)/m4/glpk.m4 \
-	$(top_srcdir)/m4/gmv.m4 $(top_srcdir)/m4/gz.m4 \
-	$(top_srcdir)/m4/hdf5.m4 \
-	$(top_srcdir)/m4/hinnant_unique_ptr.m4 \
+	$(top_srcdir)/m4/cxx17.m4 $(top_srcdir)/m4/demangle.m4 \
+	$(top_srcdir)/m4/dlopen.m4 $(top_srcdir)/m4/eigen.m4 \
+	$(top_srcdir)/m4/errno_test.m4 $(top_srcdir)/m4/exodus.m4 \
+	$(top_srcdir)/m4/feexcept.m4 $(top_srcdir)/m4/fparser.m4 \
+	$(top_srcdir)/m4/glpk.m4 $(top_srcdir)/m4/gmv.m4 \
+	$(top_srcdir)/m4/gz.m4 $(top_srcdir)/m4/hdf5.m4 \
 	$(top_srcdir)/m4/laspack.m4 $(top_srcdir)/m4/libhilbert.m4 \
 	$(top_srcdir)/m4/libmesh_compiler_features.m4 \
 	$(top_srcdir)/m4/libmesh_core_features.m4 \
+	$(top_srcdir)/m4/libmesh_metaphysicl.m4 \
 	$(top_srcdir)/m4/libmesh_method.m4 \
 	$(top_srcdir)/m4/libmesh_optional_packages.m4 \
 	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/locale.m4 \
@@ -133,14 +137,14 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ac_cxx_rtti.m4 \
 	$(top_srcdir)/m4/nlopt.m4 $(top_srcdir)/m4/parmetis.m4 \
 	$(top_srcdir)/m4/petsc.m4 $(top_srcdir)/m4/precision.m4 \
 	$(top_srcdir)/m4/prefix_config.m4 $(top_srcdir)/m4/qhull.m4 \
-	$(top_srcdir)/m4/safe_bool.m4 $(top_srcdir)/m4/sanitize.m4 \
-	$(top_srcdir)/m4/sfc.m4 $(top_srcdir)/m4/slepc.m4 \
-	$(top_srcdir)/m4/sstream.m4 $(top_srcdir)/m4/strstream.m4 \
-	$(top_srcdir)/m4/tbb.m4 $(top_srcdir)/m4/tecio.m4 \
-	$(top_srcdir)/m4/tecplot.m4 $(top_srcdir)/m4/tetgen.m4 \
-	$(top_srcdir)/m4/threads.m4 $(top_srcdir)/m4/triangle.m4 \
-	$(top_srcdir)/m4/trilinos.m4 $(top_srcdir)/m4/unordered.m4 \
-	$(top_srcdir)/m4/vtk.m4 $(top_srcdir)/configure.ac
+	$(top_srcdir)/m4/sanitize.m4 $(top_srcdir)/m4/sfc.m4 \
+	$(top_srcdir)/m4/slepc.m4 $(top_srcdir)/m4/sstream.m4 \
+	$(top_srcdir)/m4/strstream.m4 $(top_srcdir)/m4/tbb.m4 \
+	$(top_srcdir)/m4/tecio.m4 $(top_srcdir)/m4/tecplot.m4 \
+	$(top_srcdir)/m4/tetgen.m4 $(top_srcdir)/m4/threads.m4 \
+	$(top_srcdir)/m4/triangle.m4 $(top_srcdir)/m4/trilinos.m4 \
+	$(top_srcdir)/m4/unordered.m4 $(top_srcdir)/m4/vtk.m4 \
+	$(top_srcdir)/m4/xdr.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
@@ -333,6 +337,8 @@ DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
+ANY_PARANOID_FLAGS = @ANY_PARANOID_FLAGS@
+ANY_WERROR_FLAG = @ANY_WERROR_FLAG@
 AR = @AR@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
@@ -378,12 +384,17 @@ CXX = @CXX@
 CXXCPP = @CXXCPP@
 CXXDEPMODE = @CXXDEPMODE@
 CXXFLAGS = @CXXFLAGS@
-CXXFLAGS_DBG = @CXXFLAGS_DBG@
-CXXFLAGS_DEVEL = @CXXFLAGS_DEVEL@
+
+# We might have turned on -Werror and/or paranoid warnings
+CXXFLAGS_DBG = @CXXFLAGS_DBG@ $(ANY_WERROR_FLAG) $(ANY_PARANOID_FLAGS)
+CXXFLAGS_DEVEL = @CXXFLAGS_DEVEL@ $(ANY_WERROR_FLAG) \
+	$(ANY_PARANOID_FLAGS)
 CXXFLAGS_DVL = @CXXFLAGS_DVL@
-CXXFLAGS_OPROF = @CXXFLAGS_OPROF@
-CXXFLAGS_OPT = @CXXFLAGS_OPT@
-CXXFLAGS_PROF = @CXXFLAGS_PROF@
+CXXFLAGS_OPROF = @CXXFLAGS_OPROF@ $(ANY_WERROR_FLAG) \
+	$(ANY_PARANOID_FLAGS)
+CXXFLAGS_OPT = @CXXFLAGS_OPT@ $(ANY_WERROR_FLAG) $(ANY_PARANOID_FLAGS)
+CXXFLAGS_PROF = @CXXFLAGS_PROF@ $(ANY_WERROR_FLAG) \
+	$(ANY_PARANOID_FLAGS)
 CXXSHAREDFLAG = @CXXSHAREDFLAG@
 CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
@@ -453,6 +464,7 @@ LT_SYS_LIBRARY_PATH = @LT_SYS_LIBRARY_PATH@
 MAINT = @MAINT@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
+METAPHYSICL_INCLUDE = @METAPHYSICL_INCLUDE@
 METHOD = @METHOD@
 METHODS = @METHODS@
 METIS_INCLUDE = @METIS_INCLUDE@
@@ -508,6 +520,7 @@ PETSC_DIR = @PETSC_DIR@
 PETSC_FC_INCLUDES = @PETSC_FC_INCLUDES@
 PKG_CONFIG = @PKG_CONFIG@
 PROFILING_FLAGS = @PROFILING_FLAGS@
+PRTDIAG = @PRTDIAG@
 PTHREAD_CC = @PTHREAD_CC@
 PTHREAD_CFLAGS = @PTHREAD_CFLAGS@
 PTHREAD_LIBS = @PTHREAD_LIBS@
@@ -573,7 +586,8 @@ datadir = $(install_dir)
 datarootdir = @datarootdir@
 docdir = @docdir@
 dvidir = @dvidir@
-enabledefaultcommworld = @enabledefaultcommworld@
+enabledeprecated = @enabledeprecated@
+enablefwdenums = @enablefwdenums@
 enablelegacyincludepaths = @enablelegacyincludepaths@
 enablepetsc = @enablepetsc@
 enableuniqueptr = @enableuniqueptr@

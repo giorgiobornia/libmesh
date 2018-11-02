@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,6 @@
 
 #ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
 
-// C++ includes
-
 // Local includes cont'd
 #include "libmesh/cell_inf_hex16.h"
 #include "libmesh/edge_edge3.h"
@@ -29,6 +27,8 @@
 #include "libmesh/face_quad8.h"
 #include "libmesh/face_inf_quad6.h"
 #include "libmesh/side.h"
+#include "libmesh/enum_io_package.h"
+#include "libmesh/enum_order.h"
 
 namespace libMesh
 {
@@ -36,7 +36,14 @@ namespace libMesh
 
 // ------------------------------------------------------------
 // InfHex16 class static member initializations
-const unsigned int InfHex16::side_nodes_map[5][8] =
+const int InfHex16::num_nodes;
+const int InfHex16::num_sides;
+const int InfHex16::num_edges;
+const int InfHex16::num_children;
+const int InfHex16::nodes_per_side;
+const int InfHex16::nodes_per_edge;
+
+const unsigned int InfHex16::side_nodes_map[InfHex16::num_sides][InfHex16::nodes_per_side] =
   {
     { 0, 1, 2, 3, 8, 9, 10, 11},   // Side 0
     { 0, 1, 4, 5, 8, 12, 99, 99},  // Side 1
@@ -45,16 +52,16 @@ const unsigned int InfHex16::side_nodes_map[5][8] =
     { 3, 0, 7, 4, 11, 15, 99, 99}  // Side 4
   };
 
-const unsigned int InfHex16::edge_nodes_map[8][3] =
+const unsigned int InfHex16::edge_nodes_map[InfHex16::num_edges][InfHex16::nodes_per_edge] =
   {
-    { 0, 1, 8},  // Side 0
-    { 1, 2, 9},  // Side 1
-    { 2, 3, 10}, // Side 2
-    { 0, 3, 11}, // Side 3
-    { 0, 4, 99}, // Side 4
-    { 1, 5, 99}, // Side 5
-    { 2, 6, 99}, // Side 6
-    { 3, 7, 99}  // Side 7
+    {0, 1,  8}, // Edge 0
+    {1, 2,  9}, // Edge 1
+    {2, 3, 10}, // Edge 2
+    {0, 3, 11}, // Edge 3
+    {0, 4, 99}, // Edge 4
+    {1, 5, 99}, // Edge 5
+    {2, 6, 99}, // Edge 6
+    {3, 7, 99}  // Edge 7
   };
 
 
@@ -88,24 +95,55 @@ bool InfHex16::is_node_on_side(const unsigned int n,
                                const unsigned int s) const
 {
   libmesh_assert_less (s, n_sides());
-  for (unsigned int i = 0; i != 8; ++i)
-    if (side_nodes_map[s][i] == n)
-      return true;
-  return false;
+  return std::find(std::begin(side_nodes_map[s]),
+                   std::end(side_nodes_map[s]),
+                   n) != std::end(side_nodes_map[s]);
+}
+
+std::vector<unsigned>
+InfHex16::nodes_on_side(const unsigned int s) const
+{
+  libmesh_assert_less(s, n_sides());
+  auto trim = (s == 0) ? 0 : 2;
+  return {std::begin(side_nodes_map[s]), std::end(side_nodes_map[s]) - trim};
 }
 
 bool InfHex16::is_node_on_edge(const unsigned int n,
                                const unsigned int e) const
 {
   libmesh_assert_less (e, n_edges());
-  for (unsigned int i = 0; i != 3; ++i)
-    if (edge_nodes_map[e][i] == n)
-      return true;
-  return false;
+  return std::find(std::begin(edge_nodes_map[e]),
+                   std::end(edge_nodes_map[e]),
+                   n) != std::end(edge_nodes_map[e]);
 }
 
-UniquePtr<Elem> InfHex16::build_side (const unsigned int i,
-                                      bool proxy) const
+
+
+Order InfHex16::default_order() const
+{
+  return SECOND;
+}
+
+
+
+unsigned int InfHex16::which_node_am_i(unsigned int side,
+                                       unsigned int side_node) const
+{
+  libmesh_assert_less (side, this->n_sides());
+
+  // Never more than 8 nodes per side.
+  libmesh_assert_less (side_node, InfHex16::nodes_per_side);
+
+  // Some sides have 6 nodes.
+  libmesh_assert(side == 0 || side_node < 6);
+
+  return InfHex16::side_nodes_map[side][side_node];
+}
+
+
+
+std::unique_ptr<Elem> InfHex16::build_side_ptr (const unsigned int i,
+                                                bool proxy)
 {
   libmesh_assert_less (i, this->n_sides());
 
@@ -115,14 +153,14 @@ UniquePtr<Elem> InfHex16::build_side (const unsigned int i,
         {
           // base
         case 0:
-          return UniquePtr<Elem>(new Side<Quad8,InfHex16>(this,i));
+          return libmesh_make_unique<Side<Quad8,InfHex16>>(this,i);
 
           // ifem sides
         case 1:
         case 2:
         case 3:
         case 4:
-          return UniquePtr<Elem>(new Side<InfQuad6,InfHex16>(this,i));
+          return libmesh_make_unique<Side<InfQuad6,InfHex16>>(this,i);
 
         default:
           libmesh_error_msg("Invalid side i = " << i);
@@ -131,8 +169,8 @@ UniquePtr<Elem> InfHex16::build_side (const unsigned int i,
 
   else
     {
-      // Create NULL pointer to be initialized, returned later.
-      Elem * face = libmesh_nullptr;
+      // Return value
+      std::unique_ptr<Elem> face;
 
       // Think of a unit cube: (-1,1) x (-1,1) x (1,1)
       switch (i)
@@ -140,7 +178,7 @@ UniquePtr<Elem> InfHex16::build_side (const unsigned int i,
           // the base face
         case 0:
           {
-            face = new Quad8;
+            face = libmesh_make_unique<Quad8>();
             break;
           }
 
@@ -150,7 +188,7 @@ UniquePtr<Elem> InfHex16::build_side (const unsigned int i,
         case 3:
         case 4:
           {
-            face = new InfQuad6;
+            face = libmesh_make_unique<InfQuad6>();
             break;
           }
 
@@ -162,23 +200,21 @@ UniquePtr<Elem> InfHex16::build_side (const unsigned int i,
 
       // Set the nodes
       for (unsigned n=0; n<face->n_nodes(); ++n)
-        face->set_node(n) = this->get_node(InfHex16::side_nodes_map[i][n]);
+        face->set_node(n) = this->node_ptr(InfHex16::side_nodes_map[i][n]);
 
-      return UniquePtr<Elem>(face);
+      return face;
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return UniquePtr<Elem>();
 }
 
-UniquePtr<Elem> InfHex16::build_edge (const unsigned int i) const
+std::unique_ptr<Elem> InfHex16::build_edge_ptr (const unsigned int i)
 {
   libmesh_assert_less (i, this->n_edges());
 
   if (i < 4) // base edges
-    return UniquePtr<Elem>(new SideEdge<Edge3,InfHex16>(this,i));
+    return libmesh_make_unique<SideEdge<Edge3,InfHex16>>(this,i);
+
   // infinite edges
-  return UniquePtr<Elem>(new SideEdge<InfEdge2,InfHex16>(this,i));
+  return libmesh_make_unique<SideEdge<InfEdge2,InfHex16>>(this,i);
 }
 
 
@@ -198,14 +234,14 @@ void InfHex16::connectivity(const unsigned int sc,
           {
           case 0:
 
-            conn[0] = this->node(0)+1;
-            conn[1] = this->node(1)+1;
-            conn[2] = this->node(2)+1;
-            conn[3] = this->node(3)+1;
-            conn[4] = this->node(4)+1;
-            conn[5] = this->node(5)+1;
-            conn[6] = this->node(6)+1;
-            conn[7] = this->node(7)+1;
+            conn[0] = this->node_id(0)+1;
+            conn[1] = this->node_id(1)+1;
+            conn[2] = this->node_id(2)+1;
+            conn[3] = this->node_id(3)+1;
+            conn[4] = this->node_id(4)+1;
+            conn[5] = this->node_id(5)+1;
+            conn[6] = this->node_id(6)+1;
+            conn[7] = this->node_id(7)+1;
             return;
 
           default:
@@ -255,7 +291,7 @@ InfHex16::second_order_child_vertex (const unsigned int n) const
 
 #ifdef LIBMESH_ENABLE_AMR
 
-const float InfHex16::_embedding_matrix[4][16][16] =
+const float InfHex16::_embedding_matrix[InfHex16::num_children][InfHex16::num_nodes][InfHex16::num_nodes] =
   {
     // embedding matrix for child 0
     {

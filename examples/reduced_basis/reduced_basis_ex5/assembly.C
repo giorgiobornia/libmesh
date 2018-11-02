@@ -63,14 +63,14 @@ void AssemblyA0::interior_assembly(FEMContext & c)
   const unsigned int v_var = rb_sys.v_var;
   const unsigned int w_var = rb_sys.w_var;
 
-  FEBase * elem_fe = libmesh_nullptr;
+  FEBase * elem_fe = nullptr;
   c.get_element_fe(u_var, elem_fe);
 
   const std::vector<Real> & JxW = elem_fe->get_JxW();
 
   // The velocity shape function gradients at interior
   // quadrature points.
-  const std::vector<std::vector<RealGradient> > & dphi = elem_fe->get_dphi();
+  const std::vector<std::vector<RealGradient>> & dphi = elem_fe->get_dphi();
 
   // Now we will build the affine operator
   unsigned int n_qpoints = c.get_element_qrule().n_points();
@@ -122,14 +122,14 @@ void AssemblyA1::interior_assembly(FEMContext & c)
   const unsigned int v_var = rb_sys.v_var;
   const unsigned int w_var = rb_sys.w_var;
 
-  FEBase * elem_fe = libmesh_nullptr;
+  FEBase * elem_fe = nullptr;
   c.get_element_fe(u_var, elem_fe);
 
   const std::vector<Real> & JxW = elem_fe->get_JxW();
 
   // The velocity shape function gradients at interior
   // quadrature points.
-  const std::vector<std::vector<RealGradient> > & dphi = elem_fe->get_dphi();
+  const std::vector<std::vector<RealGradient>> & dphi = elem_fe->get_dphi();
 
   // Now we will build the affine operator
   unsigned int n_qpoints = c.get_element_qrule().n_points();
@@ -164,14 +164,14 @@ void AssemblyA2::interior_assembly(FEMContext & c)
   const unsigned int v_var = rb_sys.v_var;
   const unsigned int w_var = rb_sys.w_var;
 
-  FEBase * elem_fe = libmesh_nullptr;
+  FEBase * elem_fe = nullptr;
   c.get_element_fe(u_var, elem_fe);
 
   const std::vector<Real> & JxW = elem_fe->get_JxW();
 
   // The velocity shape function gradients at interior
   // quadrature points.
-  const std::vector<std::vector<RealGradient> > & dphi = elem_fe->get_dphi();
+  const std::vector<std::vector<RealGradient>> & dphi = elem_fe->get_dphi();
 
   // Now we will build the affine operator
   unsigned int n_qpoints = c.get_element_qrule().n_points();
@@ -206,12 +206,12 @@ void AssemblyF0::boundary_assembly(FEMContext & c)
     {
       const unsigned int u_var = 0;
 
-      FEBase * side_fe = libmesh_nullptr;
+      FEBase * side_fe = nullptr;
       c.get_side_fe(u_var, side_fe);
 
       const std::vector<Real> & JxW_side = side_fe->get_JxW();
 
-      const std::vector<std::vector<Real> > & phi_side = side_fe->get_phi();
+      const std::vector<std::vector<Real>> & phi_side = side_fe->get_phi();
 
       // The number of local degrees of freedom in each variable
       const unsigned int n_u_dofs = c.get_dof_indices(u_var).size();
@@ -234,12 +234,12 @@ void AssemblyF1::boundary_assembly(FEMContext & c)
       const unsigned int u_var = 0;
       const unsigned int v_var = 1;
 
-      FEBase * side_fe = libmesh_nullptr;
+      FEBase * side_fe = nullptr;
       c.get_side_fe(u_var, side_fe);
 
       const std::vector<Real> & JxW_side = side_fe->get_JxW();
 
-      const std::vector<std::vector<Real> > & phi_side = side_fe->get_phi();
+      const std::vector<std::vector<Real>> & phi_side = side_fe->get_phi();
 
       // The number of local degrees of freedom in each variable
       const unsigned int n_v_dofs = c.get_dof_indices(u_var).size();
@@ -262,12 +262,12 @@ void AssemblyF2::boundary_assembly(FEMContext & c)
       const unsigned int u_var = 0;
       const unsigned int w_var = 2;
 
-      FEBase * side_fe = libmesh_nullptr;
+      FEBase * side_fe = nullptr;
       c.get_side_fe(u_var, side_fe);
 
       const std::vector<Real> & JxW_side = side_fe->get_JxW();
 
-      const std::vector<std::vector<Real> > & phi_side = side_fe->get_phi();
+      const std::vector<std::vector<Real>> & phi_side = side_fe->get_phi();
 
       // The number of local degrees of freedom in each variable
       const unsigned int n_w_dofs = c.get_dof_indices(w_var).size();
@@ -336,14 +336,14 @@ void InnerProductAssembly::interior_assembly(FEMContext & c)
   const unsigned int v_var = rb_sys.v_var;
   const unsigned int w_var = rb_sys.w_var;
 
-  FEBase * elem_fe = libmesh_nullptr;
+  FEBase * elem_fe = nullptr;
   c.get_element_fe(u_var, elem_fe);
 
   const std::vector<Real> & JxW = elem_fe->get_JxW();
 
   // The velocity shape function gradients at interior
   // quadrature points.
-  const std::vector<std::vector<RealGradient> >& dphi = elem_fe->get_dphi();
+  const std::vector<std::vector<RealGradient>>& dphi = elem_fe->get_dphi();
 
   // The number of local degrees of freedom in each variable
   const unsigned int n_u_dofs = c.get_dof_indices(u_var).size();

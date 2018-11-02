@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -65,7 +65,13 @@ public:
   /**
    * This method implements writing a mesh to a specified ".mesh" file.
    */
-  virtual void write (const std::string &) libmesh_override;
+  virtual void write (const std::string &) override;
+
+  /**
+   * Bring in base class functionality for name resolution and to
+   * avoid warnings about hidden overloaded virtual functions.
+   */
+  using MeshOutput<MeshBase>::write_nodal_data;
 
   /**
    * This method implements writing a mesh with nodal data to a
@@ -73,7 +79,7 @@ public:
    */
   virtual void write_nodal_data (const std::string &,
                                  const std::vector<Number> &,
-                                 const std::vector<std::string> &) libmesh_override;
+                                 const std::vector<std::string> &) override;
 
   /**
    * Flag indicating whether or not to write a binary file
@@ -88,8 +94,8 @@ private:
    * provided.  This will write an ASCII file.
    */
   void write_ascii (const std::string &,
-                    const std::vector<Number> * = libmesh_nullptr,
-                    const std::vector<std::string> * = libmesh_nullptr);
+                    const std::vector<Number> * = nullptr,
+                    const std::vector<std::string> * = nullptr);
 
   /**
    * Flag to write binary data.

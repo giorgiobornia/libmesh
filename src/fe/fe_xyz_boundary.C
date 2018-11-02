@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -71,16 +71,16 @@ void FEXYZ<Dim>::reinit(const Elem * elem,
                         const std::vector<Real> * const weights)
 {
   libmesh_assert(elem);
-  libmesh_assert (this->qrule != libmesh_nullptr || pts != libmesh_nullptr);
+  libmesh_assert (this->qrule != nullptr || pts != nullptr);
   // We don't do this for 1D elements!
   libmesh_assert_not_equal_to (Dim, 1);
 
   // Build the side of interest
-  const UniquePtr<Elem> side(elem->build_side(s));
+  const std::unique_ptr<const Elem> side(elem->build_side_ptr(s));
 
   // Initialize the shape functions at the user-specified
   // points
-  if (pts != libmesh_nullptr)
+  if (pts != nullptr)
     {
       // We can't get away without recomputing shape functions next
       // time
@@ -91,7 +91,7 @@ void FEXYZ<Dim>::reinit(const Elem * elem,
 
       // Initialize the face shape functions
       this->_fe_map->template init_face_shape_functions<Dim>(*pts,  side.get());
-      if (weights != libmesh_nullptr)
+      if (weights != nullptr)
         {
           this->compute_face_values (elem, side.get(), *weights);
         }
@@ -132,7 +132,7 @@ void FEXYZ<Dim>::compute_face_values(const Elem * elem,
   libmesh_assert(elem);
   libmesh_assert(side);
 
-  START_LOG("compute_face_values()", "FEXYZ");
+  LOG_SCOPE("compute_face_values()", "FEXYZ");
 
   // The number of quadrature points.
   const std::size_t n_qp = qw.size();
@@ -218,8 +218,6 @@ void FEXYZ<Dim>::compute_face_values(const Elem * elem,
     default:
       libmesh_error_msg("Invalid dim " << this->dim);
     }
-
-  STOP_LOG("compute_face_values()", "FEXYZ");
 }
 
 

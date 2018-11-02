@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -35,6 +35,9 @@
 #include "libmesh/system.h"
 #include "libmesh/petsc_auto_fieldsplit.h"
 #include "libmesh/solver_configuration.h"
+#include "libmesh/enum_preconditioner_type.h"
+#include "libmesh/enum_solver_type.h"
+#include "libmesh/enum_convergence_flags.h"
 
 namespace libMesh
 {
@@ -42,7 +45,7 @@ namespace libMesh
 extern "C"
 {
 #if PETSC_RELEASE_LESS_THAN(3,0,1)
-  PetscErrorCode __libmesh_petsc_preconditioner_setup (void * ctx)
+  PetscErrorCode libmesh_petsc_preconditioner_setup (void * ctx)
   {
     Preconditioner<Number> * preconditioner = static_cast<Preconditioner<Number> *>(ctx);
 
@@ -55,7 +58,7 @@ extern "C"
   }
 
 
-  PetscErrorCode __libmesh_petsc_preconditioner_apply(void * ctx, Vec x, Vec y)
+  PetscErrorCode libmesh_petsc_preconditioner_apply(void * ctx, Vec x, Vec y)
   {
     Preconditioner<Number> * preconditioner = static_cast<Preconditioner<Number> *>(ctx);
 
@@ -67,7 +70,7 @@ extern "C"
     return 0;
   }
 #else
-  PetscErrorCode __libmesh_petsc_preconditioner_setup (PC pc)
+  PetscErrorCode libmesh_petsc_preconditioner_setup (PC pc)
   {
     void * ctx;
     PetscErrorCode ierr = PCShellGetContext(pc,&ctx);CHKERRQ(ierr);
@@ -81,7 +84,7 @@ extern "C"
     return 0;
   }
 
-  PetscErrorCode __libmesh_petsc_preconditioner_apply(PC pc, Vec x, Vec y)
+  PetscErrorCode libmesh_petsc_preconditioner_apply(PC pc, Vec x, Vec y)
   {
     void * ctx;
     PetscErrorCode ierr = PCShellGetContext(pc,&ctx);CHKERRQ(ierr);
@@ -95,9 +98,53 @@ extern "C"
     return 0;
   }
 #endif
+
+#ifdef LIBMESH_ENABLE_DEPRECATED
+#if PETSC_RELEASE_LESS_THAN(3,0,1)
+  PetscErrorCode __libmesh_petsc_preconditioner_setup (void * ctx)
+  {
+    libmesh_deprecated();
+    return libmesh_petsc_preconditioner_setup(ctx);
+  }
+
+  PetscErrorCode __libmesh_petsc_preconditioner_apply(void * ctx, Vec x, Vec y)
+  {
+    libmesh_deprecated();
+    return libmesh_petsc_preconditioner_apply(ctx, x, y);
+  }
+
+#else
+  PetscErrorCode __libmesh_petsc_preconditioner_setup (PC pc)
+  {
+    libmesh_deprecated();
+    return libmesh_petsc_preconditioner_setup(pc);
+  }
+
+  PetscErrorCode __libmesh_petsc_preconditioner_apply(PC pc, Vec x, Vec y)
+  {
+    libmesh_deprecated();
+    return libmesh_petsc_preconditioner_apply(pc, x, y);
+  }
+#endif
+#endif
 } // end extern "C"
 
 /*----------------------- functions ----------------------------------*/
+template <typename T>
+PetscLinearSolver<T>::PetscLinearSolver(const libMesh::Parallel::Communicator & comm_in) :
+  LinearSolver<T>(comm_in),
+  _restrict_solve_to_is(nullptr),
+  _restrict_solve_to_is_complement(nullptr),
+  _subset_solve_mode(SUBSET_ZERO)
+{
+  if (this->n_processors() == 1)
+    this->_preconditioner_type = ILU_PRECOND;
+  else
+    this->_preconditioner_type = BLOCK_JACOBI_PRECOND;
+}
+
+
+
 template <typename T>
 void PetscLinearSolver<T>::clear ()
 {
@@ -105,18 +152,18 @@ void PetscLinearSolver<T>::clear ()
     {
       /* If we were restricted to some subset, this restriction must
          be removed and the subset index set destroyed.  */
-      if (_restrict_solve_to_is != libmesh_nullptr)
+      if (_restrict_solve_to_is != nullptr)
         {
           PetscErrorCode ierr = LibMeshISDestroy(&_restrict_solve_to_is);
           LIBMESH_CHKERR(ierr);
-          _restrict_solve_to_is = libmesh_nullptr;
+          _restrict_solve_to_is = nullptr;
         }
 
-      if(_restrict_solve_to_is_complement != libmesh_nullptr)
+      if (_restrict_solve_to_is_complement != nullptr)
         {
           PetscErrorCode ierr = LibMeshISDestroy(&_restrict_solve_to_is_complement);
           LIBMESH_CHKERR(ierr);
-          _restrict_solve_to_is_complement = libmesh_nullptr;
+          _restrict_solve_to_is_complement = nullptr;
         }
 
       this->_is_initialized = false;
@@ -129,7 +176,7 @@ void PetscLinearSolver<T>::clear ()
       // Mimic PETSc default solver and preconditioner
       this->_solver_type           = GMRES;
 
-      if(!this->_preconditioner)
+      if (!this->_preconditioner)
         {
           if (this->n_processors() == 1)
             this->_preconditioner_type = ILU_PRECOND;
@@ -170,7 +217,7 @@ void PetscLinearSolver<T>::init (const char * name)
 
       // If the SolverConfiguration object is provided, use it to set
       // options during solver initialization.
-      if(this->_solver_configuration)
+      if (this->_solver_configuration)
         {
           this->_solver_configuration->set_options_during_init();
         }
@@ -223,12 +270,12 @@ void PetscLinearSolver<T>::init (const char * name)
       PetscPreconditioner<T>::set_petsc_preconditioner_type(this->_preconditioner_type,_pc);
 
       //If there is a preconditioner object we need to set the internal setup and apply routines
-      if(this->_preconditioner)
+      if (this->_preconditioner)
         {
           this->_preconditioner->init();
           PCShellSetContext(_pc,(void *)this->_preconditioner);
-          PCShellSetSetUp(_pc,__libmesh_petsc_preconditioner_setup);
-          PCShellSetApply(_pc,__libmesh_petsc_preconditioner_apply);
+          PCShellSetSetUp(_pc,libmesh_petsc_preconditioner_setup);
+          PCShellSetApply(_pc,libmesh_petsc_preconditioner_apply);
         }
     }
 }
@@ -275,7 +322,7 @@ void PetscLinearSolver<T>::init (PetscMatrix<T> * matrix,
 
       // If the SolverConfiguration object is provided, use it to set
       // options during solver initialization.
-      if(this->_solver_configuration)
+      if (this->_solver_configuration)
         {
           this->_solver_configuration->set_options_during_init();
         }
@@ -325,13 +372,13 @@ void PetscLinearSolver<T>::init (PetscMatrix<T> * matrix,
       LIBMESH_CHKERR(ierr);
 
       PetscPreconditioner<T>::set_petsc_preconditioner_type(this->_preconditioner_type,_pc);
-      if(this->_preconditioner)
+      if (this->_preconditioner)
         {
           this->_preconditioner->set_matrix(*matrix);
           this->_preconditioner->init();
           PCShellSetContext(_pc,(void *)this->_preconditioner);
-          PCShellSetSetUp(_pc,__libmesh_petsc_preconditioner_setup);
-          PCShellSetApply(_pc,__libmesh_petsc_preconditioner_apply);
+          PCShellSetSetUp(_pc,libmesh_petsc_preconditioner_setup);
+          PCShellSetApply(_pc,libmesh_petsc_preconditioner_apply);
         }
     }
 }
@@ -362,18 +409,19 @@ PetscLinearSolver<T>::restrict_solve_to (const std::vector<unsigned int> * const
 
   _subset_solve_mode = subset_solve_mode;
 
-  if (dofs != libmesh_nullptr)
+  if (dofs != nullptr)
     {
-      PetscInt * petsc_dofs = libmesh_nullptr;
+      PetscInt * petsc_dofs = nullptr;
       ierr = PetscMalloc(dofs->size()*sizeof(PetscInt), &petsc_dofs);
       LIBMESH_CHKERR(ierr);
 
-      for(size_t i=0; i<dofs->size(); i++)
-        {
-          petsc_dofs[i] = (*dofs)[i];
-        }
+      for (std::size_t i=0; i<dofs->size(); i++)
+        petsc_dofs[i] = (*dofs)[i];
 
-      ierr = ISCreateLibMesh(this->comm().get(),dofs->size(),petsc_dofs,PETSC_OWN_POINTER,&_restrict_solve_to_is);
+      ierr = ISCreateLibMesh(this->comm().get(),
+                             cast_int<PetscInt>(dofs->size()),
+                             petsc_dofs, PETSC_OWN_POINTER,
+                             &_restrict_solve_to_is);
       LIBMESH_CHKERR(ierr);
     }
 }
@@ -389,7 +437,7 @@ PetscLinearSolver<T>::solve (SparseMatrix<T> &  matrix_in,
                              const double tol,
                              const unsigned int m_its)
 {
-  START_LOG("solve()", "PetscLinearSolver");
+  LOG_SCOPE("solve()", "PetscLinearSolver");
 
   // Make sure the data passed in are really of Petsc types
   PetscMatrix<T> * matrix   = cast_ptr<PetscMatrix<T> *>(&matrix_in);
@@ -417,16 +465,16 @@ PetscLinearSolver<T>::solve (SparseMatrix<T> &  matrix_in,
   //       this->set_petsc_preconditioner_type ();
   //     }
 
-  Mat submat = libmesh_nullptr;
-  Mat subprecond = libmesh_nullptr;
-  Vec subrhs = libmesh_nullptr;
-  Vec subsolution = libmesh_nullptr;
-  VecScatter scatter = libmesh_nullptr;
-  PetscMatrix<Number> * subprecond_matrix = libmesh_nullptr;
+  Mat submat = nullptr;
+  Mat subprecond = nullptr;
+  Vec subrhs = nullptr;
+  Vec subsolution = nullptr;
+  VecScatter scatter = nullptr;
+  std::unique_ptr<PetscMatrix<Number>> subprecond_matrix;
 
   // Set operators.  Also restrict rhs and solution vector to
-  // subdomain if neccessary.
-  if (_restrict_solve_to_is != libmesh_nullptr)
+  // subdomain if necessary.
+  if (_restrict_solve_to_is != nullptr)
     {
       PetscInt is_local_size = this->_restrict_solve_to_is_local_size();
 
@@ -444,7 +492,7 @@ PetscLinearSolver<T>::solve (SparseMatrix<T> &  matrix_in,
       ierr = VecSetFromOptions(subsolution);
       LIBMESH_CHKERR(ierr);
 
-      ierr = VecScatterCreate(rhs->vec(), _restrict_solve_to_is, subrhs, libmesh_nullptr, &scatter);
+      ierr = LibMeshVecScatterCreate(rhs->vec(), _restrict_solve_to_is, subrhs, nullptr, &scatter);
       LIBMESH_CHKERR(ierr);
 
       ierr = VecScatterBegin(scatter,rhs->vec(),subrhs,INSERT_VALUES,SCATTER_FORWARD);
@@ -457,39 +505,39 @@ PetscLinearSolver<T>::solve (SparseMatrix<T> &  matrix_in,
       ierr = VecScatterEnd(scatter,solution->vec(),subsolution,INSERT_VALUES,SCATTER_FORWARD);
       LIBMESH_CHKERR(ierr);
 
+      ierr = LibMeshCreateSubMatrix(matrix->mat(),
+                                    _restrict_solve_to_is,
+                                    _restrict_solve_to_is,
 #if PETSC_VERSION_LESS_THAN(3,1,0)
-      ierr = MatGetSubMatrix(matrix->mat(),
-                             _restrict_solve_to_is,_restrict_solve_to_is,
-                             PETSC_DECIDE,MAT_INITIAL_MATRIX,&submat);
-      LIBMESH_CHKERR(ierr);
-      ierr = MatGetSubMatrix(precond->mat(),
-                             _restrict_solve_to_is,_restrict_solve_to_is,
-                             PETSC_DECIDE,MAT_INITIAL_MATRIX,&subprecond);
-      LIBMESH_CHKERR(ierr);
-#else
-      ierr = MatGetSubMatrix(matrix->mat(),
-                             _restrict_solve_to_is,_restrict_solve_to_is,
-                             MAT_INITIAL_MATRIX,&submat);
-      LIBMESH_CHKERR(ierr);
-      ierr = MatGetSubMatrix(precond->mat(),
-                             _restrict_solve_to_is,_restrict_solve_to_is,
-                             MAT_INITIAL_MATRIX,&subprecond);
-      LIBMESH_CHKERR(ierr);
+                                    PETSC_DECIDE,
 #endif
+                                    MAT_INITIAL_MATRIX,
+                                    &submat);
+      LIBMESH_CHKERR(ierr);
+
+      ierr = LibMeshCreateSubMatrix(precond->mat(),
+                                    _restrict_solve_to_is,
+                                    _restrict_solve_to_is,
+#if PETSC_VERSION_LESS_THAN(3,1,0)
+                                    PETSC_DECIDE,
+#endif
+                                    MAT_INITIAL_MATRIX,
+                                    &subprecond);
+      LIBMESH_CHKERR(ierr);
 
       /* Since removing columns of the matrix changes the equation
          system, we will now change the right hand side to compensate
          for this.  Note that this is not necessary if \p SUBSET_ZERO
          has been selected.  */
-      if(_subset_solve_mode!=SUBSET_ZERO)
+      if (_subset_solve_mode!=SUBSET_ZERO)
         {
           _create_complement_is(rhs_in);
           PetscInt is_complement_local_size =
             cast_int<PetscInt>(rhs_in.local_size()-is_local_size);
 
-          Vec subvec1 = libmesh_nullptr;
-          Mat submat1 = libmesh_nullptr;
-          VecScatter scatter1 = libmesh_nullptr;
+          Vec subvec1 = nullptr;
+          Mat submat1 = nullptr;
+          VecScatter scatter1 = nullptr;
 
           ierr = VecCreate(this->comm().get(),&subvec1);
           LIBMESH_CHKERR(ierr);
@@ -498,7 +546,7 @@ PetscLinearSolver<T>::solve (SparseMatrix<T> &  matrix_in,
           ierr = VecSetFromOptions(subvec1);
           LIBMESH_CHKERR(ierr);
 
-          ierr = VecScatterCreate(rhs->vec(),_restrict_solve_to_is_complement, subvec1, libmesh_nullptr, &scatter1);
+          ierr = LibMeshVecScatterCreate(rhs->vec(),_restrict_solve_to_is_complement, subvec1, nullptr, &scatter1);
           LIBMESH_CHKERR(ierr);
 
           ierr = VecScatterBegin(scatter1,_subset_solve_mode==SUBSET_COPY_RHS ? rhs->vec() : solution->vec(),subvec1,INSERT_VALUES,SCATTER_FORWARD);
@@ -509,17 +557,15 @@ PetscLinearSolver<T>::solve (SparseMatrix<T> &  matrix_in,
           ierr = VecScale(subvec1,-1.0);
           LIBMESH_CHKERR(ierr);
 
+          ierr = LibMeshCreateSubMatrix(matrix->mat(),
+                                        _restrict_solve_to_is,
+                                        _restrict_solve_to_is_complement,
 #if PETSC_VERSION_LESS_THAN(3,1,0)
-          ierr = MatGetSubMatrix(matrix->mat(),
-                                 _restrict_solve_to_is,_restrict_solve_to_is_complement,
-                                 PETSC_DECIDE,MAT_INITIAL_MATRIX,&submat1);
-          LIBMESH_CHKERR(ierr);
-#else
-          ierr = MatGetSubMatrix(matrix->mat(),
-                                 _restrict_solve_to_is,_restrict_solve_to_is_complement,
-                                 MAT_INITIAL_MATRIX,&submat1);
-          LIBMESH_CHKERR(ierr);
+                                        PETSC_DECIDE,
 #endif
+                                        MAT_INITIAL_MATRIX,
+                                        &submat1);
+          LIBMESH_CHKERR(ierr);
 
           ierr = MatMultAdd(submat1,subvec1,subrhs,subrhs);
           LIBMESH_CHKERR(ierr);
@@ -542,10 +588,9 @@ PetscLinearSolver<T>::solve (SparseMatrix<T> &  matrix_in,
 #endif
       LIBMESH_CHKERR(ierr);
 
-      if(this->_preconditioner)
+      if (this->_preconditioner)
         {
-          subprecond_matrix = new PetscMatrix<Number>(subprecond,
-                                                      this->comm());
+          subprecond_matrix.reset(new PetscMatrix<Number>(subprecond, this->comm()));
           this->_preconditioner->set_matrix(*subprecond_matrix);
           this->_preconditioner->init();
         }
@@ -563,7 +608,7 @@ PetscLinearSolver<T>::solve (SparseMatrix<T> &  matrix_in,
 #endif
       LIBMESH_CHKERR(ierr);
 
-      if(this->_preconditioner)
+      if (this->_preconditioner)
         {
           this->_preconditioner->set_matrix(matrix_in);
           this->_preconditioner->init();
@@ -582,13 +627,13 @@ PetscLinearSolver<T>::solve (SparseMatrix<T> &  matrix_in,
 
   // If the SolverConfiguration object is provided, use it to override
   // solver options.
-  if(this->_solver_configuration)
+  if (this->_solver_configuration)
     {
       this->_solver_configuration->configure_solver();
     }
 
   // Solve the linear system
-  if (_restrict_solve_to_is != libmesh_nullptr)
+  if (_restrict_solve_to_is != nullptr)
     {
       ierr = KSPSolve (_ksp, subrhs, subsolution);
       LIBMESH_CHKERR(ierr);
@@ -607,7 +652,7 @@ PetscLinearSolver<T>::solve (SparseMatrix<T> &  matrix_in,
   ierr = KSPGetResidualNorm (_ksp, &final_resid);
   LIBMESH_CHKERR(ierr);
 
-  if (_restrict_solve_to_is != libmesh_nullptr)
+  if (_restrict_solve_to_is != nullptr)
     {
       switch(_subset_solve_mode)
         {
@@ -636,14 +681,12 @@ PetscLinearSolver<T>::solve (SparseMatrix<T> &  matrix_in,
       ierr = LibMeshVecScatterDestroy(&scatter);
       LIBMESH_CHKERR(ierr);
 
-      if(this->_preconditioner)
+      if (this->_preconditioner)
         {
-          /* Before we delete subprecond_matrix, we should give the
-             _preconditioner a different matrix.  */
+          // Before subprecond_matrix gets cleaned up, we should give
+          // the _preconditioner a different matrix.
           this->_preconditioner->set_matrix(matrix_in);
           this->_preconditioner->init();
-          delete subprecond_matrix;
-          subprecond_matrix = libmesh_nullptr;
         }
 
       ierr = LibMeshVecDestroy(&subsolution);
@@ -656,7 +699,6 @@ PetscLinearSolver<T>::solve (SparseMatrix<T> &  matrix_in,
       LIBMESH_CHKERR(ierr);
     }
 
-  STOP_LOG("solve()", "PetscLinearSolver");
   // return the # of its. and the final residual norm.
   return std::make_pair(its, final_resid);
 }
@@ -669,7 +711,7 @@ PetscLinearSolver<T>::adjoint_solve (SparseMatrix<T> &  matrix_in,
                                      const double tol,
                                      const unsigned int m_its)
 {
-  START_LOG("solve()", "PetscLinearSolver");
+  LOG_SCOPE("solve()", "PetscLinearSolver");
 
   // Make sure the data passed in are really of Petsc types
   PetscMatrix<T> * matrix   = cast_ptr<PetscMatrix<T> *>(&matrix_in);
@@ -690,16 +732,16 @@ PetscLinearSolver<T>::adjoint_solve (SparseMatrix<T> &  matrix_in,
   solution->close ();
   rhs->close ();
 
-  Mat submat = libmesh_nullptr;
-  Mat subprecond = libmesh_nullptr;
-  Vec subrhs = libmesh_nullptr;
-  Vec subsolution = libmesh_nullptr;
-  VecScatter scatter = libmesh_nullptr;
-  PetscMatrix<Number> * subprecond_matrix = libmesh_nullptr;
+  Mat submat = nullptr;
+  Mat subprecond = nullptr;
+  Vec subrhs = nullptr;
+  Vec subsolution = nullptr;
+  VecScatter scatter = nullptr;
+  std::unique_ptr<PetscMatrix<Number>> subprecond_matrix;
 
   // Set operators.  Also restrict rhs and solution vector to
-  // subdomain if neccessary.
-  if (_restrict_solve_to_is != libmesh_nullptr)
+  // subdomain if necessary.
+  if (_restrict_solve_to_is != nullptr)
     {
       PetscInt is_local_size = this->_restrict_solve_to_is_local_size();
 
@@ -717,7 +759,7 @@ PetscLinearSolver<T>::adjoint_solve (SparseMatrix<T> &  matrix_in,
       ierr = VecSetFromOptions(subsolution);
       LIBMESH_CHKERR(ierr);
 
-      ierr = VecScatterCreate(rhs->vec(),_restrict_solve_to_is, subrhs, libmesh_nullptr, &scatter);
+      ierr = LibMeshVecScatterCreate(rhs->vec(),_restrict_solve_to_is, subrhs, nullptr, &scatter);
       LIBMESH_CHKERR(ierr);
 
       ierr = VecScatterBegin(scatter,rhs->vec(),subrhs,INSERT_VALUES,SCATTER_FORWARD);
@@ -730,39 +772,39 @@ PetscLinearSolver<T>::adjoint_solve (SparseMatrix<T> &  matrix_in,
       ierr = VecScatterEnd(scatter,solution->vec(),subsolution,INSERT_VALUES,SCATTER_FORWARD);
       LIBMESH_CHKERR(ierr);
 
+      ierr = LibMeshCreateSubMatrix(matrix->mat(),
+                                    _restrict_solve_to_is,
+                                    _restrict_solve_to_is,
 #if PETSC_VERSION_LESS_THAN(3,1,0)
-      ierr = MatGetSubMatrix(matrix->mat(),
-                             _restrict_solve_to_is,_restrict_solve_to_is,
-                             PETSC_DECIDE,MAT_INITIAL_MATRIX,&submat);
-      LIBMESH_CHKERR(ierr);
-      ierr = MatGetSubMatrix(precond->mat(),
-                             _restrict_solve_to_is,_restrict_solve_to_is,
-                             PETSC_DECIDE,MAT_INITIAL_MATRIX,&subprecond);
-      LIBMESH_CHKERR(ierr);
-#else
-      ierr = MatGetSubMatrix(matrix->mat(),
-                             _restrict_solve_to_is,_restrict_solve_to_is,
-                             MAT_INITIAL_MATRIX,&submat);
-      LIBMESH_CHKERR(ierr);
-      ierr = MatGetSubMatrix(precond->mat(),
-                             _restrict_solve_to_is,_restrict_solve_to_is,
-                             MAT_INITIAL_MATRIX,&subprecond);
-      LIBMESH_CHKERR(ierr);
+                                    PETSC_DECIDE,
 #endif
+                                    MAT_INITIAL_MATRIX,
+                                    &submat);
+      LIBMESH_CHKERR(ierr);
+
+      ierr = LibMeshCreateSubMatrix(precond->mat(),
+                                    _restrict_solve_to_is,
+                                    _restrict_solve_to_is,
+#if PETSC_VERSION_LESS_THAN(3,1,0)
+                                    PETSC_DECIDE,
+#endif
+                                    MAT_INITIAL_MATRIX,
+                                    &subprecond);
+      LIBMESH_CHKERR(ierr);
 
       /* Since removing columns of the matrix changes the equation
          system, we will now change the right hand side to compensate
          for this.  Note that this is not necessary if \p SUBSET_ZERO
          has been selected.  */
-      if(_subset_solve_mode!=SUBSET_ZERO)
+      if (_subset_solve_mode!=SUBSET_ZERO)
         {
           _create_complement_is(rhs_in);
           PetscInt is_complement_local_size =
             cast_int<PetscInt>(rhs_in.local_size()-is_local_size);
 
-          Vec subvec1 = libmesh_nullptr;
-          Mat submat1 = libmesh_nullptr;
-          VecScatter scatter1 = libmesh_nullptr;
+          Vec subvec1 = nullptr;
+          Mat submat1 = nullptr;
+          VecScatter scatter1 = nullptr;
 
           ierr = VecCreate(this->comm().get(),&subvec1);
           LIBMESH_CHKERR(ierr);
@@ -771,7 +813,7 @@ PetscLinearSolver<T>::adjoint_solve (SparseMatrix<T> &  matrix_in,
           ierr = VecSetFromOptions(subvec1);
           LIBMESH_CHKERR(ierr);
 
-          ierr = VecScatterCreate(rhs->vec(),_restrict_solve_to_is_complement, subvec1, libmesh_nullptr, &scatter1);
+          ierr = LibMeshVecScatterCreate(rhs->vec(),_restrict_solve_to_is_complement, subvec1, nullptr, &scatter1);
           LIBMESH_CHKERR(ierr);
 
           ierr = VecScatterBegin(scatter1,_subset_solve_mode==SUBSET_COPY_RHS ? rhs->vec() : solution->vec(),subvec1,INSERT_VALUES,SCATTER_FORWARD);
@@ -782,17 +824,15 @@ PetscLinearSolver<T>::adjoint_solve (SparseMatrix<T> &  matrix_in,
           ierr = VecScale(subvec1,-1.0);
           LIBMESH_CHKERR(ierr);
 
+          ierr = LibMeshCreateSubMatrix(matrix->mat(),
+                                        _restrict_solve_to_is,
+                                        _restrict_solve_to_is_complement,
 #if PETSC_VERSION_LESS_THAN(3,1,0)
-          ierr = MatGetSubMatrix(matrix->mat(),
-                                 _restrict_solve_to_is,_restrict_solve_to_is_complement,
-                                 PETSC_DECIDE,MAT_INITIAL_MATRIX,&submat1);
-          LIBMESH_CHKERR(ierr);
-#else
-          ierr = MatGetSubMatrix(matrix->mat(),
-                                 _restrict_solve_to_is,_restrict_solve_to_is_complement,
-                                 MAT_INITIAL_MATRIX,&submat1);
-          LIBMESH_CHKERR(ierr);
+                                        PETSC_DECIDE,
 #endif
+                                        MAT_INITIAL_MATRIX,
+                                        &submat1);
+          LIBMESH_CHKERR(ierr);
 
           ierr = MatMultAdd(submat1,subvec1,subrhs,subrhs);
           LIBMESH_CHKERR(ierr);
@@ -815,10 +855,9 @@ PetscLinearSolver<T>::adjoint_solve (SparseMatrix<T> &  matrix_in,
 #endif
       LIBMESH_CHKERR(ierr);
 
-      if(this->_preconditioner)
+      if (this->_preconditioner)
         {
-          subprecond_matrix = new PetscMatrix<Number>(subprecond,
-                                                      this->comm());
+          subprecond_matrix.reset(new PetscMatrix<Number>(subprecond, this->comm()));
           this->_preconditioner->set_matrix(*subprecond_matrix);
           this->_preconditioner->init();
         }
@@ -836,7 +875,7 @@ PetscLinearSolver<T>::adjoint_solve (SparseMatrix<T> &  matrix_in,
 #endif
       LIBMESH_CHKERR(ierr);
 
-      if(this->_preconditioner)
+      if (this->_preconditioner)
         {
           this->_preconditioner->set_matrix(matrix_in);
           this->_preconditioner->init();
@@ -854,7 +893,7 @@ PetscLinearSolver<T>::adjoint_solve (SparseMatrix<T> &  matrix_in,
   LIBMESH_CHKERR(ierr);
 
   // Solve the linear system
-  if (_restrict_solve_to_is != libmesh_nullptr)
+  if (_restrict_solve_to_is != nullptr)
     {
       ierr = KSPSolveTranspose (_ksp, subrhs, subsolution);
       LIBMESH_CHKERR(ierr);
@@ -873,7 +912,7 @@ PetscLinearSolver<T>::adjoint_solve (SparseMatrix<T> &  matrix_in,
   ierr = KSPGetResidualNorm (_ksp, &final_resid);
   LIBMESH_CHKERR(ierr);
 
-  if (_restrict_solve_to_is != libmesh_nullptr)
+  if (_restrict_solve_to_is != nullptr)
     {
       switch(_subset_solve_mode)
         {
@@ -902,14 +941,12 @@ PetscLinearSolver<T>::adjoint_solve (SparseMatrix<T> &  matrix_in,
       ierr = LibMeshVecScatterDestroy(&scatter);
       LIBMESH_CHKERR(ierr);
 
-      if(this->_preconditioner)
+      if (this->_preconditioner)
         {
-          /* Before we delete subprecond_matrix, we should give the
-             _preconditioner a different matrix.  */
+          // Before subprecond_matrix gets cleaned up, we should give
+          // the _preconditioner a different matrix.
           this->_preconditioner->set_matrix(matrix_in);
           this->_preconditioner->init();
-          delete subprecond_matrix;
-          subprecond_matrix = libmesh_nullptr;
         }
 
       ierr = LibMeshVecDestroy(&subsolution);
@@ -922,7 +959,6 @@ PetscLinearSolver<T>::adjoint_solve (SparseMatrix<T> &  matrix_in,
       LIBMESH_CHKERR(ierr);
     }
 
-  STOP_LOG("solve()", "PetscLinearSolver");
   // return the # of its. and the final residual norm.
   return std::make_pair(its, final_resid);
 }
@@ -938,14 +974,14 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
 {
 
 #if PETSC_VERSION_LESS_THAN(3,1,0)
-  if (_restrict_solve_to_is != libmesh_nullptr)
+  if (_restrict_solve_to_is != nullptr)
     libmesh_error_msg("The current implementation of subset solves with " \
                       << "shell matrices requires PETSc version 3.1 or above.  " \
                       << "Older PETSc version do not support automatic " \
                       << "submatrix generation of shell matrices.");
 #endif
 
-  START_LOG("solve()", "PetscLinearSolver");
+  LOG_SCOPE("solve()", "PetscLinearSolver");
 
   // Make sure the data passed in are really of Petsc types
   PetscVector<T> * solution = cast_ptr<PetscVector<T> *>(&solution_in);
@@ -957,10 +993,10 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
   PetscInt its=0, max_its = static_cast<PetscInt>(m_its);
   PetscReal final_resid=0.;
 
-  Mat submat = libmesh_nullptr;
-  Vec subrhs = libmesh_nullptr;
-  Vec subsolution = libmesh_nullptr;
-  VecScatter scatter = libmesh_nullptr;
+  Mat submat = nullptr;
+  Vec subrhs = nullptr;
+  Vec subsolution = nullptr;
+  VecScatter scatter = nullptr;
 
   // Close the matrices and vectors in case this wasn't already done.
   solution->close ();
@@ -990,7 +1026,7 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
 
   // Restrict rhs and solution vectors and set operators.  The input
   // matrix works as the preconditioning matrix.
-  if (_restrict_solve_to_is != libmesh_nullptr)
+  if (_restrict_solve_to_is != nullptr)
     {
       PetscInt is_local_size = this->_restrict_solve_to_is_local_size();
 
@@ -1008,7 +1044,7 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
       ierr = VecSetFromOptions(subsolution);
       LIBMESH_CHKERR(ierr);
 
-      ierr = VecScatterCreate(rhs->vec(),_restrict_solve_to_is, subrhs, libmesh_nullptr, &scatter);
+      ierr = LibMeshVecScatterCreate(rhs->vec(),_restrict_solve_to_is, subrhs, nullptr, &scatter);
       LIBMESH_CHKERR(ierr);
 
       ierr = VecScatterBegin(scatter,rhs->vec(),subrhs,INSERT_VALUES,SCATTER_FORWARD);
@@ -1021,13 +1057,12 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
       ierr = VecScatterEnd(scatter,solution->vec(),subsolution,INSERT_VALUES,SCATTER_FORWARD);
       LIBMESH_CHKERR(ierr);
 
-#if PETSC_VERSION_LESS_THAN(3,1,0)
-      /* This point can't be reached, see above.  */
-      libmesh_assert(false);
-#else
-      ierr = MatGetSubMatrix(mat,
-                             _restrict_solve_to_is,_restrict_solve_to_is,
-                             MAT_INITIAL_MATRIX,&submat);
+#if !PETSC_VERSION_LESS_THAN(3,1,0)
+      ierr = LibMeshCreateSubMatrix(mat,
+                                    _restrict_solve_to_is,
+                                    _restrict_solve_to_is,
+                                    MAT_INITIAL_MATRIX,
+                                    &submat);
       LIBMESH_CHKERR(ierr);
 #endif
 
@@ -1035,15 +1070,15 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
          system, we will now change the right hand side to compensate
          for this.  Note that this is not necessary if \p SUBSET_ZERO
          has been selected.  */
-      if(_subset_solve_mode!=SUBSET_ZERO)
+      if (_subset_solve_mode!=SUBSET_ZERO)
         {
           _create_complement_is(rhs_in);
           PetscInt is_complement_local_size =
             cast_int<PetscInt>(rhs_in.local_size()-is_local_size);
 
-          Vec subvec1 = libmesh_nullptr;
-          Mat submat1 = libmesh_nullptr;
-          VecScatter scatter1 = libmesh_nullptr;
+          Vec subvec1 = nullptr;
+          Mat submat1 = nullptr;
+          VecScatter scatter1 = nullptr;
 
           ierr = VecCreate(this->comm().get(),&subvec1);
           LIBMESH_CHKERR(ierr);
@@ -1052,7 +1087,7 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
           ierr = VecSetFromOptions(subvec1);
           LIBMESH_CHKERR(ierr);
 
-          ierr = VecScatterCreate(rhs->vec(),_restrict_solve_to_is_complement, subvec1, libmesh_nullptr, &scatter1);
+          ierr = LibMeshVecScatterCreate(rhs->vec(),_restrict_solve_to_is_complement, subvec1, nullptr, &scatter1);
           LIBMESH_CHKERR(ierr);
 
           ierr = VecScatterBegin(scatter1,_subset_solve_mode==SUBSET_COPY_RHS ? rhs->vec() : solution->vec(),subvec1,INSERT_VALUES,SCATTER_FORWARD);
@@ -1063,13 +1098,12 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
           ierr = VecScale(subvec1,-1.0);
           LIBMESH_CHKERR(ierr);
 
-#if PETSC_VERSION_LESS_THAN(3,1,0)
-          /* This point can't be reached, see above.  */
-          libmesh_assert(false);
-#else
-          ierr = MatGetSubMatrix(mat,
-                                 _restrict_solve_to_is,_restrict_solve_to_is_complement,
-                                 MAT_INITIAL_MATRIX,&submat1);
+#if !PETSC_VERSION_LESS_THAN(3,1,0)
+          ierr = LibMeshCreateSubMatrix(mat,
+                                        _restrict_solve_to_is,
+                                        _restrict_solve_to_is_complement,
+                                        MAT_INITIAL_MATRIX,
+                                        &submat1);
           LIBMESH_CHKERR(ierr);
 #endif
 
@@ -1083,7 +1117,7 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
           // We workaround by using a temporary vector.  Note that the
           // fix in PETsc 3.1.0-p6 uses a temporary vector internally,
           // so this is no effective performance loss.
-          Vec subvec2 = libmesh_nullptr;
+          Vec subvec2 = nullptr;
           ierr = VecCreate(this->comm().get(),&subvec2);
           LIBMESH_CHKERR(ierr);
           ierr = VecSetSizes(subvec2,is_local_size,PETSC_DECIDE);
@@ -1131,7 +1165,7 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
   LIBMESH_CHKERR(ierr);
 
   // Solve the linear system
-  if (_restrict_solve_to_is != libmesh_nullptr)
+  if (_restrict_solve_to_is != nullptr)
     {
       ierr = KSPSolve (_ksp, subrhs, subsolution);
       LIBMESH_CHKERR(ierr);
@@ -1150,7 +1184,7 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
   ierr = KSPGetResidualNorm (_ksp, &final_resid);
   LIBMESH_CHKERR(ierr);
 
-  if (_restrict_solve_to_is != libmesh_nullptr)
+  if (_restrict_solve_to_is != nullptr)
     {
       switch(_subset_solve_mode)
         {
@@ -1191,7 +1225,6 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
   ierr = LibMeshMatDestroy(&mat);
   LIBMESH_CHKERR(ierr);
 
-  STOP_LOG("solve()", "PetscLinearSolver");
   // return the # of its. and the final residual norm.
   return std::make_pair(its, final_resid);
 }
@@ -1209,14 +1242,14 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
 {
 
 #if PETSC_VERSION_LESS_THAN(3,1,0)
-  if (_restrict_solve_to_is != libmesh_nullptr)
+  if (_restrict_solve_to_is != nullptr)
     libmesh_error_msg("The current implementation of subset solves with " \
                       << "shell matrices requires PETSc version 3.1 or above.  " \
                       << "Older PETSc version do not support automatic " \
                       << "submatrix generation of shell matrices.");
 #endif
 
-  START_LOG("solve()", "PetscLinearSolver");
+  LOG_SCOPE("solve()", "PetscLinearSolver");
 
   // Make sure the data passed in are really of Petsc types
   const PetscMatrix<T> * precond  = cast_ptr<const PetscMatrix<T> *>(&precond_matrix);
@@ -1229,12 +1262,12 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
   PetscInt its=0, max_its = static_cast<PetscInt>(m_its);
   PetscReal final_resid=0.;
 
-  Mat submat = libmesh_nullptr;
-  Mat subprecond = libmesh_nullptr;
-  Vec subrhs = libmesh_nullptr;
-  Vec subsolution = libmesh_nullptr;
-  VecScatter scatter = libmesh_nullptr;
-  PetscMatrix<Number> * subprecond_matrix = libmesh_nullptr;
+  Mat submat = nullptr;
+  Mat subprecond = nullptr;
+  Vec subrhs = nullptr;
+  Vec subsolution = nullptr;
+  VecScatter scatter = nullptr;
+  std::unique_ptr<PetscMatrix<Number>> subprecond_matrix;
 
   // Close the matrices and vectors in case this wasn't already done.
   solution->close ();
@@ -1264,7 +1297,7 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
 
   // Restrict rhs and solution vectors and set operators.  The input
   // matrix works as the preconditioning matrix.
-  if (_restrict_solve_to_is != libmesh_nullptr)
+  if (_restrict_solve_to_is != nullptr)
     {
       PetscInt is_local_size = this->_restrict_solve_to_is_local_size();
 
@@ -1282,7 +1315,7 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
       ierr = VecSetFromOptions(subsolution);
       LIBMESH_CHKERR(ierr);
 
-      ierr = VecScatterCreate(rhs->vec(),_restrict_solve_to_is, subrhs, libmesh_nullptr, &scatter);
+      ierr = LibMeshVecScatterCreate(rhs->vec(),_restrict_solve_to_is, subrhs, nullptr, &scatter);
       LIBMESH_CHKERR(ierr);
 
       ierr = VecScatterBegin(scatter,rhs->vec(),subrhs,INSERT_VALUES,SCATTER_FORWARD);
@@ -1295,17 +1328,19 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
       ierr = VecScatterEnd(scatter,solution->vec(),subsolution,INSERT_VALUES,SCATTER_FORWARD);
       LIBMESH_CHKERR(ierr);
 
-#if PETSC_VERSION_LESS_THAN(3,1,0)
-      /* This point can't be reached, see above.  */
-      libmesh_assert(false);
-#else
-      ierr = MatGetSubMatrix(mat,
-                             _restrict_solve_to_is,_restrict_solve_to_is,
-                             MAT_INITIAL_MATRIX,&submat);
+#if !PETSC_VERSION_LESS_THAN(3,1,0)
+      ierr = LibMeshCreateSubMatrix(mat,
+                                    _restrict_solve_to_is,
+                                    _restrict_solve_to_is,
+                                    MAT_INITIAL_MATRIX,
+                                    &submat);
       LIBMESH_CHKERR(ierr);
-      ierr = MatGetSubMatrix(const_cast<PetscMatrix<T> *>(precond)->mat(),
-                             _restrict_solve_to_is,_restrict_solve_to_is,
-                             MAT_INITIAL_MATRIX,&subprecond);
+
+      ierr = LibMeshCreateSubMatrix(const_cast<PetscMatrix<T> *>(precond)->mat(),
+                                    _restrict_solve_to_is,
+                                    _restrict_solve_to_is,
+                                    MAT_INITIAL_MATRIX,
+                                    &subprecond);
       LIBMESH_CHKERR(ierr);
 #endif
 
@@ -1313,14 +1348,14 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
          system, we will now change the right hand side to compensate
          for this.  Note that this is not necessary if \p SUBSET_ZERO
          has been selected.  */
-      if(_subset_solve_mode!=SUBSET_ZERO)
+      if (_subset_solve_mode!=SUBSET_ZERO)
         {
           _create_complement_is(rhs_in);
           PetscInt is_complement_local_size = rhs_in.local_size()-is_local_size;
 
-          Vec subvec1 = libmesh_nullptr;
-          Mat submat1 = libmesh_nullptr;
-          VecScatter scatter1 = libmesh_nullptr;
+          Vec subvec1 = nullptr;
+          Mat submat1 = nullptr;
+          VecScatter scatter1 = nullptr;
 
           ierr = VecCreate(this->comm().get(),&subvec1);
           LIBMESH_CHKERR(ierr);
@@ -1329,7 +1364,7 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
           ierr = VecSetFromOptions(subvec1);
           LIBMESH_CHKERR(ierr);
 
-          ierr = VecScatterCreate(rhs->vec(),_restrict_solve_to_is_complement, subvec1, libmesh_nullptr, &scatter1);
+          ierr = LibMeshVecScatterCreate(rhs->vec(),_restrict_solve_to_is_complement, subvec1, nullptr, &scatter1);
           LIBMESH_CHKERR(ierr);
 
           ierr = VecScatterBegin(scatter1,_subset_solve_mode==SUBSET_COPY_RHS ? rhs->vec() : solution->vec(),subvec1,INSERT_VALUES,SCATTER_FORWARD);
@@ -1340,13 +1375,12 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
           ierr = VecScale(subvec1,-1.0);
           LIBMESH_CHKERR(ierr);
 
-#if PETSC_VERSION_LESS_THAN(3,1,0)
-          /* This point can't be reached, see above.  */
-          libmesh_assert(false);
-#else
-          ierr = MatGetSubMatrix(mat,
-                                 _restrict_solve_to_is,_restrict_solve_to_is_complement,
-                                 MAT_INITIAL_MATRIX,&submat1);
+#if !PETSC_VERSION_LESS_THAN(3,1,0)
+          ierr = LibMeshCreateSubMatrix(mat,
+                                        _restrict_solve_to_is,
+                                        _restrict_solve_to_is_complement,
+                                        MAT_INITIAL_MATRIX,
+                                        &submat1);
           LIBMESH_CHKERR(ierr);
 #endif
 
@@ -1360,7 +1394,7 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
           // We workaround by using a temporary vector.  Note that the
           // fix in PETsc 3.1.0-p6 uses a temporary vector internally,
           // so this is no effective performance loss.
-          Vec subvec2 = libmesh_nullptr;
+          Vec subvec2 = nullptr;
           ierr = VecCreate(this->comm().get(),&subvec2);
           LIBMESH_CHKERR(ierr);
           ierr = VecSetSizes(subvec2,is_local_size,PETSC_DECIDE);
@@ -1388,10 +1422,9 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
 #endif
       LIBMESH_CHKERR(ierr);
 
-      if(this->_preconditioner)
+      if (this->_preconditioner)
         {
-          subprecond_matrix = new PetscMatrix<Number>(subprecond,
-                                                      this->comm());
+          subprecond_matrix.reset(new PetscMatrix<Number>(subprecond, this->comm()));
           this->_preconditioner->set_matrix(*subprecond_matrix);
           this->_preconditioner->init();
         }
@@ -1406,7 +1439,7 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
 #endif
       LIBMESH_CHKERR(ierr);
 
-      if(this->_preconditioner)
+      if (this->_preconditioner)
         {
           this->_preconditioner->set_matrix(const_cast<SparseMatrix<Number> &>(precond_matrix));
           this->_preconditioner->init();
@@ -1424,7 +1457,7 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
   LIBMESH_CHKERR(ierr);
 
   // Solve the linear system
-  if (_restrict_solve_to_is != libmesh_nullptr)
+  if (_restrict_solve_to_is != nullptr)
     {
       ierr = KSPSolve (_ksp, subrhs, subsolution);
       LIBMESH_CHKERR(ierr);
@@ -1443,7 +1476,7 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
   ierr = KSPGetResidualNorm (_ksp, &final_resid);
   LIBMESH_CHKERR(ierr);
 
-  if (_restrict_solve_to_is != libmesh_nullptr)
+  if (_restrict_solve_to_is != nullptr)
     {
       switch(_subset_solve_mode)
         {
@@ -1472,14 +1505,12 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
       ierr = LibMeshVecScatterDestroy(&scatter);
       LIBMESH_CHKERR(ierr);
 
-      if(this->_preconditioner)
+      if (this->_preconditioner)
         {
-          /* Before we delete subprecond_matrix, we should give the
-             _preconditioner a different matrix.  */
+          // Before subprecond_matrix gets cleaned up, we should give
+          // the _preconditioner a different matrix.
           this->_preconditioner->set_matrix(const_cast<SparseMatrix<Number> &>(precond_matrix));
           this->_preconditioner->init();
-          delete subprecond_matrix;
-          subprecond_matrix = libmesh_nullptr;
         }
 
       ierr = LibMeshVecDestroy(&subsolution);
@@ -1496,7 +1527,6 @@ PetscLinearSolver<T>::solve (const ShellMatrix<T> & shell_matrix,
   ierr = LibMeshMatDestroy(&mat);
   LIBMESH_CHKERR(ierr);
 
-  STOP_LOG("solve()", "PetscLinearSolver");
   // return the # of its. and the final residual norm.
   return std::make_pair(its, final_resid);
 }
@@ -1683,6 +1713,9 @@ LinearConvergenceReason PetscLinearSolver<T>::get_converged_reason() const
 #endif
     case KSP_DIVERGED_INDEFINITE_MAT   : return DIVERGED_INDEFINITE_MAT;
     case KSP_CONVERGED_ITERATING       : return CONVERGED_ITERATING;
+#if !PETSC_VERSION_LESS_THAN(3,7,0)
+    case KSP_DIVERGED_PCSETUP_FAILED   : return DIVERGED_PCSETUP_FAILED;
+#endif
     default :
       libMesh::err << "Unknown convergence flag!" << std::endl;
       return UNKNOWN_FLAG;
@@ -1731,7 +1764,7 @@ PetscErrorCode PetscLinearSolver<T>::_petsc_shell_matrix_mult_add(Mat mat, Vec a
   PetscVector<T> dest_global(dest, shell_matrix.comm());
   PetscVector<T> add_global(add, shell_matrix.comm());
 
-  if(add!=arg)
+  if (add!=arg)
     {
       arg_global = add_global;
     }

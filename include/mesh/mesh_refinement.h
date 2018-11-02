@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -26,19 +26,19 @@
 
 #ifdef LIBMESH_ENABLE_AMR
 
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/libmesh_common.h"
 #include "libmesh/libmesh.h" // libMesh::invalid_uint
 #include "libmesh/topology_map.h"
 #include "libmesh/parallel_object.h"
 
-// C++ Includes   -----------------------------------
+// C++ Includes
 #include <vector>
 
 namespace libMesh
 {
 
-// Forward Declarations -----------------------------
+// Forward Declarations
 class MeshBase;
 class Point;
 class Node;
@@ -53,6 +53,7 @@ class PointLocatorBase;
  *
  * \author Benjamin S. Kirk
  * \date 2002-2007
+ * \brief Responsible for mesh refinement algorithms and data.
  */
 class MeshRefinement : public ParallelObject
 {
@@ -150,7 +151,8 @@ public:
    * ratios exceed \p coarsen_threshold.  It flags no more than
    * \p refine_fraction * n_elem elements for refinement and flags no
    * more than \p coarsen_fraction * n_elem elements for coarsening.
-   * This method returns true if it has done all the AMR/C it can do
+   *
+   * \returns \p true if it has done all the AMR/C it can do
    * in a single step, or false if further adaptive steps may be required
    * to produce a mesh with a narrow error distribution and the right
    * number of elements.
@@ -215,12 +217,13 @@ public:
    * Refines and coarsens user-requested elements. Will also
    * refine/coarsen additional elements to satisfy level-one rule.
    * It is possible that for a given set of refinement flags there
-   * is actually no change upon calling this member function.  Consequently,
-   * this function returns \p true if the mesh actually changed (hence
+   * is actually no change upon calling this member function.
+   *
+   * \returns \p true if the mesh actually changed (hence
    * data needs to be projected) and \p false otherwise.
    *
-   * This function used to take an argument, \p maintain_level_one -
-   * new code should use face_level_mismatch_limit() instead.
+   * \note This function used to take an argument, \p maintain_level_one.
+   * New code should use \p face_level_mismatch_limit() instead.
    */
   bool refine_and_coarsen_elements ();
 
@@ -228,11 +231,12 @@ public:
    * Only coarsens the user-requested elements. Some elements
    * will not be coarsened to satisfy the level one rule.
    * It is possible that for a given set of refinement flags there
-   * is actually no change upon calling this member function.  Consequently,
-   * this function returns \p true if the mesh actually changed (hence
-   * data needs to be projected) and \p false otherwise.
+   * is actually no change upon calling this member function.
    *
-   * This function used to take an argument, \p maintain_level_one -
+   * \returns \p true if the mesh actually changed (hence data needs
+   * to be projected) and \p false otherwise.
+   *
+   * \note This function used to take an argument, \p maintain_level_one,
    * new code should use face_level_mismatch_limit() instead.
    */
   bool coarsen_elements ();
@@ -240,12 +244,13 @@ public:
   /**
    * Only refines the user-requested elements.
    * It is possible that for a given set of refinement flags there
-   * is actually no change upon calling this member function.  Consequently,
-   * this function returns \p true if the mesh actually changed (hence
+   * is actually no change upon calling this member function.
+   *
+   * \returns \p true if the mesh actually changed (hence
    * data needs to be projected) and \p false otherwise.
    *
-   * This function used to take an argument, \p maintain_level_one -
-   * new code should use face_level_mismatch_limit() instead.
+   * \note This function used to take an argument, \p maintain_level_one,
+   * new code should use \p face_level_mismatch_limit() instead.
    */
   bool refine_elements ();
 
@@ -276,30 +281,33 @@ public:
   void clean_refinement_flags ();
 
   /**
-   * Returns true if and only if the mesh is level one smooth
-   * Returns false otherwise
-   * Aborts the program if libmesh_assert_yes is true and
-   * the mesh is not level one smooth
+   * \returns \p true if the mesh satisfies the level one restriction,
+   * and false otherwise.
+   *
+   * Aborts the program if \p libmesh_assert_yes is true and the mesh
+   * does not satisfy the level one restriction.
    */
   bool test_level_one (bool libmesh_assert_yes = false);
 
   /**
-   * Returns true if and only if the mesh has no elements
-   * flagged to be coarsened or refined
-   * Returns false otherwise
-   * Aborts the program if libmesh_assert_yes is true and
-   * the mesh has flagged elements
+   * \returns \p true if the mesh has no elements flagged to be
+   * coarsened or refined, and false otherwise.
+   *
+   * Aborts the program if libmesh_assert_yes is true and the mesh has
+   * flagged elements.
    */
   bool test_unflagged (bool libmesh_assert_yes = false);
 
   /**
    * Add a node to the mesh.  The node should be node n of child c of
-   * parent Elem parent.  The function returns a pointer to a suitable
-   * existing node, or creates a new node and returns a pointer to it
-   * if necessary.
-   * The processor_id is assigned to any newly created node.
+   * parent Elem parent.  The processor id \proc_id is used if
+   * necessary to help determine numbering of newly created nodes, but
+   * newly created nodes are left unpartitioned until a node
+   * partitionining sweep is done later.
+   *
+   * \returns A pointer to a suitable existing or newly-created node.
    */
-  Node * add_node (const Elem & parent,
+  Node * add_node (Elem & parent,
                    unsigned int child,
                    unsigned int node,
                    processor_id_type proc_id);
@@ -310,13 +318,13 @@ public:
   Elem * add_elem (Elem * elem);
 
   /**
-   * @returns a constant reference to the \p MeshBase object associated
+   * \returns A constant reference to the \p MeshBase object associated
    * with this object.
    */
   const MeshBase & get_mesh () const { return _mesh; }
 
   /**
-   * @returns a writeable reference to the \p MeshBase object associated
+   * \returns A writable reference to the \p MeshBase object associated
    * with this object.
    */
   MeshBase & get_mesh () { return _mesh; }
@@ -459,23 +467,31 @@ public:
 
   /**
    * Copy refinement flags on ghost elements from their
-   * local processors.  Return true if any flags changed.
+   * local processors.
+   *
+   * \returns \p true if any flags changed.
    */
   bool make_flags_parallel_consistent ();
 
   /**
-   * Returns the state of the _enforce_mismatch_limit_prior_to_refinement flag.
-   * Defaults to false.
-   * Deprecated - use enforce_mismatch_limit_prior_to_refinement() instead.
+   * \returns The value of the \p _enforce_mismatch_limit_prior_to_refinement flag,
+   * false by default.
+   *
+   * \deprecated Use enforce_mismatch_limit_prior_to_refinement() instead.
    */
+#ifdef LIBMESH_ENABLE_DEPRECATED
   bool get_enforce_mismatch_limit_prior_to_refinement();
+#endif
 
   /**
    * Set _enforce_mismatch_limit_prior_to_refinement option.
    * Defaults to false.
-   * Deprecated - use enforce_mismatch_limit_prior_to_refinement() instead.
+   *
+   * \deprecated Use enforce_mismatch_limit_prior_to_refinement() instead.
    */
+#ifdef LIBMESH_ENABLE_DEPRECATED
   void set_enforce_mismatch_limit_prior_to_refinement(bool enforce);
+#endif
 
   /**
    * Get/set the _enforce_mismatch_limit_prior_to_refinement flag.
@@ -486,43 +502,42 @@ public:
 private:
 
   /**
-   * Coarsens user-requested elements.  Both coarsen_elements
-   * and refine_elements used to be in the public interface for the
-   * MeshRefinement object.  Unfortunately, without proper
-   * preparation (make_refinement_compatible, make_coarsening_compatible)
-   * at least coarsen_elements() did not work alone.  By making them
-   * private, we signal to the user that they are not part of the
-   * interface.
+   * Coarsens user-requested elements.  Both coarsen_elements and
+   * refine_elements used to be in the public interface for the
+   * MeshRefinement object.  Unfortunately, without proper preparation
+   * (make_refinement_compatible, make_coarsening_compatible) at least
+   * coarsen_elements() did not work alone.  By making them private,
+   * we signal to the user that they are not part of the interface.
+   * It is possible that for a given set of refinement flags there is
+   * actually no change upon calling this member function.
    *
-   * It is possible that for a given set of refinement flags there
-   * is actually no change upon calling this member function.  Consequently,
-   * this function returns \p true if the mesh actually changed (hence
-   * data needs to be projected) and \p false otherwise.
+   * \returns \p true if the mesh actually changed (hence data needs
+   * to be projected) and \p false otherwise.
    */
   bool _coarsen_elements ();
 
   /**
-   * Refines user-requested elements.
+   * Refines user-requested elements.  It is possible that for a given
+   * set of refinement flags there is actually no change upon calling
+   * this member function.
    *
-   * It is possible that for a given set of refinement flags there
-   * is actually no change upon calling this member function.  Consequently,
-   * this function returns \p true if the mesh actually changed (hence
-   * data needs to be projected) and \p false otherwise.
+   * \returns \p true if the mesh actually changed (hence data needs
+   * to be projected) and \p false otherwise.
    */
   bool _refine_elements ();
 
   /**
-   * Smooths refinement flags according to current settings.
+   * Smooths refinement flags according to current settings.  It is
+   * possible that for a given set of refinement flags there is
+   * actually no change upon calling this member function.
    *
-   * It is possible that for a given set of refinement flags there
-   * is actually no change upon calling this member function.  Consequently,
-   * this function returns \p true if the flags actually changed (hence
-   * data needs to be projected) and \p false otherwise.
+   * \returns \p true if the flags actually changed (hence data needs
+   * to be projected) and \p false otherwise.
    */
   void _smooth_flags (bool refining, bool coarsening);
 
   //------------------------------------------------------
-  // "Smoothing" algorthms for refined meshes
+  // "Smoothing" algorithms for refined meshes
 
   /**
    * This algorithm restricts the maximum level mismatch
@@ -685,14 +700,20 @@ private:
   /**
    * Take user-specified coarsening flags and augment them
    * so that level-one dependency is satisfied.
+   *
+   * This function used to take an argument, \p maintain_level_one -
+   * new code should use face_level_mismatch_limit() instead.
    */
-  bool make_coarsening_compatible (const bool);
+  bool make_coarsening_compatible ();
 
   /**
    * Take user-specified refinement flags and augment them
    * so that level-one dependency is satisfied.
+   *
+   * This function used to take an argument, \p maintain_level_one -
+   * new code should use face_level_mismatch_limit() instead.
    */
-  bool make_refinement_compatible (const bool);
+  bool make_refinement_compatible ();
 
   /**
    * Local dispatch function for getting the correct topological
@@ -706,9 +727,9 @@ private:
    * Local dispatch function for checking the correct has_neighbor
    * function from the Elem class
    */
-  bool has_topological_neighbor (Elem * elem,
+  bool has_topological_neighbor (const Elem * elem,
                                  const PointLocatorBase * point_locator,
-                                 Elem * neighbor);
+                                 const Elem * neighbor);
 
   /**
    * Data structure that holds the new nodes information.
@@ -827,8 +848,9 @@ private:
    * to refinement.  It is called from the
    * MeshRefinement::limit_level_mismatch_at_edge() and
    * MeshRefinement::limit_level_mismatch_at_node() functions.
-   * Returns true if this enforcement caused the refinement flags for
-   * elem to change, false otherwise.
+   *
+   * \returns \p true if this enforcement caused the refinement flags for
+   * \p elem to change, false otherwise.
    */
   enum NeighborType {POINT, EDGE};
   bool enforce_mismatch_limit_prior_to_refinement(Elem * elem,
@@ -912,6 +934,7 @@ inline signed char & MeshRefinement::underrefined_boundary_limit()
   return _underrefined_boundary_limit;
 }
 
+#ifdef LIBMESH_ENABLE_DEPRECATED
 inline bool MeshRefinement::get_enforce_mismatch_limit_prior_to_refinement()
 {
   libmesh_deprecated();
@@ -923,6 +946,7 @@ inline void MeshRefinement::set_enforce_mismatch_limit_prior_to_refinement(bool 
   libmesh_deprecated();
   enforce_mismatch_limit_prior_to_refinement() = enforce;
 }
+#endif
 
 inline bool & MeshRefinement::enforce_mismatch_limit_prior_to_refinement()
 {

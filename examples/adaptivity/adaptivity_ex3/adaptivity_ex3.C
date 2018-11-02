@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -58,12 +58,14 @@
 #include "libmesh/sparse_matrix.h"
 #include "libmesh/mesh_refinement.h"
 #include "libmesh/error_vector.h"
+#include "libmesh/discontinuity_measure.h"
 #include "libmesh/exact_error_estimator.h"
 #include "libmesh/kelly_error_estimator.h"
 #include "libmesh/patch_recovery_error_estimator.h"
 #include "libmesh/uniform_refinement_estimator.h"
 #include "libmesh/hp_coarsentest.h"
 #include "libmesh/hp_singular.h"
+#include "libmesh/sibling_coupling.h"
 #include "libmesh/mesh_generation.h"
 #include "libmesh/mesh_modification.h"
 #include "libmesh/perf_log.h"
@@ -73,15 +75,16 @@
 #include "libmesh/numeric_vector.h"
 #include "libmesh/elem.h"
 #include "libmesh/string_to_enum.h"
+#include "libmesh/enum_solver_package.h"
 
 // Bring in everything from the libMesh namespace
 using namespace libMesh;
 
 // Function prototype.  This is the function that will assemble
 // the linear system for our Laplace problem.  Note that the
-// function will take the \p EquationSystems object and the
+// function will take the EquationSystems object and the
 // name of the system we are assembling as input.  From the
-// \p EquationSystems object we have acess to the \p Mesh and
+// EquationSystems object we have access to the Mesh and
 // other objects we might need.
 void assemble_laplace(EquationSystems & es,
                       const std::string & system_name);
@@ -116,6 +119,13 @@ int main(int argc, char ** argv)
   // Initialize libMesh.
   LibMeshInit init (argc, argv);
 
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
+
+  // Single precision is inadequate for p refinement
+  libmesh_example_requires(sizeof(Real) > 4, "--disable-singleprecision");
+
   // Skip adaptive examples on a non-adaptive libMesh build
 #ifndef LIBMESH_ENABLE_AMR
   libmesh_example_requires(false, "--enable-amr");
@@ -123,6 +133,9 @@ int main(int argc, char ** argv)
 
   // Parse the input file
   GetPot input_file("adaptivity_ex3.in");
+
+  // But allow the command line to override it.
+  input_file.parse_command_line(argc, argv);
 
   // Read in parameters from the input file
   const unsigned int max_r_steps    = input_file("max_r_steps", 3);
@@ -139,6 +152,13 @@ int main(int argc, char ** argv)
 
 #ifdef LIBMESH_HAVE_EXODUS_API
   const bool output_intermediate    = input_file("output_intermediate", false);
+#endif
+
+  // If libmesh is configured without second derivative support, we
+  // can't run this example with Hermite elements and will therefore
+  // fail gracefully.
+#if !defined(LIBMESH_ENABLE_SECOND_DERIVATIVES)
+  libmesh_example_requires(approx_type != "HERMITE", "--enable-second");
 #endif
 
   dim = input_file("dimension", 2);
@@ -178,6 +198,23 @@ int main(int argc, char ** argv)
   // default MPI communicator.
   Mesh mesh(init.comm());
 
+  // Create an equation systems object.
+  EquationSystems equation_systems (mesh);
+
+  // Declare the system we will solve, named Laplace
+  LinearImplicitSystem & system =
+    equation_systems.add_system<LinearImplicitSystem> ("Laplace");
+
+  // If we're doing HP refinement, then we'll need to be able to
+  // evaluate data on elements' siblings in HPCoarsenTest, which means
+  // we should instruct our system's DofMap to distribute that data.
+  // Create and add (and keep around! the DofMap will only be holding
+  // a pointer to it!) a SiblingCoupling functor to provide that
+  // instruction.
+  SiblingCoupling sibling_coupling;
+  if (refine_type == "hp")
+    system.get_dof_map().add_algebraic_ghosting_functor(sibling_coupling);
+
   // Read in the mesh
   if (dim == 1)
     MeshTools::Generation::build_line(mesh, 1, -1., 0.);
@@ -201,14 +238,6 @@ int main(int argc, char ** argv)
   mesh_refinement.refine_fraction() = refine_percentage;
   mesh_refinement.coarsen_fraction() = coarsen_percentage;
   mesh_refinement.max_h_level() = max_r_level;
-
-  // Create an equation systems object.
-  EquationSystems equation_systems (mesh);
-
-  // Declare the system and its variables.
-  // Creates a system named "Laplace"
-  LinearImplicitSystem & system =
-    equation_systems.add_system<LinearImplicitSystem> ("Laplace");
 
   // Adds the variable "u" to "Laplace", using
   // the finite element type and order specified
@@ -284,6 +313,22 @@ int main(int argc, char ** argv)
                    << exact_sol.h1_error("Laplace", "u")
                    << std::endl;
 
+      // Compute any discontinuity.  There should be none.
+      {
+        DiscontinuityMeasure disc;
+        ErrorVector disc_error;
+        disc.estimate_error(system, disc_error);
+
+        Real mean_disc_error = disc_error.mean();
+
+        libMesh::out << "Mean discontinuity error = " << mean_disc_error << std::endl;
+
+        // FIXME - this test fails when solving with Eigen?
+#ifdef LIBMESH_ENABLE_PETSC
+        libmesh_assert_less (mean_disc_error, 1e-14);
+#endif
+      }
+
       // Print to output file
       out << equation_systems.n_active_dofs() << " "
           << exact_sol.l2_error("Laplace", "u") << " "
@@ -297,13 +342,13 @@ int main(int argc, char ** argv)
           if (uniform_refine == 0)
             {
 
-              // The \p ErrorVector is a particular \p StatisticsVector
+              // The ErrorVector is a particular StatisticsVector
               // for computing error information on a finite element mesh.
               ErrorVector error;
 
               if (indicator_type == "exact")
                 {
-                  // The \p ErrorEstimator class interrogates a
+                  // The ErrorEstimator class interrogates a
                   // finite element solution and assigns to each
                   // element a positive error value.
                   // This value is used for deciding which elements to
@@ -362,13 +407,17 @@ int main(int argc, char ** argv)
               std::ostringstream ss;
               ss << r_step;
 #ifdef LIBMESH_HAVE_EXODUS_API
+#  ifdef LIBMESH_HAVE_NEMESIS_API
+              std::string error_output = "error_" + ss.str() + ".n";
+#  else
               std::string error_output = "error_" + ss.str() + ".e";
+#  endif
 #else
               std::string error_output = "error_" + ss.str() + ".gmv";
 #endif
               error.plot_error(error_output, mesh);
 
-              // This takes the error in \p error and decides which elements
+              // This takes the error in error and decides which elements
               // will be coarsened or refined.  Any element within 20% of the
               // maximum error on any element will be refined, and any
               // element within 10% of the minimum error on any element might
@@ -383,18 +432,18 @@ int main(int argc, char ** argv)
                 mesh_refinement.switch_h_to_p_refinement();
               // If we are doing "matched hp" refinement, we
               // flag elements for both h and p
-              if (refine_type == "matchedhp")
+              else if (refine_type == "matchedhp")
                 mesh_refinement.add_p_to_h_refinement();
               // If we are doing hp refinement, we
               // try switching some elements from h to p
-              if (refine_type == "hp")
+              else if (refine_type == "hp")
                 {
                   HPCoarsenTest hpselector;
                   hpselector.select_refinement(system);
                 }
               // If we are doing "singular hp" refinement, we
               // try switching most elements from h to p
-              if (refine_type == "singularhp")
+              else if (refine_type == "singularhp")
                 {
                   // This only differs from p refinement for
                   // the singular problem
@@ -404,6 +453,8 @@ int main(int argc, char ** argv)
                   hpselector.singular_points.push_back(Point());
                   hpselector.select_refinement(system);
                 }
+              else if (refine_type != "h")
+                libmesh_error_msg("Unknown refinement_type = " << refine_type);
 
               // This call actually refines and coarsens the flagged
               // elements.
@@ -420,10 +471,10 @@ int main(int argc, char ** argv)
                 mesh_refinement.uniformly_p_refine(1);
             }
 
-          // This call reinitializes the \p EquationSystems object for
+          // This call reinitializes the EquationSystems object for
           // the newly refined mesh.  One of the steps in the
-          // reinitialization is projecting the \p solution,
-          // \p old_solution, etc... vectors from the old mesh to
+          // reinitialization is projecting the solution,
+          // old_solution, etc... vectors from the old mesh to
           // the current one.
           equation_systems.reinit ();
         }
@@ -572,11 +623,14 @@ Gradient exact_derivative(const Point & p,
 void assemble_laplace(EquationSystems & es,
                       const std::string & system_name)
 {
+  // Ignore unused parameter warnings when !LIBMESH_ENABLE_AMR.
+  libmesh_ignore(es);
+  libmesh_ignore(system_name);
+
 #ifdef LIBMESH_ENABLE_AMR
   // It is a good idea to make sure we are assembling
   // the proper system.
   libmesh_assert_equal_to (system_name, "Laplace");
-
 
   // Declare a performance log.  Give it a descriptive
   // string to identify what part of the code we are
@@ -593,9 +647,9 @@ void assemble_laplace(EquationSystems & es,
   // Get a reference to the LinearImplicitSystem we are solving
   LinearImplicitSystem & system = es.get_system<LinearImplicitSystem>("Laplace");
 
-  // A reference to the \p DofMap object for this system.  The \p DofMap
+  // A reference to the DofMap object for this system.  The DofMap
   // object handles the index translation from node and element numbers
-  // to degree of freedom numbers.  We will talk more about the \p DofMap
+  // to degree of freedom numbers.  We will talk more about the DofMap
   // in future examples.
   const DofMap & dof_map = system.get_dof_map();
 
@@ -604,15 +658,15 @@ void assemble_laplace(EquationSystems & es,
   FEType fe_type = dof_map.variable_type(0);
 
   // Build a Finite Element object of the specified type.  Since the
-  // \p FEBase::build() member dynamically creates memory we will
-  // store the object as an \p UniquePtr<FEBase>.  This can be thought
+  // FEBase::build() member dynamically creates memory we will
+  // store the object as a std::unique_ptr<FEBase>.  This can be thought
   // of as a pointer that will clean up after itself.
-  UniquePtr<FEBase> fe      (FEBase::build(mesh_dim, fe_type));
-  UniquePtr<FEBase> fe_face (FEBase::build(mesh_dim, fe_type));
+  std::unique_ptr<FEBase> fe      (FEBase::build(mesh_dim, fe_type));
+  std::unique_ptr<FEBase> fe_face (FEBase::build(mesh_dim, fe_type));
 
   // Quadrature rules for numerical integration.
-  UniquePtr<QBase> qrule(fe_type.default_quadrature_rule(mesh_dim));
-  UniquePtr<QBase> qface(fe_type.default_quadrature_rule(mesh_dim-1));
+  std::unique_ptr<QBase> qrule(fe_type.default_quadrature_rule(mesh_dim));
+  std::unique_ptr<QBase> qface(fe_type.default_quadrature_rule(mesh_dim-1));
 
   // Tell the finite element object to use our quadrature rule.
   fe->attach_quadrature_rule      (qrule.get());
@@ -633,12 +687,12 @@ void assemble_laplace(EquationSystems & es,
   // The element shape functions evaluated at the quadrature points.
   // For this simple problem we usually only need them on element
   // boundaries.
-  const std::vector<std::vector<Real> > & phi = fe->get_phi();
-  const std::vector<std::vector<Real> > & psi = fe_face->get_phi();
+  const std::vector<std::vector<Real>> & phi = fe->get_phi();
+  const std::vector<std::vector<Real>> & psi = fe_face->get_phi();
 
   // The element shape function gradients evaluated at the quadrature
   // points.
-  const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+  const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
   // The XY locations of the quadrature points used for face integration
   const std::vector<Point> & qface_points = fe_face->get_xyz();
@@ -658,25 +712,18 @@ void assemble_laplace(EquationSystems & es,
   // Now we will loop over all the elements in the mesh.  We will
   // compute the element matrix and right-hand-side contribution.  See
   // example 3 for a discussion of the element iterators.  Here we use
-  // the \p const_active_local_elem_iterator to indicate we only want
+  // the const_active_local_elem_iterator to indicate we only want
   // to loop over elements that are assigned to the local processor
   // which are "active" in the sense of AMR.  This allows each
   // processor to compute its components of the global matrix for
   // active elements while ignoring parent elements which have been
   // refined.
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-  for ( ; el != end_el; ++el)
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
       // Start logging the shape function initialization.
       // This is done through a simple function call with
       // the name of the event to log.
       perf_log.push("elem init");
-
-      // Store a pointer to the element we are currently
-      // working on.  This allows for nicer syntax later.
-      const Elem * elem = *el;
 
       // Get the degree of freedom indices for the
       // current element.  These define where in the global
@@ -690,16 +737,19 @@ void assemble_laplace(EquationSystems & es,
       // (phi, dphi) for the current element.
       fe->reinit (elem);
 
+      const unsigned int n_dofs =
+        cast_int<unsigned int>(dof_indices.size());
+      libmesh_assert_equal_to (n_dofs, phi.size());
+
       // Zero the element matrix and right-hand side before
       // summing them.  We use the resize member here because
       // the number of degrees of freedom might have changed from
       // the last element.  Note that this will be the case if the
       // element type is different (i.e. the last element was a
       // triangle, now we are on a quadrilateral).
-      Ke.resize (dof_indices.size(),
-                 dof_indices.size());
+      Ke.resize (n_dofs, n_dofs);
 
-      Fe.resize (dof_indices.size());
+      Fe.resize (n_dofs);
 
       // Stop logging the shape function initialization.
       // If you forget to stop logging an event the PerfLog
@@ -707,15 +757,15 @@ void assemble_laplace(EquationSystems & es,
       perf_log.pop("elem init");
 
       // Now we will build the element matrix.  This involves
-      // a double loop to integrate the test funcions (i) against
+      // a double loop to integrate the test functions (i) against
       // the trial functions (j).
       //
       // Now start logging the element matrix computation
       perf_log.push ("Ke");
 
       for (unsigned int qp=0; qp<qrule->n_points(); qp++)
-        for (unsigned int i=0; i<dphi.size(); i++)
-          for (unsigned int j=0; j<dphi.size(); j++)
+        for (unsigned int i=0; i != n_dofs; i++)
+          for (unsigned int j=0; j != n_dofs; j++)
             Ke(i,j) += JxW[qp]*(dphi[i][qp]*dphi[j][qp]);
 
       // We need a forcing function to make the 1D case interesting
@@ -725,7 +775,7 @@ void assemble_laplace(EquationSystems & es,
             Real x = q_point[qp](0);
             Real f = singularity ? sqrt(3.)/9.*pow(-x, -4./3.) :
               cos(x);
-            for (unsigned int i=0; i<dphi.size(); ++i)
+            for (unsigned int i=0; i != n_dofs; ++i)
               Fe(i) += JxW[qp]*phi[i][qp]*f;
           }
 
@@ -754,8 +804,8 @@ void assemble_laplace(EquationSystems & es,
         // The following loops over the sides of the element.
         // If the element has no neighbor on a side then that
         // side MUST live on a boundary of the domain.
-        for (unsigned int s=0; s<elem->n_sides(); s++)
-          if (elem->neighbor(s) == libmesh_nullptr)
+        for (auto s : elem->side_index_range())
+          if (elem->neighbor_ptr(s) == nullptr)
             {
               fe_face->reinit(elem, s);
 
@@ -767,12 +817,12 @@ void assemble_laplace(EquationSystems & es,
                                                        "void");
 
                   // RHS contribution
-                  for (unsigned int i=0; i<psi.size(); i++)
+                  for (unsigned int i=0; i != n_dofs; i++)
                     Fe(i) += penalty*JxW_face[qp]*value*psi[i][qp];
 
                   // Matrix contribution
-                  for (unsigned int i=0; i<psi.size(); i++)
-                    for (unsigned int j=0; j<psi.size(); j++)
+                  for (unsigned int i=0; i != n_dofs; i++)
+                    for (unsigned int j=0; j != n_dofs; j++)
                       Ke(i,j) += penalty*JxW_face[qp]*psi[i][qp]*psi[j][qp];
                 }
             }
@@ -784,8 +834,8 @@ void assemble_laplace(EquationSystems & es,
 
       // The element matrix and right-hand-side are now built
       // for this element.  Add them to the global matrix and
-      // right-hand-side vector.  The \p SparseMatrix::add_matrix()
-      // and \p NumericVector::add_vector() members do this for us.
+      // right-hand-side vector.  The SparseMatrix::add_matrix()
+      // and NumericVector::add_vector() members do this for us.
       // Start logging the insertion of the local (element)
       // matrix and vector into the global matrix and vector
       perf_log.push ("matrix insertion");

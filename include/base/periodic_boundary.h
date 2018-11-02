@@ -1,6 +1,5 @@
-
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -19,16 +18,17 @@
 #ifndef LIBMESH_PERIODIC_BOUNDARY_H
 #define LIBMESH_PERIODIC_BOUNDARY_H
 
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/libmesh_config.h"
 
 #ifdef LIBMESH_ENABLE_PERIODIC
 
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/periodic_boundary_base.h"
 #include "libmesh/vector_value.h" // RealVectorValue
 
-namespace libMesh {
+namespace libMesh
+{
 
 // Forward Declarations
 class Elem;
@@ -36,6 +36,10 @@ class MeshBase;
 
 /**
  * The definition of a periodic boundary.
+ *
+ * \author Roy Stogner
+ * \date 2010
+ * \brief Used for implementing periodic BCs via constraints.
  */
 class PeriodicBoundary : public PeriodicBoundaryBase
 {
@@ -61,22 +65,20 @@ public:
   PeriodicBoundary(const RealVectorValue & vector);
 
   /**
-   * This function should be overloaded by derived classes to
+   * This function should be overridden by derived classes to
    * define how one finds corresponding nodes on the periodic
    * boundary pair.
    */
-  virtual Point get_corresponding_pos(const Point & pt) const libmesh_override;
+  virtual Point get_corresponding_pos(const Point & pt) const override;
 
   /**
    * If we want the DofMap to be able to make copies of references and
    * store them in the underlying map, this class must be clone'able,
    * i.e. have a kind of virtual construction mechanism.
    */
-  virtual UniquePtr<PeriodicBoundaryBase> clone(TransformationType t = FORWARD) const libmesh_override;
+  virtual std::unique_ptr<PeriodicBoundaryBase> clone(TransformationType t = FORWARD) const override;
 
 protected:
-  // One of these days we'll support rotated boundaries
-  // RealTensor rotation_matrix;
 
   // The vector which is added to points in myboundary
   // to produce corresponding points in pairedboundary

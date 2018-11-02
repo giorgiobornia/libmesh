@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -17,10 +17,7 @@
 
 
 
-// C++ Includes   -----------------------------------
-
-// Local Includes -----------------------------------
-#include "libmesh/mesh_base.h"
+// Local Includes
 #include "libmesh/linear_partitioner.h"
 #include "libmesh/libmesh_logging.h"
 #include "libmesh/elem.h"
@@ -28,53 +25,92 @@
 namespace libMesh
 {
 
-
-// ------------------------------------------------------------
-// LinearPartitioner implementation
-void LinearPartitioner::_do_partition (MeshBase & mesh,
-                                       const unsigned int n)
+void LinearPartitioner::partition_range(MeshBase & mesh,
+                                        MeshBase::element_iterator it,
+                                        MeshBase::element_iterator end,
+                                        const unsigned int n)
 {
-  libmesh_assert_greater (n, 0);
+  // Check for easy returns
+  if (it == end)
+    return;
 
-  // Check for an easy return
   if (n == 1)
     {
-      this->single_partition (mesh);
+      this->single_partition_range (it, end);
       return;
     }
 
+  libmesh_assert_greater (n, 0);
+
   // Create a simple linear partitioning
-  {
-    START_LOG ("partition()", "LinearPartitioner");
+  LOG_SCOPE ("partition_range()", "LinearPartitioner");
 
-    const dof_id_type n_active_elem = mesh.n_active_elem();
-    const dof_id_type blksize       = n_active_elem/n;
+  const bool mesh_is_serial = mesh.is_serial();
 
-    dof_id_type e = 0;
+  // This has to be an ordered set
+  std::set<dof_id_type> element_ids;
 
-    MeshBase::element_iterator       elem_it  = mesh.active_elements_begin();
-    const MeshBase::element_iterator elem_end = mesh.active_elements_end();
+  // If we're on a serialized mesh, we know our range is the same on
+  // every processor.
+  if (mesh_is_serial)
+    {
+      const dof_id_type blksize = cast_int<dof_id_type>
+        (std::distance(it, end) / n);
 
-    for ( ; elem_it != elem_end; ++elem_it)
-      {
-        if ((e/blksize) < n)
-          {
-            Elem * elem = *elem_it;
-            elem->processor_id() =
-              cast_int<processor_id_type>(e/blksize);
-          }
-        else
-          {
-            Elem * elem = *elem_it;
+      dof_id_type e = 0;
+      for (auto & elem : as_range(it, end))
+        {
+          if ((e/blksize) < n)
+            elem->processor_id() = cast_int<processor_id_type>(e/blksize);
+          else
             elem->processor_id() = 0;
-            elem = elem->parent();
-          }
 
-        e++;
-      }
+          e++;
+        }
+    }
+  // If we're on a replicated mesh, we might have different ranges on
+  // different processors, and we'll need to gather the full range.
+  //
+  // This is not an efficient way to do this, but if you want to be
+  // efficient then you want to be using a different partitioner to
+  // begin with; LinearPartitioner is more for debugging than
+  // performance.
+  else
+    {
+      for (const auto & elem : as_range(it, end))
+        element_ids.insert(elem->id());
 
-    STOP_LOG ("partition()", "LinearPartitioner");
-  }
+      mesh.comm().set_union(element_ids);
+
+      const dof_id_type blksize = cast_int<dof_id_type>
+        (element_ids.size());
+
+      dof_id_type e = 0;
+      for (auto eid : element_ids)
+        {
+          Elem * elem = mesh.query_elem_ptr(eid);
+          if (elem)
+            {
+              if ((e/blksize) < n)
+                elem->processor_id() = cast_int<processor_id_type>(e/blksize);
+              else
+                elem->processor_id() = 0;
+            }
+
+          e++;
+        }
+    }
+}
+
+
+
+void LinearPartitioner::_do_partition (MeshBase & mesh,
+                                       const unsigned int n)
+{
+  this->partition_range(mesh,
+                        mesh.active_elements_begin(),
+                        mesh.active_elements_end(),
+                        n);
 }
 
 } // namespace libMesh

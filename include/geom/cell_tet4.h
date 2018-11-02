@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -23,34 +23,34 @@
 // Local includes
 #include "libmesh/cell_tet.h"
 
-// C++ includes
-#include <cstddef>
-
 namespace libMesh
 {
-
-
-
 
 /**
  * The \p Tet4 is an element in 3D composed of 4 nodes.
  * It is numbered like this:
  * \verbatim
- * TET4:
- *       3
- *       o
- *      /|\
- *     / | \
- *    /  |  \
- * 0 o...|...o 2
- *    \  |  /
- *     \ | /
- *      \|/
- *       o
- *       1
+ *   TET4:
+ *         3
+ *         o                 zeta
+ *        /|\                 ^
+ *       / | \                |
+ *      /  |  \               |
+ *   0 o...|...o 2            o---> eta
+ *      \  |  /                \
+ *       \ | /                  \
+ *        \|/                    xi (out of page)
+ *         o
+ *         1
  * \endverbatim
+ * (xi, eta, zeta) are the reference element coordinates associated with
+ * the given numbering.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2002
+ * \brief A 3D tetrahedral element with 4 nodes.
  */
-class Tet4 libmesh_final : public Tet
+class Tet4 final : public Tet
 {
 public:
 
@@ -58,119 +58,138 @@ public:
    * Constructor.  By default this element has no parent.
    */
   explicit
-  Tet4 (Elem * p=libmesh_nullptr) :
+  Tet4 (Elem * p=nullptr) :
     Tet(Tet4::n_nodes(), p, _nodelinks_data)
   {}
 
-  /**
-   * @returns \p TET4
-   */
-  virtual ElemType type () const libmesh_override { return TET4; }
+  Tet4 (Tet4 &&) = delete;
+  Tet4 (const Tet4 &) = delete;
+  Tet4 & operator= (const Tet4 &) = delete;
+  Tet4 & operator= (Tet4 &&) = delete;
+  virtual ~Tet4() = default;
 
   /**
-   * @returns 4
+   * \returns \p TET4.
    */
-  virtual unsigned int n_nodes() const libmesh_override { return 4; }
+  virtual ElemType type () const override { return TET4; }
 
   /**
-   * @returns 1
+   * \returns 4.
    */
-  virtual unsigned int n_sub_elem() const libmesh_override { return 1; }
+  virtual unsigned int n_nodes() const override { return num_nodes; }
 
   /**
-   * @returns true iff the specified (local) node number is a vertex.
+   * \returns 1.
    */
-  virtual bool is_vertex(const unsigned int i) const libmesh_override;
+  virtual unsigned int n_sub_elem() const override { return 1; }
 
   /**
-   * @returns true iff the specified (local) node number is an edge.
+   * \returns \p true if the specified (local) node number is a vertex.
    */
-  virtual bool is_edge(const unsigned int i) const libmesh_override;
+  virtual bool is_vertex(const unsigned int i) const override;
 
   /**
-   * @returns true iff the specified (local) node number is a face.
+   * \returns \p true if the specified (local) node number is an edge.
    */
-  virtual bool is_face(const unsigned int i) const libmesh_override;
+  virtual bool is_edge(const unsigned int i) const override;
 
-  /*
-   * @returns true iff the specified (local) node number is on the
-   * specified side
+  /**
+   * \returns \p true if the specified (local) node number is a face.
+   */
+  virtual bool is_face(const unsigned int i) const override;
+
+  /**
+   * \returns \p true if the specified (local) node number is on the
+   * specified side.
    */
   virtual bool is_node_on_side(const unsigned int n,
-                               const unsigned int s) const libmesh_override;
+                               const unsigned int s) const override;
 
-  /*
-   * @returns true iff the specified (local) node number is on the
-   * specified edge
+  virtual std::vector<unsigned int> nodes_on_side(const unsigned int s) const override;
+
+  /**
+   * \returns \p true if the specified (local) node number is on the
+   * specified edge.
    */
   virtual bool is_node_on_edge(const unsigned int n,
-                               const unsigned int e) const libmesh_override;
+                               const unsigned int e) const override;
 
-  /*
-   * @returns true iff the specified child is on the
-   * specified side
+  /**
+   * \returns \p true if the specified child is on the
+   * specified side.
    */
   virtual bool is_child_on_side(const unsigned int c,
-                                const unsigned int s) const libmesh_override;
-
-  /*
-   * @returns true iff the element map is definitely affine within
-   * numerical tolerances
-   */
-  virtual bool has_affine_map () const libmesh_override { return true; }
+                                const unsigned int s) const override;
 
   /**
-   * @returns true iff the Lagrange shape functions on this element
-   * are linear
+   * \returns \p true if the element map is definitely affine within
+   * numerical tolerances.
    */
-  virtual bool is_linear () const libmesh_override { return true; }
+  virtual bool has_affine_map () const override { return true; }
 
   /**
-   * @returns FIRST
+   * \returns \p true if the Lagrange shape functions on this element
+   * are linear.
    */
-  virtual Order default_order() const libmesh_override { return FIRST; }
+  virtual bool is_linear () const override { return true; }
+
+  /**
+   * \returns FIRST.
+   */
+  virtual Order default_order() const override;
 
   /**
    * Builds a \p TRI3 built coincident with face i.
-   * The \p UniquePtr<Elem> handles the memory aspect.
+   * The \p std::unique_ptr<Elem> handles the memory aspect.
    */
-  virtual UniquePtr<Elem> build_side (const unsigned int i,
-                                      bool proxy) const libmesh_override;
+  virtual std::unique_ptr<Elem> build_side_ptr (const unsigned int i,
+                                                bool proxy) override;
 
   /**
    * Builds a \p EDGE2 built coincident with face i.
-   * The \p UniquePtr<Elem> handles the memory aspect.
+   * The \p std::unique_ptr<Elem> handles the memory aspect.
    */
-  virtual UniquePtr<Elem> build_edge (const unsigned int i) const libmesh_override;
+  virtual std::unique_ptr<Elem> build_edge_ptr (const unsigned int i) override;
 
   virtual void connectivity(const unsigned int sc,
                             const IOPackage iop,
-                            std::vector<dof_id_type> & conn) const libmesh_override;
+                            std::vector<dof_id_type> & conn) const override;
+
+  /**
+   * Geometric constants for Tet4.
+   */
+  static const int num_nodes = 4;
+  static const int num_sides = 4;
+  static const int num_edges = 6;
+  static const int num_children = 8;
+  static const int nodes_per_side = 3;
+  static const int nodes_per_edge = 2;
 
   /**
    * This maps the \f$ j^{th} \f$ node of the \f$ i^{th} \f$ side to
    * element node numbers.
    */
-  static const unsigned int side_nodes_map[4][3];
+  static const unsigned int side_nodes_map[num_sides][nodes_per_side];
 
   /**
    * This maps the \f$ j^{th} \f$ node of the \f$ i^{th} \f$ edge to
    * element node numbers.
    */
-  static const unsigned int edge_nodes_map[6][2];
+  static const unsigned int edge_nodes_map[num_edges][nodes_per_edge];
 
   /**
    * An optimized method for computing the area of a
    * 4-node tetrahedron.
    */
-  virtual Real volume () const libmesh_override;
+  virtual Real volume () const override;
 
   /**
-   * Returns the min and max *dihedral* angles for the tetrahedron.
-   * Note there are 6 dihedral angles (angles between the planar
+   * \returns The min and max *dihedral* angles for the tetrahedron.
+   *
+   * \note There are 6 dihedral angles (angles between the planar
    * faces) for the Tet4.  Dihedral angles near 180 deg. are generally
-   * bad for interplation.  Small dihedral angles are not necessarily
-   * bad for interplation, but they can effect the stiffness matrix
+   * bad for interpolation.  Small dihedral angles are not necessarily
+   * bad for interpolation, but they can affect the stiffness matrix
    * condition number.
    */
   std::pair<Real, Real> min_and_max_angle() const;
@@ -181,18 +200,24 @@ public:
   using Tet::key;
 
   /**
-   * @returns an id associated with the global node ids of this
+   * \returns An id associated with the global node ids of this
    * element.  The id is not necessarily unique, but should be
    * close.
    */
-  virtual dof_id_type key () const libmesh_override;
+  virtual dof_id_type key () const override;
+
+  /**
+   * Uses simple geometric tests to determine if the point p is inside
+   * the tetrahedron.
+   */
+  virtual bool contains_point (const Point & p, Real tol) const override;
 
 protected:
 
   /**
-   * Data for links to nodes
+   * Data for links to nodes.
    */
-  Node * _nodelinks_data[4];
+  Node * _nodelinks_data[num_nodes];
 
 
 
@@ -203,13 +228,13 @@ protected:
    */
   virtual float embedding_matrix (const unsigned int i,
                                   const unsigned int j,
-                                  const unsigned int k) const libmesh_override;
+                                  const unsigned int k) const override;
 
   /**
    * Matrix that computes new nodal locations/solution values
    * from current nodes/solution.
    */
-  static const float _embedding_matrix[8][4][4];
+  static const float _embedding_matrix[num_children][num_nodes][num_nodes];
 
   LIBMESH_ENABLE_TOPOLOGY_CACHES;
 

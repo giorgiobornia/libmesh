@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,15 +22,24 @@
 
 // Local includes
 #include "libmesh/libmesh_common.h"
-#include "libmesh/enum_solver_package.h"
 #include "libmesh/reference_counted_object.h"
 #include "libmesh/libmesh.h"
 #include "libmesh/parallel_object.h"
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
 #include "libmesh/optimization_system.h"
+
+#ifdef LIBMESH_FORWARD_DECLARE_ENUMS
+namespace libMesh
+{
+enum SolverPackage : int;
+}
+#else
+#include "libmesh/enum_solver_package.h"
+#endif
 
 // C++ includes
 #include <cstddef>
+#include <memory>
 
 namespace libMesh
 {
@@ -41,14 +50,15 @@ template <typename T> class NumericVector;
 template <typename T> class Preconditioner;
 
 /**
- * This class provides a uniform interface for optimization solvers.  This base
- * class is overloaded to provide optimization solvers from different packages.
+ * This base class can be inherited from to provide interfaces to
+ * optimization solvers from different packages like PETSc/TAO and
+ * nlopt.
  *
  * \author David Knezevic
  * \date 2015
  */
 template <typename T>
-class OptimizationSolver : public ReferenceCountedObject<OptimizationSolver<T> >,
+class OptimizationSolver : public ReferenceCountedObject<OptimizationSolver<T>>,
                            public ParallelObject
 {
 public:
@@ -72,11 +82,11 @@ public:
    * Builds an \p OptimizationSolver using the package specified by
    * \p solver_package
    */
-  static UniquePtr<OptimizationSolver<T> > build(sys_type & s,
-                                                 const SolverPackage solver_package = libMesh::default_solver_package());
+  static std::unique_ptr<OptimizationSolver<T>> build(sys_type & s,
+                                                      const SolverPackage solver_package = libMesh::default_solver_package());
 
   /**
-   * @returns true if the data structures are
+   * \returns \p true if the data structures are
    * initialized, false otherwise.
    */
   bool initialized () const { return _is_initialized; }
@@ -111,11 +121,13 @@ public:
   virtual void print_converged_reason() { libmesh_not_implemented(); }
 
   /**
-   * Most optimization solver packages return an integral status
+   * \returns 0, but derived classes should override this to return an
+   * appropriate integer convergence status value.
+   *
+   * Most optimization solver packages return an integer status
    * result of some kind.  This interface assumes they can be coerced
    * into an "int" type, which is usually safe since they are based on
-   * enumerations.  Simply returns 0 if not implemented in derived
-   * classes.
+   * enumerations.
    */
   virtual int get_converged_reason() { return 0; }
 
@@ -165,13 +177,13 @@ public:
   OptimizationSystem::ComputeLowerAndUpperBounds * lower_and_upper_bounds_object;
 
   /**
-   * @returns a constant reference to the system we are using to
+   * \returns A constant reference to the system we are using to
    * define the optimization problem.
    */
   const sys_type & system () const { return _system; }
 
   /**
-   * @returns a writeable reference to the system we are using to
+   * \returns A writable reference to the system we are using to
    * define the optimization problem.
    */
   sys_type & system () { return _system; }

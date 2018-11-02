@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -21,7 +21,7 @@
 #define LIBMESH_JUMP_ERROR_ESTIMATOR_H
 
 // Local Includes
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
 #include "libmesh/dense_vector.h"
 #include "libmesh/error_estimator.h"
 #include "libmesh/fem_context.h"
@@ -30,6 +30,7 @@
 #include <cstddef>
 #include <string>
 #include <vector>
+#include <memory>
 
 namespace libMesh
 {
@@ -62,10 +63,19 @@ public:
       coarse_error(0) {}
 
   /**
-   * Destructor.
+   * This class cannot be (default) copy constructed/assigned because
+   * it has unique_ptr members. Explicitly deleting these functions is
+   * the best way to document this fact.
    */
-  virtual ~JumpErrorEstimator() {}
+  JumpErrorEstimator (const JumpErrorEstimator &) = delete;
+  JumpErrorEstimator & operator= (const JumpErrorEstimator &) = delete;
 
+  /**
+   * Defaulted move ctor, move assignment operator, and destructor.
+   */
+  JumpErrorEstimator (JumpErrorEstimator &&) = default;
+  JumpErrorEstimator & operator= (JumpErrorEstimator &&) = default;
+  virtual ~JumpErrorEstimator() = default;
 
   /**
    * This function uses the derived class's jump error
@@ -75,8 +85,8 @@ public:
    */
   virtual void estimate_error (const System & system,
                                ErrorVector & error_per_cell,
-                               const NumericVector<Number> * solution_vector = libmesh_nullptr,
-                               bool estimate_parent_error = false) libmesh_override;
+                               const NumericVector<Number> * solution_vector = nullptr,
+                               bool estimate_parent_error = false) override;
 
   /**
    * This boolean flag allows you to scale the error indicator
@@ -113,9 +123,11 @@ protected:
   virtual void internal_side_integration() = 0;
 
   /**
-   * The function, to be implemented by derived classes, which calculates an error
-   * term on a boundary side
-   * Returns true if the flux bc function is in fact defined on the current side
+   * The function, to be implemented by derived classes, which
+   * calculates an error term on a boundary side.
+   *
+   * \returns \p true if the flux bc function is in fact defined on
+   * the current side.
    */
   virtual bool boundary_side_integration() { return false; }
 
@@ -129,7 +141,7 @@ protected:
    * Context objects for integrating on the fine and coarse elements
    * sharing a face
    */
-  UniquePtr<FEMContext> fine_context, coarse_context;
+  std::unique_ptr<FEMContext> fine_context, coarse_context;
 
   /**
    * The fine and coarse error values to be set by each side_integration();

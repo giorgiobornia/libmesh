@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -32,8 +32,9 @@ namespace libMesh
 {
 
 /**
- * Shell matrix that is given by a tensor of two vectors, i.e. A =
- * v*w^T.
+ * Shell matrix that is given by a tensor product of two vectors,
+ * i.e. A = v*w^T. All overridden virtual functions are documented in
+ * shell_matrix.h.
  *
  * \author Tim Kroeger
  * \date 2008
@@ -54,35 +55,17 @@ public:
    */
   virtual ~TensorShellMatrix ();
 
-  /**
-   * @returns \p m, the row-dimension of the matrix where the marix is
-   * \f$ M \times N \f$.
-   */
-  virtual numeric_index_type m () const libmesh_override;
+  virtual numeric_index_type m () const override;
 
-  /**
-   * @returns \p n, the column-dimension of the matrix where the marix
-   * is \f$ M \times N \f$.
-   */
-  virtual numeric_index_type n () const libmesh_override;
+  virtual numeric_index_type n () const override;
 
-  /**
-   * Multiplies the matrix with \p arg and stores the result in \p
-   * dest.
-   */
   virtual void vector_mult (NumericVector<T> & dest,
-                            const NumericVector<T> & arg) const libmesh_override;
+                            const NumericVector<T> & arg) const override;
 
-  /**
-   * Multiplies the matrix with \p arg and adds the result to \p dest.
-   */
   virtual void vector_mult_add (NumericVector<T> & dest,
-                                const NumericVector<T> & arg) const libmesh_override;
+                                const NumericVector<T> & arg) const override;
 
-  /**
-   * Copies the diagonal part of the matrix into \p dest.
-   */
-  virtual void get_diagonal (NumericVector<T> & dest) const libmesh_override;
+  virtual void get_diagonal (NumericVector<T> & dest) const override;
 
 protected:
   /**

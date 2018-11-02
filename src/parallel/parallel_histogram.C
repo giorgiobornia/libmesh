@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -78,8 +78,7 @@ void Histogram<KeyType,IdxType>::make_histogram (const IdxType nbins,
 
       bin_iters[b] =
         std::lower_bound (bin_iters[b-1], data.end(),
-                          Parallel::Utils::Convert<KeyType>::to_key_type
-                            (bin_bounds[b]));
+                          Parallel::Utils::Convert<KeyType>::to_key_type(bin_bounds[b]));
     }
 
   bin_iters[nbins]  = data.end();

@@ -35,7 +35,6 @@ using libMesh::FEMContext;
 using libMesh::RBConstruction;
 using libMesh::RBEvaluation;
 using libMesh::Real;
-using libMesh::UniquePtr;
 
 
 // A simple subclass of RBEvaluation, which just needs to specify
@@ -80,7 +79,7 @@ public:
                         const unsigned int number_in)
     : Parent(es, name_in, number_in),
       ex6_assembly_expansion(*this),
-      dirichlet_bc(UniquePtr<DirichletBoundary>())
+      dirichlet_bc(std::unique_ptr<DirichletBoundary>())
   {}
 
   /**
@@ -108,7 +107,7 @@ public:
     // Generate a DirichletBoundary object
     dirichlet_bc = build_zero_dirichlet_boundary_object();
 
-    // Set the Dirichet boundary IDs
+    // Set the Dirichlet boundary IDs
     // and the Dirichlet boundary variable numbers
     dirichlet_bc->b.insert(0);
     dirichlet_bc->b.insert(5);
@@ -135,12 +134,13 @@ public:
     // For efficiency, we should prerequest all
     // the data we will need to build the
     // linear system before doing an element loop.
-    FEBase * elem_fe = libmesh_nullptr;
+    FEBase * elem_fe = nullptr;
     c.get_element_fe(u_var, elem_fe);
 
     elem_fe->get_JxW();
     elem_fe->get_phi();
     elem_fe->get_dphi();
+    elem_fe->get_xyz();
   }
 
   /**
@@ -163,7 +163,7 @@ public:
   /**
    * The object that defines which degrees of freedom are on a Dirichlet boundary.
    */
-  UniquePtr<DirichletBoundary> dirichlet_bc;
+  std::unique_ptr<DirichletBoundary> dirichlet_bc;
 };
 
 #endif

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -43,28 +43,30 @@ void Elem::refine (MeshRefinement & mesh_refinement)
   libmesh_assert_equal_to (this->refinement_flag(), Elem::REFINE);
   libmesh_assert (this->active());
 
+  const unsigned int nc = this->n_children();
+
   // Create my children if necessary
   if (!_children)
     {
-      _children = new Elem *[this->n_children()];
+      _children = new Elem *[nc];
 
       unsigned int parent_p_level = this->p_level();
-      for (unsigned int c=0; c<this->n_children(); c++)
+      for (unsigned int c = 0; c != nc; c++)
         {
           _children[c] = Elem::build(this->type(), this).release();
-          Elem * current_child = this->child(c);
+          Elem * current_child = this->child_ptr(c);
 
           current_child->set_refinement_flag(Elem::JUST_REFINED);
           current_child->set_p_level(parent_p_level);
           current_child->set_p_refinement_flag(this->p_refinement_flag());
 
-          for (unsigned int nc=0; nc<current_child->n_nodes(); nc++)
+          for (unsigned int cnode=0; cnode != current_child->n_nodes(); ++cnode)
             {
               Node * node =
-                mesh_refinement.add_node(*this, c, nc,
+                mesh_refinement.add_node(*this, c, cnode,
                                          current_child->processor_id());
               node->set_n_systems (this->n_systems());
-              current_child->set_node(nc) = node;
+              current_child->set_node(cnode) = node;
             }
 
           mesh_refinement.add_elem (current_child);
@@ -74,9 +76,9 @@ void Elem::refine (MeshRefinement & mesh_refinement)
   else
     {
       unsigned int parent_p_level = this->p_level();
-      for (unsigned int c=0; c<this->n_children(); c++)
+      for (unsigned int c = 0; c != nc; c++)
         {
-          Elem * current_child = this->child(c);
+          Elem * current_child = this->child_ptr(c);
           libmesh_assert(current_child->subactive());
           current_child->set_refinement_flag(Elem::JUST_REFINED);
           current_child->set_p_level(parent_p_level);
@@ -86,12 +88,15 @@ void Elem::refine (MeshRefinement & mesh_refinement)
 
   // Un-set my refinement flag now
   this->set_refinement_flag(Elem::INACTIVE);
-  this->set_p_refinement_flag(Elem::INACTIVE);
 
-  for (unsigned int c=0; c<this->n_children(); c++)
+  // Leave the p refinement flag set - we will need that later to get
+  // projection operations correct
+  // this->set_p_refinement_flag(Elem::INACTIVE);
+
+  for (unsigned int c = 0; c != nc; c++)
     {
-      libmesh_assert_equal_to (this->child(c)->parent(), this);
-      libmesh_assert(this->child(c)->active());
+      libmesh_assert_equal_to (this->child_ptr(c)->parent(), this);
+      libmesh_assert(this->child_ptr(c)->active());
     }
   libmesh_assert (this->ancestor());
 }
@@ -105,17 +110,17 @@ void Elem::coarsen()
 
   // We no longer delete children until MeshRefinement::contract()
   // delete [] _children;
-  // _children = libmesh_nullptr;
+  // _children = nullptr;
 
   unsigned int parent_p_level = 0;
 
   // re-compute hanging node nodal locations
-  for (unsigned int c=0; c<this->n_children(); c++)
+  for (unsigned int c = 0, nc = this->n_children(); c != nc; ++c)
     {
-      Elem * mychild = this->child(c);
+      Elem * mychild = this->child_ptr(c);
       if (mychild == remote_elem)
         continue;
-      for (unsigned int nc=0; nc<mychild->n_nodes(); nc++)
+      for (unsigned int cnode=0; cnode != mychild->n_nodes(); ++cnode)
         {
           Point new_pos;
           bool calculated_new_pos = false;
@@ -123,7 +128,7 @@ void Elem::coarsen()
           for (unsigned int n=0; n<this->n_nodes(); n++)
             {
               // The value from the embedding matrix
-              const float em_val = this->embedding_matrix(c,nc,n);
+              const float em_val = this->embedding_matrix(c,cnode,n);
 
               // The node location is somewhere between existing vertices
               if ((em_val != 0.) && (em_val != 1.))
@@ -133,27 +138,26 @@ void Elem::coarsen()
                 }
             }
 
-          if(calculated_new_pos)
+          if (calculated_new_pos)
             {
               //Move the existing node back into it's original location
-              for(unsigned int i=0; i<LIBMESH_DIM; i++)
+              for (unsigned int i=0; i<LIBMESH_DIM; i++)
                 {
-                  Point & child_node = *(mychild->get_node(nc));
+                  Point & child_node = mychild->point(cnode);
                   child_node(i)=new_pos(i);
                 }
             }
         }
     }
 
-  for (unsigned int c=0; c<this->n_children(); c++)
+  for (auto & mychild : this->child_ref_range())
     {
-      Elem * mychild = this->child(c);
-      if (mychild == remote_elem)
+      if (&mychild == remote_elem)
         continue;
-      libmesh_assert_equal_to (mychild->refinement_flag(), Elem::COARSEN);
-      mychild->set_refinement_flag(Elem::INACTIVE);
-      if (mychild->p_level() > parent_p_level)
-        parent_p_level = mychild->p_level();
+      libmesh_assert_equal_to (mychild.refinement_flag(), Elem::COARSEN);
+      mychild.set_refinement_flag(Elem::INACTIVE);
+      if (mychild.p_level() > parent_p_level)
+        parent_p_level = mychild.p_level();
     }
 
   this->set_refinement_flag(Elem::JUST_COARSENED);
@@ -171,7 +175,7 @@ void Elem::contract()
 
   // Active contracted elements no longer can have children
   delete [] _children;
-  _children = libmesh_nullptr;
+  _children = nullptr;
 
   if (this->refinement_flag() == Elem::JUST_COARSENED)
     this->set_refinement_flag(Elem::DO_NOTHING);

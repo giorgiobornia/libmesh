@@ -1,3 +1,20 @@
+// The libMesh Finite Element Library.
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+
+// This library is free software; you can redistribute it and/or
+// modify it under the terms of the GNU Lesser General Public
+// License as published by the Free Software Foundation; either
+// version 2.1 of the License, or (at your option) any later version.
+
+// This library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+// Lesser General Public License for more details.
+
+// You should have received a copy of the GNU Lesser General Public
+// License along with this library; if not, write to the Free Software
+// Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
 // Code partially copyright Edd Dawson 2007
 //
 // Boost Software License - Version 1.0 - August 17th, 2003
@@ -131,7 +148,7 @@ bool gdb_backtrace(std::ostream & out_stream)
 
       int exit_status = 1;
 
-      try
+      libmesh_try
         {
           std::string gdb_command =
             libMesh::command_line_value("gdb",std::string(LIBMESH_GDB_COMMAND));
@@ -144,7 +161,7 @@ bool gdb_backtrace(std::ostream & out_stream)
                   << temp_file;
           exit_status = std::system(command.str().c_str());
         }
-      catch (...)
+      libmesh_catch (...)
         {
           std::cerr << "Unable to run gdb" << std::endl;
         }
@@ -203,7 +220,7 @@ void print_trace(std::ostream & out_stream)
       int size = backtrace(addresses, 40);
       strings = backtrace_symbols(addresses, size);
       out_stream << "Stack frames: " << size << std::endl;
-      for(int i = 0; i < size; i++)
+      for (int i = 0; i < size; i++)
         out_stream << i << ": " << process_trace(strings[i]) << std::endl;
       std::free(strings);
     }
@@ -238,7 +255,7 @@ std::string demangle(const char * name)
   // Actually do the demangling
   char * demangled_name = abi::__cxa_demangle(name, 0, 0, &status);
 
-  // If demangling returns non-NULL, save the result in a string.
+  // If demangling returns non-nullptr, save the result in a string.
   if (demangled_name)
     ret = demangled_name;
 

@@ -47,6 +47,10 @@ namespace RBDataDeserialization
 /**
  * This class de-serializes an RBEvaluation object
  * using the Cap'n Proto library.
+ *
+ * \author David Knezevic
+ * \date 2015
+ * \brief Deserializes RBEvaluation objects using Cap'n Proto.
  */
 class RBEvaluationDeserialization
 {
@@ -238,7 +242,7 @@ void load_point(RBData::Point3D::Reader point_reader, Point & point);
  */
 void load_elem_into_mesh(RBData::MeshElem::Reader mesh_elem_reader,
                          libMesh::Elem * elem,
-                         libMesh::SerialMesh & mesh);
+                         libMesh::ReplicatedMesh & mesh);
 
 } // namespace RBDataDeserialization
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -39,7 +39,9 @@ void QTrap::init_2D(const ElemType type_in,
       //---------------------------------------------
       // Quadrilateral quadrature rules
     case QUAD4:
+    case QUADSHELL4:
     case QUAD8:
+    case QUADSHELL8:
     case QUAD9:
       {
 
@@ -57,6 +59,7 @@ void QTrap::init_2D(const ElemType type_in,
       //---------------------------------------------
       // Triangle quadrature rules
     case TRI3:
+    case TRISHELL3:
     case TRI6:
       {
         _points.resize(3);

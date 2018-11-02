@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -34,7 +34,6 @@ namespace libMesh
 
 // Forward declarations
 class MeshBase;
-class MeshData;
 
 
 /**
@@ -51,42 +50,49 @@ class TetGenIO : public MeshInput<MeshBase>,
 public:
 
   /**
-   * Constructor.  Takes a writeable reference to a mesh object.
+   * Constructor.  Takes a writable reference to a mesh object.
    * This is the constructor required to read a mesh.
    */
   explicit
-  TetGenIO (MeshBase & mesh, MeshData * mesh_data=libmesh_nullptr);
+  TetGenIO (MeshBase & mesh);
 
   /**
    * Constructor.  Takes a read-only reference to a mesh object.
    * This is the constructor required to write a mesh.
    */
   explicit
-  TetGenIO (const MeshBase & mesh, MeshData * mesh_data=libmesh_nullptr);
+  TetGenIO (const MeshBase & mesh);
 
   /**
    * This method implements reading a mesh from a specified file
    * in TetGen format.
    */
-  virtual void read (const std::string &) libmesh_override;
+  virtual void read (const std::string &) override;
 
   /**
    * This method implements writing a mesh to a specified ".poly" file.
    * ".poly" files defines so called Piecewise Linear Complex (PLC).
    */
-  virtual void write (const std::string &) libmesh_override;
+  virtual void write (const std::string &) override;
 
   /**
    * Data structure to hold node attributes read in from file.
    * What you do with these is up to you!
    */
-  std::vector<std::vector<Real> > node_attributes;
+  std::vector<std::vector<Real>> node_attributes;
 
   /**
    * Data structure to hold element attributes read in from file.
-   * What you do with these is up to you!
+   *
+   * \note This vector is no longer filled or used for anything. If
+   * region attributes are present in the .ele file, they are used to
+   * set the subdomain ids of the elements as they are created.
+   *
+   * \deprecated This member, since it was originally a part of the
+   * public interface, remains for now, but will be removed some time
+   * in the near future.
    */
-  std::vector<std::vector<Real> > element_attributes;
+  std::vector<std::vector<Real>> element_attributes;
 
 private:
 
@@ -106,9 +112,7 @@ private:
    * vector<Node *> \p nodes in the order they come in.
    * The original node labels are being stored in the
    * map \p _assign_nodes in order to assign the elements to
-   * the right nodes later.  In addition, provided it is
-   * active, the \p MeshData gets to know the node id from
-   * the file, too.
+   * the right nodes later.
    */
   void node_in (std::istream & node_stream);
 
@@ -116,8 +120,7 @@ private:
    * Method reads elements and stores them in
    * vector<Elem *> \p elements in the same order as they
    * come in. Within \p TetGenMeshInterface, element labels are
-   * ignored, but \p MeshData takes care of such things
-   * (if active).
+   * ignored.
    */
   void element_in (std::istream & ele_stream);
 
@@ -138,12 +141,6 @@ private:
    * total number of elements. Primarily used when reading.
    */
   dof_id_type _num_elements;
-
-  /**
-   * A pointer to the MeshData object you would like to use.
-   * with this TetGenIO object.  Can be NULL.
-   */
-  MeshData * _mesh_data;
 };
 
 
@@ -151,19 +148,17 @@ private:
 // ------------------------------------------------------------
 // TetGenIO inline members
 inline
-TetGenIO::TetGenIO (MeshBase & mesh, MeshData * mesh_data) :
+TetGenIO::TetGenIO (MeshBase & mesh) :
   MeshInput<MeshBase> (mesh),
-  MeshOutput<MeshBase>(mesh),
-  _mesh_data(mesh_data)
+  MeshOutput<MeshBase>(mesh)
 {
 }
 
 
 
 inline
-TetGenIO::TetGenIO (const MeshBase & mesh, MeshData * mesh_data) :
-  MeshOutput<MeshBase>(mesh),
-  _mesh_data(mesh_data)
+TetGenIO::TetGenIO (const MeshBase & mesh) :
+  MeshOutput<MeshBase>(mesh)
 {
 }
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -27,32 +27,53 @@
 // C++ includes
 #include <string>
 
-namespace libMesh {
+namespace libMesh
+{
 
+/**
+ * Function that returns a single value that never changes. All
+ * overridden virtual functions are documented in function_base.h.
+ *
+ * \author Roy Stogner
+ * \date 2012
+ * \brief Function that returns a single value that never changes.
+ */
 template <typename Output=Number>
 class ConstFunction : public FunctionBase<Output>
 {
 public:
   explicit
-  ConstFunction (const Output & c) : _c(c) { this->_initialized = true;
-                                             this->_is_time_dependent = false;}
+  ConstFunction (const Output & c) : _c(c)
+  {
+    this->_initialized = true;
+    this->_is_time_dependent = false;
+  }
+
+  /**
+   * The 5 special functions can be defaulted for this class.
+   */
+  ConstFunction (ConstFunction &&) = default;
+  ConstFunction (const ConstFunction &) = default;
+  ConstFunction & operator= (const ConstFunction &) = default;
+  ConstFunction & operator= (ConstFunction &&) = default;
+  virtual ~ConstFunction () = default;
 
   virtual Output operator() (const Point &,
-                             const Real = 0) libmesh_override
+                             const Real = 0) override
   { return _c; }
 
   virtual void operator() (const Point &,
                            const Real,
-                           DenseVector<Output> & output) libmesh_override
+                           DenseVector<Output> & output) override
   {
     unsigned int size = output.size();
     for (unsigned int i=0; i != size; ++i)
       output(i) = _c;
   }
 
-  virtual UniquePtr<FunctionBase<Output> > clone() const libmesh_override
+  virtual std::unique_ptr<FunctionBase<Output>> clone() const override
   {
-    return UniquePtr<FunctionBase<Output> >
+    return std::unique_ptr<FunctionBase<Output>>
       (new ConstFunction<Output>(_c));
   }
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -70,7 +70,7 @@ PostscriptIO::~PostscriptIO ()
 
 void PostscriptIO::write (const std::string & fname)
 {
-  // We may need to gather a ParallelMesh to output it, making that
+  // We may need to gather a DistributedMesh to output it, making that
   // const qualifier in our constructor a dirty lie
   MeshSerializer serialize(const_cast<MeshBase &>(this->mesh()), !_is_parallel_format);
 
@@ -92,7 +92,7 @@ void PostscriptIO::write (const std::string & fname)
 
       // The mesh bounding box gives us info about what the
       // Postscript bounding box should be.
-      MeshTools::BoundingBox bbox = MeshTools::bounding_box(the_mesh);
+      BoundingBox bbox = MeshTools::create_bounding_box(the_mesh);
 
       // Add a little extra padding to the "true" bounding box so
       // that we can still see the boundary
@@ -173,13 +173,8 @@ void PostscriptIO::write (const std::string & fname)
       // line sits between each pair of vertices.  Also we draw every edge
       // for an element regardless of the fact that it may overlap with
       // another.  This would probably be a useful optimization...
-      MeshBase::const_element_iterator       el     = the_mesh.active_elements_begin();
-      const MeshBase::const_element_iterator end_el = the_mesh.active_elements_end();
-      for ( ; el != end_el; ++el)
-        {
-          this->plot_linear_elem(*el);
-          //this->plot_quadratic_elem(*el); // Experimental
-        }
+      for (const auto & elem : the_mesh.active_element_ptr_range())
+        this->plot_linear_elem(elem);
 
       // Issue the showpage command, and we're done.
       _out << "showpage" << std::endl;
@@ -236,10 +231,10 @@ void PostscriptIO::plot_linear_elem(const Elem * elem)
 
 void PostscriptIO::plot_quadratic_elem(const Elem * elem)
 {
-  for (unsigned int ns=0; ns<elem->n_sides(); ++ns)
+  for (auto ns : elem->side_index_range())
     {
       // Build the quadratic side
-      UniquePtr<Elem> side = elem->build_side(ns);
+      std::unique_ptr<const Elem> side = elem->build_side_ptr(ns);
 
       // Be sure it's quadratic (Edge2).  Eventually we could
       // handle cubic elements as well...
@@ -257,7 +252,7 @@ void PostscriptIO::plot_quadratic_elem(const Elem * elem)
       this->_compute_edge_bezier_coeffs(side.get());
 
       // Print curveto path to file
-      for (unsigned int i=0; i<_bezier_coeffs.size(); ++i)
+      for (std::size_t i=0; i<_bezier_coeffs.size(); ++i)
         _out << _bezier_coeffs[i](0) << " " << _bezier_coeffs[i](1) << " ";
       _out << " cs\n";
     }
@@ -273,30 +268,29 @@ void PostscriptIO::_compute_edge_bezier_coeffs(const Elem * elem)
 
   // Get x-coordinates into an array, transform them,
   // and repeat for y.
-  float
-    phys_coords[3] = {0., 0., 0.},
-    bez_coords[3]  = {0., 0., 0.};
+  float phys_coords[3] = {0., 0., 0.};
+  float bez_coords[3]  = {0., 0., 0.};
 
-    for (unsigned int i=0; i<2; ++i)
-      {
-        // Initialize vectors.  Physical coordinates are initialized
-        // by their postscript-scaled values.
-        for (unsigned int j=0; j<3; ++j)
-          {
-            phys_coords[j] = static_cast<float>
-              ((elem->point(j)(i) - _offset(i)) * _scale);
-            bez_coords[j] = 0.; // zero out result vector
-          }
+  for (unsigned int i=0; i<2; ++i)
+    {
+      // Initialize vectors.  Physical coordinates are initialized
+      // by their postscript-scaled values.
+      for (unsigned int j=0; j<3; ++j)
+        {
+          phys_coords[j] = static_cast<float>
+            ((elem->point(j)(i) - _offset(i)) * _scale);
+          bez_coords[j] = 0.; // zero out result vector
+        }
 
-        // Multiply matrix times vector
-        for (unsigned int j=0; j<3; ++j)
-          for (unsigned int k=0; k<3; ++k)
-            bez_coords[j] += _bezier_transform[j][k]*phys_coords[k];
+      // Multiply matrix times vector
+      for (unsigned int j=0; j<3; ++j)
+        for (unsigned int k=0; k<3; ++k)
+          bez_coords[j] += _bezier_transform[j][k]*phys_coords[k];
 
-        // Store result in _bezier_coeffs
-        for (unsigned int j=0; j<3; ++j)
-          _bezier_coeffs[j](i) = phys_coords[j];
-      }
+      // Store result in _bezier_coeffs
+      for (unsigned int j=0; j<3; ++j)
+        _bezier_coeffs[j](i) = phys_coords[j];
+    }
 }
 
 } // namespace libMesh

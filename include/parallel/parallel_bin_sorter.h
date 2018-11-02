@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -34,12 +34,18 @@
 namespace libMesh
 {
 
-namespace Parallel {
+namespace Parallel
+{
 
-template <typename KeyType, typename IdxType=unsigned int>
 /**
  * Perform a parallel sort using a bin-sort method.
+ *
+ * \author Benjamin S. Kirk
+ * \author John W. Peterson
+ * \date 2007
+ * \brief Parallel bin sorting object.
  */
+template <typename KeyType, typename IdxType=unsigned int>
 class BinSorter : public ParallelObject
 {
   // the type of iterator we will be using is inferred from KeyType
@@ -52,14 +58,18 @@ public:
   BinSorter (const Parallel::Communicator & comm,
              const std::vector<KeyType> & d);
 
-  // The actual function which sorts the data into
-  // nbins.  Currently based on the global min and
-  // max which you must provide e.g. by using MPI.
+  /**
+   * The actual function which sorts the data into
+   * nbins.  Currently based on the global min and
+   * max which you must provide e.g. by using MPI.
+   */
   void binsort (const IdxType nbins,
                 KeyType max,
                 KeyType min);
 
-  // Returns the size of bin b as an unsigned int.
+  /**
+   * \returns The size of bin b as an unsigned int.
+   */
   IdxType sizeof_bin (const IdxType bin) const;
 
 

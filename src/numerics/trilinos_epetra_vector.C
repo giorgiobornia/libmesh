@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -21,7 +21,7 @@
 // Local Includes
 #include "libmesh/trilinos_epetra_vector.h"
 
-#ifdef LIBMESH_HAVE_TRILINOS
+#ifdef LIBMESH_TRILINOS_HAVE_EPETRA
 
 #include "libmesh/dense_subvector.h"
 #include "libmesh/dense_vector.h"
@@ -30,6 +30,7 @@
 #include "libmesh/utility.h"
 
 // Trilinos Includes
+#include "libmesh/ignore_warnings.h"
 #include <Epetra_LocalMap.h>
 #include <Epetra_Comm.h>
 #include <Epetra_Map.h>
@@ -40,6 +41,7 @@
 #include <Epetra_IntSerialDenseVector.h>
 #include <Epetra_SerialDenseVector.h>
 #include <Epetra_Vector.h>
+#include "libmesh/restore_warnings.h"
 
 namespace libMesh
 {
@@ -126,12 +128,12 @@ EpetraVector<T>::operator -= (const NumericVector<T> & v)
 
 template <typename T>
 NumericVector<T> &
-EpetraVector<T>::operator /= (NumericVector<T> & v)
+EpetraVector<T>::operator /= (const NumericVector<T> & v)
 {
   libmesh_assert(this->closed());
   libmesh_assert_equal_to(size(), v.size());
 
-  EpetraVector<T> & v_vec = cast_ref<EpetraVector<T> &>(v);
+  const EpetraVector<T> & v_vec = cast_ref<const EpetraVector<T> &>(v);
 
   _vec->ReciprocalMultiply(1.0, *v_vec._vec, *_vec, 0.0);
 
@@ -213,8 +215,8 @@ void EpetraVector<T>::add_vector (const T * v,
 {
   libmesh_assert_equal_to (sizeof(numeric_index_type), sizeof(int));
 
-  SumIntoGlobalValues (dof_indices.size(),
-                       (int *) &dof_indices[0],
+  SumIntoGlobalValues (cast_int<numeric_index_type>(dof_indices.size()),
+                       numeric_trilinos_cast(&dof_indices[0]),
                        const_cast<T *>(v));
 }
 
@@ -222,16 +224,16 @@ void EpetraVector<T>::add_vector (const T * v,
 
 // TODO: fill this in after creating an EpetraMatrix
 template <typename T>
-void EpetraVector<T>::add_vector (const NumericVector<T> & V_in,
+void EpetraVector<T>::add_vector (const NumericVector<T> & v_in,
                                   const SparseMatrix<T> & A_in)
 {
-  const EpetraVector<T> * V = cast_ptr<const EpetraVector<T> *>(&V_in);
+  const EpetraVector<T> * v = cast_ptr<const EpetraVector<T> *>(&v_in);
   const EpetraMatrix<T> * A = cast_ptr<const EpetraMatrix<T> *>(&A_in);
 
   // FIXME - does Trilinos let us do this *without* memory allocation?
-  UniquePtr<NumericVector<T> > temp = V->zero_clone();
-  EpetraVector<T> * tempV = cast_ptr<EpetraVector<T> *>(temp.get());
-  A->mat()->Multiply(false, *V->_vec, *tempV->_vec);
+  std::unique_ptr<NumericVector<T>> temp = v->zero_clone();
+  EpetraVector<T> * temp_v = cast_ptr<EpetraVector<T> *>(temp.get());
+  A->mat()->Multiply(false, *v->_vec, *temp_v->_vec);
   *this += *temp;
 }
 
@@ -239,7 +241,7 @@ void EpetraVector<T>::add_vector (const NumericVector<T> & V_in,
 
 // TODO: fill this in after creating an EpetraMatrix
 template <typename T>
-void EpetraVector<T>::add_vector_transpose (const NumericVector<T> & /* V_in */,
+void EpetraVector<T>::add_vector_transpose (const NumericVector<T> & /* v_in */,
                                             const SparseMatrix<T> & /* A_in */)
 {
   libmesh_not_implemented();
@@ -286,8 +288,8 @@ void EpetraVector<T>::insert (const T * v,
 {
   libmesh_assert_equal_to (sizeof(numeric_index_type), sizeof(int));
 
-  ReplaceGlobalValues (dof_indices.size(),
-                       (int *) &dof_indices[0],
+  ReplaceGlobalValues (cast_int<numeric_index_type>(dof_indices.size()),
+                       numeric_trilinos_cast(&dof_indices[0]),
                        const_cast<T *>(v));
 }
 
@@ -307,13 +309,13 @@ void EpetraVector<T>::abs()
 
 
 template <typename T>
-T EpetraVector<T>::dot (const NumericVector<T> & V_in) const
+T EpetraVector<T>::dot (const NumericVector<T> & v_in) const
 {
-  const EpetraVector<T> * V = cast_ptr<const EpetraVector<T> *>(&V_in);
+  const EpetraVector<T> * v = cast_ptr<const EpetraVector<T> *>(&v_in);
 
   T result=0.0;
 
-  _vec->Dot(*V->_vec, &result);
+  _vec->Dot(*v->_vec, &result);
 
   return result;
 }
@@ -323,10 +325,10 @@ template <typename T>
 void EpetraVector<T>::pointwise_mult (const NumericVector<T> & vec1,
                                       const NumericVector<T> & vec2)
 {
-  const EpetraVector<T> * V1 = cast_ptr<const EpetraVector<T> *>(&vec1);
-  const EpetraVector<T> * V2 = cast_ptr<const EpetraVector<T> *>(&vec2);
+  const EpetraVector<T> * v1 = cast_ptr<const EpetraVector<T> *>(&vec1);
+  const EpetraVector<T> * v2 = cast_ptr<const EpetraVector<T> *>(&vec2);
 
-  _vec->Multiply(1.0, *V1->_vec, *V2->_vec, 0.0);
+  _vec->Multiply(1.0, *v1->_vec, *v2->_vec, 0.0);
 }
 
 
@@ -343,25 +345,14 @@ EpetraVector<T>::operator = (const T s_in)
 
 template <typename T>
 NumericVector<T> &
-EpetraVector<T>::operator = (const NumericVector<T> & v_in)
+EpetraVector<T>::operator = (const NumericVector<T> & /*v_in*/)
 {
-  const EpetraVector<T> * v = cast_ptr<const EpetraVector<T> *>(&v_in);
-
-  *this = *v;
-
-  return *this;
-}
-
-
-
-template <typename T>
-EpetraVector<T> &
-EpetraVector<T>::operator = (const EpetraVector<T> & v)
-{
-  (*_vec) = *v._vec;
-
-  // FIXME - what about our communications data?
-
+  // This function could be implemented in terms of the copy
+  // assignment operator (see other NumericVector subclasses) but that
+  // function is currently deleted so calling this function is an error.
+  // const EpetraVector<T> * v = cast_ptr<const EpetraVector<T> *>(&v_in);
+  // *this = *v;
+  libmesh_not_implemented();
   return *this;
 }
 
@@ -377,12 +368,12 @@ EpetraVector<T>::operator = (const std::vector<T> & v)
    * Case 1:  The vector is the same size of
    * The global vector.  Only add the local components.
    */
-  if(this->size() == v.size())
+  if (this->size() == v.size())
     {
       const unsigned int nl=this->local_size();
       const unsigned int fli=this->first_local_index();
 
-      for(unsigned int i=0;i<nl;i++)
+      for (unsigned int i=0;i<nl;i++)
         values[i]=v[fli+i];
     }
 
@@ -396,7 +387,7 @@ EpetraVector<T>::operator = (const std::vector<T> & v)
 
       const unsigned int nl=this->local_size();
 
-      for(unsigned int i=0;i<nl;i++)
+      for (unsigned int i=0;i<nl;i++)
         values[i]=v[i];
     }
 
@@ -438,6 +429,46 @@ void EpetraVector<T>::localize (NumericVector<T> & v_local_in,
 
   //   v_local->_vec->Import (*this->_vec, importer, Insert);
 }
+
+
+
+template <typename T>
+void EpetraVector<T>::localize (std::vector<T> & v_local,
+                                const std::vector<numeric_index_type> & indices) const
+{
+  // Create a "replicated" map for importing values.  This is
+  // equivalent to creating a general Epetra_Map with
+  // NumGlobalElements == NumMyElements.
+  Epetra_LocalMap import_map(static_cast<int>(indices.size()),
+                             /*IndexBase=*/0,
+                             _map->Comm());
+
+  // Get a pointer to the list of global elements for the map, and set
+  // all the values from indices.
+  int * import_map_global_elements = import_map.MyGlobalElements();
+  for (int i=0; i<import_map.NumMyElements(); ++i)
+    import_map_global_elements[i] = indices[i];
+
+  // Create a new EpetraVector to import values into.
+  Epetra_Vector import_vector(import_map);
+
+  // Set up an "Import" object which associates the two maps.
+  Epetra_Import import_object(import_map, *_map);
+
+  // Import the values
+  import_vector.Import(*_vec, import_object, Insert);
+
+  // Get a pointer to the imported values array and the length of the
+  // array.
+  T * values = import_vector.Values();
+  int import_vector_length = import_vector.MyLength();
+
+  // Copy the imported values into v_local
+  v_local.resize(import_vector_length);
+  for (int i=0; i<import_vector_length; ++i)
+    v_local[i] = values[i];
+}
+
 
 
 template <typename T>
@@ -621,7 +652,7 @@ int EpetraVector<T>::inputValues(int numIDs,
   //Important note!! This method assumes that there is only 1 point
   //associated with each element.
 
-  for(int i=0; i<numIDs; ++i) {
+  for (int i=0; i<numIDs; ++i) {
     if (_vec->Map().MyGID(GIDs[i])) {
       if (accumulate) {
         _vec->SumIntoGlobalValue(GIDs[i], 0, 0, values[i]);
@@ -657,16 +688,16 @@ int EpetraVector<T>::inputValues(int numIDs,
   }
 
   int offset=0;
-  for(int i=0; i<numIDs; ++i) {
+  for (int i=0; i<numIDs; ++i) {
     int numValues = numValuesPerID[i];
     if (_vec->Map().MyGID(GIDs[i])) {
       if (accumulate) {
-        for(int j=0; j<numValues; ++j) {
+        for (int j=0; j<numValues; ++j) {
           _vec->SumIntoGlobalValue(GIDs[i], j, 0, values[offset+j]);
         }
       }
       else {
-        for(int j=0; j<numValues; ++j) {
+        for (int j=0; j<numValues; ++j) {
           _vec->ReplaceGlobalValue(GIDs[i], j, 0, values[offset+j]);
         }
       }
@@ -750,12 +781,12 @@ int EpetraVector<T>::inputNonlocalValues(int GID,
     }
 
     if (accumulate) {
-      for(int j=0; j<numValues; ++j) {
+      for (int j=0; j<numValues; ++j) {
         nonlocalCoefs_[offset][j] += values[j];
       }
     }
     else {
-      for(int j=0; j<numValues; ++j) {
+      for (int j=0; j<numValues; ++j) {
         nonlocalCoefs_[offset][j] = values[j];
       }
     }
@@ -775,7 +806,7 @@ int EpetraVector<T>::inputNonlocalValues(int GID,
     EPETRA_CHK_ERR( Epetra_Util_insert(numValues, insertPoint, nonlocalElementSize_,
                                        tmp1, tmp3) );
     double * newvalues = new double[numValues];
-    for(int j=0; j<numValues; ++j) {
+    for (int j=0; j<numValues; ++j) {
       newvalues[j] = values[j];
     }
     EPETRA_CHK_ERR( Epetra_Util_insert(newvalues, insertPoint, nonlocalCoefs_,
@@ -813,8 +844,8 @@ int EpetraVector<T>::GlobalAssemble(Epetra_CombineMode mode)
   Epetra_MultiVector nonlocalVector(sourceMap, 1);
 
   int i,j;
-  for(i=0; i<numNonlocalIDs_; ++i) {
-    for(j=0; j<nonlocalElementSize_[i]; ++j) {
+  for (i=0; i<numNonlocalIDs_; ++i) {
+    for (j=0; j<nonlocalElementSize_[i]; ++j) {
       nonlocalVector.ReplaceGlobalValue(nonlocalIDs_[i], j, 0,
                                         nonlocalCoefs_[i][j]);
     }
@@ -844,12 +875,12 @@ void EpetraVector<T>::FEoperatorequals(const EpetraVector & source)
     nonlocalIDs_ = new int[allocatedNonlocalLength_];
     nonlocalElementSize_ = new int[allocatedNonlocalLength_];
     nonlocalCoefs_ = new double *[allocatedNonlocalLength_];
-    for(int i=0; i<numNonlocalIDs_; ++i) {
+    for (int i=0; i<numNonlocalIDs_; ++i) {
       int elemSize = source.nonlocalElementSize_[i];
       nonlocalCoefs_[i] = new double[elemSize];
       nonlocalIDs_[i] = source.nonlocalIDs_[i];
       nonlocalElementSize_[i] = elemSize;
-      for(int j=0; j<elemSize; ++j) {
+      for (int j=0; j<elemSize; ++j) {
         nonlocalCoefs_[i][j] = source.nonlocalCoefs_[i][j];
       }
     }
@@ -864,13 +895,13 @@ void EpetraVector<T>::destroyNonlocalData()
   if (allocatedNonlocalLength_ > 0) {
     delete [] nonlocalIDs_;
     delete [] nonlocalElementSize_;
-    nonlocalIDs_ = libmesh_nullptr;
-    nonlocalElementSize_ = libmesh_nullptr;
-    for(int i=0; i<numNonlocalIDs_; ++i) {
+    nonlocalIDs_ = nullptr;
+    nonlocalElementSize_ = nullptr;
+    for (int i=0; i<numNonlocalIDs_; ++i) {
       delete [] nonlocalCoefs_[i];
     }
     delete [] nonlocalCoefs_;
-    nonlocalCoefs_ = libmesh_nullptr;
+    nonlocalCoefs_ = nullptr;
     numNonlocalIDs_ = 0;
     allocatedNonlocalLength_ = 0;
   }
@@ -884,4 +915,4 @@ template class EpetraVector<Number>;
 
 } // namespace libMesh
 
-#endif // #ifdef LIBMESH_HAVE_TRILINOS
+#endif // LIBMESH_TRILINOS_HAVE_EPETRA

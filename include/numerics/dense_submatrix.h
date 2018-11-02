@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -31,9 +31,11 @@ namespace libMesh
 {
 
 /**
- * Defines a dense submatrix for use in Finite Element-type computations.
- * Useful for storing element stiffness matrices before summation
- * into a global matrix, particularly when you have systems of equations.
+ * Defines a dense submatrix for use in Finite Element-type
+ * computations.  Useful for storing element stiffness matrices before
+ * summation into a global matrix, particularly when you have systems
+ * of equations.  All overridden virtual functions are documented in
+ * dense_matrix_base.h.
  *
  * \author Benjamin S. Kirk
  * \date 2003
@@ -56,61 +58,45 @@ public:
                  const unsigned int n=0);
 
   /**
-   * Copy Constructor.
+   * The 5 special functions can be defaulted for this class, as it
+   * does not manage any memory itself.
    */
-  DenseSubMatrix (const DenseSubMatrix<T> & other_matrix);
+  DenseSubMatrix (DenseSubMatrix &&) = default;
+  DenseSubMatrix (const DenseSubMatrix &) = default;
+  DenseSubMatrix & operator= (const DenseSubMatrix &) = default;
+  DenseSubMatrix & operator= (DenseSubMatrix &&) = default;
+  virtual ~DenseSubMatrix() = default;
 
   /**
-   * Destructor.  Empty.
-   */
-  virtual ~DenseSubMatrix() {}
-
-
-  /**
-   * @returns a reference to the parent matrix.
+   * \returns A reference to the parent matrix.
    */
   DenseMatrix<T> & parent () { return _parent_matrix; }
 
-  /**
-   * Set every element in the submatrix to 0.
-   */
-  virtual void zero() libmesh_override;
+  virtual void zero() override;
 
   /**
-   * @returns the \p (i,j) element of the submatrix.
+   * \returns The \p (i,j) element of the submatrix.
    */
   T operator() (const unsigned int i,
                 const unsigned int j) const;
 
   /**
-   * @returns the \p (i,j) element of the submatrix as a writeable reference.
+   * \returns The \p (i,j) element of the submatrix as a writable reference.
    */
   T & operator() (const unsigned int i,
                   const unsigned int j);
 
-  /**
-   * @returns the \p (i,j) element of the matrix as a writeable reference.
-   */
   virtual T el(const unsigned int i,
-               const unsigned int j) const libmesh_override
+               const unsigned int j) const override
   { return (*this)(i,j); }
 
-  /**
-   * @returns the \p (i,j) element of the matrix as a writeable reference.
-   */
   virtual T & el(const unsigned int i,
-                 const unsigned int j) libmesh_override
+                 const unsigned int j) override
   { return (*this)(i,j); }
 
-  /**
-   * Performs the operation: (*this) <- M2 * (*this)
-   */
-  virtual void left_multiply (const DenseMatrixBase<T> & M2) libmesh_override;
+  virtual void left_multiply (const DenseMatrixBase<T> & M2) override;
 
-  /**
-   * Performs the operation: (*this) <- (*this) * M3
-   */
-  virtual void right_multiply (const DenseMatrixBase<T> & M3) libmesh_override;
+  virtual void right_multiply (const DenseMatrixBase<T> & M3) override;
 
   /**
    * Changes the location of the submatrix in the parent matrix.
@@ -121,12 +107,12 @@ public:
                   const unsigned int new_n);
 
   /**
-   * @returns the row offset into the parent matrix.
+   * \returns The row offset into the parent matrix.
    */
   unsigned int i_off() const { return _i_off; }
 
   /**
-   * @returns the column offset into the parent matrix.
+   * \returns The column offset into the parent matrix.
    */
   unsigned int j_off() const { return _j_off; }
 
@@ -178,18 +164,6 @@ DenseSubMatrix<T>::DenseSubMatrix(DenseMatrix<T> & new_parent,
   _parent_matrix(new_parent)
 {
   this->reposition (ioff, joff, new_m, new_n);
-}
-
-
-// Copy Constructor
-template<typename T>
-inline
-DenseSubMatrix<T>::DenseSubMatrix(const DenseSubMatrix<T> & other_matrix) :
-  DenseMatrixBase<T>(other_matrix._m, other_matrix._n),
-  _parent_matrix(other_matrix._parent_matrix)
-{
-  _i_off = other_matrix._i_off;
-  _j_off = other_matrix._j_off;
 }
 
 

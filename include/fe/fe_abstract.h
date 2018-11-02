@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -24,18 +24,26 @@
 #include "libmesh/reference_counted_object.h"
 #include "libmesh/point.h"
 #include "libmesh/vector_value.h"
-#include "libmesh/enum_elem_type.h"
 #include "libmesh/fe_type.h"
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
 #include "libmesh/fe_map.h"
+#ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
+#include "libmesh/tensor_value.h"
+#endif
+
+#ifdef LIBMESH_FORWARD_DECLARE_ENUMS
+namespace libMesh
+{
+enum ElemType : int;
+}
+#else
+#include "libmesh/enum_elem_type.h"
+#endif
 
 // C++ includes
 #include <cstddef>
 #include <vector>
-
-#ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
-#include "libmesh/tensor_value.h"
-#endif
+#include <memory>
 
 namespace libMesh
 {
@@ -69,25 +77,23 @@ class InfFE;
 
 
 /**
- * This class forms the foundation from which generic finite
- * elements may be derived.  In the current implementation the
- * templated derived class \p FE offers a wide variety of commonly
- * used finite element concepts.  Check there for details.
- * Use the \p FEAbstract::build() method to create an object of any of
- * the derived classes.
- * Note that the amount of virtual members is kept to a minimum,
- * and the sophisticated template scheme of \p FE is quite
- * likely to offer acceptably fast code.
+ * This class forms the foundation from which generic finite elements
+ * may be derived.  In the current implementation, the templated
+ * derived class \p FE offers a wide variety of commonly used finite
+ * element concepts.  Check there for details.  Use the \p
+ * FEAbstract::build() method to create an object of any of the
+ * derived classes.
+ *
+ * \note In the present design, the number of virtual members is kept
+ * to a minimum for performance reasons, although this is not based on
+ * rigorous profiling.
  *
  * All calls to static members of the \p FE classes should be
  * requested through the \p FEInterface.  This interface class
- * offers sort-of runtime polymorphism for the templated finite
- * element classes.  Even internal library classes, like \p DofMap,
- * request the number of dof's through this interface class.
- * Note that this also enables the co-existence of various
- * element-based schemes.
- * This class is well 'at the heart' of the library, so
- * things in here should better remain unchanged.
+ * approximates runtime polymorphism for the templated finite element
+ * classes.  Even internal library classes, like \p DofMap, request
+ * the number of DOFs through this interface class.  This approach
+ * also enables the co-existence of various element-based schemes.
  *
  * \author Benjamin S. Kirk
  * \date 2002
@@ -112,12 +118,13 @@ public:
   virtual ~FEAbstract();
 
   /**
-   * Builds a specific finite element type.  A \p
-   * UniquePtr<FEAbstract> is returned to prevent a memory leak. This
-   * way the user need not remember to delete the object.
+   * Builds a specific finite element type.
+   *
+   * \returns A std::unique_ptr<FEAbstract> to the FE object to prevent
+   * memory leaks.
    */
-  static UniquePtr<FEAbstract> build (const unsigned int dim,
-                                      const FEType & type);
+  static std::unique_ptr<FEAbstract> build (const unsigned int dim,
+                                            const FEType & type);
 
   /**
    * This is at the core of this class. Use this for each
@@ -128,18 +135,18 @@ public:
    * of points on the reference element may be specified in the optional
    * argument \p pts.
    *
-   * Note that the FE classes decide which data to initialize based on
-   * which accessor functions such as \p get_phi() or \p get_d2phi() have
-   * been called, so all such accessors should be called before the first
-   * \p reinit().
+   * \note The FE classes decide which data to initialize based on
+   * which accessor functions such as \p get_phi() or \p get_d2phi()
+   * have been called, so all such accessors should be called before
+   * the first \p reinit().
    */
   virtual void reinit (const Elem * elem,
-                       const std::vector<Point> * const pts = libmesh_nullptr,
-                       const std::vector<Real> * const weights = libmesh_nullptr) = 0;
+                       const std::vector<Point> * const pts = nullptr,
+                       const std::vector<Real> * const weights = nullptr) = 0;
 
   /**
    * Reinitializes all the physical element-dependent data based on
-   * the \p side of the element \p elem.  The \p tolerance paremeter
+   * the \p side of the element \p elem.  The \p tolerance parameter
    * is passed to the involved call to \p inverse_map().  By default the
    * element data are computed at the quadrature points specified by the
    * quadrature rule \p qrule, but any set of points on the reference
@@ -148,12 +155,12 @@ public:
   virtual void reinit (const Elem * elem,
                        const unsigned int side,
                        const Real tolerance = TOLERANCE,
-                       const std::vector<Point> * const pts = libmesh_nullptr,
-                       const std::vector<Real> * const weights = libmesh_nullptr) = 0;
+                       const std::vector<Point> * const pts = nullptr,
+                       const std::vector<Real> * const weights = nullptr) = 0;
 
   /**
    * Reinitializes all the physical element-dependent data based on
-   * the \p edge of the element \p elem.  The \p tolerance paremeter
+   * the \p edge of the element \p elem.  The \p tolerance parameter
    * is passed to the involved call to \p inverse_map().  By default the
    * element data are computed at the quadrature points specified by the
    * quadrature rule \p qrule, but any set of points on the reference
@@ -162,8 +169,8 @@ public:
   virtual void edge_reinit (const Elem * elem,
                             const unsigned int edge,
                             const Real tolerance = TOLERANCE,
-                            const std::vector<Point> * pts = libmesh_nullptr,
-                            const std::vector<Real> * weights = libmesh_nullptr) = 0;
+                            const std::vector<Point> * pts = nullptr,
+                            const std::vector<Real> * weights = nullptr) = 0;
 
   /**
    * Computes the reference space quadrature points on the side of
@@ -176,7 +183,7 @@ public:
                          std::vector<Point> &       reference_points) = 0;
 
   /**
-   * @returns true if the point p is located on the reference element
+   * \returns \p true if the point p is located on the reference element
    * for element type t, false otherwise.  Since we are doing floating
    * point comparisons here the parameter \p eps can be specified to
    * indicate a tolerance.  For example, \f$ x \le 1 \f$  becomes
@@ -186,8 +193,8 @@ public:
                                    const ElemType t,
                                    const Real eps = TOLERANCE);
   /**
-   * returns the reference space nodes coordinates
-   * given the element type
+   * \returns The reference space coordinates of \p nodes based on the
+   * element type.
    */
   static void get_refspace_nodes(const ElemType t,
                                  std::vector<Point> & nodes);
@@ -219,48 +226,54 @@ public:
 #endif // LIBMESH_ENABLE_PERIODIC
 
   /**
-   * @returns the \p xyz spatial locations of the quadrature
+   * \returns the dimension of this FE
+   */
+  unsigned int get_dim() const
+  { return dim; }
+
+  /**
+   * \returns The \p xyz spatial locations of the quadrature
    * points on the element.
    */
   const std::vector<Point> & get_xyz() const
   { return this->_fe_map->get_xyz(); }
 
   /**
-   * @returns the element Jacobian times the quadrature weight for
+   * \returns The element Jacobian times the quadrature weight for
    * each quadrature point.
    */
   const std::vector<Real> & get_JxW() const
   { return this->_fe_map->get_JxW(); }
 
   /**
-   * @returns the element tangents in xi-direction at the quadrature
+   * \returns The element tangents in xi-direction at the quadrature
    * points.
    */
   const std::vector<RealGradient> & get_dxyzdxi() const
   { return this->_fe_map->get_dxyzdxi(); }
 
   /**
-   * @returns the element tangents in eta-direction at the quadrature
+   * \returns The element tangents in eta-direction at the quadrature
    * points.
    */
   const std::vector<RealGradient> & get_dxyzdeta() const
   { return this->_fe_map->get_dxyzdeta(); }
 
   /**
-   * @returns the element tangents in zeta-direction at the quadrature
+   * \returns The element tangents in zeta-direction at the quadrature
    * points.
    */
   const std::vector<RealGradient> & get_dxyzdzeta() const
   { return _fe_map->get_dxyzdzeta(); }
 
   /**
-   * @returns the second partial derivatives in xi.
+   * \returns The second partial derivatives in xi.
    */
   const std::vector<RealGradient> & get_d2xyzdxi2() const
   { return this->_fe_map->get_d2xyzdxi2(); }
 
   /**
-   * @returns the second partial derivatives in eta.
+   * \returns The second partial derivatives in eta.
    */
   const std::vector<RealGradient> & get_d2xyzdeta2() const
   { return this->_fe_map->get_d2xyzdeta2(); }
@@ -268,7 +281,7 @@ public:
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
 
   /**
-   * @returns the second partial derivatives in zeta.
+   * \returns The second partial derivatives in zeta.
    */
   const std::vector<RealGradient> & get_d2xyzdzeta2() const
   { return this->_fe_map->get_d2xyzdzeta2(); }
@@ -276,7 +289,7 @@ public:
 #endif
 
   /**
-   * @returns the second partial derivatives in xi-eta.
+   * \returns The second partial derivatives in xi-eta.
    */
   const std::vector<RealGradient> & get_d2xyzdxideta() const
   { return this->_fe_map->get_d2xyzdxideta(); }
@@ -284,13 +297,13 @@ public:
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
 
   /**
-   * @returns the second partial derivatives in xi-zeta.
+   * \returns The second partial derivatives in xi-zeta.
    */
   const std::vector<RealGradient> & get_d2xyzdxidzeta() const
   { return this->_fe_map->get_d2xyzdxidzeta(); }
 
   /**
-   * @returns the second partial derivatives in eta-zeta.
+   * \returns The second partial derivatives in eta-zeta.
    */
   const std::vector<RealGradient> & get_d2xyzdetadzeta() const
   { return this->_fe_map->get_d2xyzdetadzeta(); }
@@ -298,82 +311,82 @@ public:
 #endif
 
   /**
-   * @returns the dxi/dx entry in the transformation
+   * \returns The dxi/dx entry in the transformation
    * matrix from physical to local coordinates.
    */
   const std::vector<Real> & get_dxidx() const
   { return this->_fe_map->get_dxidx(); }
 
   /**
-   * @returns the dxi/dy entry in the transformation
+   * \returns The dxi/dy entry in the transformation
    * matrix from physical to local coordinates.
    */
   const std::vector<Real> & get_dxidy() const
   { return this->_fe_map->get_dxidy(); }
 
   /**
-   * @returns the dxi/dz entry in the transformation
+   * \returns The dxi/dz entry in the transformation
    * matrix from physical to local coordinates.
    */
   const std::vector<Real> & get_dxidz() const
   { return this->_fe_map->get_dxidz(); }
 
   /**
-   * @returns the deta/dx entry in the transformation
+   * \returns The deta/dx entry in the transformation
    * matrix from physical to local coordinates.
    */
   const std::vector<Real> & get_detadx() const
   { return this->_fe_map->get_detadx(); }
 
   /**
-   * @returns the deta/dy entry in the transformation
+   * \returns The deta/dy entry in the transformation
    * matrix from physical to local coordinates.
    */
   const std::vector<Real> & get_detady() const
   { return this->_fe_map->get_detady(); }
 
   /**
-   * @returns the deta/dz entry in the transformation
+   * \returns The deta/dz entry in the transformation
    * matrix from physical to local coordinates.
    */
   const std::vector<Real> & get_detadz() const
   { return this->_fe_map->get_detadz(); }
 
   /**
-   * @returns the dzeta/dx entry in the transformation
+   * \returns The dzeta/dx entry in the transformation
    * matrix from physical to local coordinates.
    */
   const std::vector<Real> & get_dzetadx() const
   { return this->_fe_map->get_dzetadx(); }
 
   /**
-   * @returns the dzeta/dy entry in the transformation
+   * \returns The dzeta/dy entry in the transformation
    * matrix from physical to local coordinates.
    */
   const std::vector<Real> & get_dzetady() const
   { return this->_fe_map->get_dzetady(); }
 
   /**
-   * @returns the dzeta/dz entry in the transformation
+   * \returns The dzeta/dz entry in the transformation
    * matrix from physical to local coordinates.
    */
   const std::vector<Real> & get_dzetadz() const
   { return this->_fe_map->get_dzetadz(); }
 
   /**
-   * @returns the tangent vectors for face integration.
+   * \returns The tangent vectors for face integration.
    */
-  const std::vector<std::vector<Point> > & get_tangents() const
+  const std::vector<std::vector<Point>> & get_tangents() const
   { return this->_fe_map->get_tangents(); }
 
   /**
-   * @returns the normal vectors for face integration.
+   * \returns The outward pointing normal vectors for face integration.
    */
   const std::vector<Point> & get_normals() const
   { return this->_fe_map->get_normals(); }
 
   /**
-   * @returns the curvatures for use in face integration.
+   * \returns The curvatures for use in face integration.
    */
   const std::vector<Real> & get_curvatures() const
   { return this->_fe_map->get_curvatures();}
@@ -385,59 +398,64 @@ public:
   virtual void attach_quadrature_rule (QBase * q) = 0;
 
   /**
-   * @returns the total number of approximation shape functions
+   * \returns The total number of approximation shape functions
    * for the current element.  Useful during matrix assembly.
    * Implement this in derived classes.
    */
   virtual unsigned int n_shape_functions () const = 0;
 
   /**
-   * @returns the total number of quadrature points.  Useful
+   * \returns The total number of quadrature points.  Useful
    * during matrix assembly.  Implement this in derived classes.
    */
   virtual unsigned int n_quadrature_points () const = 0;
 
   /**
-   * @returns the element type that the current shape functions
+   * \returns The element type that the current shape functions
    * have been calculated for.  Useful in determining when shape
    * functions must be recomputed.
    */
   ElemType get_type()  const { return elem_type; }
 
   /**
-   * @returns the p refinement level that the current shape
+   * \returns The p refinement level that the current shape
    * functions have been calculated for.
    */
   unsigned int get_p_level() const { return _p_level; }
 
   /**
-   * @returns the FE Type (approximation order and family) of the finite element.
+   * \returns The FE Type (approximation order and family) of the finite element.
    */
   FEType get_fe_type()  const { return fe_type; }
 
   /**
-   * @returns the approximation order of the finite element.
+   * \returns The approximation order of the finite element.
    */
   Order get_order()  const { return static_cast<Order>(fe_type.order + _p_level); }
 
   /**
-   * @returns the continuity level of the finite element.
+   * Sets the *base* FE order of the finite element.
+   */
+  void set_fe_order(int new_order) { fe_type.order = new_order; }
+
+  /**
+   * \returns The continuity level of the finite element.
    */
   virtual FEContinuity get_continuity() const = 0;
 
   /**
-   * @returns true if the finite element's higher order shape functions are
+   * \returns \p true if the finite element's higher order shape functions are
    * hierarchic
    */
   virtual bool is_hierarchic() const = 0;
 
   /**
-   * @returns the finite element family of this element.
+   * \returns The finite element family of this element.
    */
   FEFamily get_family()  const { return fe_type.family; }
 
   /**
-   * @returns the mapping object
+   * \returns The mapping object
    */
   const FEMap & get_fe_map() const { return *_fe_map.get(); }
 
@@ -504,7 +522,7 @@ protected:
    */
   virtual void compute_shape_functions(const Elem *, const std::vector<Point> & ) =0;
 
-  UniquePtr<FEMap> _fe_map;
+  std::unique_ptr<FEMap> _fe_map;
 
 
   /**
@@ -550,10 +568,11 @@ protected:
 
 
   /**
-   * The finite element type for this object.  Note that this
-   * should be constant for the object.
+   * The finite element type for this object.
+   *
+   * \note This should be constant for the object.
    */
-  const FEType fe_type;
+  FEType fe_type;
 
   /**
    * The element type the current data structures are
@@ -579,7 +598,7 @@ protected:
   bool shapes_on_quadrature;
 
   /**
-   * @returns \p true when the shape functions (for
+   * \returns \p true when the shape functions (for
    * this \p FEFamily) depend on the particular
    * element, and therefore needs to be re-initialized
    * for each new element.  \p false otherwise.
@@ -587,37 +606,6 @@ protected:
   virtual bool shapes_need_reinit() const = 0;
 
 };
-
-
-
-
-// ------------------------------------------------------------
-// FEAbstract class inline members
-inline
-FEAbstract::FEAbstract(const unsigned int d,
-                       const FEType & fet) :
-  _fe_map( FEMap::build(fet) ),
-  dim(d),
-  calculations_started(false),
-  calculate_phi(false),
-  calculate_dphi(false),
-  calculate_d2phi(false),
-  calculate_curl_phi(false),
-  calculate_div_phi(false),
-  calculate_dphiref(false),
-  fe_type(fet),
-  elem_type(INVALID_ELEM),
-  _p_level(0),
-  qrule(libmesh_nullptr),
-  shapes_on_quadrature(false)
-{
-}
-
-
-inline
-FEAbstract::~FEAbstract()
-{
-}
 
 } // namespace libMesh
 

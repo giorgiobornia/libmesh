@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -18,10 +18,13 @@
 #ifndef LIBMESH_CONST_FEM_FUNCTION_H
 #define LIBMESH_CONST_FEM_FUNCTION_H
 
-#include <string>
-
+// libMesh includes
 #include "libmesh/dense_vector.h"
 #include "libmesh/fem_function_base.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
+
+// C++ includes
+#include <string>
 
 namespace libMesh
 {
@@ -29,16 +32,31 @@ namespace libMesh
 // Forward declarations
 class Point;
 
+/**
+ * FEMFunction that returns a single value, regardless of the time and
+ * location inputs.
+ *
+ * \author Roy Stogner
+ * \date 2012
+ * \brief FEMFunction that returns a single value.
+ */
 template <typename Output=Number>
 class ConstFEMFunction : public FEMFunctionBase<Output>
 {
 public:
   ConstFEMFunction (const Output c) : _c(c) {}
 
-  ~ConstFEMFunction() {}
+  /**
+   * The 5 special functions can be defaulted for this class.
+   */
+  ConstFEMFunction (ConstFEMFunction &&) = default;
+  ConstFEMFunction (const ConstFEMFunction &) = default;
+  ConstFEMFunction & operator= (const ConstFEMFunction &) = default;
+  ConstFEMFunction & operator= (ConstFEMFunction &&) = default;
+  virtual ~ConstFEMFunction () = default;
 
-  virtual UniquePtr<FEMFunctionBase<Output> > clone () const
-  {return UniquePtr<FEMFunctionBase<Output> >( new ConstFEMFunction(*this) ); }
+  virtual std::unique_ptr<FEMFunctionBase<Output>> clone () const
+  {return libmesh_make_unique<ConstFEMFunction>(*this); }
 
   virtual Output operator() (const FEMContext &,
                              const Point &,
@@ -49,8 +67,10 @@ public:
                            const Point &,
                            const Real,
                            DenseVector<Output> & output)
-  {for(unsigned int i = 0; i < output.size(); i++ )
-      output(i) = _c;}
+  {
+    for (unsigned int i = 0; i < output.size(); i++)
+      output(i) = _c;
+  }
 
 private:
   Output _c;

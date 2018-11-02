@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -16,13 +16,14 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-// C++ includes
-
 // Local includes
 #include "libmesh/side.h"
 #include "libmesh/cell_tet4.h"
 #include "libmesh/edge_edge2.h"
 #include "libmesh/face_tri3.h"
+#include "libmesh/tensor_value.h"
+#include "libmesh/enum_io_package.h"
+#include "libmesh/enum_order.h"
 
 namespace libMesh
 {
@@ -31,7 +32,14 @@ namespace libMesh
 
 // ------------------------------------------------------------
 // Tet4 class static member initializations
-const unsigned int Tet4::side_nodes_map[4][3] =
+const int Tet4::num_nodes;
+const int Tet4::num_sides;
+const int Tet4::num_edges;
+const int Tet4::num_children;
+const int Tet4::nodes_per_side;
+const int Tet4::nodes_per_edge;
+
+const unsigned int Tet4::side_nodes_map[Tet4::num_sides][Tet4::nodes_per_side] =
   {
     {0, 2, 1}, // Side 0
     {0, 1, 3}, // Side 1
@@ -39,14 +47,14 @@ const unsigned int Tet4::side_nodes_map[4][3] =
     {2, 0, 3}  // Side 3
   };
 
-const unsigned int Tet4::edge_nodes_map[6][2] =
+const unsigned int Tet4::edge_nodes_map[Tet4::num_edges][Tet4::nodes_per_edge] =
   {
-    {0, 1}, // Side 0
-    {1, 2}, // Side 1
-    {0, 2}, // Side 2
-    {0, 3}, // Side 3
-    {1, 3}, // Side 4
-    {2, 3}  // Side 5
+    {0, 1}, // Edge 0
+    {1, 2}, // Edge 1
+    {0, 2}, // Edge 2
+    {0, 3}, // Edge 3
+    {1, 3}, // Edge 4
+    {2, 3}  // Edge 5
   };
 
 
@@ -72,10 +80,9 @@ bool Tet4::is_node_on_edge(const unsigned int n,
                            const unsigned int e) const
 {
   libmesh_assert_less (e, n_edges());
-  for (unsigned int i = 0; i != 2; ++i)
-    if (edge_nodes_map[e][i] == n)
-      return true;
-  return false;
+  return std::find(std::begin(edge_nodes_map[e]),
+                   std::end(edge_nodes_map[e]),
+                   n) != std::end(edge_nodes_map[e]);
 }
 
 
@@ -120,41 +127,49 @@ bool Tet4::is_node_on_side(const unsigned int n,
                            const unsigned int s) const
 {
   libmesh_assert_less (s, n_sides());
-  for (unsigned int i = 0; i != 3; ++i)
-    if (side_nodes_map[s][i] == n)
-      return true;
-  return false;
+  return std::find(std::begin(side_nodes_map[s]),
+                   std::end(side_nodes_map[s]),
+                   n) != std::end(side_nodes_map[s]);
 }
 
-UniquePtr<Elem> Tet4::build_side (const unsigned int i,
-                                  bool proxy) const
+std::vector<unsigned>
+Tet4::nodes_on_side(const unsigned int s) const
+{
+  libmesh_assert_less(s, n_sides());
+  return {std::begin(side_nodes_map[s]), std::end(side_nodes_map[s])};
+}
+
+Order Tet4::default_order() const
+{
+  return FIRST;
+}
+
+std::unique_ptr<Elem> Tet4::build_side_ptr (const unsigned int i,
+                                            bool proxy)
 {
   libmesh_assert_less (i, this->n_sides());
 
   if (proxy)
-    return UniquePtr<Elem>(new Side<Tri3,Tet4>(this,i));
+    return libmesh_make_unique<Side<Tri3,Tet4>>(this,i);
 
   else
     {
-      Elem * face = new Tri3;
+      std::unique_ptr<Elem> face = libmesh_make_unique<Tri3>();
       face->subdomain_id() = this->subdomain_id();
 
       for (unsigned n=0; n<face->n_nodes(); ++n)
-        face->set_node(n) = this->get_node(Tet4::side_nodes_map[i][n]);
+        face->set_node(n) = this->node_ptr(Tet4::side_nodes_map[i][n]);
 
-      return UniquePtr<Elem>(face);
+      return face;
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return UniquePtr<Elem>();
 }
 
 
-UniquePtr<Elem> Tet4::build_edge (const unsigned int i) const
+std::unique_ptr<Elem> Tet4::build_edge_ptr (const unsigned int i)
 {
   libmesh_assert_less (i, this->n_edges());
 
-  return UniquePtr<Elem>(new SideEdge<Edge2,Tet4>(this,i));
+  return libmesh_make_unique<SideEdge<Edge2,Tet4>>(this,i);
 }
 
 
@@ -172,24 +187,24 @@ void Tet4::connectivity(const unsigned int libmesh_dbg_var(sc),
     case TECPLOT:
       {
         conn.resize(8);
-        conn[0] = this->node(0)+1;
-        conn[1] = this->node(1)+1;
-        conn[2] = this->node(2)+1;
-        conn[3] = this->node(2)+1;
-        conn[4] = this->node(3)+1;
-        conn[5] = this->node(3)+1;
-        conn[6] = this->node(3)+1;
-        conn[7] = this->node(3)+1;
+        conn[0] = this->node_id(0)+1;
+        conn[1] = this->node_id(1)+1;
+        conn[2] = this->node_id(2)+1;
+        conn[3] = this->node_id(2)+1;
+        conn[4] = this->node_id(3)+1;
+        conn[5] = this->node_id(3)+1;
+        conn[6] = this->node_id(3)+1;
+        conn[7] = this->node_id(3)+1;
         return;
       }
 
     case VTK:
       {
         conn.resize(4);
-        conn[0] = this->node(0);
-        conn[1] = this->node(1);
-        conn[2] = this->node(2);
-        conn[3] = this->node(3);
+        conn[0] = this->node_id(0);
+        conn[1] = this->node_id(1);
+        conn[2] = this->node_id(2);
+        conn[3] = this->node_id(3);
         return;
       }
 
@@ -202,7 +217,7 @@ void Tet4::connectivity(const unsigned int libmesh_dbg_var(sc),
 
 #ifdef LIBMESH_ENABLE_AMR
 
-const float Tet4::_embedding_matrix[8][4][4] =
+const float Tet4::_embedding_matrix[Tet4::num_children][Tet4::num_nodes][Tet4::num_nodes] =
   {
     // embedding matrix for child 0
     {
@@ -326,6 +341,52 @@ std::pair<Real, Real> Tet4::min_and_max_angle() const
 
 
 
+dof_id_type Tet4::key () const
+{
+  return this->compute_key(this->node_id(0),
+                           this->node_id(1),
+                           this->node_id(2),
+                           this->node_id(3));
+}
+
+
+
+bool Tet4::contains_point (const Point & p, Real tol) const
+{
+  // See the response by Tony Noe on this thread.
+  // http://bbs.dartmouth.edu/~fangq/MATH/download/source/Point_in_Tetrahedron.htm
+  Point
+    col1 = point(1) - point(0),
+    col2 = point(2) - point(0),
+    col3 = point(3) - point(0);
+
+  Point r;
+
+  libmesh_try
+    {
+      RealTensorValue(col1(0), col2(0), col3(0),
+                      col1(1), col2(1), col3(1),
+                      col1(2), col2(2), col3(2)).solve(p - point(0), r);
+    }
+  libmesh_catch (ConvergenceFailure &)
+    {
+      // The Jacobian was singular, therefore the Tet had
+      // zero volume.  In this degenerate case, it is not
+      // possible for the Tet to contain any points.
+      return false;
+    }
+
+  // The point p is inside the tetrahedron if r1 + r2 + r3 < 1 and
+  // 0 <= ri <= 1 for i = 1,2,3.
+  return
+    r(0) > -tol &&
+    r(1) > -tol &&
+    r(2) > -tol &&
+    r(0) + r(1) + r(2) < 1.0 + tol;
+}
+
+
+
 #ifdef LIBMESH_ENABLE_AMR
 float Tet4::embedding_matrix (const unsigned int i,
                               const unsigned int j,
@@ -363,18 +424,8 @@ float Tet4::embedding_matrix (const unsigned int i,
   // libMesh::err << "jp=" << jp << std::endl;
   // libMesh::err << "kp=" << kp << std::endl;
 
-  // Call embedding matrx with permuted indices
+  // Call embedding matrix with permuted indices
   return this->_embedding_matrix[i][jp][kp];
-}
-
-
-
-dof_id_type Tet4::key () const
-{
-  return this->compute_key(this->node(0),
-                           this->node(1),
-                           this->node(2),
-                           this->node(3));
 }
 
 
@@ -406,11 +457,11 @@ dof_id_type Tet4::key () const
 //  available.  */
 //       for (unsigned int c=4; c<this->n_children(); c++)
 // {
-//   Elem * child = this->child(c);
+//   Elem * child = this->child_ptr(c);
 //   for (unsigned int nc=0; nc<child->n_nodes(); nc++)
 //     {
 //       /* Unassign the current node.  */
-//       child->set_node(nc) = libmesh_nullptr;
+//       child->set_node(nc) = nullptr;
 //
 //       /* We have to find the correct new node now.  We know
 //  that it exists somewhere.  We make use of the fact
@@ -431,21 +482,21 @@ dof_id_type Tet4::key () const
 //  value.  */
 //       if (first_05_in_embedding_matrix==libMesh::invalid_uint)
 // {
-//   /* First time, so just remeber this position.  */
+//   /* First time, so just remember this position.  */
 //   first_05_in_embedding_matrix = n;
 // }
 //       else
 // {
 //   /* Second time, so we know now which node to
 //      use.  */
-//   child->set_node(nc) = this->child(n)->get_node(first_05_in_embedding_matrix);
+//   child->set_node(nc) = this->child_ptr(n)->node_ptr(first_05_in_embedding_matrix);
 // }
 //
 //     }
 // }
 //
 //       /* Make sure that a node has been found.  */
-//       libmesh_assert(child->get_node(nc));
+//       libmesh_assert(child->node_ptr(nc));
 //     }
 // }
 //     }

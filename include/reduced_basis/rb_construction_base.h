@@ -74,7 +74,7 @@ public:
   typedef RBConstructionBase<Base> sys_type;
 
   /**
-   * @returns a clever pointer to the system.
+   * \returns A reference to *this.
    */
   sys_type & system () { return *this; }
 
@@ -83,6 +83,20 @@ public:
    * the system.
    */
   virtual void clear ();
+
+  /**
+   * Set the quiet_mode flag. If quiet == false then
+   * we print out a lot of extra information
+   * during the Offline stage.
+   */
+  void set_quiet_mode(bool quiet_mode_in)
+  { this->quiet_mode = quiet_mode_in; }
+
+  /**
+   * Is the system in quiet mode?
+   */
+  bool is_quiet() const
+  { return this->quiet_mode; }
 
   /**
    * Get the total number of training samples.
@@ -118,7 +132,7 @@ public:
   /**
    * Overwrite the training parameters with new_training_set.
    */
-  virtual void load_training_set(std::map< std::string, std::vector<Number> > & new_training_set);
+  virtual void load_training_set(std::map<std::string, std::vector<Number>> & new_training_set);
 
   /**
    * Broadcasts parameters on processor proc_id
@@ -189,14 +203,14 @@ protected:
    * processors.
    */
   static void get_global_max_error_pair(const Parallel::Communicator & communicator,
-                                        std::pair<unsigned int, Real> & error_pair);
+                                        std::pair<numeric_index_type, Real> & error_pair);
 
   /**
    * Static helper function for generating a randomized set of parameters.
    */
   static void generate_training_parameters_random(const Parallel::Communicator & communicator,
                                                   std::map<std::string, bool> log_param_scale,
-                                                  std::map<std::string, NumericVector<Number> * > & training_parameters_in,
+                                                  std::map<std::string, std::unique_ptr<NumericVector<Number>>> & training_parameters_in,
                                                   unsigned int n_training_samples_in,
                                                   const RBParameters & min_parameters,
                                                   const RBParameters & max_parameters,
@@ -209,7 +223,7 @@ protected:
    */
   static void generate_training_parameters_deterministic(const Parallel::Communicator & communicator,
                                                          std::map<std::string, bool> log_param_scale,
-                                                         std::map< std::string, NumericVector<Number> * > & training_parameters_in,
+                                                         std::map<std::string, std::unique_ptr<NumericVector<Number>>> & training_parameters_in,
                                                          unsigned int n_training_samples_in,
                                                          const RBParameters & min_parameters,
                                                          const RBParameters & max_parameters,
@@ -217,6 +231,12 @@ protected:
 
 
   //----------- PROTECTED DATA MEMBERS -----------//
+
+  /**
+   * Flag to indicate whether we print out extra information during
+   * the Offline stage.
+   */
+  bool quiet_mode;
 
   /**
    * This boolean flag indicates whether or not the training set should
@@ -231,7 +251,7 @@ protected:
    * performing inner products (avoids unnecessary memory
    * allocation/deallocation).
    */
-  UniquePtr< NumericVector<Number> > inner_product_storage_vector;
+  std::unique_ptr<NumericVector<Number>> inner_product_storage_vector;
 
 
 private:
@@ -245,7 +265,7 @@ private:
   /**
    * The training samples.
    */
-  std::map< std::string, NumericVector<Number> * > training_parameters;
+  std::map<std::string, std::unique_ptr<NumericVector<Number>>> training_parameters;
 
   /**
    * If < 0, use std::time() * processor_id() to seed the random

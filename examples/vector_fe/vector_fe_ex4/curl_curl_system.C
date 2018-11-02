@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -46,7 +46,8 @@ void CurlCurlSystem::init_data ()
   // Add the solution variable
   u_var = this->add_variable ("u", FIRST, NEDELEC_ONE);
 
-  this->time_evolving(u_var);
+  // The solution is evolving, with a first order time derivative
+  this->time_evolving(u_var, 1);
 
   // Useful debugging options
   // Set verify_analytic_jacobians to 1e-6 to use
@@ -97,6 +98,7 @@ void CurlCurlSystem::init_context(DiffContext & context)
 
   side_fe->get_JxW();
   side_fe->get_phi();
+  side_fe->get_xyz();
 }
 
 
@@ -106,7 +108,7 @@ bool CurlCurlSystem::element_time_derivative (bool request_jacobian,
   FEMContext & c = cast_ref<FEMContext &>(context);
 
   // Get finite element object
-  FEGenericBase<RealGradient> * fe = libmesh_nullptr;
+  FEGenericBase<RealGradient> * fe = nullptr;
   c.get_element_fe<RealGradient>(u_var, fe);
 
   // First we get some references to cell-specific data that
@@ -116,16 +118,16 @@ bool CurlCurlSystem::element_time_derivative (bool request_jacobian,
   const std::vector<Real> & JxW = fe->get_JxW();
 
   // The velocity shape functions at interior quadrature points.
-  const std::vector<std::vector<RealGradient> > & phi = fe->get_phi();
+  const std::vector<std::vector<RealGradient>> & phi = fe->get_phi();
 
   // The velocity shape function gradients at interior
   // quadrature points.
-  const std::vector<std::vector<RealGradient> > & curl_phi = fe->get_curl_phi();
+  const std::vector<std::vector<RealGradient>> & curl_phi = fe->get_curl_phi();
 
   const std::vector<Point> & qpoint = fe->get_xyz();
 
   // The number of local degrees of freedom in each variable
-  const unsigned int n_u_dofs = c.get_dof_indices(u_var).size();
+  const unsigned int n_u_dofs = c.n_dof_indices(u_var);
 
   DenseSubMatrix<Number> & Kuu = c.get_elem_jacobian(u_var, u_var);
 
@@ -175,7 +177,7 @@ bool CurlCurlSystem::side_time_derivative (bool request_jacobian,
   FEMContext & c = cast_ref<FEMContext &>(context);
 
   // Get finite element object
-  FEGenericBase<RealGradient> * side_fe = libmesh_nullptr;
+  FEGenericBase<RealGradient> * side_fe = nullptr;
   c.get_side_fe<RealGradient>(u_var, side_fe);
 
   // First we get some references to cell-specific data that
@@ -185,10 +187,10 @@ bool CurlCurlSystem::side_time_derivative (bool request_jacobian,
   const std::vector<Real> & JxW = side_fe->get_JxW();
 
   // The velocity shape functions at interior quadrature points.
-  const std::vector<std::vector<RealGradient> > & phi = side_fe->get_phi();
+  const std::vector<std::vector<RealGradient>> & phi = side_fe->get_phi();
 
   // The number of local degrees of freedom in each variable
-  const unsigned int n_u_dofs = c.get_dof_indices(u_var).size();
+  const unsigned int n_u_dofs = c.n_dof_indices(u_var);
 
   const std::vector<Point> & normals = side_fe->get_normals();
 

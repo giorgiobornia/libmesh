@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -17,13 +17,11 @@
 
 
 
-// C++ includes
-
-
 // Local Includes
 #include "libmesh/point_locator_base.h"
 #include "libmesh/point_locator_tree.h"
-#include "libmesh/point_locator_list.h"
+#include "libmesh/elem.h"
+#include "libmesh/enum_point_locator_type.h"
 
 namespace libMesh
 {
@@ -61,30 +59,24 @@ bool PointLocatorBase::initialized () const
 
 
 
-UniquePtr<PointLocatorBase> PointLocatorBase::build (PointLocatorType t,
-                                                     const MeshBase & mesh,
-                                                     const PointLocatorBase * master)
+std::unique_ptr<PointLocatorBase> PointLocatorBase::build (PointLocatorType t,
+                                                           const MeshBase & mesh,
+                                                           const PointLocatorBase * master)
 {
   switch (t)
     {
     case TREE:
-      return UniquePtr<PointLocatorBase>(new PointLocatorTree(mesh, /*Trees::NODES,*/ master));
+      return libmesh_make_unique<PointLocatorTree>(mesh, /*Trees::NODES,*/ master);
 
     case TREE_ELEMENTS:
-      return UniquePtr<PointLocatorBase>(new PointLocatorTree(mesh, Trees::ELEMENTS, master));
+      return libmesh_make_unique<PointLocatorTree>(mesh, Trees::ELEMENTS, master);
 
     case TREE_LOCAL_ELEMENTS:
-      return UniquePtr<PointLocatorBase>(new PointLocatorTree(mesh, Trees::LOCAL_ELEMENTS, master));
-
-    case LIST:
-      return UniquePtr<PointLocatorBase>(new PointLocatorList(mesh, master));
+      return libmesh_make_unique<PointLocatorTree>(mesh, Trees::LOCAL_ELEMENTS, master);
 
     default:
       libmesh_error_msg("ERROR: Bad PointLocatorType = " << t);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return UniquePtr<PointLocatorBase>();
 }
 
 void PointLocatorBase::set_close_to_point_tol (Real close_to_point_tol)
@@ -98,6 +90,36 @@ void PointLocatorBase::unset_close_to_point_tol ()
 {
   _use_close_to_point_tol = false;
   _close_to_point_tol = TOLERANCE;
+}
+
+
+const MeshBase & PointLocatorBase::get_mesh () const
+{
+  return _mesh;
+}
+
+
+const Node *
+PointLocatorBase::
+locate_node(const Point & p,
+            const std::set<subdomain_id_type> * allowed_subdomains,
+            Real tol) const
+{
+  std::set<const Elem *> candidate_elements;
+  this->operator()(p, candidate_elements, allowed_subdomains);
+
+  for (const auto & elem : candidate_elements)
+    {
+      const int elem_n_nodes = elem->n_nodes();
+      const Real hmax = elem->hmax();
+      const Real dist_tol_sq = (tol * hmax) * (tol * hmax);
+
+      for (int n=0; n != elem_n_nodes; ++n)
+        if ((elem->point(n) - p).norm_sq() < dist_tol_sq)
+          return elem->node_ptr(n);
+    }
+
+  return nullptr;
 }
 
 } // namespace libMesh

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -39,12 +39,9 @@ template <typename T> class VectorValue;
 template <typename T> class TensorValue;
 
 /**
- * This class defines a vector in \p LIBMESH_DIM dimensional space of type T.
- * T may either be Real or Complex.  The default constructor for
- * this class is protected, suggesting that you should not instantiate
- * one of these directly.  Instead use one of the derived types: \p Point
- * for a real-valued point in LIBMESH_DIM-space, or \p SpaceVector for a real
- * or complex-valued vector in LIBMESH_DIM-space.
+ * This class defines a vector in \p LIBMESH_DIM dimensional space of
+ * type T.  T may either be Real or Complex. Instead use one of the derived
+ * types such as \p Point or \p Node.
  *
  * \author Benjamin S. Kirk
  * \date 2003
@@ -57,15 +54,14 @@ class TypeVector
 
   friend class TypeTensor<T>;
 
-protected:
-
+public:
   /**
    * Empty constructor.  Gives the vector 0 in \p LIBMESH_DIM
    * dimensions.
    */
   TypeVector  ();
 
-
+protected:
   /**
    * Constructor-from-T.  By default sets higher dimensional
    * entries to 0.
@@ -73,7 +69,6 @@ protected:
   TypeVector (const T x,
               const T y=0,
               const T z=0);
-
 
   /**
    * Constructor-from-scalars.  By default sets higher dimensional
@@ -90,7 +85,6 @@ protected:
               boostcopy::enable_if_c<ScalarTraits<Scalar3>::value,
               const Scalar3>::type z=0);
 
-
   /**
    * Constructor-from-scalar.  Sets higher dimensional entries to 0.
    * Necessary because for some reason the constructor-from-scalars
@@ -101,7 +95,7 @@ protected:
   TypeVector (const Scalar x,
               typename
               boostcopy::enable_if_c<ScalarTraits<Scalar>::value,
-              const Scalar>::type * sfinae = libmesh_nullptr);
+              const Scalar>::type * sfinae = nullptr);
 
 public:
 
@@ -109,6 +103,11 @@ public:
    * Helper typedef for C++98 generic programming
    */
   typedef T value_type;
+
+  /**
+   * Helper typedef for generic index programming
+   */
+  typedef unsigned int index_type;
 
   /**
    * Copy-constructor.
@@ -122,7 +121,7 @@ public:
   ~TypeVector ();
 
   /**
-   * Assign to a vector without creating a temporary.
+   * Assign to this vector without creating a temporary.
    */
   template <typename T2>
   void assign (const TypeVector<T2> &);
@@ -134,25 +133,25 @@ public:
   typename boostcopy::enable_if_c<
     ScalarTraits<Scalar>::value,
     TypeVector &>::type
-  operator = (const Scalar & p)
+  operator = (const Scalar & libmesh_dbg_var(p))
   { libmesh_assert_equal_to (p, Scalar(0)); this->zero(); return *this; }
 
   /**
-   * Return the \f$ i^{th} \f$ element of the vector.
+   * \returns A const reference to the \f$ i^{th} \f$ entry of the vector.
    */
   const T & operator () (const unsigned int i) const;
-
   const T & slice (const unsigned int i) const { return (*this)(i); }
 
   /**
-   * Return a writeable reference to the \f$ i^{th} \f$ element of the vector.
+   * \returns A writable reference to the \f$ i^{th} \f$ entry of the vector.
    */
   T & operator () (const unsigned int i);
-
   T & slice (const unsigned int i) { return (*this)(i); }
 
   /**
    * Add two vectors.
+   *
+   * \returns A copy of the result, this vector is unchanged.
    */
   template <typename T2>
   TypeVector<typename CompareTypes<T, T2>::supertype>
@@ -160,6 +159,8 @@ public:
 
   /**
    * Add to this vector.
+   *
+   * \returns A reference to *this.
    */
   template <typename T2>
   const TypeVector<T> & operator += (const TypeVector<T2> &);
@@ -171,14 +172,15 @@ public:
   void add (const TypeVector<T2> &);
 
   /**
-   * Add a scaled value to this vector without
-   * creating a temporary.
+   * Add a scaled value to this vector without creating a temporary.
    */
   template <typename T2>
   void add_scaled (const TypeVector<T2> &, const T);
 
   /**
-   * Subtract two vectors.
+   * Subtract from this vector.
+   *
+   * \returns A copy of the result, this vector is unchanged.
    */
   template <typename T2>
   TypeVector<typename CompareTypes<T, T2>::supertype>
@@ -186,6 +188,8 @@ public:
 
   /**
    * Subtract from this vector.
+   *
+   * \returns A reference to *this.
    */
   template <typename T2>
   const TypeVector<T> & operator -= (const TypeVector<T2> &);
@@ -197,160 +201,176 @@ public:
   void subtract (const TypeVector<T2> &);
 
   /**
-   * Subtract a scaled value from this vector without
-   * creating a temporary.
+   * Subtract a scaled value from this vector without creating a
+   * temporary.
    */
   template <typename T2>
   void subtract_scaled (const TypeVector<T2> &, const T);
 
   /**
-   * Return the opposite of a vector
+   * \returns The negative of this vector in a separate copy.
    */
   TypeVector<T> operator - () const;
 
   /**
-   * Multiply a vector by a number, i.e. scale.
+   * Multiply this vector by a scalar value.
+   *
+   * \returns A copy of the result, this vector is unchanged.
    */
   template <typename Scalar>
   typename boostcopy::enable_if_c<
     ScalarTraits<Scalar>::value,
-    TypeVector<typename CompareTypes<T, Scalar>::supertype> >::type
+    TypeVector<typename CompareTypes<T, Scalar>::supertype>>::type
   operator * (const Scalar) const;
 
   /**
-   * Multiply this vector by a number, i.e. scale.
+   * Multiply this vector by a scalar value.
+   *
+   * \returns A reference to *this.
    */
   const TypeVector<T> & operator *= (const T);
 
   /**
-   * Divide a vector by a number, i.e. scale.
+   * Divide each entry of this vector by scalar value.
+   *
+   * \returns A copy of the result, this vector is unchanged.
    */
   template <typename Scalar>
   typename boostcopy::enable_if_c<
     ScalarTraits<Scalar>::value,
-    TypeVector<typename CompareTypes<T, Scalar>::supertype> >::type
+    TypeVector<typename CompareTypes<T, Scalar>::supertype>>::type
   operator / (const Scalar) const;
 
   /**
-   * Divide this vector by a number, i.e. scale.
+   * Divide each entry of this vector by scalar value.
+   *
+   * \returns A reference to *this.
    */
   const TypeVector<T> & operator /= (const T);
 
   /**
-   * Multiply 2 vectors together, i.e. dot-product.
-   * The vectors may be of different types.
+   * \returns The dot-product of this vector with another vector.
+   *
+   * \note The complex conjugate is *not* taken in the complex-valued case.
+   * \note The vectors may contain different numeric types.
    */
   template <typename T2>
   typename CompareTypes<T, T2>::supertype
   operator * (const TypeVector<T2> &) const;
 
   /**
-   * Multiply 2 vectors together, i.e. dot-product.
-   * The vectors may be of different types.
+   * \returns The result of TypeVector::operator*().
    */
   template <typename T2>
   typename CompareTypes<T, T2>::supertype
   contract (const TypeVector<T2> &) const;
 
   /**
-   * Cross 2 vectors together, i.e. cross-product.
+   * \returns The cross product of this vector with \p v.
    */
   template <typename T2>
   TypeVector<typename CompareTypes<T, T2>::supertype>
-  cross(const TypeVector<T2> &) const;
+  cross(const TypeVector<T2> & v) const;
 
   /**
-   * Think of a vector as a \p dim dimensional vector.  This
-   * will return a unit vector aligned in that direction.
+   * \returns A unit vector in the direction of *this.
    */
   TypeVector<T> unit() const;
 
   /**
-   * Returns the magnitude of the vector, i.e. the square-root of the
-   * sum of the elements squared.  This function is deprecated, instead
-   * call norm().
+   * \returns The magnitude of the vector, i.e. the square-root of the
+   * sum of the elements squared.
+   *
+   * \deprecated Use the norm() function instead.
    */
+#ifdef LIBMESH_ENABLE_DEPRECATED
   Real size() const;
+#endif
 
   /**
-   * Returns the magnitude of the vector, i.e. the square-root of the
+   * \returns The magnitude of the vector, i.e. the square-root of the
    * sum of the elements squared.
    */
   Real norm() const;
 
   /**
-   * Returns the magnitude of the vector squared, i.e. the sum of the
-   * element magnitudes squared.  This function is deprecated, instead
-   * call norm_sq().
+   * \returns The magnitude of the vector squared, i.e. the sum of the
+   * element magnitudes squared.
+   *
+   * \deprecated Use the norm_sq() function instead.
    */
+#ifdef LIBMESH_ENABLE_DEPRECATED
   Real size_sq() const;
+#endif
 
   /**
-   * Returns the magnitude of the vector squared, i.e. the sum of the
+   * \returns The magnitude of the vector squared, i.e. the sum of the
    * element magnitudes squared.
    */
   Real norm_sq() const;
 
   /**
-   * Zero the vector in any dimension.
+   * Set all entries of the vector to 0.
    */
   void zero();
 
   /**
-   * @returns \p true iff two vectors occupy approximately the same
-   * physical location in space, to within a relative tolerance of \p tol.
+   * \returns \p true if two vectors are equal to within a relative
+   * tolerance of \p tol.
    */
   bool relative_fuzzy_equals(const TypeVector<T> & rhs,
                              Real tol = TOLERANCE) const;
 
   /**
-   * @returns \p true iff two vectors occupy approximately the same
-   * physical location in space, to within an absolute tolerance of \p tol.
+   * \returns \p true if two vectors are equal to within an absolute
+   * tolerance of \p tol.
    */
   bool absolute_fuzzy_equals(const TypeVector<T> & rhs,
                              Real tol = TOLERANCE) const;
 
   /**
-   * @returns \p true iff two vectors occupy approximately the same
-   * physical location in space, to within an absolute tolerance of \p TOLERANCE.
+   * \returns \p true if this(i)==rhs(i) for each component of the
+   * vector.
+   *
+   * \note For floating point types T, the function \p absolute_fuzzy_equals()
+   * may be a more appropriate choice.
    */
   bool operator == (const TypeVector<T> & rhs) const;
 
   /**
-   * @returns \p true iff two vectors do not occupy approximately the same
-   * physical location in space.
+   * \returns !(*this == rhs)
    */
   bool operator != (const TypeVector<T> & rhs) const;
 
   /**
-   * @returns \p true if this vector is "less"
-   * than another.  Useful for sorting.
-   * Also used for choosing some arbitrary basis function
-   * orientations
+   * \returns \p true if this vector is "less" than \p rhs.
+   *
+   * Useful for sorting.  Also used for choosing some arbitrary basis
+   * function orientations.
    */
   bool operator < (const TypeVector<T> & rhs) const;
 
   /**
-   * @returns \p true if this vector is "less"
-   * than or equal to another.  Useful for sorting.
-   * Also used for choosing some arbitrary constraint
-   * equation directions
+   * \returns \p true if this vector is <= to \p rhs.
+   *
+   * Useful for sorting.  Also used for choosing some arbitrary
+   * constraint equation directions.
    */
   bool operator <= (const TypeVector<T> & rhs) const;
 
   /**
-   * @returns \p true if this vector is "greater"
-   * than another.  Useful for sorting.
-   * Also used for choosing some arbitrary basis function
-   * orientations
+   * \returns \p true if this vector is "greater" than \p rhs.
+   *
+   * Useful for sorting.  Also used for choosing some arbitrary basis
+   * function orientations.
    */
   bool operator > (const TypeVector<T> & rhs) const;
 
   /**
-   * @returns \p true if this vector is "greater"
-   * than or equal to another.  Useful for sorting.
-   * Also used for choosing some arbitrary constraint
-   * equation directions
+   * \returns \p true if this vector is >= \p rhs.
+   *
+   * Useful for sorting.  Also used for choosing some arbitrary
+   * constraint equation directions.
    */
   bool operator >= (const TypeVector<T> & rhs) const;
 
@@ -360,9 +380,12 @@ public:
   void print(std::ostream & os = libMesh::out) const;
 
   /**
-   * Formatted print as above but allows you to do
+   * Formatted print as above but supports the syntax:
+   *
+   * \code
    * Point p(1,2,3);
    * std::cout << p << std::endl;
+   * \endcode
    */
   friend std::ostream & operator << (std::ostream & os, const TypeVector<T> & t)
   {
@@ -371,16 +394,17 @@ public:
   }
 
   /**
-   * Unformatted print to the stream \p out.  Simply prints the elements
-   * of the vector separated by spaces.  Optionally prints a newline,
-   * which it does by default.
+   * Unformatted print to the stream \p out.  Simply prints the
+   * elements of the vector separated by spaces.  Also prints a
+   * newline by default, however, this behavior can be controlled with
+   * the \p newline parameter.
    */
   void write_unformatted (std::ostream & out, const bool newline = true) const;
 
 protected:
 
   /**
-   * The coordinates of the \p TypeVector
+   * The coordinates of the \p TypeVector.
    */
   T _coords[LIBMESH_DIM];
 };
@@ -711,7 +735,7 @@ template <typename Scalar>
 inline
 typename boostcopy::enable_if_c<
   ScalarTraits<Scalar>::value,
-  TypeVector<typename CompareTypes<T, Scalar>::supertype> >::type
+  TypeVector<typename CompareTypes<T, Scalar>::supertype>>::type
 TypeVector<T>::operator * (const Scalar factor) const
 {
   typedef typename CompareTypes<T, Scalar>::supertype SuperType;
@@ -738,7 +762,7 @@ template <typename T, typename Scalar>
 inline
 typename boostcopy::enable_if_c<
   ScalarTraits<Scalar>::value,
-  TypeVector<typename CompareTypes<T, Scalar>::supertype> >::type
+  TypeVector<typename CompareTypes<T, Scalar>::supertype>>::type
 operator * (const Scalar factor,
             const TypeVector<T> & v)
 {
@@ -776,7 +800,7 @@ template <typename Scalar>
 inline
 typename boostcopy::enable_if_c<
   ScalarTraits<Scalar>::value,
-  TypeVector<typename CompareTypes<T, Scalar>::supertype> >::type
+  TypeVector<typename CompareTypes<T, Scalar>::supertype>>::type
 TypeVector<T>::operator / (const Scalar factor) const
 {
   libmesh_assert_not_equal_to (factor, static_cast<T>(0.));
@@ -871,6 +895,7 @@ TypeVector<T>::cross(const TypeVector<T2> & p) const
 
 
 
+#ifdef LIBMESH_ENABLE_DEPRECATED
 template <typename T>
 inline
 Real TypeVector<T>::size() const
@@ -878,6 +903,7 @@ Real TypeVector<T>::size() const
   libmesh_deprecated();
   return this->norm();
 }
+#endif
 
 
 
@@ -900,6 +926,7 @@ void TypeVector<T>::zero()
 
 
 
+#ifdef LIBMESH_ENABLE_DEPRECATED
 template <typename T>
 inline
 Real TypeVector<T>::size_sq() const
@@ -907,6 +934,7 @@ Real TypeVector<T>::size_sq() const
   libmesh_deprecated();
   return this->norm_sq();
 }
+#endif
 
 
 
@@ -1027,13 +1055,49 @@ T triple_product(const TypeVector<T> & a,
                  const TypeVector<T> & b,
                  const TypeVector<T> & c)
 {
-  // We only support cross products when LIBMESH_DIM==3, same goes for this.
-  libmesh_assert_equal_to (LIBMESH_DIM, 3);
-
+#if LIBMESH_DIM == 3
   return
     a(0)*(b(1)*c(2) - b(2)*c(1)) -
     a(1)*(b(0)*c(2) - b(2)*c(0)) +
     a(2)*(b(0)*c(1) - b(1)*c(0));
+#else
+  return 0;
+#endif
+}
+
+
+
+/**
+ * Compute |b x c|^2 without creating the extra temporary produced by
+ * calling b.cross(c).norm_sq().
+ */
+template <typename T>
+inline
+T cross_norm_sq(const TypeVector<T> & b,
+                const TypeVector<T> & c)
+{
+  T z = b(0)*c(1) - b(1)*c(0);
+
+#if LIBMESH_DIM == 3
+  T x = b(1)*c(2) - b(2)*c(1),
+    y = b(0)*c(2) - b(2)*c(0);
+  return x*x + y*y + z*z;
+#else
+  return z*z;
+#endif
+}
+
+
+
+/**
+ * Calls cross_norm_sq() and takes the square root of the result.
+ */
+template <typename T>
+inline
+T cross_norm(const TypeVector<T> & b,
+             const TypeVector<T> & c)
+{
+  return std::sqrt(cross_norm_sq(b,c));
 }
 
 } // namespace libMesh

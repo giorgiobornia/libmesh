@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -67,7 +67,7 @@ class ReferenceCountedObject : public ReferenceCounter
 protected:
 
   /**
-   * Constructor. Protected so that you cannont
+   * Constructor. Protected so that you cannot
    * instantiate a \p ReferenceCountedObject, only derive
    * from it.
    */
@@ -93,6 +93,32 @@ protected:
 #endif
   }
 
+  /**
+   * Move constructor, must be declared noexcept.
+   */
+  ReferenceCountedObject(ReferenceCountedObject && other) noexcept
+    : ReferenceCounter(std::move(other))
+  {
+#if defined(LIBMESH_ENABLE_REFERENCE_COUNTING) && defined(DEBUG)
+
+    increment_constructor_count(typeid(T).name());
+
+#endif
+  }
+
+  /**
+   * Copy assignment operator does nothing - we're copying an
+   * already-allocated object over an already-allocated object, so the
+   * counts for this class shouldn't change. There are also no non-static
+   * members in this or the base class to copy, so there is nothing
+   * for us to actually do.
+   */
+  ReferenceCountedObject & operator= (const ReferenceCountedObject & /*other*/)
+  {
+    return *this;
+  }
+
+
 public:
 
   /**
@@ -106,9 +132,6 @@ public:
 
 #endif
   }
-
-private:
-
 };
 
 

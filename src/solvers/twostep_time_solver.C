@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -76,9 +76,9 @@ void TwostepTimeSolver::solve()
 
       // Save a copy of the double-length nonlinear solution
       // and the old nonlinear solution
-      UniquePtr<NumericVector<Number> > double_solution =
+      std::unique_ptr<NumericVector<Number>> double_solution =
         _system.solution->clone();
-      UniquePtr<NumericVector<Number> > old_solution =
+      std::unique_ptr<NumericVector<Number>> old_solution =
         _system.get_vector("_old_nonlinear_solution").clone();
 
       double_norm = calculate_norm(_system, *double_solution);

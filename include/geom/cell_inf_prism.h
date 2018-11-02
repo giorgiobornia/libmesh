@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -30,17 +30,18 @@
 namespace libMesh
 {
 
-
-
-
 /**
  * The \p InfPrism is an element in 3D with 4 sides.
  * The \f$ 5^{th} \f$ side is theoretically located at infinity,
  * and therefore not accounted for.
  * However, one could say that the \f$ 5^{th} \f$ side actually
- * @e does exist in the mesh, since the outer nodes are located
+ * does exist in the mesh, since the outer nodes are located
  * at a specific distance from the mesh origin (and therefore
  * define a side).  Still, this face is not to be used!
+ *
+ * \author Daniel Dreyer
+ * \date 2003
+ * \brief The base class for all 3D infinite prismatic element types.
  */
 class InfPrism : public InfCell
 {
@@ -54,11 +55,17 @@ public:
     InfCell(nn, InfPrism::n_sides(), p, _elemlinks_data, nodelinkdata)
   {}
 
+  InfPrism (InfPrism &&) = delete;
+  InfPrism (const InfPrism &) = delete;
+  InfPrism & operator= (const InfPrism &) = delete;
+  InfPrism & operator= (InfPrism &&) = delete;
+  virtual ~InfPrism() = default;
+
   /**
-   * @returns the \p Point associated with local \p Node \p i,
+   * \returns The \p Point associated with local \p Node \p i,
    * in master element rather than physical coordinates.
    */
-  virtual Point master_point (const unsigned int i) const libmesh_override
+  virtual Point master_point (const unsigned int i) const override
   {
     libmesh_assert_less(i, this->n_nodes());
     return Point(_master_points[i][0],
@@ -67,46 +74,52 @@ public:
   }
 
   /**
-   * @returns 4.  Infinite elements have one side less
+   * \returns 4.  Infinite elements have one side less
    * than their conventional counterparts, since one
    * side is supposed to be located at infinity.
    */
-  virtual unsigned int n_sides() const libmesh_override { return 4; }
+  virtual unsigned int n_sides() const override { return 4; }
 
   /**
-   * @returns 6.  All infinite prisms (in our
+   * \returns 6.  All infinite prisms (in our
    * setting) have 6 vertices.
    */
-  virtual unsigned int n_vertices() const libmesh_override { return 6; }
+  virtual unsigned int n_vertices() const override { return 6; }
 
   /**
-   * @returns 6.  All infinite prismahedrals have 6 edges,
+   * \returns 6.  All infinite prisms have 6 edges,
    * 3 lying in the base, and 3 perpendicular to the base.
    */
-  virtual unsigned int n_edges() const libmesh_override { return 6; }
+  virtual unsigned int n_edges() const override { return 6; }
 
   /**
-   * @returns 4.  All prisms have 4 faces.
+   * \returns 4.  All prisms have 4 faces.
    */
-  virtual unsigned int n_faces() const libmesh_override { return 4; }
+  virtual unsigned int n_faces() const override { return 4; }
 
   /**
-   * @returns 4
+   * \returns 4.
    */
-  virtual unsigned int n_children() const libmesh_override { return 4; }
+  virtual unsigned int n_children() const override { return 4; }
 
-  /*
-   * @returns true iff the specified child is on the
-   * specified side
+  /**
+   * \returns \p true if the specified (local) node number is a
+   * "mid-edge" node on an infinite element edge.
+   */
+  virtual bool is_mid_infinite_edge_node(const unsigned int i) const
+    override { return (i > 2 && i < 6); }
+
+  /**
+   * \returns \p true if the specified child is on the specified side.
    */
   virtual bool is_child_on_side(const unsigned int c,
-                                const unsigned int s) const libmesh_override;
+                                const unsigned int s) const override;
 
-  /*
-   * @returns true iff the specified edge is on the specified side
+  /**
+   * \returns \p true if the specified edge is on the specified side.
    */
   virtual bool is_edge_on_side(const unsigned int e,
-                               const unsigned int s) const libmesh_override;
+                               const unsigned int s) const override;
 
   /**
    * Don't hide Elem::key() defined in the base class.
@@ -114,17 +127,30 @@ public:
   using Elem::key;
 
   /**
-   * @returns an id associated with the \p s side of this element.
+   * \returns An id associated with the \p s side of this element.
    * The id is not necessarily unique, but should be close.  This is
    * particularly useful in the \p MeshBase::find_neighbors() routine.
    */
-  virtual dof_id_type key (const unsigned int s) const libmesh_override;
+  virtual dof_id_type key (const unsigned int s) const override;
 
   /**
-   * @returns a primitive (3-noded) tri or (4-noded) infquad for
+   * \returns InfPrism6::side_nodes_map[side][side_node] after doing some range checking.
+   */
+  virtual unsigned int which_node_am_i(unsigned int side,
+                                       unsigned int side_node) const override;
+
+  /**
+   * \returns A primitive (3-noded) tri or (4-noded) infquad for
    * face i.
    */
-  virtual UniquePtr<Elem> side (const unsigned int i) const libmesh_override;
+  virtual std::unique_ptr<Elem> side_ptr (const unsigned int i) override;
+
+  /**
+   * @returns \p true when this element contains the point
+   * \p p.  Customized for infinite elements, since knowledge
+   * about the envelope can be helpful.
+   */
+  virtual bool contains_point (const Point & p, Real tol=TOLERANCE) const override;
 
 
 protected:

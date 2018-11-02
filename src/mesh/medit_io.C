@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -47,13 +47,11 @@ void MEDITIO::write_nodal_data (const std::string & fname,
                                 const std::vector<Number> & soln,
                                 const std::vector<std::string> & names)
 {
-  START_LOG("write_nodal_data()", "MEDITIO");
+  LOG_SCOPE("write_nodal_data()", "MEDITIO");
 
   if (this->mesh().processor_id() == 0)
     if (!this->binary())
       this->write_ascii  (fname, &soln, &names);
-
-  STOP_LOG("write_nodal_data()", "MEDITIO");
 }
 
 
@@ -106,95 +104,77 @@ void MEDITIO::write_ascii (const std::string & fname,
     int n_quad4 = 0;
     int n_tet4  = 0;
 
-    {
-      MeshBase::const_element_iterator       it  = the_mesh.active_elements_begin();
-      const MeshBase::const_element_iterator end = the_mesh.active_elements_end();
-
-      for ( ; it != end; ++it)
-        {
-          if ((*it)->type() == TRI3)  n_tri3++;
-          if ((*it)->type() == QUAD4) n_quad4++;
-          if ((*it)->type() == QUAD9) n_quad4+=4; // (QUAD9 is written as 4 QUAD4.)
-          if ((*it)->type() == TET4)  n_tet4++;
-        } // for
-    }
+    for (const auto & elem : the_mesh.active_element_ptr_range())
+      {
+        if (elem->type() == TRI3)  n_tri3++;
+        if (elem->type() == QUAD4) n_quad4++;
+        if (elem->type() == QUAD9) n_quad4+=4; // (QUAD9 is written as 4 QUAD4.)
+        if (elem->type() == TET4)  n_tet4++;
+      }
 
     // First: write out TRI3 elements:
     out_stream << "Triangles\n";
     out_stream << n_tri3 << "\n";
 
-    {
-      MeshBase::const_element_iterator       it  = the_mesh.active_elements_begin();
-      const MeshBase::const_element_iterator end = the_mesh.active_elements_end();
-
-      for ( ; it != end; ++it)
-        if ((*it)->type() == TRI3)
-          out_stream << (*it)->node(0)+1  << " " << (*it)->node(1)+1  << " " << (*it)->node(2)+1  << " 0\n";
-    }
+    for (const auto & elem : the_mesh.active_element_ptr_range())
+      if (elem->type() == TRI3)
+        out_stream << elem->node_id(0)+1  << " "
+                   << elem->node_id(1)+1  << " "
+                   << elem->node_id(2)+1  << " 0\n";
 
     // Second: write out QUAD4 elements:
     out_stream << "Quadrilaterals\n";
     out_stream << n_quad4 << "\n";
 
-    {
-      MeshBase::const_element_iterator       it  = the_mesh.active_elements_begin();
-      const MeshBase::const_element_iterator end = the_mesh.active_elements_end();
-
-      for ( ; it != end; ++it)
-        if ((*it)->type() == QUAD4)
+    for (const auto & elem : the_mesh.active_element_ptr_range())
+      {
+        if (elem->type() == QUAD4)
           {
-            out_stream << (*it)->node(0)+1  << " "
-                       << (*it)->node(1)+1  << " "
-                       << (*it)->node(2)+1  << " "
-                       << (*it)->node(3)+1  <<" 0\n";
+            out_stream << elem->node_id(0)+1  << " "
+                       << elem->node_id(1)+1  << " "
+                       << elem->node_id(2)+1  << " "
+                       << elem->node_id(3)+1  <<" 0\n";
           } // if
-        else if ((*it)->type() == QUAD9)
+        else if (elem->type() == QUAD9)
           {
-            out_stream << (*it)->node(0)+1  << " "
-                       << (*it)->node(4)+1  << " "
-                       << (*it)->node(8)+1  << " "
-                       << (*it)->node(7)+1  <<" 0\n";
-            out_stream << (*it)->node(7)+1  << " "
-                       << (*it)->node(8)+1  << " "
-                       << (*it)->node(6)+1  << " "
-                       << (*it)->node(3)+1  <<" 0\n";
-            out_stream << (*it)->node(4)+1  << " "
-                       << (*it)->node(1)+1  << " "
-                       << (*it)->node(5)+1  << " "
-                       << (*it)->node(8)+1  <<" 0\n";
-            out_stream << (*it)->node(8)+1  << " "
-                       << (*it)->node(5)+1  << " "
-                       << (*it)->node(2)+1  << " "
-                       << (*it)->node(6)+1  <<" 0\n";
-          } // if
-    }
-
+            out_stream << elem->node_id(0)+1  << " "
+                       << elem->node_id(4)+1  << " "
+                       << elem->node_id(8)+1  << " "
+                       << elem->node_id(7)+1  <<" 0\n";
+            out_stream << elem->node_id(7)+1  << " "
+                       << elem->node_id(8)+1  << " "
+                       << elem->node_id(6)+1  << " "
+                       << elem->node_id(3)+1  <<" 0\n";
+            out_stream << elem->node_id(4)+1  << " "
+                       << elem->node_id(1)+1  << " "
+                       << elem->node_id(5)+1  << " "
+                       << elem->node_id(8)+1  <<" 0\n";
+            out_stream << elem->node_id(8)+1  << " "
+                       << elem->node_id(5)+1  << " "
+                       << elem->node_id(2)+1  << " "
+                       << elem->node_id(6)+1  <<" 0\n";
+          }
+      }
 
     // Third: write out TET4 elements:
     out_stream << "Tetrahedra\n";
     out_stream << n_tet4 << "\n";
 
-    {
-      MeshBase::const_element_iterator       it  = the_mesh.active_elements_begin();
-      const MeshBase::const_element_iterator end = the_mesh.active_elements_end();
-
-      for ( ; it != end; ++it)
-        if ((*it)->type() == TET4)
-          {
-            out_stream << (*it)->node(0)+1  << " "
-                       << (*it)->node(1)+1  << " "
-                       << (*it)->node(2)+1  << " "
-                       << (*it)->node(3)+1  <<" 0\n";
-          } // if
-    }
-
+    for (const auto & elem : the_mesh.active_element_ptr_range())
+      if (elem->type() == TET4)
+        {
+          out_stream << elem->node_id(0)+1  << " "
+                     << elem->node_id(1)+1  << " "
+                     << elem->node_id(2)+1  << " "
+                     << elem->node_id(3)+1  <<" 0\n";
+        }
   }
   // end of the out file
   out_stream << '\n' << "# end of file\n";
 
   // optionally write the data
-  if ((solution_names != libmesh_nullptr) &&
-      (vec != libmesh_nullptr))
+  if ((solution_names != nullptr) &&
+      (vec != nullptr))
     {
       // Open the ".bb" file stream
       std::size_t idx = fname.find_last_of(".");

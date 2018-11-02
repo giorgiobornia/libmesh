@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -23,8 +23,6 @@
 // Local includes
 #include "libmesh/surface.h"
 
-// C++ includes
-
 namespace libMesh
 {
 
@@ -33,6 +31,7 @@ namespace libMesh
  *
  * \author Benjamin S. Kirk
  * \date 2002
+ * \brief A geometric object representing a planar surface.
  */
 class Plane : public Surface
 {
@@ -80,82 +79,71 @@ public:
                                  const Point & p2 );
 
   /**
-   * Creates an XY plane located at z=zpos,
+   * Creates an XY plane located at z=zpos.
    */
   void xy_plane (const Real zpos=0.);
 
   /**
-   * Creates an XZ plane located at y=ypos,
+   * Creates an XZ plane located at y=ypos.
    */
   void xz_plane (const Real ypos=0.);
 
   /**
-   * Creates an YZ plane located at x=xpos,
+   * Creates an YZ plane located at x=xpos.
    */
   void yz_plane (const Real xpos=0.);
 
   /**
-   * @returns true if the point p is above the surface,
+   * \returns \p true if the point p is above the surface,
    * false otherwise.
    */
-  virtual bool above_surface (const Point & p) const libmesh_override;
+  virtual bool above_surface (const Point & p) const override;
 
   /**
-   * @returns true if the point p is below the surface,
+   * \returns \p true if the point p is below the surface,
    * false otherwise.
    */
-  virtual bool below_surface (const Point & p) const libmesh_override;
+  virtual bool below_surface (const Point & p) const override;
 
   /**
-   * @returns true if the point p is on the surface,
-   * false otherwise.  Note that the definition of on
-   * the surface really means "very close" to account
-   * for roundoff error.
+   * \returns \p true if the point p is on the surface,
+   * false otherwise.
+   *
+   * \note The definition of "on the surface" really means "very close"
+   * to account for roundoff error.
    */
-  virtual bool on_surface (const Point & p) const libmesh_override;
+  virtual bool on_surface (const Point & p) const override;
 
   /**
-   * @returns the closest point on the surface to point p.
+   * \returns The closest point on the surface to point p.
    */
-  virtual Point closest_point (const Point & p) const libmesh_override;
+  virtual Point closest_point (const Point & p) const override;
 
   /**
-   * @returns a unit vector normal to the surface at
+   * \returns A unit vector normal to the surface at
    * point p.
    */
-  virtual Point unit_normal (const Point & p) const libmesh_override;
+  virtual Point unit_normal (const Point & p) const override;
 
   /**
-   * @returns a point on the plane useful
-   * for determining position
+   * \returns A point on the plane useful
+   * for determining position.
    */
   const Point & get_planar_point() const;
 
 
 private:
-
-
   /**
-   * Returns the normal for the plane.
+   * \returns The normal for the plane.
    */
-  const Point & normal () const;
+  const Point & normal () const { return _normal; }
 
   /**
    *  The plane is defined by a point and a normal.
    */
   Point _point;
   Point _normal;
-
 };
-
-
-
-// ------------------------------------------------------------
-// Plane class inline members
-inline const Point & Plane::normal () const
-{
-  return _normal;
-}
 
 } // namespace libMesh
 

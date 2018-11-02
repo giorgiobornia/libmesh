@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -23,10 +23,12 @@
 // Local includes
 #include "libmesh/libmesh_common.h"
 #include "libmesh/type_vector.h"
+#include "libmesh/tuple_of.h"
 
 // C++ includes
 #include <cstdlib> // *must* precede <cmath> for proper std:abs() on PGI, Sun Studio CC
 #include <cmath>
+#include <vector>
 
 namespace libMesh
 {
@@ -34,6 +36,7 @@ namespace libMesh
 /**
  * This class will eventually define a rank-N tensor in \p LIBMESH_DIM
  * dimensional space of type T.
+ *
  * Right now it defines a shim to allow for rank-independent code to
  * compile (but not give correct results) in the case of vector-valued
  * elements and second derivatives.
@@ -45,13 +48,18 @@ template <unsigned int N, typename T>
 class TypeNTensor
 {
 public:
-  TypeNTensor () {}
+  /**
+   * Helper typedef for generic index programming
+   */
+  typedef tuple_of<N, unsigned int> index_type;
 
-  TypeNTensor (const T &) {}
+  TypeNTensor () : _coords(std::vector<T>(int_pow(LIBMESH_DIM, N))) {}
 
-  TypeNTensor (const TypeVector<T> &) {}
+  TypeNTensor (const T &) : _coords(std::vector<T>(int_pow(LIBMESH_DIM, N))) {}
 
-  TypeNTensor (const TypeTensor<T> &) {}
+  TypeNTensor (const TypeVector<T> &) : _coords(std::vector<T>(int_pow(LIBMESH_DIM, N))) {}
+
+  TypeNTensor (const TypeTensor<T> &) : _coords(std::vector<T>(int_pow(LIBMESH_DIM, N))) {}
 
   operator TypeVector<T> () const { libmesh_not_implemented(); return 0; }
   operator VectorValue<T> () const { libmesh_not_implemented(); return 0; }
@@ -65,13 +73,13 @@ public:
   ~TypeNTensor() {}
 
   /**
-   * Return a proxy for the \f$ i^{th} \f$ slice of the tensor.
+   * \returns A proxy for the \f$ i^{th} \f$ slice of the tensor.
    */
   const TypeNTensor<N-1,T> slice (const unsigned int /*i*/) const
   { return TypeNTensor<N-1,T>(); }
 
   /**
-   * Return a writeable proxy for the \f$ i^{th} \f$ slice of the tensor.
+   * \returns A writable proxy for the \f$ i^{th} \f$ slice of the tensor.
    */
   TypeNTensor<N-1,T> slice (const unsigned int /*i*/)
   { return TypeNTensor<N-1,T>(); }
@@ -107,90 +115,101 @@ public:
   { return *this; }
 
   /**
-   * Return the opposite of a tensor
+   * \returns The negative of a tensor.
    */
   TypeNTensor<N,T> operator - () const
   { return *this; }
 
   /**
-   * Multiply a tensor by a number, i.e. scale.
+   * Multiply every entry of a tensor by a number.
    */
   template <typename Scalar>
   typename boostcopy::enable_if_c<
     ScalarTraits<Scalar>::value,
-    TypeNTensor<N,typename CompareTypes<T, Scalar>::supertype> >::type
+    TypeNTensor<N,typename CompareTypes<T, Scalar>::supertype>>::type
   operator * (const Scalar) const
   { return TypeNTensor<N,typename CompareTypes<T, Scalar>::supertype>(); }
 
   /**
-   * Multiply this tensor by a number, i.e. scale.
+   * Multiply every entry of this tensor by a number.
    */
   template <typename Scalar>
   const TypeNTensor<N,T> & operator *= (const Scalar) { return *this; }
 
   /**
-   * Divide a tensor by a number, i.e. scale.
+   * Divide every entry of a tensor by a number.
    */
   template <typename Scalar>
   typename boostcopy::enable_if_c<
     ScalarTraits<Scalar>::value,
-    TypeNTensor<N,typename CompareTypes<T, Scalar>::supertype> >::type
+    TypeNTensor<N,typename CompareTypes<T, Scalar>::supertype>>::type
   operator / (const Scalar) const { return *this; }
 
   /**
-   * Divide this tensor by a number, i.e. scale.
+   * Divide every entry of this tensor by a number.
    */
   const TypeNTensor<N,T> & operator /= (const T) { return *this; }
 
   /**
-   * Multiply 2 tensors together, i.e. dyadic product
-   * sum_ij Aij*Bij.
-   * The tensors may be of different types.
+   * Multiply 2 tensors together to return a scalar, i.e.
+   * \f$ \sum_{ij} A_{ij} B_{ij} \f$
+   * The tensors may contain different numeric types.
+   * Also known as the "double inner product" or "double dot product"
+   * of tensors.
+   *
+   * \returns The scalar-valued result, this tensor is unchanged.
    */
   template <typename T2>
   typename CompareTypes<T,T2>::supertype
   contract (const TypeNTensor<N,T2> &) const { return 0; }
 
   /**
-   * Returns the Frobenius norm of the tensor squared, i.e.  sum of the
-   * element magnitudes squared.
+   * \returns The Frobenius norm of the tensor squared, i.e. the sum of the
+   * entry magnitudes squared.
+   *
+   * \deprecated Use the norm_sq() function instead.
    */
+#ifdef LIBMESH_ENABLE_DEPRECATED
   Real size_sq() const { libmesh_deprecated(); return 0.;}
+#endif
 
   /**
-   * Returns the Frobenius norm of the tensor squared, i.e.  sum of the
-   * element magnitudes squared.
+   * \returns The Frobenius norm of the tensor squared, i.e. the sum of the
+   * entry magnitudes squared.
    */
   Real norm_sq() const { return 0.;}
 
   /**
-   * @returns \p true if two tensors are equal valued.
+   * \returns \p true if two tensors are equal, \p false otherwise.
    */
   bool operator == (const TypeNTensor<N,T> & /*rhs*/) const
   { return true; }
 
   /**
-   * @returns \p true if this tensor is "less"
-   * than another.  Useful for sorting.
+   * \returns \p true if this tensor is "less" than another.
+   *
+   * Useful for sorting.
    */
   bool operator < (const TypeNTensor<N,T> & /*rhs*/) const
   { return false; }
 
   /**
-   * @returns \p true if this tensor is "greater"
-   * than another.
+   * \returns \p true if this tensor is "greater" than another.
    */
   bool operator > (const TypeNTensor<N,T> & /*rhs*/) const
   { return false; }
 
   /**
-   * Formatted print, by default to \p libMesh::out.
+   * Do a formatted print of this tensor to a stream which defaults to
+   * \p libMesh::out.
    */
   void print(std::ostream & /*os = libMesh::out*/) const {}
 
   /**
-   * Formatted print as above but allows you to do
+   * Does a formatted print (as above) but supports the syntax:
+   * \code
    * std::cout << t << std::endl;
+   * \endcode
    */
   friend std::ostream & operator << (std::ostream & os,
                                      const TypeNTensor<N,T> & t)
@@ -198,9 +217,58 @@ public:
     t.print(os);
     return os;
   }
+
+  /**
+   * Add a scaled type N tensor to this type N tensor without creating a temporary.
+   */
+  template<typename T2>
+  void add_scaled (const TypeNTensor<N, T2> &, const T &);
+
+  /**
+   * The coordinates of the \p TypeNTensor
+   */
+  std::vector<T> _coords;
+
+private:
+  static constexpr int int_pow(int b, int e)
+  {
+    return (e == 0) ? 1 : b * int_pow(b, e - 1);
+  }
 };
 
 
+template<unsigned int N, typename T>
+template<typename T2>
+inline
+void TypeNTensor<N, T>::add_scaled (const TypeNTensor<N, T2> & p, const T & factor)
+{
+  unsigned int size = int_pow(LIBMESH_DIM, N);
+  for (unsigned int i = 0; i < size ; i++)
+    _coords[i] += factor*p._coords[i];
+}
+
+template <unsigned int N, typename T, typename Scalar>
+typename boostcopy::enable_if_c<
+  ScalarTraits<Scalar>::value,
+  TypeNTensor<N,typename CompareTypes<Scalar, T>::supertype>>::type
+operator * (const Scalar &, const TypeNTensor<N, T> &)
+{
+  libmesh_not_implemented();
+  return TypeNTensor<N,typename CompareTypes<Scalar, T>::supertype>();
+}
+
+template <unsigned int N, typename T, typename Scalar>
+typename boostcopy::enable_if_c<
+  ScalarTraits<Scalar>::value,
+  TypeNTensor<N,typename CompareTypes<Scalar, T>::supertype>>::type
+operator / (const Scalar &, const TypeNTensor<N, T> &)
+{
+  libmesh_not_implemented();
+  return TypeNTensor<N,typename CompareTypes<Scalar, T>::supertype>();
+}
+
+
 } // namespace libMesh
+
 
 #endif // LIBMESH_TYPE_N_TENSOR_H

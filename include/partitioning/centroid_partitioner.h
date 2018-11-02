@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,6 +22,7 @@
 // Local includes
 #include "libmesh/partitioner.h"
 #include "libmesh/point.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
 
 // C++ includes
 #include <utility> // pair
@@ -30,18 +31,15 @@
 namespace libMesh
 {
 
-
 // Forward declarations
 class Elem;
 
-
 /**
- * The centroid partitioner partitions simply based on the
- * locations of element centroids.  You must define what
- * you mean by "less than" for the list of element centroids, e.g.
- * if you only care about distance in the z-direction, you would
- * define "less than" differently than if you cared about radial
- * distance.
+ * Partitions the Mesh based on the locations of element centroids.
+ * You must define what you mean by "less than" for the list of
+ * element centroids, e.g. if you only care about distance in the
+ * z-direction, you would define "less than" differently than if you
+ * cared about radial distance.
  *
  * \author John W. Peterson
  * \author Benjamin S. Kirk
@@ -51,11 +49,10 @@ class CentroidPartitioner : public Partitioner
 {
 public:
 
-
   /**
-   * A typedef which is reserved only for use within
-   * this class.  If \p X is chosen, then centroid locations
-   * will be sorted according to their X-location, etc...
+   * A typedef which controls the sorting method used for ordering the
+   * centroids. If e.g. \p X is chosen, then the centroids will be
+   * sorted according to their x-coordinate.
    */
   enum CentroidSortMethod {X=0,
                            Y,
@@ -71,93 +68,97 @@ public:
   CentroidPartitioner (const CentroidSortMethod sm=X) : _sort_method(sm) {}
 
   /**
-   * Creates a new partitioner of this type and returns it in
-   * an \p UniquePtr.
+   * Copy/move ctor, copy/move assignment operator, and destructor are
+   * all explicitly defaulted for this class.
    */
-  virtual UniquePtr<Partitioner> clone () const libmesh_override
+  CentroidPartitioner (const CentroidPartitioner &) = default;
+  CentroidPartitioner (CentroidPartitioner &&) = default;
+  CentroidPartitioner & operator= (const CentroidPartitioner &) = default;
+  CentroidPartitioner & operator= (CentroidPartitioner &&) = default;
+  virtual ~CentroidPartitioner() = default;
+
+  /**
+   * \returns A copy of this partitioner wrapped in a smart pointer.
+   */
+  virtual std::unique_ptr<Partitioner> clone () const override
   {
-    return UniquePtr<Partitioner>(new CentroidPartitioner(sort_method()));
+    return libmesh_make_unique<CentroidPartitioner>(*this);
   }
 
   /**
-   * Specifies how the elements will be sorted.
+   * Getter for the current sorting method.
    */
   CentroidSortMethod sort_method () const { return _sort_method; }
 
   /**
-   * Change how the elements will be sorted.
+   * Setter for the current sorting method.
    */
-  void set_sort_method (const CentroidSortMethod sm) {_sort_method = sm; }
+  void set_sort_method (const CentroidSortMethod sm) { _sort_method = sm; }
 
+  /**
+   * Called by the SubdomainPartitioner to partition elements in the range (it, end).
+   */
+  virtual void partition_range(MeshBase & mesh,
+                               MeshBase::element_iterator it,
+                               MeshBase::element_iterator end,
+                               const unsigned int n) override;
 
 protected:
+
   /**
-   * Partitions the mesh into n subdomains.  This is
-   * a required interface for the class.
+   * Partitions the mesh into n subdomains.
    */
   virtual void _do_partition (MeshBase & mesh,
-                              const unsigned int n) libmesh_override;
+                              const unsigned int n) override;
 
 private:
 
   /**
    * Computes a list of element centroids for the mesh.
-   * This list will be kept around in case a repartition
-   * is desired.
    */
-  void compute_centroids (MeshBase & mesh);
+  void compute_centroids (MeshBase::element_iterator it,
+                          MeshBase::element_iterator end);
 
   /**
-   * Partition the list of centroids based on the
-   * x-coordinate of the centroid.  This provides
-   * a function which may be passed to the std::sort
-   * routine for sorting the elements by centroid.
+   * Helper function which sorts by the centroid's x-coordinate in the
+   * internal std::sort call.
    */
   static bool sort_x (const std::pair<Point, Elem *> & lhs,
                       const std::pair<Point, Elem *> & rhs);
 
   /**
-   * Partition the list of centroids based on the
-   * y-coordinate of the centroid.  This  provides
-   * a function which may be passed to the std::sort
-   * routine for sorting the elements by centroid.
+   * Helper function which sorts by the centroid's y-coordinate in the
+   * internal std::sort call.
    */
   static bool sort_y (const std::pair<Point, Elem *> & lhs,
                       const std::pair<Point, Elem *> & rhs);
 
   /**
-   * Partition the list of centroids based on the
-   * z-coordinate of the centroid.  This provides
-   * a function which may be passed to the std::sort
-   * routine for sorting the elements by centroid.
+   * Helper function which sorts by the centroid's z-coordinate in the
+   * internal std::sort call.
    */
   static bool sort_z (const std::pair<Point, Elem *> & lhs,
                       const std::pair<Point, Elem *> & rhs);
 
-
   /**
-   * Partition the list of centroids based on the
-   * radial position of the centroid.  This provides
-   * a function which may be passed to the std::sort
-   * routine for sorting the elements by centroid.
+   * Helper function which sorts by the centroid's distance from the
+   * origin in the internal std::sort call.
    */
   static bool sort_radial (const std::pair<Point, Elem *> & lhs,
                            const std::pair<Point, Elem *> & rhs);
 
   /**
-   * Store a flag which tells which type of
-   * sort method we are using.
+   * Flag indicating the type of sort method we are using.
    */
   CentroidSortMethod _sort_method;
 
   /**
-   * Vector which holds pairs of centroids and
-   * their respective element pointers.
+   * Vector which holds pairs of centroids and their respective
+   * element pointers.
    */
-  std::vector<std::pair<Point, Elem *> > _elem_centroids;
+  std::vector<std::pair<Point, Elem *>> _elem_centroids;
 };
 
 } // namespace libMesh
-
 
 #endif // LIBMESH_CENTROID_PARTITIONER_H

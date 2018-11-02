@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -40,10 +40,11 @@ namespace Parallel {
 namespace Utils {
 
 /**
- * Utility function that returns true if the vector v
- * is sorted, false otherwise.  O(N), the length of the
- * vector.  This is implemented solely because the std::is_sorted
- * appears to be an STL extension.
+ * \returns \p true if the vector \p v is sorted, \p false otherwise.
+ *
+ * Requires O(N) comparisons, where N is the length of the vector.
+ * This was implemented because std::is_sorted() was an STL extension
+ * at the time.
  */
 template <typename KeyType>
 inline
@@ -52,7 +53,7 @@ bool is_sorted (const std::vector<KeyType> & v)
   if (v.empty())
     return true;
 
-  for (unsigned int i=1; i<v.size(); i++)
+  for (std::size_t i=1; i<v.size(); i++)
     if (v[i] < v[i-1])
       return false;
 
@@ -90,7 +91,7 @@ struct Convert {
  * A pseudoinverse for converting bounds back to pairs of key types.
  */
 template <typename FirstKeyType, typename SecondKeyType>
-struct Convert<std::pair<FirstKeyType, SecondKeyType> > {
+struct Convert<std::pair<FirstKeyType, SecondKeyType>> {
   inline static
   std::pair<FirstKeyType,SecondKeyType> to_key_type (const double f)
   {

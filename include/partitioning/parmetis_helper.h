@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -18,10 +18,10 @@
 #ifndef LIBMESH_PARMETIS_HELPER_H
 #define LIBMESH_PARMETIS_HELPER_H
 
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/libmesh_config.h"
 
-// C++ Includes   -----------------------------------
+// C++ Includes
 #include <vector>
 
 // Include the ParMETIS header files.  We need this so we can use
@@ -42,29 +42,47 @@ namespace libMesh
 
 /**
  * The \p ParmetisHelper class allows us to use a 'pimpl' strategy in
- * the ParmetisPartitioner class.  Since we don't install this header
- * file, apps do not include parmetis.h, and consequently we don't
- * have to install it, either.  This class is empty when Parmetis
- * is not available, when it is it is simply a data container.
+ * the ParmetisPartitioner class.  Since we don't include the
+ * parmetis.h header file here, we don't have to install it, either.
+ * This class is empty when Parmetis is not available, otherwise it is
+ * simply a data container.
+ *
+ * \author John W. Peterson
+ * \date 2015
+ * \brief Pointer-to-implementation class used by ParmetisPartitioner.
  */
 class ParmetisHelper
 {
 public:
   /**
-   * Constructor.
+   * Defaulted constructors, assignment operators, and destructor.
    */
-  ParmetisHelper () {}
+  ParmetisHelper () = default;
+  ParmetisHelper (const ParmetisHelper &) = default;
+  ParmetisHelper (ParmetisHelper &&) = default;
+  ParmetisHelper & operator= (const ParmetisHelper &) = default;
+  ParmetisHelper & operator= (ParmetisHelper &&) = default;
+  ~ParmetisHelper () = default;
 
 #ifdef LIBMESH_HAVE_PARMETIS
 
   /**
    * Data structures used by ParMETIS to describe the connectivity graph
-   * of the mesh.  Consult the ParMETIS documentation.
+   * of the mesh. Consult the ParMETIS documentation.
    */
   std::vector<Parmetis::idx_t>  vtxdist;
   std::vector<Parmetis::idx_t>  xadj;
   std::vector<Parmetis::idx_t>  adjncy;
-  std::vector<Parmetis::idx_t>  part;
+
+  // We use dof_id_type for part so we can pass it directly to
+  // Partitioner:: methods expecting that type.
+  std::vector<dof_id_type>  part;
+
+  // But we plan to pass a pointer to part as a buffer to ParMETIS, so
+  // it had better be using a simply reinterpretable type!
+  static_assert(sizeof(Parmetis::idx_t) == sizeof(dof_id_type),
+                "ParMETIS and libMesh ID sizes must match!");
+
   std::vector<Parmetis::real_t> tpwgts;
   std::vector<Parmetis::real_t> ubvec;
   std::vector<Parmetis::idx_t>  options;
@@ -76,9 +94,9 @@ public:
   Parmetis::idx_t nparts;
   Parmetis::idx_t edgecut;
 
-#endif
+#endif // LIBMESH_HAVE_PARMETIS
 };
 
-}
+} // namespace libMesh
 
-#endif
+#endif // LIBMESH_PARMETIS_HELPER_H

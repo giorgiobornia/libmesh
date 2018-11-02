@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,14 +20,19 @@
 #ifndef LIBMESH_ENUM_ELEM_QUALITY_H
 #define LIBMESH_ENUM_ELEM_QUALITY_H
 
-// ------------------------------------------------------------
-// enum ElemType definition
 namespace libMesh
 {
+
 /**
  * Defines an \p enum for element quality metrics.
+ *
+ * The fixed type, i.e. ": int", enumeration syntax used here allows
+ * this enum to be forward declared as
+ * enum ElemQuality : int;
+ * reducing header file dependencies.
  */
-enum ElemQuality {ASPECT_RATIO=0,
+enum ElemQuality : int {
+                  ASPECT_RATIO=0,
                   SKEW,
                   SHEAR,
                   SHAPE,
@@ -45,4 +50,4 @@ enum ElemQuality {ASPECT_RATIO=0,
                   JACOBIAN};
 }
 
-#endif // LIBMESH_ENUM_ELEM_QUALITY_H
+#endif

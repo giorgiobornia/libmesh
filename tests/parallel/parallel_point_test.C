@@ -9,15 +9,28 @@
 
 #include "test_comm.h"
 
+// THE CPPUNIT_TEST_SUITE_END macro expands to code that involves
+// std::auto_ptr, which in turn produces -Wdeprecated-declarations
+// warnings.  These can be ignored in GCC as long as we wrap the
+// offending code in appropriate pragmas.  We can't get away with a
+// single ignore_warnings.h inclusion at the beginning of this file,
+// since the libmesh headers pull in a restore_warnings.h at some
+// point.  We also don't bother restoring warnings at the end of this
+// file since it's not a header.
+#include <libmesh/ignore_warnings.h>
+
 using namespace libMesh;
 
 class ParallelPointTest : public CppUnit::TestCase {
 public:
   CPPUNIT_TEST_SUITE( ParallelPointTest );
 
+#if LIBMESH_DIM > 2
   CPPUNIT_TEST( testAllGatherPoint );
   CPPUNIT_TEST( testAllGatherPairPointPoint );
   CPPUNIT_TEST( testAllGatherPairRealPoint );
+#endif
+
   CPPUNIT_TEST( testBroadcastVectorValueInt );
   CPPUNIT_TEST( testBroadcastVectorValueReal );
   CPPUNIT_TEST( testBroadcastPoint );
@@ -59,7 +72,7 @@ public:
 
   void testAllGatherPairPointPoint()
   {
-    std::vector<std::pair<Point, Point> > vals;
+    std::vector<std::pair<Point, Point>> vals;
     Real myrank = TestCommWorld->rank();
     TestCommWorld->allgather
       (std::make_pair(Point(myrank, myrank+0.125, myrank+0.25), Point(myrank+0.5, myrank+0.625, myrank+0.75)), vals);
@@ -83,7 +96,7 @@ public:
 
   void testAllGatherPairRealPoint()
   {
-    std::vector<std::pair<Real, Point> > vals;
+    std::vector<std::pair<Real, Point>> vals;
     Real myrank = TestCommWorld->rank();
     TestCommWorld->allgather
       (std::make_pair(Real(myrank+0.75), Point(myrank, myrank+0.25, myrank+0.5)), vals);
@@ -107,7 +120,7 @@ public:
   template <typename T>
   void testBroadcastVectorValue()
   {
-    std::vector<VectorValue<T> > src(3), dest(3);
+    std::vector<VectorValue<T>> src(3), dest(3);
 
     {
       T val=T(0);
@@ -197,7 +210,7 @@ public:
 
         CPPUNIT_ASSERT_EQUAL ( src_val.size() , recv_val.size() );
 
-        for (unsigned int i=0; i<src_val.size(); i++)
+        for (std::size_t i=0; i<src_val.size(); i++)
           CPPUNIT_ASSERT_EQUAL( src_val[i] , recv_val[i] );
 
 
@@ -216,7 +229,7 @@ public:
 
         CPPUNIT_ASSERT_EQUAL ( src_val.size() , recv_val.size() );
 
-        for (unsigned int i=0; i<src_val.size(); i++)
+        for (std::size_t i=0; i<src_val.size(); i++)
           CPPUNIT_ASSERT_EQUAL( src_val[i] , recv_val[i] );
 
         // Restore default communication
@@ -258,7 +271,7 @@ public:
 
         CPPUNIT_ASSERT_EQUAL ( src_val.size() , recv_val.size() );
 
-        for (unsigned int i=0; i<src_val.size(); i++)
+        for (std::size_t i=0; i<src_val.size(); i++)
           CPPUNIT_ASSERT_EQUAL( src_val[i] , recv_val[i] );
 
         // Synchronous communication
@@ -277,7 +290,7 @@ public:
 
         CPPUNIT_ASSERT_EQUAL ( src_val.size() , recv_val.size() );
 
-        for (unsigned int i=0; i<src_val.size(); i++)
+        for (std::size_t i=0; i<src_val.size(); i++)
           CPPUNIT_ASSERT_EQUAL( src_val[i] , recv_val[i] );
 
         // Restore default communication

@@ -56,7 +56,7 @@ public:
   virtual ~RBThetaExpansion() {}
 
   /**
-   * Evaluate theta_q_a at the current parameter. Overload
+   * Evaluate theta_q_a at the current parameter. Override
    * if the theta functions need to be treated differently
    * in subclasses.
    */
@@ -108,7 +108,7 @@ public:
    * Attach a vector of pointers to functor objects that each define one
    * of the theta_q_a terms.
    */
-  virtual void attach_multiple_A_theta(std::vector<RBTheta *> theta_q_a);
+  virtual void attach_multiple_A_theta(std::vector<std::unique_ptr<RBTheta>> & theta_q_a);
 
   /**
    * Attach a pointer to a functor object that defines one
@@ -120,13 +120,19 @@ public:
    * Attach a vector of pointers to functor objects that each define one
    * of the theta_q_f terms.
    */
-  virtual void attach_multiple_F_theta(std::vector<RBTheta *> theta_q_f);
+  virtual void attach_multiple_F_theta(std::vector<std::unique_ptr<RBTheta>> & theta_q_f);
 
   /**
    * Attach a vector of pointers to functor objects that define one
    * of the outputs.
    */
-  virtual void attach_output_theta(std::vector<RBTheta *> theta_q_l);
+  virtual void attach_output_theta(std::vector<std::unique_ptr<RBTheta>> & theta_q_l);
+
+  /**
+   * Attach a vector of pointers to functor objects that define one
+   * of the outputs.
+   */
+  virtual void attach_output_theta(std::vector<RBTheta*> theta_q_l);
 
   /**
    * Attach a pointer to a functor object that defines one
@@ -150,7 +156,7 @@ private:
   /**
    * Vector storing the RBTheta functors for the affine expansion of the outputs.
    */
-  std::vector< std::vector<RBTheta *> > _output_theta_vector;
+  std::vector<std::vector<RBTheta *>> _output_theta_vector;
 
 };
 

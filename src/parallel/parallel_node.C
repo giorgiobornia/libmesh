@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -21,6 +21,7 @@
 
 // Local includes
 #include "libmesh/boundary_info.h"
+#include "libmesh/distributed_mesh.h"
 #include "libmesh/mesh_base.h"
 #include "libmesh/node.h"
 #include "libmesh/parallel.h"
@@ -32,7 +33,6 @@ namespace
 {
 using namespace libMesh;
 
-#ifdef LIBMESH_HAVE_MPI
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
 static const unsigned int header_size = 3;
 #else
@@ -43,6 +43,8 @@ static const unsigned int header_size = 2;
 static const unsigned int idtypes_per_Real =
   (sizeof(Real) + sizeof(largest_id_type) - 1) / sizeof(largest_id_type);
 
+#ifndef NDEBUG
+// Currently this constant is only used for debugging.
 static const largest_id_type node_magic_header = 1234567890;
 #endif
 }
@@ -50,8 +52,6 @@ static const largest_id_type node_magic_header = 1234567890;
 
 namespace libMesh
 {
-
-#ifdef LIBMESH_HAVE_MPI
 
 namespace Parallel
 {
@@ -110,7 +110,18 @@ template <>
 template <>
 unsigned int
 Packing<const Node *>::packable_size (const Node * const & node,
-                                     const ParallelMesh * mesh)
+                                      const DistributedMesh * mesh)
+{
+  return packable_size(node, static_cast<const MeshBase *>(mesh));
+}
+
+
+
+template <>
+template <>
+unsigned int
+Packing<const Node *>::packable_size (const Node * const & node,
+                                      const ParallelMesh * mesh)
 {
   return packable_size(node, static_cast<const MeshBase *>(mesh));
 }
@@ -121,7 +132,7 @@ template <>
 template <>
 void
 Packing<const Node *>::pack (const Node * const & node,
-                             std::back_insert_iterator<std::vector<largest_id_type> > data_out,
+                             std::back_insert_iterator<std::vector<largest_id_type>> data_out,
                              const MeshBase * mesh)
 {
   libmesh_assert(node);
@@ -166,9 +177,8 @@ Packing<const Node *>::pack (const Node * const & node,
 
   *data_out++ =(bcs.size());
 
-  for (std::vector<boundary_id_type>::iterator bc_it=bcs.begin();
-       bc_it != bcs.end(); ++bc_it)
-    *data_out++ =(*bc_it);
+  for (const auto & bid : bcs)
+    *data_out++ = bid;
 }
 
 
@@ -176,8 +186,20 @@ Packing<const Node *>::pack (const Node * const & node,
 template <>
 template <>
 void
-Packing<const Node *>::pack (const Node* const & node,
-                             std::back_insert_iterator<std::vector<largest_id_type> > data_out,
+Packing<const Node *>::pack (const Node * const & node,
+                             std::back_insert_iterator<std::vector<largest_id_type>> data_out,
+                             const DistributedMesh * mesh)
+{
+  pack(node, data_out, static_cast<const MeshBase*>(mesh));
+}
+
+
+
+template <>
+template <>
+void
+Packing<const Node *>::pack (const Node * const & node,
+                             std::back_insert_iterator<std::vector<largest_id_type>> data_out,
                              const ParallelMesh * mesh)
 {
   pack(node, data_out, static_cast<const MeshBase*>(mesh));
@@ -277,7 +299,7 @@ Packing<Node *>::unpack (std::vector<largest_id_type>::const_iterator in,
   const largest_id_type num_bcs = *in++;
   // libmesh_assert_greater_equal (num_bcs, 0);
 
-  for(largest_id_type bc_it=0; bc_it < num_bcs; bc_it++)
+  for (largest_id_type bc_it=0; bc_it < num_bcs; bc_it++)
     mesh->get_boundary_info().add_node
       (node, cast_int<boundary_id_type>(*in++));
 
@@ -296,13 +318,22 @@ template <>
 template <>
 Node *
 Packing<Node *>::unpack (std::vector<largest_id_type>::const_iterator in,
+                         DistributedMesh * mesh)
+{
+  return unpack(in, static_cast<MeshBase*>(mesh));
+}
+
+
+
+template <>
+template <>
+Node *
+Packing<Node *>::unpack (std::vector<largest_id_type>::const_iterator in,
                          ParallelMesh * mesh)
 {
   return unpack(in, static_cast<MeshBase*>(mesh));
 }
 
 } // namespace Parallel
-
-#endif // #ifdef LIBMESH_HAVE_MPI
 
 } // namespace libMesh

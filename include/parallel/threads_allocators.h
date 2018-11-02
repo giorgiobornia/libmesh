@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -25,12 +25,14 @@
 
 // Threading building blocks includes
 #ifdef LIBMESH_HAVE_TBB_API
+#  include "libmesh/ignore_warnings.h"
 #  include "tbb/scalable_allocator.h"
+#  include "libmesh/restore_warnings.h"
 #endif
 
 // C++ includes
 #include <memory> // for std::allocator
-#include <cstddef>
+#include <cstddef> // std::ptrdiff_t
 
 namespace libMesh
 {
@@ -60,7 +62,7 @@ public:
   //     typedef const T & const_reference;  // so we can't typedef a reference to void.
   typedef T value_type;
   typedef size_t size_type;
-  typedef ptrdiff_t difference_type;
+  typedef std::ptrdiff_t difference_type;
 
   template<typename U>
   struct rebind
@@ -99,7 +101,7 @@ public:
   //     typedef const T & const_reference;  // so we can't typedef a reference to void.
   typedef T value_type;
   typedef size_t size_type;
-  typedef ptrdiff_t difference_type;
+  typedef std::ptrdiff_t difference_type;
 
   template<typename U>
   struct rebind

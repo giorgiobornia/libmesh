@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -52,7 +52,7 @@ void NewmarkSolver::advance_timestep ()
   NumericVector<Number> & old_solution_accel =
     _system.get_vector("_old_solution_accel");
 
-  if( !first_solve )
+  if (!first_solve)
     {
       NumericVector<Number> & old_nonlinear_soln =
         _system.get_vector("_old_nonlinear_solution");
@@ -65,7 +65,7 @@ void NewmarkSolver::advance_timestep ()
       // v_{n+1} = gamma/(beta*Delta t)*(x_{n+1}-x_n)
       //         - ((gamma/beta)-1)*v_n
       //         - (gamma/(2*beta)-1)*(Delta t)*a_n
-      UniquePtr<NumericVector<Number> > new_solution_rate = nonlinear_solution.clone();
+      std::unique_ptr<NumericVector<Number>> new_solution_rate = nonlinear_solution.clone();
       (*new_solution_rate) -= old_nonlinear_soln;
       (*new_solution_rate) *= (_gamma/(_beta*_system.deltat));
       new_solution_rate->add( (1.0-_gamma/_beta), old_solution_rate );
@@ -74,7 +74,7 @@ void NewmarkSolver::advance_timestep ()
       // a_{n+1} = (1/(beta*(Delta t)^2))*(x_{n+1}-x_n)
       //         - 1/(beta*Delta t)*v_n
       //         - (1-1/(2*beta))*a_n
-      UniquePtr<NumericVector<Number> > new_solution_accel = old_solution_accel.clone();
+      std::unique_ptr<NumericVector<Number>> new_solution_accel = old_solution_accel.clone();
       (*new_solution_accel) *=  -(1.0/(2.0*_beta)-1.0);
       new_solution_accel->add( -1.0/(_beta*_system.deltat), old_solution_rate );
       new_solution_accel->add( 1.0/(_beta*_system.deltat*_system.deltat), nonlinear_solution );
@@ -108,7 +108,7 @@ void NewmarkSolver::compute_initial_accel()
   // We need to compute the initial acceleration based off of
   // the initial position and velocity and, thus, acceleration
   // is the unknown in diff_solver and not the displacement. So,
-  // We swap solution and acceleration. NewarkSolver::_general_residual
+  // We swap solution and acceleration. NewmarkSolver::_general_residual
   // will check _is_accel_solve and provide the correct
   // values to the FEMContext assuming this swap was made.
   this->_is_accel_solve = true;
@@ -148,7 +148,7 @@ void NewmarkSolver::set_initial_accel_avail( bool initial_accel_set )
 void NewmarkSolver::solve ()
 {
   // First, check that the initial accel was set one way or another
-  if( !_initial_accel_set )
+  if (!_initial_accel_set)
     {
       std::string error = "ERROR: Must first set initial acceleration using one of:\n";
       error += "NewmarkSolver::compute_initial_accel()\n";
@@ -168,7 +168,8 @@ bool NewmarkSolver::element_residual (bool request_jacobian,
                                  &DifferentiablePhysics::mass_residual,
                                  &DifferentiablePhysics::damping_residual,
                                  &DifferentiablePhysics::_eulerian_time_deriv,
-                                 &DifferentiablePhysics::element_constraint);
+                                 &DifferentiablePhysics::element_constraint,
+                                 &DiffContext::elem_reinit);
 }
 
 
@@ -181,7 +182,8 @@ bool NewmarkSolver::side_residual (bool request_jacobian,
                                  &DifferentiablePhysics::side_mass_residual,
                                  &DifferentiablePhysics::side_damping_residual,
                                  &DifferentiablePhysics::side_time_derivative,
-                                 &DifferentiablePhysics::side_constraint);
+                                 &DifferentiablePhysics::side_constraint,
+                                 &DiffContext::elem_side_reinit);
 }
 
 
@@ -194,7 +196,8 @@ bool NewmarkSolver::nonlocal_residual (bool request_jacobian,
                                  &DifferentiablePhysics::nonlocal_mass_residual,
                                  &DifferentiablePhysics::nonlocal_damping_residual,
                                  &DifferentiablePhysics::nonlocal_time_derivative,
-                                 &DifferentiablePhysics::nonlocal_constraint);
+                                 &DifferentiablePhysics::nonlocal_constraint,
+                                 &DiffContext::nonlocal_reinit);
 }
 
 
@@ -204,7 +207,8 @@ bool NewmarkSolver::_general_residual (bool request_jacobian,
                                        ResFuncType mass,
                                        ResFuncType damping,
                                        ResFuncType time_deriv,
-                                       ResFuncType constraint)
+                                       ResFuncType constraint,
+                                       ReinitFuncType reinit_func)
 {
   unsigned int n_dofs = context.get_elem_solution().size();
 
@@ -222,7 +226,7 @@ bool NewmarkSolver::_general_residual (bool request_jacobian,
   // So upstream we've swapped _system.solution and _old_local_solution_accel
   // So we need to give the context the correct entries since we're solving for
   // acceleration here.
-  if( _is_accel_solve )
+  if (_is_accel_solve)
     {
       // System._solution is actually the acceleration right now so we need
       // to reset the elem_solution to the right thing, which in this case
@@ -255,7 +259,7 @@ bool NewmarkSolver::_general_residual (bool request_jacobian,
       request_jacobian = false;
     }
   // Otherwise, the unknowns are the displacements and everything is straight
-  // foward and is what you think it is
+  // forward and is what you think it is
   else
     {
       if (request_jacobian)
@@ -303,6 +307,9 @@ bool NewmarkSolver::_general_residual (bool request_jacobian,
       context.get_elem_solution_accel() *= context.elem_solution_accel_derivative;
       context.get_elem_solution_accel().add(-1.0/(_beta*dt), old_elem_solution_rate);
       context.get_elem_solution_accel().add(-(1.0/(2.0*_beta)-1.0), old_elem_solution_accel);
+
+      // Move the mesh into place first if necessary, set t = t_{n+1}
+      (context.*reinit_func)(1.);
     }
 
   // If a fixed solution is requested, we'll use x_{n+1}
@@ -310,18 +317,18 @@ bool NewmarkSolver::_general_residual (bool request_jacobian,
     context.get_elem_fixed_solution() = context.get_elem_solution();
 
   // Get the time derivative at t_{n+1}, F(u_{n+1})
-  bool jacobian_computed = (_system.*time_deriv)(request_jacobian, context);
+  bool jacobian_computed = (_system.get_physics()->*time_deriv)(request_jacobian, context);
 
   // Damping at t_{n+1}, C(u_{n+1})
-  jacobian_computed = (_system.*damping)(jacobian_computed, context) &&
+  jacobian_computed = (_system.get_physics()->*damping)(jacobian_computed, context) &&
     jacobian_computed;
 
   // Mass at t_{n+1}, M(u_{n+1})
-  jacobian_computed = (_system.*mass)(jacobian_computed, context) &&
+  jacobian_computed = (_system.get_physics()->*mass)(jacobian_computed, context) &&
     jacobian_computed;
 
   // Add the constraint term
-  jacobian_computed = (_system.*constraint)(jacobian_computed, context) &&
+  jacobian_computed = (_system.get_physics()->*constraint)(jacobian_computed, context) &&
     jacobian_computed;
 
   // Add back (or restore) the old jacobian

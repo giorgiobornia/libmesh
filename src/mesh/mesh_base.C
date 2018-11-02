@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -24,11 +24,12 @@
 #include <algorithm> // for std::min
 #include <map>       // for std::multimap
 #include <sstream>   // for std::ostringstream
-
+#include <unordered_map>
 
 // Local includes
 #include "libmesh/boundary_info.h"
 #include "libmesh/elem.h"
+#include "libmesh/ghost_point_neighbors.h"
 #include "libmesh/mesh_base.h"
 #include "libmesh/mesh_communication.h"
 #include "libmesh/mesh_tools.h"
@@ -36,8 +37,9 @@
 #include "libmesh/partitioner.h"
 #include "libmesh/point_locator_base.h"
 #include "libmesh/threads.h"
+#include "libmesh/enum_elem_type.h"
+#include "libmesh/enum_point_locator_type.h"
 
-#include LIBMESH_INCLUDE_UNORDERED_MAP
 
 namespace libMesh
 {
@@ -53,42 +55,23 @@ MeshBase::MeshBase (const Parallel::Communicator & comm_in,
   _n_parts       (1),
   _is_prepared   (false),
   _point_locator (),
+  _count_lower_dim_elems_in_point_locator(true),
   _partitioner   (),
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
   _next_unique_id(DofObject::invalid_unique_id),
 #endif
   _skip_partitioning(libMesh::on_command_line("--skip-partitioning")),
   _skip_renumber_nodes_and_elements(false),
-  _spatial_dimension(d)
+  _allow_remote_element_removal(true),
+  _spatial_dimension(d),
+  _default_ghosting(new GhostPointNeighbors(*this))
 {
   _elem_dims.insert(d);
+  _ghosting_functors.insert(_default_ghosting.get());
   libmesh_assert_less_equal (LIBMESH_DIM, 3);
   libmesh_assert_greater_equal (LIBMESH_DIM, d);
   libmesh_assert (libMesh::initialized());
 }
-
-
-#ifndef LIBMESH_DISABLE_COMMWORLD
-MeshBase::MeshBase (unsigned char d) :
-  ParallelObject (CommWorld),
-  boundary_info  (new BoundaryInfo(*this)),
-  _n_parts       (1),
-  _is_prepared   (false),
-  _point_locator (),
-  _partitioner   (),
-#ifdef LIBMESH_ENABLE_UNIQUE_ID
-  _next_unique_id(DofObject::invalid_unique_id),
-#endif
-  _skip_partitioning(libMesh::on_command_line("--skip-partitioning")),
-  _skip_renumber_nodes_and_elements(false),
-  _spatial_dimension(d)
-{
-  _elem_dims.insert(d);
-  libmesh_assert_less_equal (LIBMESH_DIM, 3);
-  libmesh_assert_greater_equal (LIBMESH_DIM, d);
-  libmesh_assert (libMesh::initialized());
-}
-#endif // !LIBMESH_DISABLE_COMMWORLD
 
 
 
@@ -98,20 +81,36 @@ MeshBase::MeshBase (const MeshBase & other_mesh) :
   _n_parts       (other_mesh._n_parts),
   _is_prepared   (other_mesh._is_prepared),
   _point_locator (),
+  _count_lower_dim_elems_in_point_locator(other_mesh._count_lower_dim_elems_in_point_locator),
   _partitioner   (),
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
   _next_unique_id(other_mesh._next_unique_id),
 #endif
   _skip_partitioning(libMesh::on_command_line("--skip-partitioning")),
   _skip_renumber_nodes_and_elements(false),
+  _allow_remote_element_removal(true),
   _elem_dims(other_mesh._elem_dims),
-  _spatial_dimension(other_mesh._spatial_dimension)
+  _spatial_dimension(other_mesh._spatial_dimension),
+  _default_ghosting(new GhostPointNeighbors(*this)),
+  _ghosting_functors(other_mesh._ghosting_functors)
 {
-  if(other_mesh._partitioner.get())
+  // Make sure we don't accidentally delete the other mesh's default
+  // ghosting functor; we'll use our own if that's needed.
+  if (other_mesh._ghosting_functors.count(other_mesh._default_ghosting.get()))
+    {
+      _ghosting_functors.erase(other_mesh._default_ghosting.get());
+      _ghosting_functors.insert(_default_ghosting.get());
+    }
+
+  if (other_mesh._partitioner.get())
     {
       _partitioner = other_mesh._partitioner->clone();
     }
 }
+
+
+
+MeshBase::MeshBase(MeshBase &&) = default;
 
 
 
@@ -152,6 +151,8 @@ void MeshBase::set_spatial_dimension(unsigned char d)
 
 void MeshBase::prepare_for_use (const bool skip_renumber_nodes_and_elements, const bool skip_find_neighbors)
 {
+  LOG_SCOPE("prepare_for_use()", "MeshBase");
+
   parallel_object_only();
 
   libmesh_assert(this->comm().verify(this->is_serial()));
@@ -185,14 +186,22 @@ void MeshBase::prepare_for_use (const bool skip_renumber_nodes_and_elements, con
 
   // Mesh modification operations might not leave us with consistent
   // id counts, but our partitioner might need that consistency.
-  if(!_skip_renumber_nodes_and_elements)
+  if (!_skip_renumber_nodes_and_elements)
     this->renumber_nodes_and_elements();
   else
     this->update_parallel_id_counts();
 
   // Let all the elements find their neighbors
-  if(!skip_find_neighbors)
+  if (!skip_find_neighbors)
     this->find_neighbors();
+
+  // The user may have set boundary conditions.  We require that the
+  // boundary conditions were set consistently.  Because we examine
+  // neighbors when evaluating non-raw boundary condition IDs, this
+  // assert is only valid when our neighbor links are in place.
+#ifdef DEBUG
+  MeshTools::libmesh_assert_valid_boundary_ids(*this);
+#endif
 
   // Search the mesh for all the dimensions of the elements
   // and cache them.
@@ -204,7 +213,7 @@ void MeshBase::prepare_for_use (const bool skip_renumber_nodes_and_elements, con
 
   // Fix up node unique ids in case mesh generation code didn't take
   // exceptional care to do so.
-//  MeshCommunication().make_node_unique_ids_parallel_consistent(*this);
+  //  MeshCommunication().make_node_unique_ids_parallel_consistent(*this);
 
   // We're going to still require that mesh generation code gets
   // element unique ids consistent.
@@ -212,23 +221,36 @@ void MeshBase::prepare_for_use (const bool skip_renumber_nodes_and_elements, con
   MeshTools::libmesh_assert_valid_unique_ids(*this);
 #endif
 
+  // Reset our PointLocator.  Any old locator is invalidated any time
+  // the elements in the underlying elements in the mesh have changed,
+  // so we clear it here.
+  this->clear_point_locator();
+
+  // Allow our GhostingFunctor objects to reinit if necessary.
+  // Do this before partitioning and redistributing, and before
+  // deleting remote elements.
+  for (auto & gf : _ghosting_functors)
+    {
+      libmesh_assert(gf);
+      gf->mesh_reinit();
+    }
+
   // Partition the mesh.
   this->partition();
 
-  // If we're using ParallelMesh, we'll want it parallelized.
-  this->delete_remote_elements();
+  // If we're using DistributedMesh, we'll probably want it
+  // parallelized.
+  if (this->_allow_remote_element_removal)
+    this->delete_remote_elements();
 
-  if(!_skip_renumber_nodes_and_elements)
+  if (!_skip_renumber_nodes_and_elements)
     this->renumber_nodes_and_elements();
-
-  // Reset our PointLocator.  This needs to happen any time the elements
-  // in the underlying elements in the mesh have changed, so we do it here.
-  this->clear_point_locator();
 
   // The mesh is now prepared for use.
   _is_prepared = true;
 
 #if defined(DEBUG) && defined(LIBMESH_ENABLE_UNIQUE_ID)
+  MeshTools::libmesh_assert_valid_boundary_ids(*this);
   MeshTools::libmesh_assert_valid_unique_ids(*this);
 #endif
 }
@@ -244,13 +266,21 @@ void MeshBase::clear ()
   _is_prepared = false;
 
   // Clear boundary information
-  this->get_boundary_info().clear();
+  if (boundary_info)
+    boundary_info->clear();
 
   // Clear element dimensions
   _elem_dims.clear();
 
   // Clear our point locator.
   this->clear_point_locator();
+}
+
+
+
+void MeshBase::remove_ghosting_functor(GhostingFunctor & ghosting_functor)
+{
+  _ghosting_functors.erase(&ghosting_functor);
 }
 
 
@@ -262,11 +292,8 @@ void MeshBase::subdomain_ids (std::set<subdomain_id_type> & ids) const
 
   ids.clear();
 
-  const_element_iterator el  = this->active_local_elements_begin();
-  const_element_iterator end = this->active_local_elements_end();
-
-  for (; el!=end; ++el)
-    ids.insert((*el)->subdomain_id());
+  for (const auto & elem : this->active_local_element_ptr_range())
+    ids.insert(elem->subdomain_id());
 
   // Some subdomains may only live on other processors
   this->comm().set_union(ids);
@@ -328,11 +355,8 @@ dof_id_type MeshBase::n_sub_elem () const
 {
   dof_id_type ne=0;
 
-  const_element_iterator       el  = this->elements_begin();
-  const const_element_iterator end = this->elements_end();
-
-  for (; el!=end; ++el)
-    ne += (*el)->n_sub_elem();
+  for (const auto & elem : this->element_ptr_range())
+    ne += elem->n_sub_elem();
 
   return ne;
 }
@@ -343,11 +367,8 @@ dof_id_type MeshBase::n_active_sub_elem () const
 {
   dof_id_type ne=0;
 
-  const_element_iterator       el  = this->active_elements_begin();
-  const const_element_iterator end = this->active_elements_end();
-
-  for (; el!=end; ++el)
-    ne += (*el)->n_sub_elem();
+  for (const auto & elem : this->active_element_ptr_range())
+    ne += elem->n_sub_elem();
 
   return ne;
 }
@@ -412,10 +433,10 @@ void MeshBase::partition (const unsigned int n_parts)
       libmesh_assert (this->is_serial());
       partitioner()->partition (*this, n_parts);
     }
-  // NULL partitioner means don't repartition
+  // A nullptr partitioner means don't repartition; skip_partitioning()
+  // checks on this.
   // Non-serial meshes may not be ready for repartitioning here.
-  else if(!skip_partitioning() &&
-          partitioner().get())
+  else if (!skip_partitioning())
     {
       partitioner()->partition (*this, n_parts);
     }
@@ -424,9 +445,9 @@ void MeshBase::partition (const unsigned int n_parts)
       // Adaptive coarsening may have "orphaned" nodes on processors
       // whose elements no longer share them.  We need to check for
       // and possibly fix that.
-      Partitioner::set_node_processor_ids(*this);
+      MeshTools::correct_node_proc_ids(*this);
 
-      // Make sure locally cached partition count
+      // Make sure locally cached partition count is correct
       this->recalculate_n_partitions();
 
       // Make sure any other locally cached data is correct
@@ -439,13 +460,10 @@ unsigned int MeshBase::recalculate_n_partitions()
   // This requires an inspection on every processor
   parallel_object_only();
 
-  const_element_iterator el  = this->active_local_elements_begin();
-  const_element_iterator end = this->active_local_elements_end();
-
   unsigned int max_proc_id=0;
 
-  for (; el!=end; ++el)
-    max_proc_id = std::max(max_proc_id, static_cast<unsigned int>((*el)->processor_id()));
+  for (const auto & elem : this->active_local_element_ptr_range())
+    max_proc_id = std::max(max_proc_id, static_cast<unsigned int>(elem->processor_id()));
 
   // The number of partitions is one more than the max processor ID.
   _n_parts = max_proc_id+1;
@@ -457,26 +475,28 @@ unsigned int MeshBase::recalculate_n_partitions()
 
 
 
+#ifdef LIBMESH_ENABLE_DEPRECATED
 const PointLocatorBase & MeshBase::point_locator () const
 {
   libmesh_deprecated();
 
-  if (_point_locator.get() == libmesh_nullptr)
+  if (_point_locator.get() == nullptr)
     {
       // PointLocator construction may not be safe within threads
       libmesh_assert(!Threads::in_threads);
 
-      _point_locator.reset (PointLocatorBase::build(TREE_ELEMENTS, *this).release());
+      _point_locator = PointLocatorBase::build(TREE_ELEMENTS, *this);
     }
 
   return *_point_locator;
 }
+#endif
 
 
-UniquePtr<PointLocatorBase> MeshBase::sub_point_locator () const
+std::unique_ptr<PointLocatorBase> MeshBase::sub_point_locator () const
 {
   // If there's no master point locator, then we need one.
-  if (_point_locator.get() == libmesh_nullptr)
+  if (_point_locator.get() == nullptr)
     {
       // PointLocator construction may not be safe within threads
       libmesh_assert(!Threads::in_threads);
@@ -484,7 +504,7 @@ UniquePtr<PointLocatorBase> MeshBase::sub_point_locator () const
       // And it may require parallel communication
       parallel_object_only();
 
-      _point_locator.reset (PointLocatorBase::build(TREE_ELEMENTS, *this).release());
+      _point_locator = PointLocatorBase::build(TREE_ELEMENTS, *this);
     }
 
   // Otherwise there was a master point locator, and we can grab a
@@ -496,7 +516,21 @@ UniquePtr<PointLocatorBase> MeshBase::sub_point_locator () const
 
 void MeshBase::clear_point_locator ()
 {
-  _point_locator.reset(libmesh_nullptr);
+  _point_locator.reset(nullptr);
+}
+
+
+
+void MeshBase::set_count_lower_dim_elems_in_point_locator(bool count_lower_dim_elems)
+{
+  _count_lower_dim_elems_in_point_locator = count_lower_dim_elems;
+}
+
+
+
+bool MeshBase::get_count_lower_dim_elems_in_point_locator() const
+{
+  return _count_lower_dim_elems_in_point_locator;
 }
 
 
@@ -546,11 +580,8 @@ void MeshBase::cache_elem_dims()
   // particular dimension have been deleted.
   _elem_dims.clear();
 
-  const_element_iterator el  = this->active_elements_begin();
-  const_element_iterator end = this->active_elements_end();
-
-  for (; el!=end; ++el)
-    _elem_dims.insert((*el)->dim());
+  for (const auto & elem : this->active_element_ptr_range())
+    _elem_dims.insert(cast_int<unsigned char>(elem->dim()));
 
   // Some different dimension elements may only live on other processors
   this->comm().set_union(_elem_dims);
@@ -569,15 +600,12 @@ void MeshBase::cache_elem_dims()
   // early...
   if (_spatial_dimension < 3)
     {
-      const_node_iterator node_it  = this->nodes_begin();
-      const_node_iterator node_end = this->nodes_end();
-      for (; node_it != node_end; ++node_it)
+      for (const auto & node : this->node_ptr_range())
         {
-          Node & node = **node_it;
-
+#if LIBMESH_DIM > 1
           // Note: the exact floating point comparison is intentional,
           // we don't want to get tripped up by tolerances.
-          if (node(1) != 0.)
+          if ((*node)(1) != 0.)
             {
               _spatial_dimension = 2;
 #if LIBMESH_DIM == 2
@@ -587,9 +615,10 @@ void MeshBase::cache_elem_dims()
               break;
 #endif
             }
+#endif
 
 #if LIBMESH_DIM > 2
-          if (node(2) != 0.)
+          if ((*node)(2) != 0.)
             {
               // Spatial dimension can't get any higher than this, so
               // we can break out.
@@ -611,30 +640,22 @@ void MeshBase::detect_interior_parents()
     return;
 
   //This map will be used to set interior parents
-  LIBMESH_BEST_UNORDERED_MAP<dof_id_type, std::vector<dof_id_type> > node_to_elem;
+  std::unordered_map<dof_id_type, std::vector<dof_id_type>> node_to_elem;
 
-  const_element_iterator el  = this->active_elements_begin();
-  const_element_iterator end = this->active_elements_end();
-
-  for (; el!=end; ++el)
+  for (const auto & elem : this->active_element_ptr_range())
     {
-      const Elem * elem = *el;
-
       // Populating the node_to_elem map, same as MeshTools::build_nodes_to_elem_map
       for (unsigned int n=0; n<elem->n_vertices(); n++)
         {
           libmesh_assert_less (elem->id(), this->max_elem_id());
 
-          node_to_elem[elem->node(n)].push_back(elem->id());
+          node_to_elem[elem->node_id(n)].push_back(elem->id());
         }
     }
 
   // Automatically set interior parents
-  el = this->elements_begin();
-  for (; el!=end; ++el)
+  for (const auto & element : this->element_ptr_range())
     {
-      Elem * element = *el;
-
       // Ignore an 3D element or an element that already has an interior parent
       if (element->dim()>=LIBMESH_DIM || element->interior_parent())
         continue;
@@ -643,20 +664,17 @@ void MeshBase::detect_interior_parents()
       // element at each vertex of the current element, thus ignoring interior nodes.
       // If one of the SET of elements is empty, then we will not have an interior parent
       // since an interior parent must be connected to all vertices of the current element
-      std::vector< std::set<dof_id_type> > neighbors( element->n_vertices() );
+      std::vector<std::set<dof_id_type>> neighbors( element->n_vertices() );
 
       bool found_interior_parents = false;
 
       for (dof_id_type n=0; n < element->n_vertices(); n++)
         {
-          std::vector<dof_id_type> & element_ids = node_to_elem[element->node(n)];
-          for (std::vector<dof_id_type>::iterator e_it = element_ids.begin();
-               e_it != element_ids.end(); e_it++)
-            {
-              dof_id_type eid = *e_it;
-              if (this->elem(eid)->dim() == element->dim()+1)
-                neighbors[n].insert(eid);
-            }
+          std::vector<dof_id_type> & element_ids = node_to_elem[element->node_id(n)];
+          for (const auto & eid : element_ids)
+            if (this->elem_ref(eid).dim() == element->dim()+1)
+              neighbors[n].insert(eid);
+
           if (neighbors[n].size()>0)
             {
               found_interior_parents = true;
@@ -678,11 +696,9 @@ void MeshBase::detect_interior_parents()
       if (found_interior_parents)
         {
           std::set<dof_id_type> & neighbors_0 = neighbors[0];
-          for (std::set<dof_id_type>::iterator e_it = neighbors_0.begin();
-               e_it != neighbors_0.end(); e_it++)
+          for (const auto & interior_parent_id : neighbors_0)
             {
-              found_interior_parents=false;
-              dof_id_type interior_parent_id = *e_it;
+              found_interior_parents = false;
               for (dof_id_type n=1; n < element->n_vertices(); n++)
                 {
                   if (neighbors[n].find(interior_parent_id)!=neighbors[n].end())
@@ -697,7 +713,7 @@ void MeshBase::detect_interior_parents()
                 }
               if (found_interior_parents)
                 {
-                  element->set_interior_parent(this->elem(interior_parent_id));
+                  element->set_interior_parent(this->elem_ptr(interior_parent_id));
                   break;
                 }
             }

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -36,7 +36,7 @@
 
 // LibMesh includes
 #include "libmesh/libmesh.h"
-#include "libmesh/serial_mesh.h"
+#include "libmesh/replicated_mesh.h"
 #include "libmesh/mesh_refinement.h"
 #include "libmesh/mesh_modification.h"
 #include "libmesh/mesh_tools.h"
@@ -57,6 +57,7 @@
 #include "libmesh/numeric_vector.h"
 #include "libmesh/vtk_io.h"
 #include "libmesh/exodusII_io.h"
+#include "libmesh/enum_solver_package.h"
 
 // These are the include files typically needed for subdivision elements.
 #include "libmesh/face_tri3_subdivision.h"
@@ -79,6 +80,10 @@ int main (int argc, char ** argv)
   // Initialize libMesh.
   LibMeshInit init (argc, argv);
 
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
+
   // Skip this 3D example if libMesh was compiled as 1D/2D-only.
   libmesh_example_requires (3 == LIBMESH_DIM, "3D support");
 
@@ -98,8 +103,8 @@ int main (int argc, char ** argv)
 #else
 
   // Create a 2D mesh distributed across the default MPI communicator.
-  // Subdivision surfaces do not appear to work with ParallelMesh yet.
-  SerialMesh mesh (init.comm(), 2);
+  // Subdivision surfaces do not appear to work with DistributedMesh yet.
+  ReplicatedMesh mesh (init.comm(), 2);
 
   // Read the coarse square mesh.
   mesh.read ("square_mesh.off");
@@ -110,7 +115,7 @@ int main (int argc, char ** argv)
 
   // Quadrisect the mesh triangles a few times to obtain a
   // finer mesh.  Subdivision surface elements require the
-  // refinement data to be removed afterwards.
+  // refinement data to be removed afterward.
   MeshRefinement mesh_refinement (mesh);
   mesh_refinement.uniformly_refine (3);
   MeshTools::Modification::flatten (mesh);
@@ -160,7 +165,7 @@ int main (int argc, char ** argv)
   // rotational or other auxiliary variables are needed.
   // Loop Subdivision Elements are always interpolated
   // by quartic box splines, hence the order must always
-  // be \p FOURTH.
+  // be FOURTH.
   system.add_variable ("u", FOURTH, SUBDIVISION);
   system.add_variable ("v", FOURTH, SUBDIVISION);
   system.add_variable ("w", FOURTH, SUBDIVISION);
@@ -202,10 +207,10 @@ int main (int argc, char ** argv)
 
   // Find the center node to measure the maximum deformation of the plate.
   Node * center_node = 0;
-  Real nearest_dist_sq = mesh.point(0).size_sq();
+  Real nearest_dist_sq = mesh.point(0).norm_sq();
   for (unsigned int nid=1; nid<mesh.n_nodes(); ++nid)
     {
-      const Real dist_sq = mesh.point(nid).size_sq();
+      const Real dist_sq = mesh.point(nid).norm_sq();
       if (dist_sq < nearest_dist_sq)
         {
           nearest_dist_sq = dist_sq;
@@ -251,7 +256,7 @@ int main (int argc, char ** argv)
 // end we also take into account the boundary conditions
 // here, using the penalty method.
 void assemble_shell (EquationSystems & es,
-                     const std::string & system_name)
+                     const std::string & libmesh_dbg_var(system_name))
 {
   // It is a good idea to make sure we are assembling
   // the proper system.
@@ -269,8 +274,8 @@ void assemble_shell (EquationSystems & es,
   const Real nu = es.parameters.get<Real> ("poisson ratio");
   const Real q  = es.parameters.get<Real> ("uniform load");
 
-  // Compute the membrane stiffness \p K and the bending
-  // rigidity \p D from these parameters.
+  // Compute the membrane stiffness K and the bending
+  // rigidity D from these parameters.
   const Real K = E * h     /     (1-nu*nu);
   const Real D = E * h*h*h / (12*(1-nu*nu));
 
@@ -284,13 +289,13 @@ void assemble_shell (EquationSystems & es,
   FEType fe_type = system.variable_type (u_var);
 
   // Build a Finite Element object of the specified type.
-  UniquePtr<FEBase> fe (FEBase::build(2, fe_type));
+  std::unique_ptr<FEBase> fe (FEBase::build(2, fe_type));
 
   // A Gauss quadrature rule for numerical integration.
   // For subdivision shell elements, a single Gauss point per
   // element is sufficient, hence we use extraorder = 0.
   const int extraorder = 0;
-  UniquePtr<QBase> qrule (fe_type.default_quadrature_rule (2, extraorder));
+  std::unique_ptr<QBase> qrule (fe_type.default_quadrature_rule (2, extraorder));
 
   // Tell the finite element object to use our quadrature rule.
   fe->attach_quadrature_rule (qrule.get());
@@ -309,11 +314,11 @@ void assemble_shell (EquationSystems & es,
 
   // The element shape function and its derivatives evaluated at the
   // quadrature points.
-  const std::vector<std::vector<Real> > &          phi = fe->get_phi();
-  const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
-  const std::vector<std::vector<RealTensor> > &  d2phi = fe->get_d2phi();
+  const std::vector<std::vector<Real>> &          phi = fe->get_phi();
+  const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
+  const std::vector<std::vector<RealTensor>> &  d2phi = fe->get_d2phi();
 
-  // A reference to the \p DofMap object for this system.  The \p DofMap
+  // A reference to the DofMap object for this system.  The DofMap
   // object handles the index translation from node and element numbers
   // to degree of freedom numbers.
   const DofMap & dof_map = system.get_dof_map();
@@ -345,15 +350,8 @@ void assemble_shell (EquationSystems & es,
 
   // Now we will loop over all the elements in the mesh.  We will
   // compute the element matrix and right-hand-side contribution.
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-  for (; el != end_el; ++el)
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      // Store a pointer to the element we are currently
-      // working on.  This allows for nicer syntax later.
-      const Elem * elem = *el;
-
       // The ghost elements at the boundaries need to be excluded
       // here, as they don't belong to the physical shell,
       // but serve for a proper boundary treatment only.
@@ -397,10 +395,10 @@ void assemble_shell (EquationSystems & es,
       //        | Kwu Kwv Kww |        | Fw |
       //         -           -          -  -
       //
-      // The \p DenseSubMatrix.repostition () member takes the
+      // The DenseSubMatrix.reposition () member takes the
       // (row_offset, column_offset, row_size, column_size).
       //
-      // Similarly, the \p DenseSubVector.reposition () member
+      // Similarly, the DenseSubVector.reposition () member
       // takes the (row_offset, row_size)
       Kuu.reposition (u_var*n_u_dofs, u_var*n_u_dofs, n_u_dofs, n_u_dofs);
       Kuv.reposition (u_var*n_u_dofs, v_var*n_u_dofs, n_u_dofs, n_v_dofs);
@@ -436,7 +434,7 @@ void assemble_shell (EquationSystems & es,
           const RealVectorValue & a1 = dxyzdxi[qp];
           const RealVectorValue & a2 = dxyzdeta[qp];
           RealVectorValue   a3 = a1.cross(a2);
-          const Real jac = a3.size(); // the surface Jacobian
+          const Real jac = a3.norm(); // the surface Jacobian
           libmesh_assert_greater (jac, 0);
           a3 /= jac; // the shell director a3 is normalized to unit length
 
@@ -453,7 +451,7 @@ void assemble_shell (EquationSystems & es,
           // covariant components of the first fundamental form rather
           // than the contravariant components, exploiting that the
           // contravariant first fundamental form is the inverse of the
-          // covatiant first fundamental form (hence the determinant etc.).
+          // covariant first fundamental form (hence the determinant etc.).
           RealTensorValue H;
           H(0,0) = a(1) * a(1);
           H(0,1) = H(1,0) = nu * a(1) * a(0) + (1-nu) * a(2) * a(2);
@@ -537,7 +535,7 @@ void assemble_shell (EquationSystems & es,
                     + JxW[qp] * D * BI.transpose() * H * BJ;
 
                   // Insert the components of the coupling stiffness
-                  // matrix \p KIJ into the corresponding directional
+                  // matrix KIJ into the corresponding directional
                   // submatrices.
                   Kuu(i,j) += KIJ(0,0);
                   Kuv(i,j) += KIJ(0,1);
@@ -557,8 +555,8 @@ void assemble_shell (EquationSystems & es,
 
       // The element matrix and right-hand-side are now built
       // for this element.  Add them to the global matrix and
-      // right-hand-side vector.  The \p NumericMatrix::add_matrix()
-      // and \p NumericVector::add_vector() members do this for us.
+      // right-hand-side vector.  The NumericMatrix::add_matrix()
+      // and NumericVector::add_vector() members do this for us.
       system.matrix->add_matrix (Ke, dof_indices);
       system.rhs->add_vector    (Fe, dof_indices);
     } // end of non-ghost element loop
@@ -570,14 +568,8 @@ void assemble_shell (EquationSystems & es,
   // for subdivision shells.  We use the simplest way here,
   // which is known to be overly restrictive and will lead to
   // a slightly too small deformation of the plate.
-  el = mesh.active_local_elements_begin();
-
-  for (; el != end_el; ++el)
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      // Store a pointer to the element we are currently
-      // working on.  This allows for nicer syntax later.
-      const Elem * elem = *el;
-
       // For the boundary conditions, we only need to loop over
       // the ghost elements.
       libmesh_assert_equal_to (elem->type(), TRI3SUBDIVISION);
@@ -587,16 +579,16 @@ void assemble_shell (EquationSystems & es,
 
       // Find the side which is part of the physical plate boundary,
       // that is, the boundary of the original mesh without ghosts.
-      for (unsigned int s=0; s<elem->n_sides(); ++s)
+      for (auto s : elem->side_index_range())
         {
-          const Tri3Subdivision * nb_elem = static_cast<const Tri3Subdivision *> (elem->neighbor(s));
-          if (nb_elem == libmesh_nullptr || nb_elem->is_ghost())
+          const Tri3Subdivision * nb_elem = static_cast<const Tri3Subdivision *> (elem->neighbor_ptr(s));
+          if (nb_elem == nullptr || nb_elem->is_ghost())
             continue;
 
           /*
            * Determine the four nodes involved in the boundary
-           * condition treatment of this side.  The \p MeshTools::Subdiv
-           * namespace provides lookup tables \p next and \p prev
+           * condition treatment of this side.  The MeshTools::Subdiv
+           * namespace provides lookup tables next and prev
            * for an efficient determination of the next and previous
            * nodes of an element, respectively.
            *
@@ -608,18 +600,18 @@ void assemble_shell (EquationSystems & es,
            *     \  /
            *      n1
            */
-          Node * nodes [4]; // n1, n2, n3, n4
-          nodes[1] = gh_elem->get_node(s); // n2
-          nodes[2] = gh_elem->get_node(MeshTools::Subdivision::next[s]); // n3
-          nodes[3] = gh_elem->get_node(MeshTools::Subdivision::prev[s]); // n4
+          const Node * nodes [4]; // n1, n2, n3, n4
+          nodes[1] = gh_elem->node_ptr(s); // n2
+          nodes[2] = gh_elem->node_ptr(MeshTools::Subdivision::next[s]); // n3
+          nodes[3] = gh_elem->node_ptr(MeshTools::Subdivision::prev[s]); // n4
 
-          // The node in the interior of the domain, \p n1, is the
-          // hardest to find.  Walk along the edges of element \p nb until
+          // The node in the interior of the domain, n1, is the
+          // hardest to find.  Walk along the edges of element nb until
           // we have identified it.
           unsigned int n_int = 0;
-          nodes[0] = nb_elem->get_node(0);
+          nodes[0] = nb_elem->node_ptr(0);
           while (nodes[0]->id() == nodes[1]->id() || nodes[0]->id() == nodes[2]->id())
-            nodes[0] = nb_elem->get_node(++n_int);
+            nodes[0] = nb_elem->node_ptr(++n_int);
 
           // The penalty value.  \f$ \frac{1}{\epsilon} \f$
           const Real penalty = 1.e10;
@@ -627,7 +619,7 @@ void assemble_shell (EquationSystems & es,
           // With this simple method, clamped boundary conditions are
           // obtained by penalizing the displacements of all four nodes.
           // This ensures that the displacement field vanishes on the
-          // boundary side \p s.
+          // boundary side s.
           for (unsigned int n=0; n<4; ++n)
             {
               const dof_id_type u_dof = nodes[n]->dof_number (system.number(), u_var, 0);

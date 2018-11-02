@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -19,13 +19,19 @@
 
 // Local includes
 #include "libmesh/edge_edge4.h"
+#include "libmesh/enum_io_package.h"
+#include "libmesh/enum_order.h"
 
 namespace libMesh
 {
 
+// Edge4 class static member initializations
+const int Edge4::num_nodes;
+const int Edge4::num_children;
+
 #ifdef LIBMESH_ENABLE_AMR
 
-const float Edge4::_embedding_matrix[2][4][4] =
+const float Edge4::_embedding_matrix[Edge4::num_children][Edge4::num_nodes][Edge4::num_nodes] =
   {
     // embedding matrix for child 0
 
@@ -68,7 +74,7 @@ bool Edge4::is_node_on_side(const unsigned int n,
                             const unsigned int s) const
 {
   libmesh_assert_less (s, 2);
-  libmesh_assert_less (n, 4);
+  libmesh_assert_less (n, Edge4::num_nodes);
   return (s == n);
 }
 
@@ -94,6 +100,13 @@ bool Edge4::has_affine_map() const
 
 
 
+Order Edge4::default_order() const
+{
+  return THIRD;
+}
+
+
+
 void Edge4::connectivity(const unsigned int sc,
                          const IOPackage iop,
                          std::vector<dof_id_type> & conn) const
@@ -112,18 +125,18 @@ void Edge4::connectivity(const unsigned int sc,
         switch (sc)
           {
           case 0:
-            conn[0] = this->node(0)+1;
-            conn[1] = this->node(2)+1;
+            conn[0] = this->node_id(0)+1;
+            conn[1] = this->node_id(2)+1;
             return;
 
           case 1:
-            conn[0] = this->node(2)+1;
-            conn[1] = this->node(3)+1;
+            conn[0] = this->node_id(2)+1;
+            conn[1] = this->node_id(3)+1;
             return;
 
           case 2:
-            conn[0] = this->node(3)+1;
-            conn[1] = this->node(1)+1;
+            conn[0] = this->node_id(3)+1;
+            conn[1] = this->node_id(1)+1;
             return;
 
           default:
@@ -138,18 +151,18 @@ void Edge4::connectivity(const unsigned int sc,
         switch (sc)
           {
           case 0:
-            conn[0] = this->node(0);
-            conn[1] = this->node(2);
+            conn[0] = this->node_id(0);
+            conn[1] = this->node_id(2);
             return;
 
           case 1:
-            conn[0] = this->node(2);
-            conn[1] = this->node(3);
+            conn[0] = this->node_id(2);
+            conn[1] = this->node_id(3);
             return;
 
           case 2:
-            conn[0] = this->node(3);
-            conn[1] = this->node(1);
+            conn[0] = this->node_id(3);
+            conn[1] = this->node_id(1);
             return;
 
           default:
@@ -164,12 +177,37 @@ void Edge4::connectivity(const unsigned int sc,
 
 
 
+BoundingBox Edge4::loose_bounding_box () const
+{
+  // This might be a curved line through 2-space or 3-space, in which
+  // case the full bounding box can be larger than the bounding box of
+  // just the nodes.
+  //
+  // FIXME - I haven't yet proven the formula below to be correct for
+  // cubics - RHS
+  Point pmin, pmax;
+
+  for (unsigned d=0; d<LIBMESH_DIM; ++d)
+    {
+      Real center = (this->point(2)(d) + this->point(3)(d))/2;
+      Real hd = std::max(std::abs(center - this->point(0)(d)),
+                         std::abs(center - this->point(1)(d)));
+
+      pmin(d) = center - hd;
+      pmax(d) = center + hd;
+    }
+
+  return BoundingBox(pmin, pmax);
+}
+
+
+
 dof_id_type Edge4::key () const
 {
-  return this->compute_key(this->node(0),
-                           this->node(1),
-                           this->node(2),
-                           this->node(3));
+  return this->compute_key(this->node_id(0),
+                           this->node_id(1),
+                           this->node_id(2),
+                           this->node_id(3));
 }
 
 

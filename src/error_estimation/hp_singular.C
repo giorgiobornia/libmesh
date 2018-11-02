@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -35,20 +35,13 @@ namespace libMesh
 
 void HPSingularity::select_refinement (System & system)
 {
-  START_LOG("select_refinement()", "HPSingularity");
+  LOG_SCOPE("select_refinement()", "HPSingularity");
 
   // The current mesh
   MeshBase & mesh = system.get_mesh();
 
-  MeshBase::element_iterator       elem_it  =
-    mesh.active_local_elements_begin();
-  const MeshBase::element_iterator elem_end =
-    mesh.active_local_elements_end();
-
-  for (; elem_it != elem_end; ++elem_it)
+  for (auto & elem : mesh.active_element_ptr_range())
     {
-      Elem * elem = *elem_it;
-
       // We're only checking elements that are already flagged for h
       // refinement
       if (elem->refinement_flag() != Elem::REFINE)
@@ -57,20 +50,14 @@ void HPSingularity::select_refinement (System & system)
       elem->set_p_refinement_flag(Elem::REFINE);
       elem->set_refinement_flag(Elem::DO_NOTHING);
 
-      for (std::list<Point>::iterator ppoint =
-             singular_points.begin();
-           ppoint != singular_points.end(); ++ppoint)
-        {
-          if (elem->contains_point(*ppoint))
-            {
-              elem->set_p_refinement_flag(Elem::DO_NOTHING);
-              elem->set_refinement_flag(Elem::REFINE);
-              break;
-            }
-        }
+      for (const auto & pt : singular_points)
+        if (elem->contains_point(pt))
+          {
+            elem->set_p_refinement_flag(Elem::DO_NOTHING);
+            elem->set_refinement_flag(Elem::REFINE);
+            break;
+          }
     }
-
-  STOP_LOG("select_refinement()", "HPSingularity");
 }
 
 } // namespace libMesh

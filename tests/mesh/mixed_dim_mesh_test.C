@@ -5,7 +5,7 @@
 #include <libmesh/restore_warnings.h>
 
 #include <libmesh/equation_systems.h>
-#include <libmesh/serial_mesh.h>
+#include <libmesh/replicated_mesh.h>
 #include <libmesh/mesh_generation.h>
 #include <libmesh/edge_edge2.h>
 #include <libmesh/face_quad4.h>
@@ -16,6 +16,16 @@
 #include <libmesh/mesh_refinement.h>
 
 #include "test_comm.h"
+
+// THE CPPUNIT_TEST_SUITE_END macro expands to code that involves
+// std::auto_ptr, which in turn produces -Wdeprecated-declarations
+// warnings.  These can be ignored in GCC as long as we wrap the
+// offending code in appropriate pragmas.  We can't get away with a
+// single ignore_warnings.h inclusion at the beginning of this file,
+// since the libmesh headers pull in a restore_warnings.h at some
+// point.  We also don't bother restoring warnings at the end of this
+// file since it's not a header.
+#include <libmesh/ignore_warnings.h>
 
 using namespace libMesh;
 
@@ -28,37 +38,37 @@ class MixedDimensionMeshTest : public CppUnit::TestCase {
 public:
   CPPUNIT_TEST_SUITE( MixedDimensionMeshTest );
 
+#if LIBMESH_DIM > 1
   CPPUNIT_TEST( testMesh );
   CPPUNIT_TEST( testDofOrdering );
   CPPUNIT_TEST( testPointLocatorTree );
+#endif
 
   CPPUNIT_TEST_SUITE_END();
 
 protected:
 
-  SerialMesh* _mesh;
+  ReplicatedMesh* _mesh;
 
   void build_mesh()
   {
-    _mesh = new SerialMesh(*TestCommWorld);
+    _mesh = new ReplicatedMesh(*TestCommWorld);
 
-    /*
-      (0,1)           (1,1)
-        x---------------x
-        |               |
-        |               |
-        |               |
-        |               |
-        |               |
-        x---------------x
-       (0,0)           (1,0)
-        |               |
-        |               |
-        |               |
-        |               |
-        x---------------x
-       (0,-1)          (1,-1)
-     */
+    // (0,1)           (1,1)
+    // x---------------x
+    // |               |
+    // |               |
+    // |               |
+    // |               |
+    // |               |
+    // x---------------x
+    // (0,0)           (1,0)
+    // |               |
+    // |               |
+    // |               |
+    // |               |
+    // x---------------x
+    // (0,-1)          (1,-1)
 
     _mesh->set_mesh_dimension(2);
 
@@ -91,7 +101,7 @@ protected:
     }
 
     // libMesh will renumber, but we numbered according to its scheme
-    // anyway. We do this because when we call uniformly_refine subsequenly,
+    // anyway. We do this because when we call uniformly_refine subsequently,
     // it's going use skip_renumber=false.
     _mesh->prepare_for_use(false /*skip_renumber*/);
   }
@@ -99,13 +109,15 @@ protected:
 public:
   void setUp()
   {
+#if LIBMESH_DIM > 1
     this->build_mesh();
+#endif
   }
 
   void tearDown()
   {
     delete _mesh;
-   }
+  }
 
   void testMesh()
   {
@@ -117,22 +129,22 @@ public:
 
     /* The nodes for the EDGE2 element should have the same global ids
        as the bottom edge of the top QUAD4 element */
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(2)->node(0), _mesh->elem(0)->node(0) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(2)->node(1), _mesh->elem(0)->node(1) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(2).node_id(0), _mesh->elem_ref(0).node_id(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(2).node_id(1), _mesh->elem_ref(0).node_id(1) );
 
     /* The nodes for the EDGE2 element should have the same global ids
        as the top edge of the bottom QUAD4 element */
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(2)->node(0), _mesh->elem(1)->node(3) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(2)->node(1), _mesh->elem(1)->node(2) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(2).node_id(0), _mesh->elem_ref(1).node_id(3) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(2).node_id(1), _mesh->elem_ref(1).node_id(2) );
 
     /* The nodes for the bottom edge of the top QUAD4 element should have
        the same global ids as the top edge of the bottom QUAD4 element */
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(0)->node(0), _mesh->elem(1)->node(3) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(0)->node(1), _mesh->elem(1)->node(2) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(0).node_id(0), _mesh->elem_ref(1).node_id(3) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(0).node_id(1), _mesh->elem_ref(1).node_id(2) );
 
     // We didn't set an interior_parent on the edge element, so it
     // should default to NULL
-    CPPUNIT_ASSERT( _mesh->elem(2)->interior_parent() );
+    CPPUNIT_ASSERT( _mesh->elem_ref(2).interior_parent() );
   }
 
   void testDofOrdering()
@@ -146,9 +158,9 @@ public:
 
     std::vector<dof_id_type> top_quad_dof_indices, bottom_quad_dof_indices, edge_dof_indices;
 
-    dof_map.dof_indices( _mesh->elem(0), top_quad_dof_indices );
-    dof_map.dof_indices( _mesh->elem(1), bottom_quad_dof_indices );
-    dof_map.dof_indices( _mesh->elem(2), edge_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(0), top_quad_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(1), bottom_quad_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(2), edge_dof_indices );
 
     /* The dofs for the EDGE2 element should be the same
        as the bottom edge of the top QUAD4 dofs */
@@ -166,39 +178,9 @@ public:
     CPPUNIT_ASSERT_EQUAL( top_quad_dof_indices[1], bottom_quad_dof_indices[2] );
   }
 
-  void testPointLocatorList()
-  {
-    UniquePtr<PointLocatorBase> locator = PointLocatorBase::build(LIST,*_mesh);
-
-    Point top_point(0.4, 0.5);
-    const Elem* top_elem = (*locator)(top_point);
-    CPPUNIT_ASSERT(top_elem);
-
-    // We should have gotten back the top quad
-    CPPUNIT_ASSERT_EQUAL( (dof_id_type)0, top_elem->id() );
-
-    Point bottom_point(0.5, -0.5);
-    const Elem* bottom_elem = (*locator)(bottom_point);
-    CPPUNIT_ASSERT(bottom_elem);
-
-    // We should have gotten back the bottom quad
-    CPPUNIT_ASSERT_EQUAL( (dof_id_type)1, bottom_elem->id() );
-
-    // Test getting back the edge
-    {
-      std::set<subdomain_id_type> subdomain_id; subdomain_id.insert(1);
-      Point interface_point( 0.2, 0.0 );
-      const Elem* interface_elem = (*locator)(interface_point, &subdomain_id);
-      CPPUNIT_ASSERT(interface_elem);
-
-      // We should have gotten back the overlapping edge element
-      CPPUNIT_ASSERT_EQUAL( (dof_id_type)2, interface_elem->id() );
-    }
-  }
-
   void testPointLocatorTree()
   {
-    UniquePtr<PointLocatorBase> locator = _mesh->sub_point_locator();
+    std::unique_ptr<PointLocatorBase> locator = _mesh->sub_point_locator();
 
     Point top_point(0.5, 0.5);
     const Elem* top_elem = (*locator)(top_point);
@@ -238,8 +220,10 @@ class MixedDimensionRefinedMeshTest : public MixedDimensionMeshTest {
 public:
   CPPUNIT_TEST_SUITE( MixedDimensionRefinedMeshTest );
 
+#if LIBMESH_DIM > 1
   CPPUNIT_TEST( testMesh );
   CPPUNIT_TEST( testDofOrdering );
+#endif
 
   CPPUNIT_TEST_SUITE_END();
 
@@ -248,27 +232,25 @@ public:
 
   void setUp()
   {
-    /*
-
-        3-------10------2
-        |       |       |
-        |   5   |   6   |
-        8-------7-------9
-        |       |       |
-        |   3   |   4   |
-        0-------6-------1
-        |       |       |
-        |   9   |  10   |
-       13------12-------14
-        |       |       |
-        |   7   |   8   |
-        4-------11------5
-
-     */
+    // 3-------10------2
+    // |       |       |
+    // |   5   |   6   |
+    // 8-------7-------9
+    // |       |       |
+    // |   3   |   4   |
+    // 0-------6-------1
+    // |       |       |
+    // |   9   |  10   |
+    // 13------12-------14
+    // |       |       |
+    // |   7   |   8   |
+    // 4-------11------5
+#if LIBMESH_DIM > 1
     this->build_mesh();
 
 #ifdef LIBMESH_ENABLE_AMR
     MeshRefinement(*_mesh).uniformly_refine(1);
+#endif
 #endif
   }
 
@@ -283,31 +265,44 @@ public:
     CPPUNIT_ASSERT_EQUAL( (dof_id_type)15, _mesh->n_nodes() );
 
     // EDGE2,id=11 should have same nodes of bottom of QUAD4, id=3
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(11)->node(0), _mesh->elem(3)->node(0) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(11)->node(1), _mesh->elem(3)->node(1) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(11).node_id(0),
+                          _mesh->elem_ref(3).node_id(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(11).node_id(1),
+                          _mesh->elem_ref(3).node_id(1) );
 
     // EDGE2,id=12 should have same nodes of bottom of QUAD4, id=4
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(12)->node(0), _mesh->elem(4)->node(0) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(12)->node(1), _mesh->elem(4)->node(1) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(12).node_id(0),
+                          _mesh->elem_ref(4).node_id(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(12).node_id(1),
+                          _mesh->elem_ref(4).node_id(1) );
 
     // EDGE2,id=11 should have same nodes of top of QUAD4, id=9
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(11)->node(0), _mesh->elem(9)->node(3) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(11)->node(1), _mesh->elem(9)->node(2) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(11).node_id(0),
+                          _mesh->elem_ref(9).node_id(3) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(11).node_id(1),
+                          _mesh->elem_ref(9).node_id(2) );
 
     // EDGE2,id=12 should have same nodes of top of QUAD4, id=10
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(12)->node(0), _mesh->elem(10)->node(3) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(12)->node(1), _mesh->elem(10)->node(2) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(12).node_id(0),
+                          _mesh->elem_ref(10).node_id(3) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(12).node_id(1),
+                          _mesh->elem_ref(10).node_id(2) );
 
     // Shared node between the EDGE2 elements should have the same global id
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(11)->node(1), _mesh->elem(12)->node(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(11).node_id(1),
+                          _mesh->elem_ref(12).node_id(0) );
 
     // EDGE2 child elements should have the correct parent
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(11)->parent(), _mesh->elem(2) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(12)->parent(), _mesh->elem(2) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(11).parent(),
+                          _mesh->elem_ptr(2) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(12).parent(),
+                          _mesh->elem_ptr(2) );
 
     // EDGE2 child elements should have the correct interior_parent
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(11)->interior_parent(), _mesh->elem(3) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(12)->interior_parent(), _mesh->elem(4) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(11).interior_parent(),
+                          _mesh->elem_ptr(3) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(12).interior_parent(),
+                          _mesh->elem_ptr(4) );
 #endif
   }
 
@@ -325,12 +320,12 @@ public:
     std::vector<dof_id_type> bottom_quad9_dof_indices, bottom_quad10_dof_indices;
     std::vector<dof_id_type> edge11_dof_indices, edge12_dof_indices;
 
-    dof_map.dof_indices( _mesh->elem(3), top_quad3_dof_indices );
-    dof_map.dof_indices( _mesh->elem(4), top_quad4_dof_indices );
-    dof_map.dof_indices( _mesh->elem(9), bottom_quad9_dof_indices );
-    dof_map.dof_indices( _mesh->elem(10), bottom_quad10_dof_indices );
-    dof_map.dof_indices( _mesh->elem(11), edge11_dof_indices );
-    dof_map.dof_indices( _mesh->elem(12), edge12_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(3), top_quad3_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(4), top_quad4_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(9), bottom_quad9_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(10), bottom_quad10_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(11), edge11_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(12), edge12_dof_indices );
 
     // EDGE2,id=11 should have same dofs as of bottom of QUAD4, id=3
     CPPUNIT_ASSERT_EQUAL( edge11_dof_indices[0], top_quad3_dof_indices[0] );
@@ -366,82 +361,81 @@ class MixedDimensionNonUniformRefinement : public CppUnit::TestCase {
 public:
   CPPUNIT_TEST_SUITE( MixedDimensionNonUniformRefinement );
 
+#if LIBMESH_DIM > 1
   CPPUNIT_TEST( testMesh );
   CPPUNIT_TEST( testDofOrdering );
+#endif
 
   CPPUNIT_TEST_SUITE_END();
 
   // Yes, this is necessary. Somewhere in those macros is a protected/private
 protected:
 
-  SerialMesh* _mesh;
+  ReplicatedMesh* _mesh;
 
   void build_mesh()
   {
-    _mesh = new SerialMesh(*TestCommWorld);
-    /*
-        We start with this
-
-
-      (0,2)           (1,2)
-        4---------------5
-        |               |
-        |               |
-        |       1       |
-        |               |
-        |               |
-      (0,1)           (1,1)
-        3---------------2
-        |               |
-        |               |
-        |       0       |
-        |               |
-        |               |
-        0---------------1
-      (0,0)           (1,0)
-        |               |
-        |       2       |
-        |               |
-        |               |
-        6---------------7
-      (0,-1)          (1,-1)
-        |               |
-        |       3       |
-        |               |
-        |               |
-        9---------------8
-      (0,-2)          (1,-2)
-
-       But the single element refinement should result
-       with this for the default max_mismatch = 0 case
-
-        4---------------5
-        |               |
-        |               |
-        |       1       |
-        |               |
-        |               |
-        3------14-------2
-        |       |       |
-        |   7   |   8   |
-       12------11-------13
-        |       |       |
-        |   5   |   6   |
-        0------10-------1
-        |       |       |
-        |   11  |   12  |
-       17------16-------18
-        |       |       |
-        |   9   |   10  |
-        6------15-------7
-        |               |
-        |               |
-        |       3       |
-        |               |
-        |               |
-        9---------------8
-
-     */
+    _mesh = new ReplicatedMesh(*TestCommWorld);
+    // We start with this
+    //
+    //
+    // (0,2)           (1,2)
+    // 4---------------5
+    // |               |
+    // |               |
+    // |       1       |
+    // |               |
+    // |               |
+    // (0,1)           (1,1)
+    // 3---------------2
+    // |               |
+    // |               |
+    // |       0       |
+    // |               |
+    // |               |
+    // 0---------------1
+    // (0,0)           (1,0)
+    // |               |
+    // |       2       |
+    // |               |
+    // |               |
+    // 6---------------7
+    // (0,-1)          (1,-1)
+    // |               |
+    // |       3       |
+    // |               |
+    // |               |
+    // 9---------------8
+    // (0,-2)          (1,-2)
+    //
+    // But the single element refinement should result
+    // with this for the default max_mismatch = 0 case
+    //
+    // 4---------------5
+    // |               |
+    // |               |
+    // |       1       |
+    // |               |
+    // |               |
+    // 3------14-------2
+    // |       |       |
+    // |   7   |   8   |
+    // 12------11-------13
+    // |       |       |
+    // |   5   |   6   |
+    // 0------10-------1
+    // |       |       |
+    // |   11  |   12  |
+    // 17------16-------18
+    // |       |       |
+    // |   9   |   10  |
+    // 6------15-------7
+    // |               |
+    // |               |
+    // |       3       |
+    // |               |
+    // |               |
+    // 9---------------8
 
     _mesh->set_mesh_dimension(2);
 
@@ -491,14 +485,14 @@ protected:
     }
 
     // libMesh will renumber, but we numbered according to its scheme
-    // anyway. We do this because when we call uniformly_refine subsequenly,
+    // anyway. We do this because when we call uniformly_refine subsequently,
     // it's going use skip_renumber=false.
     _mesh->prepare_for_use(false /*skip_renumber*/);
 
 
 #ifdef LIBMESH_ENABLE_AMR
     //Flag the bottom element for refinement
-    _mesh->elem(0)->set_refinement_flag(Elem::REFINE);
+    _mesh->elem_ref(0).set_refinement_flag(Elem::REFINE);
     MeshRefinement(*_mesh).refine_and_coarsen_elements();
 #endif
 
@@ -507,12 +501,16 @@ protected:
 public:
   void setUp()
   {
+#if LIBMESH_DIM > 1
     this->build_mesh();
+#endif
   }
 
   void tearDown()
   {
+#if LIBMESH_DIM > 1
     delete _mesh;
+#endif
   }
 
   void testMesh()
@@ -526,31 +524,44 @@ public:
     CPPUNIT_ASSERT_EQUAL( (dof_id_type)19, _mesh->n_nodes() );
 
     // EDGE2,id=13 should have same nodes of bottom of QUAD4, id=5
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(13)->node(0), _mesh->elem(5)->node(0) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(13)->node(1), _mesh->elem(5)->node(1) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(13).node_id(0),
+                          _mesh->elem_ref(5).node_id(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(13).node_id(1),
+                          _mesh->elem_ref(5).node_id(1) );
 
     // EDGE2,id=14 should have same nodes of bottom of QUAD4, id=6
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(14)->node(0), _mesh->elem(6)->node(0) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(14)->node(1), _mesh->elem(6)->node(1) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(14).node_id(0),
+                          _mesh->elem_ref(6).node_id(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(14).node_id(1),
+                          _mesh->elem_ref(6).node_id(1) );
 
     // EDGE2,id=13 should have same nodes of top of QUAD4, id=11
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(13)->node(0), _mesh->elem(11)->node(3) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(13)->node(1), _mesh->elem(11)->node(2) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(13).node_id(0),
+                          _mesh->elem_ref(11).node_id(3) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(13).node_id(1),
+                          _mesh->elem_ref(11).node_id(2) );
 
     // EDGE2,id=14 should have same nodes of top of QUAD4, id=12
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(14)->node(0), _mesh->elem(12)->node(3) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(14)->node(1), _mesh->elem(12)->node(2) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(14).node_id(0),
+                          _mesh->elem_ref(12).node_id(3) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(14).node_id(1),
+                          _mesh->elem_ref(12).node_id(2) );
 
     // Shared node between the EDGE2 elements should have the same global id
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(13)->node(1), _mesh->elem(14)->node(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(13).node_id(1),
+                          _mesh->elem_ref(14).node_id(0) );
 
     // EDGE2 child elements should have the correct parent
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(13)->parent(), _mesh->elem(4) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(14)->parent(), _mesh->elem(4) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(13).parent(),
+                          _mesh->elem_ptr(4) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(14).parent(),
+                          _mesh->elem_ptr(4) );
 
     // EDGE2 child elements should have the correct interior_parent
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(13)->interior_parent(), _mesh->elem(5) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(14)->interior_parent(), _mesh->elem(6) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(13).interior_parent(),
+                          _mesh->elem_ptr(5) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(14).interior_parent(),
+                          _mesh->elem_ptr(6) );
 #endif
   }
 
@@ -568,12 +579,12 @@ public:
     std::vector<dof_id_type> bottom_quad11_dof_indices, bottom_quad12_dof_indices;
     std::vector<dof_id_type> edge13_dof_indices, edge14_dof_indices;
 
-    dof_map.dof_indices( _mesh->elem(5),  top_quad5_dof_indices );
-    dof_map.dof_indices( _mesh->elem(6),  top_quad6_dof_indices );
-    dof_map.dof_indices( _mesh->elem(11), bottom_quad11_dof_indices );
-    dof_map.dof_indices( _mesh->elem(12), bottom_quad12_dof_indices );
-    dof_map.dof_indices( _mesh->elem(13), edge13_dof_indices );
-    dof_map.dof_indices( _mesh->elem(14), edge14_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(5),  top_quad5_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(6),  top_quad6_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(11), bottom_quad11_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(12), bottom_quad12_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(13), edge13_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(14), edge14_dof_indices );
 
     // EDGE2,id=13 should have same dofs as of bottom of QUAD4, id=5
     CPPUNIT_ASSERT_EQUAL( edge13_dof_indices[0], top_quad5_dof_indices[0] );
@@ -608,18 +619,20 @@ class MixedDimensionNonUniformRefinementTriangle : public CppUnit::TestCase {
 public:
   CPPUNIT_TEST_SUITE( MixedDimensionNonUniformRefinementTriangle );
 
+#if LIBMESH_DIM > 1
   CPPUNIT_TEST( testMesh );
   CPPUNIT_TEST( testDofOrdering );
+#endif
 
   CPPUNIT_TEST_SUITE_END();
 
 protected:
 
-  SerialMesh* _mesh;
+  ReplicatedMesh* _mesh;
 
   void build_mesh()
   {
-    _mesh = new SerialMesh(*TestCommWorld);
+    _mesh = new ReplicatedMesh(*TestCommWorld);
 
     /**
      * We start with this
@@ -707,7 +720,7 @@ protected:
 
 #ifdef LIBMESH_ENABLE_AMR
     //Flag the bottom element for refinement
-    _mesh->elem(4)->set_refinement_flag(Elem::REFINE);
+    _mesh->elem_ref(4).set_refinement_flag(Elem::REFINE);
     MeshRefinement(*_mesh).refine_and_coarsen_elements();
 #endif
   }
@@ -715,16 +728,21 @@ protected:
 public:
   void setUp()
   {
+#if LIBMESH_DIM > 1
     this->build_mesh();
+#endif
   }
 
   void tearDown()
   {
+#if LIBMESH_DIM > 1
     delete _mesh;
-   }
+#endif
+  }
 
   void testMesh()
   {
+#ifdef LIBMESH_ENABLE_AMR
     // We should have 15 total and 12 active elements.
     CPPUNIT_ASSERT_EQUAL( (dof_id_type)15, _mesh->n_elem() );
     CPPUNIT_ASSERT_EQUAL( (dof_id_type)12, _mesh->n_active_elem() );
@@ -733,44 +751,63 @@ public:
     CPPUNIT_ASSERT_EQUAL( (dof_id_type)11, _mesh->n_nodes() );
 
     // EDGE2,id=13 should have same nodes of the base of TRI3, id=5
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(13)->node(0), _mesh->elem(5)->node(0) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(13)->node(1), _mesh->elem(5)->node(1) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(13).node_id(0),
+                          _mesh->elem_ref(5).node_id(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(13).node_id(1),
+                          _mesh->elem_ref(5).node_id(1) );
 
     // EDGE2,id=13 should have same nodes of the base of TRI3, id=10
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(13)->node(0), _mesh->elem(10)->node(1) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(13)->node(1), _mesh->elem(10)->node(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(13).node_id(0),
+                          _mesh->elem_ref(10).node_id(1) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(13).node_id(1),
+                          _mesh->elem_ref(10).node_id(0) );
 
     // EDGE2,id=13 should have same node as the tip of TRI3, id=8 and id=12
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(13)->node(1), _mesh->elem(8)->node(0) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(13)->node(1), _mesh->elem(12)->node(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(13).node_id(1),
+                          _mesh->elem_ref(8).node_id(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(13).node_id(1),
+                          _mesh->elem_ref(12).node_id(0) );
 
     // EDGE2,id=14 should have same nodes of the base of TRI3, id=6
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(14)->node(0), _mesh->elem(6)->node(0) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(14)->node(1), _mesh->elem(6)->node(1) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(14).node_id(0),
+                          _mesh->elem_ref(6).node_id(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(14).node_id(1),
+                          _mesh->elem_ref(6).node_id(1) );
 
     // EDGE2,id=14 should have same nodes of the base of TRI3, id=9
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(14)->node(0), _mesh->elem(9)->node(1) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(14)->node(1), _mesh->elem(9)->node(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(14).node_id(0),
+                          _mesh->elem_ref(9).node_id(1) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(14).node_id(1),
+                          _mesh->elem_ref(9).node_id(0) );
 
     // EDGE2,id=14 should have same node as the tip of TRI3, id=8 and id=12
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(14)->node(0), _mesh->elem(8)->node(0) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(14)->node(0), _mesh->elem(12)->node(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(14).node_id(0),
+                          _mesh->elem_ref(8).node_id(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(14).node_id(0),
+                          _mesh->elem_ref(12).node_id(0) );
 
     // Shared node between the EDGE2 elements should have the same global id
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(13)->node(1), _mesh->elem(14)->node(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(13).node_id(1),
+                          _mesh->elem_ref(14).node_id(0) );
 
     // EDGE2 child elements should have the correct parent
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(13)->parent(), _mesh->elem(4) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(14)->parent(), _mesh->elem(4) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(13).parent(),
+                          _mesh->elem_ptr(4) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(14).parent(),
+                          _mesh->elem_ptr(4) );
 
     // EDGE2 child elements should have the correct interior_parent
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(13)->interior_parent(), _mesh->elem(5) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(14)->interior_parent(), _mesh->elem(6) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(13).interior_parent(),
+                          _mesh->elem_ptr(5) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(14).interior_parent(),
+                          _mesh->elem_ptr(6) );
 
+#endif // LIBMESH_ENABLE_AMR
   }
 
   void testDofOrdering()
   {
+#ifdef LIBMESH_ENABLE_AMR
     EquationSystems es(*_mesh);
     es.add_system<LinearImplicitSystem>("TestDofSystem");
     es.get_system("TestDofSystem").add_variable("u",FIRST);
@@ -787,14 +824,14 @@ public:
     //EDGE2 Elements
     std::vector<dof_id_type> elem13_dof_indices, elem14_dof_indices;
 
-    dof_map.dof_indices( _mesh->elem(5), elem5_dof_indices );
-    dof_map.dof_indices( _mesh->elem(6), elem6_dof_indices );
-    dof_map.dof_indices( _mesh->elem(8), elem8_dof_indices );
-    dof_map.dof_indices( _mesh->elem(9), elem9_dof_indices );
-    dof_map.dof_indices( _mesh->elem(10), elem10_dof_indices );
-    dof_map.dof_indices( _mesh->elem(12), elem12_dof_indices );
-    dof_map.dof_indices( _mesh->elem(13), elem13_dof_indices );
-    dof_map.dof_indices( _mesh->elem(14), elem14_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(5), elem5_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(6), elem6_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(8), elem8_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(9), elem9_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(10), elem10_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(12), elem12_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(13), elem13_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(14), elem14_dof_indices );
 
     /* The dofs for the EDGE2 (id = 13 and id =14) element should be the same
        as the bottom edge of the top TRI3 (id=5 and id=6) and the tip of
@@ -827,6 +864,7 @@ public:
     CPPUNIT_ASSERT_EQUAL( elem6_dof_indices[0], elem9_dof_indices[1] );
     CPPUNIT_ASSERT_EQUAL( elem6_dof_indices[1], elem9_dof_indices[0] );
     CPPUNIT_ASSERT_EQUAL( elem8_dof_indices[0], elem12_dof_indices[0] );
+#endif // LIBMESH_ENABLE_AMR
   }
 
 };
@@ -842,42 +880,44 @@ class MixedDimensionNonUniformRefinement3D : public CppUnit::TestCase {
 public:
   CPPUNIT_TEST_SUITE( MixedDimensionNonUniformRefinement3D );
 
+#if LIBMESH_DIM > 2
   CPPUNIT_TEST( testMesh );
   CPPUNIT_TEST( testDofOrdering );
+#endif
 
   CPPUNIT_TEST_SUITE_END();
 
   // Yes, this is necessary. Somewhere in those macros is a protected/private
 protected:
 
-  SerialMesh* _mesh;
+  ReplicatedMesh* _mesh;
 
   void build_mesh()
   {
-    _mesh = new SerialMesh(*TestCommWorld);
+    _mesh = new ReplicatedMesh(*TestCommWorld);
 
     _mesh->set_mesh_dimension(3);
 
     //Add the nodes
-    for(unsigned int z = 0; z < 5; z++)
-    {
-        for(unsigned int y = 0; y < 4; y++)
-        {
-             for(unsigned int x = 0; x < 4; x++)
-             {
-                 _mesh->add_point( Point(Real(x),Real(y),Real(z)), 16*z+4*y+x);
-             }
-        }
-    }
+    for (unsigned int z = 0; z < 5; z++)
+      {
+        for (unsigned int y = 0; y < 4; y++)
+          {
+            for (unsigned int x = 0; x < 4; x++)
+              {
+                _mesh->add_point( Point(Real(x),Real(y),Real(z)), 16*z+4*y+x);
+              }
+          }
+      }
 
     {
       //Add the HEX8 elements
-      for(unsigned int z = 0; z < 4; z++)
-      {
-          for(unsigned int y = 0; y < 3; y++)
-          {
-              for(unsigned int x = 0; x < 3; x++)
-              {
+      for (unsigned int z = 0; z < 4; z++)
+        {
+          for (unsigned int y = 0; y < 3; y++)
+            {
+              for (unsigned int x = 0; x < 3; x++)
+                {
                   Elem* hex = _mesh->add_elem( new Hex8 );
                   hex->set_node(0) = _mesh->node_ptr(x+4*y    +16*z        );
                   hex->set_node(1) = _mesh->node_ptr(x+4*y    +16*z     + 1);
@@ -887,9 +927,9 @@ protected:
                   hex->set_node(5) = _mesh->node_ptr(x+4*y    +16*(z+1) + 1);
                   hex->set_node(6) = _mesh->node_ptr(x+4*(y+1)+16*(z+1) + 1);
                   hex->set_node(7) = _mesh->node_ptr(x+4*(y+1)+16*(z+1)    );
-              }
-          }
-      }
+                }
+            }
+        }
       Elem* quad = _mesh->add_elem( new Quad4 );
       unsigned int x=1,y=1,z=2;
       quad->set_node(0) = _mesh->node_ptr(x+4*y    +16*z    );
@@ -908,7 +948,7 @@ protected:
 
 #ifdef LIBMESH_ENABLE_AMR
     //Flag the bottom element for refinement
-    _mesh->elem(13)->set_refinement_flag(Elem::REFINE);
+    _mesh->elem_ref(13).set_refinement_flag(Elem::REFINE);
     MeshRefinement(*_mesh).refine_and_coarsen_elements();
 #endif
   }
@@ -916,12 +956,16 @@ protected:
 public:
   void setUp()
   {
+#if LIBMESH_DIM > 2
     this->build_mesh();
+#endif
   }
 
   void tearDown()
   {
+#if LIBMESH_DIM > 2
     delete _mesh;
+#endif
   }
 
   void testMesh()
@@ -935,74 +979,122 @@ public:
     CPPUNIT_ASSERT_EQUAL( (dof_id_type)113, _mesh->n_nodes() );
 
     // QUAD4,id=53 should have same nodes as a face in HEX8, id=39
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(53)->node(0), _mesh->elem(41)->node(4) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(53)->node(1), _mesh->elem(41)->node(5) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(53)->node(2), _mesh->elem(41)->node(6) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(53)->node(3), _mesh->elem(41)->node(7) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(53).node_id(0),
+                          _mesh->elem_ref(41).node_id(4) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(53).node_id(1),
+                          _mesh->elem_ref(41).node_id(5) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(53).node_id(2),
+                          _mesh->elem_ref(41).node_id(6) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(53).node_id(3),
+                          _mesh->elem_ref(41).node_id(7) );
 
     // QUAD4,id=53 should have same nodes as a face in HEX8, id=45
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(53)->node(0), _mesh->elem(45)->node(0) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(53)->node(1), _mesh->elem(45)->node(1) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(53)->node(2), _mesh->elem(45)->node(2) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(53)->node(3), _mesh->elem(45)->node(3) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(53).node_id(0),
+                          _mesh->elem_ref(45).node_id(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(53).node_id(1),
+                          _mesh->elem_ref(45).node_id(1) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(53).node_id(2),
+                          _mesh->elem_ref(45).node_id(2) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(53).node_id(3),
+                          _mesh->elem_ref(45).node_id(3) );
 
     // QUAD4,id=54 should have same nodes as a face in HEX8, id=42
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(54)->node(0), _mesh->elem(42)->node(4) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(54)->node(1), _mesh->elem(42)->node(5) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(54)->node(2), _mesh->elem(42)->node(6) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(54)->node(3), _mesh->elem(42)->node(7) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(54).node_id(0),
+                          _mesh->elem_ref(42).node_id(4) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(54).node_id(1),
+                          _mesh->elem_ref(42).node_id(5) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(54).node_id(2),
+                          _mesh->elem_ref(42).node_id(6) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(54).node_id(3),
+                          _mesh->elem_ref(42).node_id(7) );
 
     // QUAD4,id=54 should have same nodes as a face in HEX8, id=46
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(54)->node(0), _mesh->elem(46)->node(0) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(54)->node(1), _mesh->elem(46)->node(1) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(54)->node(2), _mesh->elem(46)->node(2) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(54)->node(3), _mesh->elem(46)->node(3) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(54).node_id(0),
+                          _mesh->elem_ref(46).node_id(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(54).node_id(1),
+                          _mesh->elem_ref(46).node_id(1) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(54).node_id(2),
+                          _mesh->elem_ref(46).node_id(2) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(54).node_id(3),
+                          _mesh->elem_ref(46).node_id(3) );
 
     // QUAD4,id=55 should have same nodes as a face in HEX8, id=43
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(55)->node(0), _mesh->elem(43)->node(4) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(55)->node(1), _mesh->elem(43)->node(5) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(55)->node(2), _mesh->elem(43)->node(6) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(55)->node(3), _mesh->elem(43)->node(7) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(55).node_id(0),
+                          _mesh->elem_ref(43).node_id(4) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(55).node_id(1),
+                          _mesh->elem_ref(43).node_id(5) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(55).node_id(2),
+                          _mesh->elem_ref(43).node_id(6) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(55).node_id(3),
+                          _mesh->elem_ref(43).node_id(7) );
 
     // QUAD4,id=55 should have same nodes as a face in HEX8, id=47
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(55)->node(0), _mesh->elem(47)->node(0) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(55)->node(1), _mesh->elem(47)->node(1) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(55)->node(2), _mesh->elem(47)->node(2) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(55)->node(3), _mesh->elem(47)->node(3) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(55).node_id(0),
+                          _mesh->elem_ref(47).node_id(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(55).node_id(1),
+                          _mesh->elem_ref(47).node_id(1) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(55).node_id(2),
+                          _mesh->elem_ref(47).node_id(2) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(55).node_id(3),
+                          _mesh->elem_ref(47).node_id(3) );
 
     // QUAD4,id=56 should have same nodes as a face in HEX8, id=44
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(56)->node(0), _mesh->elem(44)->node(4) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(56)->node(1), _mesh->elem(44)->node(5) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(56)->node(2), _mesh->elem(44)->node(6) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(56)->node(3), _mesh->elem(44)->node(7) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(56).node_id(0),
+                          _mesh->elem_ref(44).node_id(4) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(56).node_id(1),
+                          _mesh->elem_ref(44).node_id(5) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(56).node_id(2),
+                          _mesh->elem_ref(44).node_id(6) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(56).node_id(3),
+                          _mesh->elem_ref(44).node_id(7) );
 
     // QUAD4,id=56 should have same nodes as a face in HEX8, id=48
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(56)->node(0), _mesh->elem(48)->node(0) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(56)->node(1), _mesh->elem(48)->node(1) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(56)->node(2), _mesh->elem(48)->node(2) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(56)->node(3), _mesh->elem(48)->node(3) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(56).node_id(0),
+                          _mesh->elem_ref(48).node_id(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(56).node_id(1),
+                          _mesh->elem_ref(48).node_id(1) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(56).node_id(2),
+                          _mesh->elem_ref(48).node_id(2) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(56).node_id(3),
+                          _mesh->elem_ref(48).node_id(3) );
 
     // Shared node between the QUAD4 elements should have the same global id
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(53)->node(1), _mesh->elem(54)->node(0) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(53)->node(2), _mesh->elem(54)->node(3) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(53)->node(3), _mesh->elem(55)->node(0) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(53)->node(2), _mesh->elem(55)->node(1) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(54)->node(3), _mesh->elem(56)->node(0) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(54)->node(2), _mesh->elem(56)->node(1) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(55)->node(1), _mesh->elem(56)->node(0) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(55)->node(2), _mesh->elem(56)->node(3) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(53).node_id(1),
+                          _mesh->elem_ref(54).node_id(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(53).node_id(2),
+                          _mesh->elem_ref(54).node_id(3) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(53).node_id(3),
+                          _mesh->elem_ref(55).node_id(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(53).node_id(2),
+                          _mesh->elem_ref(55).node_id(1) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(54).node_id(3),
+                          _mesh->elem_ref(56).node_id(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(54).node_id(2),
+                          _mesh->elem_ref(56).node_id(1) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(55).node_id(1),
+                          _mesh->elem_ref(56).node_id(0) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(55).node_id(2),
+                          _mesh->elem_ref(56).node_id(3) );
 
     // QUAD4 child elements should have the correct parent
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(53)->parent(), _mesh->elem(36) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(54)->parent(), _mesh->elem(36) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(55)->parent(), _mesh->elem(36) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(56)->parent(), _mesh->elem(36) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(53).parent(),
+                          _mesh->elem_ptr(36) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(54).parent(),
+                          _mesh->elem_ptr(36) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(55).parent(),
+                          _mesh->elem_ptr(36) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(56).parent(),
+                          _mesh->elem_ptr(36) );
 
     // QUAD4 child elements should have the correct interior_parent
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(53)->interior_parent(), _mesh->elem(41) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(54)->interior_parent(), _mesh->elem(42) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(55)->interior_parent(), _mesh->elem(43) );
-    CPPUNIT_ASSERT_EQUAL( _mesh->elem(56)->interior_parent(), _mesh->elem(44) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(53).interior_parent(),
+                          _mesh->elem_ptr(41) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(54).interior_parent(),
+                          _mesh->elem_ptr(42) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(55).interior_parent(),
+                          _mesh->elem_ptr(43) );
+    CPPUNIT_ASSERT_EQUAL( _mesh->elem_ref(56).interior_parent(),
+                          _mesh->elem_ptr(44) );
 
 #endif
   }
@@ -1024,18 +1116,18 @@ public:
     //QUAD4 elements
     std::vector<dof_id_type> elem53_dof_indices, elem54_dof_indices, elem55_dof_indices, elem56_dof_indices;
 
-    dof_map.dof_indices( _mesh->elem(41), elem41_dof_indices );
-    dof_map.dof_indices( _mesh->elem(42), elem42_dof_indices );
-    dof_map.dof_indices( _mesh->elem(43), elem43_dof_indices );
-    dof_map.dof_indices( _mesh->elem(44), elem44_dof_indices );
-    dof_map.dof_indices( _mesh->elem(45), elem45_dof_indices );
-    dof_map.dof_indices( _mesh->elem(46), elem46_dof_indices );
-    dof_map.dof_indices( _mesh->elem(47), elem47_dof_indices );
-    dof_map.dof_indices( _mesh->elem(48), elem48_dof_indices );
-    dof_map.dof_indices( _mesh->elem(53), elem53_dof_indices );
-    dof_map.dof_indices( _mesh->elem(54), elem54_dof_indices );
-    dof_map.dof_indices( _mesh->elem(55), elem55_dof_indices );
-    dof_map.dof_indices( _mesh->elem(56), elem56_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(41), elem41_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(42), elem42_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(43), elem43_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(44), elem44_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(45), elem45_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(46), elem46_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(47), elem47_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(48), elem48_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(53), elem53_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(54), elem54_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(55), elem55_dof_indices );
+    dof_map.dof_indices( _mesh->elem_ptr(56), elem56_dof_indices );
 
     /* The dofs for the QUAD4 (ids = 53, 54, 55, and 56) element should be the same
        as the face of the HEX8 elements HEX8 (id=41, 42, 43, and 44) left of the

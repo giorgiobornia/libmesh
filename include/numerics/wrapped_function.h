@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -37,7 +37,8 @@ namespace libMesh
 /**
  * This class provides a wrapper with which to evaluate a
  * (libMesh-style) function pointer in a FunctionBase-compatible
- * interface.
+ * interface. All overridden virtual functions are documented in
+ * function_base.h.
  *
  * \author Roy Stogner
  * \date 2012
@@ -54,8 +55,8 @@ public:
                    Output fptr(const Point & p,
                                const Parameters & parameters,
                                const std::string & sys_name,
-                               const std::string & unknown_name) = libmesh_nullptr,
-                   const Parameters * parameters = libmesh_nullptr,
+                               const std::string & unknown_name) = nullptr,
+                   const Parameters * parameters = nullptr,
                    unsigned int varnum=0)
     : _sys(sys),
       _fptr(fptr),
@@ -67,31 +68,31 @@ public:
       _parameters = &sys.get_equation_systems().parameters;
   }
 
-  virtual UniquePtr<FunctionBase<Output> > clone () const libmesh_override;
+  /**
+   * The move/copy ctor and destructor are defaulted for this class.
+   */
+  WrappedFunction (WrappedFunction &&) = default;
+  WrappedFunction (const WrappedFunction &) = default;
+  virtual ~WrappedFunction () = default;
 
   /**
-   * @returns the scalar value of variable varnum at coordinate \p p
-   * and time \p time.
+   * This class contains a const reference so it can't be assigned.
    */
+  WrappedFunction & operator= (const WrappedFunction &) = delete;
+  WrappedFunction & operator= (WrappedFunction &&) = delete;
+
+  virtual std::unique_ptr<FunctionBase<Output>> clone () const override;
+
   virtual Output operator() (const Point & p,
-                             const Real time = 0.) libmesh_override;
+                             const Real time = 0.) override;
 
-  /**
-   * Return function for vectors.
-   * Returns in \p output the values of all system variables at the
-   * coordinate \p p and for time \p time.
-   */
   virtual void operator() (const Point & p,
                            const Real time,
-                           DenseVector<Output> & output) libmesh_override;
+                           DenseVector<Output> & output) override;
 
-  /**
-   * @returns the vector component \p i at coordinate
-   * \p p and time \p time.
-   */
   virtual Output component (unsigned int i,
                             const Point & p,
-                            Real time=0.) libmesh_override;
+                            Real time=0.) override;
 
 protected:
 
@@ -128,20 +129,15 @@ Output WrappedFunction<Output>::operator() (const Point & p,
 
 template <typename Output>
 inline
-UniquePtr<FunctionBase<Output> >
+std::unique_ptr<FunctionBase<Output>>
 WrappedFunction<Output>::clone () const
 {
-  return UniquePtr<FunctionBase<Output> >
+  return std::unique_ptr<FunctionBase<Output>>
     (new WrappedFunction<Output>
      (_sys, _fptr, _parameters, _varnum));
 }
 
 
-/**
- * Return function for vectors.
- * Returns in \p output the values of all system variables at the
- * coordinate \p p and for time \p time.
- */
 template <typename Output>
 inline
 void WrappedFunction<Output>::operator() (const Point & p,
@@ -183,10 +179,6 @@ void WrappedFunction<Output>::operator() (const Point & p,
 }
 
 
-/**
- * @returns the vector component \p i at coordinate
- * \p p and time \p time.
- */
 template <typename Output>
 inline
 Output WrappedFunction<Output>::component (unsigned int i,

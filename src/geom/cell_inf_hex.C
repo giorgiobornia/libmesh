@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -29,6 +29,9 @@
 #include "libmesh/cell_inf_hex8.h"
 #include "libmesh/face_quad4.h"
 #include "libmesh/face_inf_quad4.h"
+#include "libmesh/fe_type.h"
+#include "libmesh/fe_interface.h"
+#include "libmesh/enum_elem_quality.h"
 
 namespace libMesh
 {
@@ -75,20 +78,31 @@ dof_id_type InfHex::key (const unsigned int s) const
 
   // The order of the node ids does not matter, they are sorted by the
   // compute_key() function.
-  return this->compute_key(this->node(InfHex8::side_nodes_map[s][0]),
-                           this->node(InfHex8::side_nodes_map[s][1]),
-                           this->node(InfHex8::side_nodes_map[s][2]),
-                           this->node(InfHex8::side_nodes_map[s][3]));
+  return this->compute_key(this->node_id(InfHex8::side_nodes_map[s][0]),
+                           this->node_id(InfHex8::side_nodes_map[s][1]),
+                           this->node_id(InfHex8::side_nodes_map[s][2]),
+                           this->node_id(InfHex8::side_nodes_map[s][3]));
 }
 
 
 
-UniquePtr<Elem> InfHex::side (const unsigned int i) const
+unsigned int InfHex::which_node_am_i(unsigned int side,
+                                     unsigned int side_node) const
+{
+  libmesh_assert_less (side, this->n_sides());
+  libmesh_assert_less (side_node, 4);
+
+  return InfHex8::side_nodes_map[side][side_node];
+}
+
+
+
+std::unique_ptr<Elem> InfHex::side_ptr (const unsigned int i)
 {
   libmesh_assert_less (i, this->n_sides());
 
-  // To be returned wrapped in an UniquePtr
-  Elem * face = libmesh_nullptr;
+  // Return value
+  std::unique_ptr<Elem> face;
 
   // Think of a unit cube: (-1,1) x (-1,1) x (-1,1),
   // with (in general) the normals pointing outwards
@@ -103,10 +117,10 @@ UniquePtr<Elem> InfHex::side (const unsigned int i) const
         // elements point outwards -- and this is the exception:
         // For the side built from the base face,
         // the normal is pointing _into_ the element!
-        // Why is that? - In agreement with build_side(),
+        // Why is that? - In agreement with build_side_ptr(),
         // which in turn _has_ to build the face in this
         // way as to enable the cool way \p InfFE re-uses \p FE.
-        face = new Quad4;
+        face = libmesh_make_unique<Quad4>();
         break;
       }
 
@@ -116,7 +130,7 @@ UniquePtr<Elem> InfHex::side (const unsigned int i) const
     case 3: // the face at y = 1
     case 4: // the face at x = -1
       {
-        face = new InfQuad4;
+        face = libmesh_make_unique<InfQuad4>();
         break;
       }
 
@@ -126,9 +140,9 @@ UniquePtr<Elem> InfHex::side (const unsigned int i) const
 
   // Set the nodes
   for (unsigned n=0; n<face->n_nodes(); ++n)
-    face->set_node(n) = this->get_node(InfHex8::side_nodes_map[i][n]);
+    face->set_node(n) = this->node_ptr(InfHex8::side_nodes_map[i][n]);
 
-  return UniquePtr<Elem>(face);
+  return face;
 }
 
 
@@ -163,7 +177,7 @@ Real InfHex::quality (const ElemQuality q) const
     {
 
       /**
-       * Compue the min/max diagonal ratio.
+       * Compute the min/max diagonal ratio.
        * Source: CUBIT User's Manual.
        *
        * For infinite elements, we just only compute
@@ -264,9 +278,6 @@ Real InfHex::quality (const ElemQuality q) const
     default:
       return Elem::quality(q);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -378,6 +389,83 @@ const unsigned short int InfHex::_second_order_vertex_child_index[18] =
     5,6,7,7,2,               // Faces
     6                        // Interior
   };
+
+
+bool InfHex::contains_point (const Point & p, Real tol) const
+{
+  // For infinite elements with linear base interpolation:
+  // make use of the fact that infinite elements do not
+  // live inside the envelope.  Use a fast scheme to
+  // check whether point \p p is inside or outside
+  // our relevant part of the envelope.  Note that
+  // this is not exclusive: only when the distance is less,
+  // we are safe.  Otherwise, we cannot say anything. The
+  // envelope may be non-spherical, the physical point may lie
+  // inside the envelope, outside the envelope, or even inside
+  // this infinite element.  Therefore if this fails,
+  // fall back to the FEInterface::inverse_map()
+  const Point my_origin (this->origin());
+
+  // determine the minimal distance of the base from the origin
+  // Use norm_sq() instead of norm(), it is faster
+  Point pt0_o(this->point(0) - my_origin);
+  Point pt1_o(this->point(1) - my_origin);
+  Point pt2_o(this->point(2) - my_origin);
+  Point pt3_o(this->point(3) - my_origin);
+  const Real min_distance_sq = std::min(pt0_o.norm_sq(),
+                                        std::min(pt1_o.norm_sq(),
+                                                 std::min(pt2_o.norm_sq(),
+                                                          pt3_o.norm_sq())));
+
+  // work with 1% allowable deviation.  We can still fall
+  // back to the InfFE::inverse_map()
+  const Real conservative_p_dist_sq = 1.01 * (Point(p - my_origin).norm_sq());
+
+
+
+  if (conservative_p_dist_sq < min_distance_sq)
+    {
+      // the physical point is definitely not contained in the element
+      return false;
+    }
+
+  // this captures the case that the point is not (almost) in the direction of the element.:
+  // first, project the problem onto the unit sphere:
+  Point p_o(p - my_origin);
+  pt0_o /= pt0_o.norm();
+  pt1_o /= pt1_o.norm();
+  pt2_o /= pt2_o.norm();
+  pt3_o /= pt3_o.norm();
+  p_o /= p_o.norm();
+
+
+  // now, check if it is in the projected face; using that the diagonal contains
+  // the largest distance between points in it
+  Real max_h = std::max((pt0_o - pt2_o).norm_sq(),
+                        (pt1_o - pt2_o).norm_sq())*1.01;
+
+  if ((p_o - pt0_o).norm_sq() > max_h ||
+      (p_o - pt1_o).norm_sq() > max_h ||
+      (p_o - pt2_o).norm_sq() > max_h ||
+      (p_o - pt3_o).norm_sq() > max_h )
+    {
+      // the physical point is definitely not contained in the element
+      return false;
+    }
+
+  // Declare a basic FEType.  Will use default in the base,
+  // and something else (not important) in radial direction.
+  FEType fe_type(default_order());
+
+  const Point mapped_point = FEInterface::inverse_map(dim(),
+                                                      fe_type,
+                                                      this,
+                                                      p,
+                                                      tol,
+                                                      false);
+
+  return FEInterface::on_reference_element(mapped_point, this->type(), tol);
+}
 
 } // namespace libMesh
 

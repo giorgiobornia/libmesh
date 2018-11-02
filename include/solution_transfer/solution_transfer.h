@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -30,14 +30,18 @@
 namespace libMesh {
 
 /**
- * Base class for objects that allow transfering variable values between different systems with different meshes.
+ * Base class for objects that allow transferring variable values
+ * between different systems with different meshes.
+ *
+ * \author Derek Gaston
+ * \date 2013
+ * \brief Base class for all SolutionTransfer implementations.
  */
 class SolutionTransfer : public ParallelObject
 {
 public:
 
-  SolutionTransfer(const libMesh::Parallel::Communicator & comm_in
-                   LIBMESH_CAN_DEFAULT_TO_COMMWORLD) :
+  SolutionTransfer(const libMesh::Parallel::Communicator & comm_in) :
     ParallelObject(comm_in)
   {}
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -29,6 +29,7 @@
 #include "libmesh/mesh_base.h"
 #include "libmesh/elem.h"
 #include "libmesh/parallel.h"
+#include "libmesh/enum_io_package.h"
 
 #ifdef LIBMESH_HAVE_TECPLOT_API
 extern "C" {
@@ -69,7 +70,6 @@ public:
   dof_id_type n_cells;
   const unsigned int n_vert;
 };
-}
 
 
 
@@ -110,6 +110,8 @@ void TecplotMacros::set_n_cells (const dof_id_type nc)
   n_cells = nc;
   connData.resize(n_cells*n_vert);
 }
+}
+
 #endif
 //--------------------------------------------------------
 
@@ -187,7 +189,7 @@ void TecplotIO::write_nodal_data (const std::string & fname,
                                   const std::vector<Number> & soln,
                                   const std::vector<std::string> & names)
 {
-  START_LOG("write_nodal_data()", "TecplotIO");
+  LOG_SCOPE("write_nodal_data()", "TecplotIO");
 
   if (this->mesh().processor_id() == 0)
     {
@@ -196,8 +198,6 @@ void TecplotIO::write_nodal_data (const std::string & fname,
       else
         this->write_ascii  (fname, &soln, &names);
     }
-
-  STOP_LOG("write_nodal_data()", "TecplotIO");
 }
 
 
@@ -211,10 +211,8 @@ unsigned TecplotIO::elem_dimension()
 
   // Loop over all the elements and mark the proper dimension entry in
   // the elem_dims vector.
-  MeshBase::const_element_iterator       it  = the_mesh.active_elements_begin();
-  const MeshBase::const_element_iterator end = the_mesh.active_elements_end();
-  for ( ; it != end; ++it)
-    elem_dims[(*it)->dim() - 1] = 1;
+  for (const auto & elem : the_mesh.active_element_ptr_range())
+    elem_dims[elem->dim() - 1] = 1;
 
   // Detect and disallow (for now) the writing of mixed dimension meshes.
   if (std::count(elem_dims.begin(), elem_dims.end(), 1) > 1)
@@ -259,8 +257,8 @@ void TecplotIO::write_ascii (const std::string & fname,
 
     out_stream << "Variables=x,y,z";
 
-    if (solution_names != libmesh_nullptr)
-      for (unsigned int n=0; n<solution_names->size(); n++)
+    if (solution_names != nullptr)
+      for (std::size_t n=0; n<solution_names->size(); n++)
         {
 #ifdef LIBMESH_USE_REAL_NUMBERS
 
@@ -318,7 +316,7 @@ void TecplotIO::write_ascii (const std::string & fname,
       // Print the point without a newline
       the_mesh.point(i).write_unformatted(out_stream, false);
 
-      if ((v != libmesh_nullptr) && (solution_names != libmesh_nullptr))
+      if ((v != nullptr) && (solution_names != nullptr))
         {
           const std::size_t n_vars = solution_names->size();
 
@@ -345,11 +343,8 @@ void TecplotIO::write_ascii (const std::string & fname,
       out_stream << '\n';
     }
 
-  MeshBase::const_element_iterator       it  = the_mesh.active_elements_begin();
-  const MeshBase::const_element_iterator end = the_mesh.active_elements_end();
-
-  for ( ; it != end; ++it)
-    (*it)->write_connectivity(out_stream, TECPLOT);
+  for (const auto & elem : the_mesh.active_element_ptr_range())
+    elem->write_connectivity(out_stream, TECPLOT);
 }
 
 
@@ -419,9 +414,9 @@ void TecplotIO::write_binary (const std::string & fname,
   {
     tecplot_variable_names += "x, y, z";
 
-    if (solution_names != libmesh_nullptr)
+    if (solution_names != nullptr)
       {
-        for (unsigned int name=0; name<solution_names->size(); name++)
+        for (std::size_t name=0; name<solution_names->size(); name++)
           {
 #ifdef LIBMESH_USE_REAL_NUMBERS
 
@@ -451,10 +446,10 @@ void TecplotIO::write_binary (const std::string & fname,
 
   TecplotMacros tm(the_mesh.n_nodes(),
 #ifdef LIBMESH_USE_REAL_NUMBERS
-                   (3 + ((solution_names == libmesh_nullptr) ? 0 :
+                   (3 + ((solution_names == nullptr) ? 0 :
                          cast_int<unsigned int>(solution_names->size()))),
 #else
-                   (3 + 3*((solution_names == libmesh_nullptr) ? 0 :
+                   (3 + 3*((solution_names == nullptr) ? 0 :
                            cast_int<unsigned int>(solution_names->size()))),
 #endif
                    the_mesh.n_active_sub_elem(),
@@ -471,8 +466,8 @@ void TecplotIO::write_binary (const std::string & fname,
       tm.nd(1,v) = static_cast<float>(the_mesh.point(v)(1));
       tm.nd(2,v) = static_cast<float>(the_mesh.point(v)(2));
 
-      if ((vec != libmesh_nullptr) &&
-          (solution_names != libmesh_nullptr))
+      if ((vec != nullptr) &&
+          (solution_names != nullptr))
         {
           const std::size_t n_vars = solution_names->size();
 
@@ -492,7 +487,7 @@ void TecplotIO::write_binary (const std::string & fname,
 
 
   // Initialize the file
-  ierr = TECINI112 (libmesh_nullptr,
+  ierr = TECINI112 (nullptr,
                     const_cast<char *>(tecplot_variable_names.c_str()),
                     const_cast<char *>(fname.c_str()),
                     const_cast<char *>("."),
@@ -505,33 +500,32 @@ void TecplotIO::write_binary (const std::string & fname,
 
   // A zone for each subdomain
   bool firstzone=true;
-  for (std::set<subdomain_id_type>::const_iterator sbd_it=_subdomain_ids.begin();
-       sbd_it!=_subdomain_ids.end(); ++sbd_it)
+  for (const auto & sbd_id : _subdomain_ids)
     {
       // Copy the connectivity for this subdomain
       {
-        MeshBase::const_element_iterator       it  = the_mesh.active_subdomain_elements_begin (*sbd_it);
-        const MeshBase::const_element_iterator end = the_mesh.active_subdomain_elements_end   (*sbd_it);
-
         unsigned int n_subcells_in_subdomain=0;
 
-        for (; it != end; ++it)
-          n_subcells_in_subdomain += (*it)->n_sub_elem();
+        for (const auto & elem :
+               as_range(the_mesh.active_subdomain_elements_begin(sbd_id),
+                        the_mesh.active_subdomain_elements_end(sbd_id)))
+          n_subcells_in_subdomain += elem->n_sub_elem();
 
-        // update the connectivty array to include only the elements in this subdomain
+        // update the connectivity array to include only the elements in this subdomain
         tm.set_n_cells (n_subcells_in_subdomain);
 
         unsigned int te = 0;
 
-        for (it  = the_mesh.active_subdomain_elements_begin (*sbd_it);
-             it != end; ++it)
+        for (const auto & elem :
+               as_range(the_mesh.active_subdomain_elements_begin(sbd_id),
+                        the_mesh.active_subdomain_elements_end(sbd_id)))
           {
             std::vector<dof_id_type> conn;
-            for (unsigned int se=0; se<(*it)->n_sub_elem(); se++)
+            for (unsigned int se=0; se<elem->n_sub_elem(); se++)
               {
-                (*it)->connectivity(se, TECPLOT, conn);
+                elem->connectivity(se, TECPLOT, conn);
 
-                for (unsigned int node=0; node<conn.size(); node++)
+                for (std::size_t node=0; node<conn.size(); node++)
                   tm.cd(node,te) = conn[node];
 
                 te++;
@@ -549,7 +543,7 @@ void TecplotIO::write_binary (const std::string & fname,
           i_cell_max  = 0,
           j_cell_max  = 0,
           k_cell_max  = 0,
-          strand_id   = std::max(*sbd_it,static_cast<subdomain_id_type>(1)) + this->strand_offset(),
+          strand_id   = std::max(sbd_id, static_cast<subdomain_id_type>(1)) + this->strand_offset(),
           parent_zone = 0,
           is_block    = 1,
           num_face_connect   = 0,
@@ -565,7 +559,7 @@ void TecplotIO::write_binary (const std::string & fname,
         // zones will share from this one.
 
         // get the subdomain name from libMesh, if there is one.
-        std::string subdomain_name = the_mesh.subdomain_name(*sbd_it);
+        std::string subdomain_name = the_mesh.subdomain_name(sbd_id);
         std::ostringstream zone_name;
         zone_name << this->zone_title();
 
@@ -581,7 +575,7 @@ void TecplotIO::write_binary (const std::string & fname,
         else if (_subdomain_ids.size() > 1)
           {
             zone_name << "_";
-            zone_name << *sbd_it;
+            zone_name << sbd_id;
           }
 
         ierr = TECZNE112 (const_cast<char *>(zone_name.str().c_str()),
@@ -602,8 +596,8 @@ void TecplotIO::write_binary (const std::string & fname,
                           &num_connect_boundary_faces,
                           &tot_num_boundary_connect,
                           &passive_var_list[0],
-                          libmesh_nullptr, // = all are node centered
-                          (firstzone) ? libmesh_nullptr : &share_var_from_zone[0],
+                          nullptr, // = all are node centered
+                          (firstzone) ? nullptr : &share_var_from_zone[0],
                           &share_connect_from_zone);
 
         if (ierr)
@@ -614,9 +608,9 @@ void TecplotIO::write_binary (const std::string & fname,
           {
             int total = cast_int<int>
 #ifdef LIBMESH_USE_REAL_NUMBERS
-              ((3 + ((solution_names == libmesh_nullptr) ? 0 : solution_names->size()))*num_nodes);
+              ((3 + ((solution_names == nullptr) ? 0 : solution_names->size()))*num_nodes);
 #else
-            ((3 + 3*((solution_names == libmesh_nullptr) ? 0 : solution_names->size()))*num_nodes);
+            ((3 + 3*((solution_names == nullptr) ? 0 : solution_names->size()))*num_nodes);
 #endif
 
 
@@ -672,9 +666,9 @@ void TecplotIO::write_binary (const std::string & fname,
   {
     tecplot_variable_names += "x, y, z";
 
-    if (solution_names != libmesh_nullptr)
+    if (solution_names != nullptr)
       {
-        for (unsigned int name=0; name<solution_names->size(); name++)
+        for (std::size_t name=0; name<solution_names->size(); name++)
           {
 #ifdef LIBMESH_USE_REAL_NUMBERS
 
@@ -705,9 +699,9 @@ void TecplotIO::write_binary (const std::string & fname,
   TecplotMacros tm(cast_int<unsigned int>(the_mesh.n_nodes()),
                    cast_int<unsigned int>
 #ifdef LIBMESH_USE_REAL_NUMBERS
-                   (3 + ((solution_names == libmesh_nullptr) ? 0 : solution_names->size())),
+                   (3 + ((solution_names == nullptr) ? 0 : solution_names->size())),
 #else
-                   (3 + 3*((solution_names == libmesh_nullptr) ? 0 : solution_names->size())),
+                   (3 + 3*((solution_names == nullptr) ? 0 : solution_names->size())),
 #endif
                    cast_int<unsigned int>
                    (the_mesh.n_active_sub_elem()),
@@ -724,12 +718,12 @@ void TecplotIO::write_binary (const std::string & fname,
       tm.nd(1,v) = static_cast<float>(the_mesh.point(v)(1));
       tm.nd(2,v) = static_cast<float>(the_mesh.point(v)(2));
 
-      if ((vec != libmesh_nullptr) &&
-          (solution_names != libmesh_nullptr))
+      if ((vec != nullptr) &&
+          (solution_names != nullptr))
         {
-          const unsigned int n_vars = solution_names->size();
+          const std::size_t n_vars = solution_names->size();
 
-          for (unsigned int c=0; c<n_vars; c++)
+          for (std::size_t c=0; c<n_vars; c++)
             {
 #ifdef LIBMESH_USE_REAL_NUMBERS
 
@@ -748,17 +742,14 @@ void TecplotIO::write_binary (const std::string & fname,
   {
     unsigned int te = 0;
 
-    MeshBase::const_element_iterator       it  = the_mesh.active_elements_begin();
-    const MeshBase::const_element_iterator end = the_mesh.active_elements_end();
-
-    for ( ; it != end; ++it)
+    for (const auto & elem : the_mesh.active_element_ptr_range())
       {
         std::vector<dof_id_type> conn;
-        for (unsigned int se=0; se<(*it)->n_sub_elem(); se++)
+        for (unsigned int se=0; se<elem->n_sub_elem(); se++)
           {
-            (*it)->connectivity(se, TECPLOT, conn);
+            elem->connectivity(se, TECPLOT, conn);
 
-            for (unsigned int node=0; node<conn.size(); node++)
+            for (std::size_t node=0; node<conn.size(); node++)
               tm.cd(node,te) = conn[node];
 
             te++;
@@ -774,7 +765,7 @@ void TecplotIO::write_binary (const std::string & fname,
       num_cells = static_cast<int>(the_mesh.n_active_sub_elem());
 
 
-    ierr = TECINI (libmesh_nullptr,
+    ierr = TECINI (nullptr,
                    (char *) tecplot_variable_names.c_str(),
                    (char *) fname.c_str(),
                    (char *) ".",
@@ -785,12 +776,12 @@ void TecplotIO::write_binary (const std::string & fname,
       libmesh_file_error(fname);
 
 
-    ierr = TECZNE (libmesh_nullptr,
+    ierr = TECZNE (nullptr,
                    &num_nodes,
                    &num_cells,
                    &cell_type,
                    (char *) "FEBLOCK",
-                   libmesh_nullptr);
+                   nullptr);
 
     if (ierr)
       libmesh_file_error(fname);
@@ -798,9 +789,9 @@ void TecplotIO::write_binary (const std::string & fname,
 
     int total =
 #ifdef LIBMESH_USE_REAL_NUMBERS
-      ((3 + ((solution_names == libmesh_nullptr) ? 0 : solution_names->size()))*num_nodes);
+      ((3 + ((solution_names == nullptr) ? 0 : solution_names->size()))*num_nodes);
 #else
-    ((3 + 3*((solution_names == libmesh_nullptr) ? 0 : solution_names->size()))*num_nodes);
+    ((3 + 3*((solution_names == nullptr) ? 0 : solution_names->size()))*num_nodes);
 #endif
 
 

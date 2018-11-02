@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,13 +20,13 @@
 // arguments, parse the function specified in a command line argument,
 // L2-project its value onto the mesh, and output the new solution.
 
+// C++ includes
 #include <map>
 #include <string>
 
+// libMesh includes
 #include "L2system.h"
-
 #include "libmesh/libmesh.h"
-
 #include "libmesh/dof_map.h"
 #include "libmesh/equation_systems.h"
 #include "libmesh/getpot.h"
@@ -36,6 +36,7 @@
 #include "libmesh/parsed_fem_function.h"
 #include "libmesh/point.h"
 #include "libmesh/steady_solver.h"
+#include "libmesh/enum_xdr_mode.h"
 
 
 using namespace libMesh;
@@ -65,7 +66,7 @@ T assert_argument (GetPot & cl,
                    const char * progname,
                    const T & defaultarg)
 {
-  if(!cl.search(argname))
+  if (!cl.search(argname))
     {
       libMesh::err << ("No " + argname + " argument found!") << std::endl;
       usage_error(progname);
@@ -128,12 +129,11 @@ int main(int argc, char ** argv)
 
   old_es.print_info();
 
-  const unsigned int n_systems = old_es.n_systems();
 
   const unsigned int sysnum =
     cl.follow(0, "--insys");
 
-  libmesh_assert_less(sysnum, n_systems);
+  libmesh_assert_less(sysnum, old_es.n_systems());
 
   System & old_sys = old_es.get_system(sysnum);
   std::string current_sys_name = old_sys.name();
@@ -143,7 +143,7 @@ int main(int argc, char ** argv)
   L2System & new_sys = new_es.add_system<L2System>(current_sys_name);
 
   new_sys.time_solver =
-    UniquePtr<TimeSolver>(new SteadySolver(new_sys));
+    libmesh_make_unique<SteadySolver>(new_sys);
 
   new_sys.fe_family() =
     cl.follow(std::string("LAGRANGE"), "--family");
@@ -156,7 +156,7 @@ int main(int argc, char ** argv)
 
   ParsedFEMFunction<Number> goal_function(old_sys, calcfunc);
 
-  new_sys.goal_func.reset(goal_function.clone().release());
+  new_sys.goal_func = goal_function.clone();
   new_sys.input_system = &old_sys;
 
   new_es.init();

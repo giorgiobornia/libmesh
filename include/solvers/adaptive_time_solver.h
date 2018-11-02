@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -66,52 +66,52 @@ public:
    */
   virtual ~AdaptiveTimeSolver ();
 
-  virtual void init() libmesh_override;
+  virtual void init() override;
 
-  virtual void reinit() libmesh_override;
+  virtual void reinit() override;
 
-  virtual void solve() libmesh_override = 0;
+  virtual void solve() override = 0;
 
-  virtual void advance_timestep() libmesh_override;
+  virtual void advance_timestep() override;
 
   /**
    * This method is passed on to the core_time_solver
    */
-  virtual Real error_order () const libmesh_override;
+  virtual Real error_order () const override;
 
   /**
    * This method is passed on to the core_time_solver
    */
   virtual bool element_residual (bool get_jacobian,
-                                 DiffContext &) libmesh_override;
+                                 DiffContext &) override;
 
   /**
    * This method is passed on to the core_time_solver
    */
   virtual bool side_residual (bool get_jacobian,
-                              DiffContext &) libmesh_override;
+                              DiffContext &) override;
 
   /**
    * This method is passed on to the core_time_solver
    */
   virtual bool nonlocal_residual (bool get_jacobian,
-                                  DiffContext &) libmesh_override;
+                                  DiffContext &) override;
 
   /**
    * An implicit linear or nonlinear solver to use at each timestep.
    */
-  virtual UniquePtr<DiffSolver> & diff_solver() libmesh_override;
+  virtual std::unique_ptr<DiffSolver> & diff_solver() override;
 
   /**
    * An implicit linear solver to use for adjoint and sensitivity
    * problems.
    */
-  virtual UniquePtr<LinearSolver<Number> > & linear_solver() libmesh_override;
+  virtual std::unique_ptr<LinearSolver<Number>> & linear_solver() override;
 
   /**
    * This object is used to take timesteps
    */
-  UniquePtr<UnsteadySolver> core_time_solver;
+  std::unique_ptr<UnsteadySolver> core_time_solver;
 
   /**
    * Error calculations are done in this norm, DISCRETE_L2 by default.
@@ -189,7 +189,8 @@ public:
    * deltat, the result is first-order accurate.  If you set this to
    * false, you can grow (shrink) your timestep based on the local
    * accuracy rather than the global accuracy of the core TimeSolver.
-   * Note that by setting this value to false you may fail to achieve
+   *
+   * \note By setting this value to false you may fail to achieve
    * the predicted convergence in time of the underlying method, however
    * it may be possible to get more fine-grained control over step sizes
    * as well.

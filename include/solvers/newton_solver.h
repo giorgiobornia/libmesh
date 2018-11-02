@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -64,19 +64,29 @@ public:
    * The initialization function.  This method is used to
    * initialize internal data structures before a simulation begins.
    */
-  virtual void init () libmesh_override;
+  virtual void init () override;
 
   /**
    * The reinitialization function.  This method is used after
    * changes in the mesh.
    */
-  virtual void reinit () libmesh_override;
+  virtual void reinit () override;
 
   /**
    * This method performs a solve, using an inexact Newton-Krylov
    * method with line search.
    */
-  virtual unsigned int solve () libmesh_override;
+  virtual unsigned int solve () override;
+
+  LinearSolver<Number> & get_linear_solver()
+  { libmesh_assert(_linear_solver);
+    return *_linear_solver;
+  }
+
+  const LinearSolver<Number> & get_linear_solver() const
+  { libmesh_assert(_linear_solver);
+    return *_linear_solver;
+  }
 
   /**
    * If this is set to true, the solver is forced to test the residual
@@ -140,13 +150,14 @@ protected:
    * details of interfacing with various linear algebra packages
    * like PETSc or LASPACK.
    */
-  UniquePtr<LinearSolver<Number> > linear_solver;
+  std::unique_ptr<LinearSolver<Number>> _linear_solver;
 
   /**
-   * This does a line search in the direction opposite linear_solution
-   * to try and minimize the residual of newton_iterate.
-   * newton_iterate is moved to the end of the quasiNewton step, and
-   * the return value is the substep size.
+   * This does a line search in the direction opposite \p linear_solution
+   * to try and minimize the residual of \p newton_iterate.
+   * \p newton_iterate is moved to the end of the quasiNewton step.
+   *
+   * \returns The substep size.
    */
   Real line_search(Real tol,
                    Real last_residual,
@@ -164,7 +175,7 @@ protected:
                          bool linear_solve_finished);
 
   /**
-   * This returns true if a convergence criterion has been passed
+   * \returns \p true if a convergence criterion has been passed
    * by the given residual and step size; false otherwise.
    */
   bool test_convergence(Real current_residual,

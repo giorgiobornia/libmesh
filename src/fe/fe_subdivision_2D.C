@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -183,9 +183,6 @@ Real FESubdivision::regular_shape(const unsigned int i,
     default:
       libmesh_error_msg("Invalid i = " << i);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -275,9 +272,6 @@ Real FESubdivision::regular_shape_deriv(const unsigned int i,
     default:
       libmesh_error_msg("Invalid j = " << j);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -391,9 +385,6 @@ Real FESubdivision::regular_shape_second_deriv(const unsigned int i,
     default:
       libmesh_error_msg("Invalid j = " << j);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -417,18 +408,9 @@ void FESubdivision::init_shape_functions(const std::vector<Point> & qp,
   libmesh_assert_equal_to(elem->type(), TRI3SUBDIVISION);
   const Tri3Subdivision * sd_elem = static_cast<const Tri3Subdivision *>(elem);
 
-  START_LOG("init_shape_functions()", "FESubdivision");
+  LOG_SCOPE("init_shape_functions()", "FESubdivision");
 
   calculations_started = true;
-
-  // If the user forgot to request anything, we'll be safe and calculate everything:
-#ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
-  if (!calculate_phi && !calculate_dphi && !calculate_d2phi)
-    calculate_phi = calculate_dphi = calculate_d2phi = true;
-#else
-  if (!calculate_phi && !calculate_dphi)
-    calculate_phi = calculate_dphi = true;
-#endif
 
   const unsigned int valence = sd_elem->get_ordered_valence(0);
   const unsigned int n_qp = cast_int<unsigned int>(qp.size());
@@ -659,8 +641,6 @@ void FESubdivision::init_shape_functions(const std::vector<Point> & qp,
   this->_fe_map->get_d2phideta2_map()   = d2phideta2;
   this->_fe_map->get_d2phidxideta_map() = d2phidxideta;
 #endif
-
-  STOP_LOG("init_shape_functions()", "FESubdivision");
 }
 
 
@@ -687,7 +667,7 @@ void FESubdivision::reinit(const Elem * elem,
   const Tri3Subdivision * sd_elem = static_cast<const Tri3Subdivision *>(elem);
 #endif
 
-  START_LOG("reinit()", "FESubdivision");
+  LOG_SCOPE("reinit()", "FESubdivision");
 
   libmesh_assert(!sd_elem->is_ghost());
   libmesh_assert(sd_elem->is_subdivision_updated());
@@ -696,8 +676,11 @@ void FESubdivision::reinit(const Elem * elem,
   libmesh_assert_equal_to(sd_elem->get_ordered_valence(1), 6);
   libmesh_assert_equal_to(sd_elem->get_ordered_valence(2), 6);
 
+  // We're calculating now!  Time to determine what.
+  this->determine_calculations();
+
   // no custom quadrature support
-  libmesh_assert(pts == libmesh_nullptr);
+  libmesh_assert(pts == nullptr);
   libmesh_assert(qrule);
   qrule->init(elem->type());
 
@@ -709,8 +692,6 @@ void FESubdivision::reinit(const Elem * elem,
 
   // Compute the map for this element.
   this->_fe_map->compute_map (this->dim, this->qrule->get_weights(), elem, this->calculate_d2phi);
-
-  STOP_LOG("reinit()", "FESubdivision");
 }
 
 
@@ -737,9 +718,6 @@ Real FE<2,SUBDIVISION>::shape(const ElemType type,
     default:
       libmesh_error_msg("ERROR: Unsupported polynomial order!");
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -779,9 +757,6 @@ Real FE<2,SUBDIVISION>::shape_deriv(const ElemType type,
     default:
       libmesh_error_msg("ERROR: Unsupported polynomial order!");
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -822,9 +797,6 @@ Real FE<2,SUBDIVISION>::shape_second_deriv(const ElemType type,
     default:
       libmesh_error_msg("ERROR: Unsupported polynomial order!");
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 

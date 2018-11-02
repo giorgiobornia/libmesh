@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -32,13 +32,15 @@
 #include "libmesh/mesh_generation.h"
 #include "libmesh/exact_solution.h"
 #include "libmesh/string_to_enum.h"
+#include "libmesh/enum_solver_package.h"
+#include "libmesh/enum_norm_type.h"
 
 // The systems and solvers we may use
 #include "curl_curl_system.h"
 #include "libmesh/diff_solver.h"
 #include "libmesh/steady_solver.h"
-
 #include "solution_function.h"
+
 
 // Bring in everything from the libMesh namespace
 using namespace libMesh;
@@ -48,6 +50,10 @@ int main (int argc, char ** argv)
 {
   // Initialize libMesh.
   LibMeshInit init (argc, argv);
+
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
 
   // Parse the input file
   GetPot infile("vector_fe_ex3.in");
@@ -93,8 +99,7 @@ int main (int argc, char ** argv)
     equation_systems.add_system<CurlCurlSystem> ("CurlCurl");
 
   // This example only implements the steady-state problem
-  system.time_solver =
-    UniquePtr<TimeSolver>(new SteadySolver(system));
+  system.time_solver = libmesh_make_unique<SteadySolver>(system);
 
   // Initialize the system
   equation_systems.init();

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -32,6 +32,7 @@
 #include "libmesh/boundary_info.h"
 #include "libmesh/mesh_triangle_holes.h"
 #include "libmesh/mesh_triangle_wrapper.h"
+#include "libmesh/enum_elem_type.h"
 
 namespace libMesh
 {
@@ -42,7 +43,7 @@ namespace libMesh
 // Constructor
 TriangleInterface::TriangleInterface(UnstructuredMesh & mesh)
   : _mesh(mesh),
-    _holes(libmesh_nullptr),
+    _holes(nullptr),
     _elem_type(TRI3),
     _desired_area(0.1),
     _minimum_angle(20.0),
@@ -59,7 +60,7 @@ TriangleInterface::TriangleInterface(UnstructuredMesh & mesh)
 void TriangleInterface::triangulate()
 {
   // Will the triangulation have holes?
-  const bool have_holes = ((_holes != libmesh_nullptr) && (!_holes->empty()));
+  const bool have_holes = ((_holes != nullptr) && (!_holes->empty()));
 
   // If the initial PSLG is really simple, e.g. an L-shaped domain or
   // a square/rectangle, the resulting triangulation may be very
@@ -73,13 +74,10 @@ void TriangleInterface::triangulate()
   if ((_triangulation_type==PSLG) && (_insert_extra_points))
     {
       // Make a copy of the original points from the Mesh
-      std::vector<Point> original_points (_mesh.n_nodes());
-
-      MeshBase::node_iterator       node_it  = _mesh.nodes_begin();
-      const MeshBase::node_iterator node_end = _mesh.nodes_end();
-
-      for (unsigned int ctr=0; node_it != node_end; ++node_it)
-        original_points[ctr++] = **node_it;
+      std::vector<Point> original_points;
+      original_points.reserve (_mesh.n_nodes());
+      for (auto & node : _mesh.node_ptr_range())
+        original_points.push_back(*node);
 
       // Clear out the mesh
       _mesh.clear();
@@ -90,7 +88,7 @@ void TriangleInterface::triangulate()
       // Insert a new point on each PSLG at some random location
       // np=index into new points vector
       // n =index into original points vector
-      for (unsigned int np=0, n=0; np<2*original_points.size(); ++np)
+      for (std::size_t np=0, n=0; np<2*original_points.size(); ++np)
         {
           // the even entries are the original points
           if (np%2==0)
@@ -104,14 +102,14 @@ void TriangleInterface::triangulate()
   // Regardless of whether we added additional points, the set of points to
   // triangulate is now sitting in the mesh.
 
-  // If the holes vector is non-NULL (and non-empty) we need to determine
+  // If the holes vector is non-nullptr (and non-empty) we need to determine
   // the number of additional points which the holes will add to the
   // triangulation.
   unsigned int n_hole_points = 0;
 
   if (have_holes)
     {
-      for (unsigned int i=0; i<_holes->size(); ++i)
+      for (std::size_t i=0; i<_holes->size(); ++i)
         n_hole_points += (*_holes)[i]->n_points();
     }
 
@@ -157,7 +155,7 @@ void TriangleInterface::triangulate()
   unsigned int hole_offset=0;
 
   if (have_holes)
-    for (unsigned int i=0; i<_holes->size(); ++i)
+    for (std::size_t i=0; i<_holes->size(); ++i)
       {
         for (unsigned int ctr=0, h=0; h<(*_holes)[i]->n_points(); ctr+=2, ++h)
           {
@@ -182,15 +180,10 @@ void TriangleInterface::triangulate()
 
   // Copy all the non-hole points and segments into the triangle struct.
   {
-    MeshBase::node_iterator it = _mesh.nodes_begin();
-    const MeshBase::node_iterator end = _mesh.nodes_end();
-
-    for (dof_id_type ctr=0; it != end; ctr+=2, ++it)
+    dof_id_type ctr=0;
+    for (auto & node : _mesh.node_ptr_range())
       {
         dof_id_type index = 2*hole_offset + ctr;
-
-        // Get pointer to the current node
-        Node * node = *it;
 
         // Set x,y values in pointlist
         initial.pointlist[index] = (*node)(0);
@@ -207,12 +200,14 @@ void TriangleInterface::triangulate()
                 initial.segmentlist[index+1] = (n==_mesh.n_nodes()-1) ? hole_offset : hole_offset+n+1; // wrap around
               }
           }
+
+        ctr +=2;
       }
   }
 
 
   // If the user provided it, use his ordering to define the segments
-  for (unsigned int ctr=0, s=0; s<this->segments.size(); ctr+=2, ++s)
+  for (std::size_t ctr=0, s=0; s<this->segments.size(); ctr+=2, ++s)
     {
       const unsigned int index0 = 2*hole_offset+ctr;
       const unsigned int index1 = 2*hole_offset+ctr+1;
@@ -228,7 +223,7 @@ void TriangleInterface::triangulate()
     {
       initial.numberofholes = _holes->size();
       initial.holelist      = static_cast<REAL*>(std::malloc(initial.numberofholes * 2 * sizeof(REAL)));
-      for (unsigned int i=0, ctr=0; i<_holes->size(); ++i, ctr+=2)
+      for (std::size_t i=0, ctr=0; i<_holes->size(); ++i, ctr+=2)
         {
           Point inside_point = (*_holes)[i]->inside();
           initial.holelist[ctr]   = inside_point(0);
@@ -244,7 +239,7 @@ void TriangleInterface::triangulate()
   // p ~ Triangulates a Planar Straight Line Graph
   //     If the `p' switch is used, `segmentlist' must point to a list of
   //     segments, `numberofsegments' must be properly set, and
-  //     `segmentmarkerlist' must either be set to NULL (in which case all
+  //     `segmentmarkerlist' must either be set to nullptr (in which case all
   //     markers default to zero), or must point to a list of markers.
   // D ~ Conforming Delaunay: use this switch if you want all triangles
   //     in the mesh to be Delaunay, and not just constrained Delaunay
@@ -323,7 +318,7 @@ void TriangleInterface::triangulate()
   TriangleWrapper::triangulate(const_cast<char *>(flags.str().c_str()),
                                &initial,
                                &final,
-                               libmesh_nullptr); // voronoi ouput -- not used
+                               nullptr); // voronoi ouput -- not used
 
 
   // Send the information computed by Triangle to the Mesh.
@@ -341,6 +336,10 @@ void TriangleInterface::triangulate()
   TriangleWrapper::destroy(initial,      TriangleWrapper::INPUT);
   TriangleWrapper::destroy(final,        TriangleWrapper::OUTPUT);
 
+  // Prepare the mesh for use before returning.  This ensures (among
+  // other things) that it is partitioned and therefore users can
+  // iterate over local elements, etc.
+  _mesh.prepare_for_use();
 }
 
 } // namespace libMesh

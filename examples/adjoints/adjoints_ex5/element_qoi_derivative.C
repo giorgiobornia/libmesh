@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -40,17 +40,17 @@ void HeatSystem::element_qoi_derivative (DiffContext & context,
 
   // First we get some references to cell-specific data that
   // will be used to assemble the linear system.
-  FEBase * elem_fe = libmesh_nullptr;
+  FEBase * elem_fe = nullptr;
   c.get_element_fe(0, elem_fe);
 
   // Element Jacobian * quadrature weights for interior integration
   const std::vector<Real> & JxW = elem_fe->get_JxW();
 
   // The basis functions for the element
-  const std::vector<std::vector<Real> > & phi = elem_fe->get_phi();
+  const std::vector<std::vector<Real>> & phi = elem_fe->get_phi();
 
   // The number of local degrees of freedom in each variable
-  const unsigned int n_T_dofs = c.get_dof_indices(0).size();
+  const unsigned int n_T_dofs = c.n_dof_indices(0);
   unsigned int n_qpoints = c.get_element_qrule().n_points();
 
   // Fill the QoI RHS corresponding to this QoI. Since this is the 0th QoI

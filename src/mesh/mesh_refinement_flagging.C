@@ -1,6 +1,5 @@
-
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -96,14 +95,9 @@ void MeshRefinement::flag_elements_by_error_fraction (const ErrorVector & error_
     }
 
   // We need to loop over all active elements to find the minimum
-  MeshBase::element_iterator       el_it  =
-    _mesh.active_local_elements_begin();
-  const MeshBase::element_iterator el_end =
-    _mesh.active_local_elements_end();
-
-  for (; el_it != el_end; ++el_it)
+  for (auto & elem : _mesh.active_local_element_ptr_range())
     {
-      const dof_id_type id  = (*el_it)->id();
+      const dof_id_type id  = elem->id();
       libmesh_assert_less (id, error_per_cell.size());
 
       error_max = std::max (error_max, error_per_cell[id]);
@@ -133,14 +127,8 @@ void MeshRefinement::flag_elements_by_error_fraction (const ErrorVector & error_
 
   // Loop over the elements and flag them for coarsening or
   // refinement based on the element error
-
-  MeshBase::element_iterator       e_it  =
-    _mesh.active_elements_begin();
-  const MeshBase::element_iterator e_end =
-    _mesh.active_elements_end();
-  for (; e_it != e_end; ++e_it)
+  for (auto & elem : _mesh.active_element_ptr_range())
     {
-      Elem * elem           = *e_it;
       const dof_id_type id = elem->id();
 
       libmesh_assert_less (id, error_per_cell.size());
@@ -206,12 +194,8 @@ void MeshRefinement::flag_elements_by_error_tolerance (const ErrorVector & error
                                  parent_error_max);
     }
 
-  MeshBase::element_iterator       elem_it  = _mesh.active_elements_begin();
-  const MeshBase::element_iterator elem_end = _mesh.active_elements_end();
-
-  for (; elem_it != elem_end; ++elem_it)
+  for (auto & elem : _mesh.active_element_ptr_range())
     {
-      Elem * elem = *elem_it;
       Elem * parent = elem->parent();
       const dof_id_type elem_number    = elem->id();
       const ErrorVectorReal elem_error = error_per_cell_in[elem_number];
@@ -281,20 +265,18 @@ bool MeshRefinement::flag_elements_by_nelem_target (const ErrorVector & error_pe
   // Create an vector with active element errors and ids,
   // sorted by highest errors first
   const dof_id_type max_elem_id = _mesh.max_elem_id();
-  std::vector<std::pair<ErrorVectorReal, dof_id_type> > sorted_error;
+  std::vector<std::pair<ErrorVectorReal, dof_id_type>> sorted_error;
 
   sorted_error.reserve (n_active_elem);
 
-  // On a ParallelMesh, we need to communicate to know which remote ids
+  // On a DistributedMesh, we need to communicate to know which remote ids
   // correspond to active elements.
   {
     std::vector<bool> is_active(max_elem_id, false);
 
-    MeshBase::element_iterator       elem_it  = _mesh.active_local_elements_begin();
-    const MeshBase::element_iterator elem_end = _mesh.active_local_elements_end();
-    for (; elem_it != elem_end; ++elem_it)
+    for (auto & elem : _mesh.active_local_element_ptr_range())
       {
-        const dof_id_type eid = (*elem_it)->id();
+        const dof_id_type eid = elem->id();
         is_active[eid] = true;
         libmesh_assert_less (eid, error_per_cell.size());
         sorted_error.push_back
@@ -313,7 +295,7 @@ bool MeshRefinement::flag_elements_by_nelem_target (const ErrorVector & error_pe
   // Create a sorted error vector with coarsenable parent elements
   // only, sorted by lowest errors first
   ErrorVector error_per_parent;
-  std::vector<std::pair<ErrorVectorReal, dof_id_type> > sorted_parent_error;
+  std::vector<std::pair<ErrorVectorReal, dof_id_type>> sorted_parent_error;
   Real parent_error_min, parent_error_max;
 
   create_parent_error_vector(error_per_cell,
@@ -323,7 +305,7 @@ bool MeshRefinement::flag_elements_by_nelem_target (const ErrorVector & error_pe
 
   // create_parent_error_vector sets values for non-parents and
   // non-coarsenable parents to -1.  Get rid of them.
-  for (dof_id_type i=0; i != error_per_parent.size(); ++i)
+  for (std::size_t i=0; i != error_per_parent.size(); ++i)
     if (error_per_parent[i] != -1)
       sorted_parent_error.push_back(std::make_pair(error_per_parent[i], i));
 
@@ -368,16 +350,16 @@ bool MeshRefinement::flag_elements_by_nelem_target (const ErrorVector & error_pe
       refine_count++;
     }
 
-  // On a ParallelMesh, we need to communicate to know which remote ids
+  // On a DistributedMesh, we need to communicate to know which remote ids
   // correspond to refinable elements
   dof_id_type successful_refine_count = 0;
   {
     std::vector<bool> is_refinable(max_elem_id, false);
 
-    for (dof_id_type i=0; i != sorted_error.size(); ++i)
+    for (std::size_t i=0; i != sorted_error.size(); ++i)
       {
         dof_id_type eid = sorted_error[i].second;
-        Elem * elem = _mesh.query_elem(eid);
+        Elem * elem = _mesh.query_elem_ptr(eid);
         if (elem && elem->level() < _max_h_level)
           is_refinable[eid] = true;
       }
@@ -385,13 +367,13 @@ bool MeshRefinement::flag_elements_by_nelem_target (const ErrorVector & error_pe
 
     if (refine_count > max_elem_refine)
       refine_count = max_elem_refine;
-    for (dof_id_type i=0; i != sorted_error.size(); ++i)
+    for (std::size_t i=0; i != sorted_error.size(); ++i)
       {
         if (successful_refine_count >= refine_count)
           break;
 
         dof_id_type eid = sorted_error[i].second;
-        Elem * elem = _mesh.query_elem(eid);
+        Elem * elem = _mesh.query_elem_ptr(eid);
         if (is_refinable[eid])
           {
             if (elem)
@@ -414,26 +396,25 @@ bool MeshRefinement::flag_elements_by_nelem_target (const ErrorVector & error_pe
   dof_id_type successful_coarsen_count = 0;
   if (coarsen_count)
     {
-      for (dof_id_type i=0; i != sorted_parent_error.size(); ++i)
+      for (std::size_t i=0; i != sorted_parent_error.size(); ++i)
         {
           if (successful_coarsen_count >= coarsen_count * twotodim)
             break;
 
           dof_id_type parent_id = sorted_parent_error[i].second;
-          Elem * parent = _mesh.query_elem(parent_id);
+          Elem * parent = _mesh.query_elem_ptr(parent_id);
 
-          // On a ParallelMesh we skip remote elements
+          // On a DistributedMesh we skip remote elements
           if (!parent)
             continue;
 
           libmesh_assert(parent->has_children());
-          for (unsigned int c=0; c != parent->n_children(); ++c)
+          for (auto & elem : parent->child_ref_range())
             {
-              Elem * elem = parent->child(c);
-              if (elem && elem != remote_elem)
+              if (&elem != remote_elem)
                 {
-                  libmesh_assert(elem->active());
-                  elem->set_refinement_flag(Elem::COARSEN);
+                  libmesh_assert(elem.active());
+                  elem.set_refinement_flag(Elem::COARSEN);
                   successful_coarsen_count++;
                 }
             }
@@ -481,7 +462,7 @@ void MeshRefinement::flag_elements_by_elem_fraction (const ErrorVector & error_p
   libmesh_assert_less_equal (_coarsen_fraction, 1);
 
   // The number of active elements in the mesh
-  const dof_id_type n_active_elem  = _mesh.n_elem();
+  const dof_id_type n_active_elem  = _mesh.n_active_elem();
 
   // The number of elements to flag for coarsening
   const dof_id_type n_elem_coarsen =
@@ -507,11 +488,8 @@ void MeshRefinement::flag_elements_by_elem_fraction (const ErrorVector & error_p
 
   // Loop over the active elements and create the entry
   // in the sorted_error vector
-  MeshBase::element_iterator       elem_it  = _mesh.active_local_elements_begin();
-  const MeshBase::element_iterator elem_end = _mesh.active_local_elements_end();
-
-  for (; elem_it != elem_end; ++elem_it)
-    sorted_error.push_back (error_per_cell[(*elem_it)->id()]);
+  for (auto & elem : _mesh.active_local_element_ptr_range())
+    sorted_error.push_back (error_per_cell[elem->id()]);
 
   this->comm().allgather(sorted_error);
 
@@ -566,10 +544,8 @@ void MeshRefinement::flag_elements_by_elem_fraction (const ErrorVector & error_p
     top_error = sorted_error[sorted_error.size() - n_elem_refine];
 
   // Finally, let's do the element flagging
-  elem_it  = _mesh.active_elements_begin();
-  for (; elem_it != elem_end; ++elem_it)
+  for (auto & elem : _mesh.active_element_ptr_range())
     {
-      Elem * elem = *elem_it;
       Elem * parent = elem->parent();
 
       if (_coarsen_by_parents && parent && n_elem_coarsen &&
@@ -629,12 +605,8 @@ void MeshRefinement::flag_elements_by_mean_stddev (const ErrorVector & error_per
 
   // Loop over the elements and flag them for coarsening or
   // refinement based on the element error
-  MeshBase::element_iterator       elem_it  = _mesh.active_elements_begin();
-  const MeshBase::element_iterator elem_end = _mesh.active_elements_end();
-
-  for (; elem_it != elem_end; ++elem_it)
+  for (auto & elem : _mesh.active_element_ptr_range())
     {
-      Elem * elem             = *elem_it;
       const dof_id_type id  = elem->id();
 
       libmesh_assert_less (id, error_per_cell.size());
@@ -662,20 +634,17 @@ void MeshRefinement::flag_elements_by (ElementFlagging & element_flagging)
 
 void MeshRefinement::switch_h_to_p_refinement ()
 {
-  MeshBase::element_iterator       elem_it  = _mesh.elements_begin();
-  const MeshBase::element_iterator elem_end = _mesh.elements_end();
-
-  for ( ; elem_it != elem_end; ++elem_it)
+  for (auto & elem : _mesh.element_ptr_range())
     {
-      if ((*elem_it)->active())
+      if (elem->active())
         {
-          (*elem_it)->set_p_refinement_flag((*elem_it)->refinement_flag());
-          (*elem_it)->set_refinement_flag(Elem::DO_NOTHING);
+          elem->set_p_refinement_flag(elem->refinement_flag());
+          elem->set_refinement_flag(Elem::DO_NOTHING);
         }
       else
         {
-          (*elem_it)->set_p_refinement_flag((*elem_it)->refinement_flag());
-          (*elem_it)->set_refinement_flag(Elem::INACTIVE);
+          elem->set_p_refinement_flag(elem->refinement_flag());
+          elem->set_refinement_flag(Elem::INACTIVE);
         }
     }
 }
@@ -684,11 +653,8 @@ void MeshRefinement::switch_h_to_p_refinement ()
 
 void MeshRefinement::add_p_to_h_refinement ()
 {
-  MeshBase::element_iterator       elem_it  = _mesh.elements_begin();
-  const MeshBase::element_iterator elem_end = _mesh.elements_end();
-
-  for ( ; elem_it != elem_end; ++elem_it)
-    (*elem_it)->set_p_refinement_flag((*elem_it)->refinement_flag());
+  for (auto & elem : _mesh.element_ptr_range())
+    elem->set_p_refinement_flag(elem->refinement_flag());
 }
 
 
@@ -697,23 +663,17 @@ void MeshRefinement::clean_refinement_flags ()
 {
   // Possibly clean up the refinement flags from
   // a previous step
-  //   elem_iterator       elem_it (_mesh.elements_begin());
-  //   const elem_iterator elem_end(_mesh.elements_end());
-
-  MeshBase::element_iterator       elem_it  = _mesh.elements_begin();
-  const MeshBase::element_iterator elem_end = _mesh.elements_end();
-
-  for ( ; elem_it != elem_end; ++elem_it)
+  for (auto & elem : _mesh.element_ptr_range())
     {
-      if ((*elem_it)->active())
+      if (elem->active())
         {
-          (*elem_it)->set_refinement_flag(Elem::DO_NOTHING);
-          (*elem_it)->set_p_refinement_flag(Elem::DO_NOTHING);
+          elem->set_refinement_flag(Elem::DO_NOTHING);
+          elem->set_p_refinement_flag(Elem::DO_NOTHING);
         }
       else
         {
-          (*elem_it)->set_refinement_flag(Elem::INACTIVE);
-          (*elem_it)->set_p_refinement_flag(Elem::INACTIVE);
+          elem->set_refinement_flag(Elem::INACTIVE);
+          elem->set_p_refinement_flag(Elem::INACTIVE);
         }
     }
 }

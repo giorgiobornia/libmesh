@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -31,6 +31,10 @@ namespace libMesh
  * This class extends FEMContext in order to provide extra data
  * required to perform local element residual and Jacobian assembly
  * in the case of a discontinuous Galerkin (DG) discretization.
+ *
+ * \author David Knezevic
+ * \date 2015
+ * \brief Extends FEMContext to work for DG problems.
  */
 class DGFEMContext : public FEMContext
 {
@@ -52,7 +56,7 @@ public:
    * default DG terms are assumed to be inactive. DG terms are
    * only active if neighbor_side_fe_reinit is called.
    */
-  virtual void side_fe_reinit () libmesh_override;
+  virtual void side_fe_reinit () override;
 
   /**
    * Initialize neighbor side data needed to assemble DG terms.
@@ -206,7 +210,8 @@ public:
 
   /**
    * Set the neighbor element which we will use to assemble DG terms.
-   * Note that we do not assume that this element is get_elem().neighbor(side)
+   *
+   * \note We do not assume that this element is get_elem().neighbor(side)
    * because we also need to be able to handle the special case of DG terms on
    * "cracks" in a mesh to model certain types of interface conditions. In this
    * case, we need to be able to specify the neighbor element manually.
@@ -257,17 +262,17 @@ private:
   /**
    * Element residual subvectors and Jacobian submatrices
    */
-  std::vector<DenseSubVector<Number> *> _neighbor_subresiduals;
-  std::vector<std::vector<DenseSubMatrix<Number> *> > _elem_elem_subjacobians;
-  std::vector<std::vector<DenseSubMatrix<Number> *> > _elem_neighbor_subjacobians;
-  std::vector<std::vector<DenseSubMatrix<Number> *> > _neighbor_elem_subjacobians;
-  std::vector<std::vector<DenseSubMatrix<Number> *> > _neighbor_neighbor_subjacobians;
+  std::vector<std::unique_ptr<DenseSubVector<Number>>> _neighbor_subresiduals;
+  std::vector<std::vector<std::unique_ptr<DenseSubMatrix<Number>>>> _elem_elem_subjacobians;
+  std::vector<std::vector<std::unique_ptr<DenseSubMatrix<Number>>>> _elem_neighbor_subjacobians;
+  std::vector<std::vector<std::unique_ptr<DenseSubMatrix<Number>>>> _neighbor_elem_subjacobians;
+  std::vector<std::vector<std::unique_ptr<DenseSubMatrix<Number>>>> _neighbor_neighbor_subjacobians;
 
   /**
    * Global Degree of freedom index lists for the neighbor element
    */
   std::vector<dof_id_type> _neighbor_dof_indices;
-  std::vector<std::vector<dof_id_type> > _neighbor_dof_indices_var;
+  std::vector<std::vector<dof_id_type>> _neighbor_dof_indices_var;
 
   /**
    * Finite element objects for each variable's
@@ -276,7 +281,7 @@ private:
    * interior since we just need to handle DG interface
    * terms here.
    */
-  std::map<FEType, FEAbstract *> _neighbor_side_fe;
+  std::map<FEType, std::unique_ptr<FEAbstract>> _neighbor_side_fe;
 
   /**
    * Pointers to the same finite element objects on the neighbor element,

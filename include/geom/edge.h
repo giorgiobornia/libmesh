@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -23,21 +23,16 @@
 // Local includes
 #include "libmesh/elem.h"
 
-// C++ includes
-#include <cstddef>
-
 namespace libMesh
 {
-
-
-// Forward declarations
-class Mesh;
-
-
 
 /**
  * The \p Edge is an element in 1D. It can be thought of as a
  * line segment.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2002
+ * \brief The base class for all 1D geometric element types.
  */
 class Edge : public Elem
 {
@@ -54,71 +49,76 @@ public:
   {
     // Make sure the interior parent isn't undefined
     if (LIBMESH_DIM > 1)
-      this->set_interior_parent(libmesh_nullptr);
+      this->set_interior_parent(nullptr);
   }
 
-  /**
-   * @returns 1, the dimensionality of the object.
-   */
-  virtual unsigned int dim () const libmesh_override { return 1; }
+  Edge (Edge &&) = delete;
+  Edge (const Edge &) = delete;
+  Edge & operator= (const Edge &) = delete;
+  Edge & operator= (Edge &&) = delete;
+  virtual ~Edge() = default;
 
   /**
-   * @returns 2. Every edge is guaranteed to have at least 2 nodes.
+   * \returns 1, the dimensionality of the object.
    */
-  virtual unsigned int n_nodes() const libmesh_override { return 2; }
+  virtual unsigned short dim () const override { return 1; }
 
   /**
-   * @returns 2
+   * \returns 2. Every edge is guaranteed to have at least 2 nodes.
    */
-  virtual unsigned int n_sides() const libmesh_override { return 2; }
+  virtual unsigned int n_nodes() const override { return 2; }
 
   /**
-   * @returns 2.  Every edge has exactly two vertices.
+   * \returns 2.
    */
-  virtual unsigned int n_vertices() const libmesh_override { return 2; }
+  virtual unsigned int n_sides() const override { return 2; }
 
   /**
-   * @returns 0.  All 1D elements have no edges.
+   * \returns 2.  Every edge has exactly two vertices.
    */
-  virtual unsigned int n_edges() const libmesh_override { return 0; }
+  virtual unsigned int n_vertices() const override { return 2; }
 
   /**
-   * @returns 0.  All 1D elements have no faces.
+   * \returns 0.  All 1D elements have no edges.
    */
-  virtual unsigned int n_faces() const libmesh_override { return 0; }
+  virtual unsigned int n_edges() const override { return 0; }
 
   /**
-   * @returns 2
+   * \returns 0.  All 1D elements have no faces.
    */
-  virtual unsigned int n_children() const libmesh_override { return 2; }
+  virtual unsigned int n_faces() const override { return 0; }
 
-  /*
-   * @returns true iff the specified child is on the
-   * specified side
+  /**
+   * \returns 2.
+   */
+  virtual unsigned int n_children() const override { return 2; }
+
+  /**
+   * \returns \p true if the specified child is on the specified side.
    */
   virtual bool is_child_on_side(const unsigned int c,
-                                const unsigned int s) const libmesh_override;
+                                const unsigned int s) const override;
 
-  /*
-   * @returns true iff the specified edge is on the specified side
+  /**
+   * \returns \p true if the specified edge is on the specified side.
    */
   virtual bool is_edge_on_side(const unsigned int,
-                               const unsigned int) const libmesh_override
+                               const unsigned int) const override
   { return false; }
 
-  /*
-   * @returns the side number opposite to \p s (for a tensor product
+  /**
+   * \returns The side number opposite to \p s (for a tensor product
    * element), or throws an error otherwise.
    */
-  virtual unsigned int opposite_side(const unsigned int s) const libmesh_override;
+  virtual unsigned int opposite_side(const unsigned int s) const override;
 
-  /*
-   * @returns the local node number for the node opposite to node n
+  /**
+   * \returns The local node number for the node opposite to node n
    * on side \p opposite_side(s) (for a tensor product element), or
    * throws an error otherwise.
    */
   virtual unsigned int opposite_node(const unsigned int n,
-                                     const unsigned int s) const libmesh_override;
+                                     const unsigned int s) const override;
 
   /**
    * Don't hide Elem::key() defined in the base class.
@@ -126,32 +126,37 @@ public:
   using Elem::key;
 
   /**
-   * @returns an id associated with the \p s side of this element.
+   * \returns An id associated with the \p s side of this element.
    * The id is not necessarily unique, but should be close.  This is
    * particularly useful in the \p MeshBase::find_neighbors() routine.
    */
-  virtual dof_id_type key (const unsigned int s) const libmesh_override
-  { return this->compute_key(this->node(s)); }
+  virtual dof_id_type key (const unsigned int s) const override
+  { return this->compute_key(this->node_id(s)); }
 
   /**
-   * The \p Elem::side() member returns
-   * an auto pointer to a NodeElem for the specified node.
+   * \returns \p side after doing some range checking. \p side_node is ignored.
    */
-  virtual UniquePtr<Elem> side (const unsigned int i) const libmesh_override;
+  virtual unsigned int which_node_am_i(unsigned int side,
+                                       unsigned int /*side_node*/) const override;
 
   /**
-   * The \p Elem::side() member returns
-   * an auto pointer to a NodeElem for the specified node.
+   * \returns A pointer to a NodeElem for the specified node.
    */
-  virtual UniquePtr<Elem> build_side (const unsigned int i,
-                                      bool proxy) const libmesh_override;
+  virtual std::unique_ptr<Elem> side_ptr (const unsigned int i) override;
 
   /**
-   * The \p Elem::build_edge() member makes no sense for edges.
+   * \returns A pointer to a NodeElem for the specified node.
    */
-  virtual UniquePtr<Elem> build_edge (const unsigned int) const libmesh_override
-  { libmesh_not_implemented(); return UniquePtr<Elem>(); }
+  virtual std::unique_ptr<Elem> build_side_ptr (const unsigned int i,
+                                                bool proxy) override;
 
+  /**
+   * The \p Elem::build_edge_ptr() member makes no sense for edges.
+   */
+  virtual std::unique_ptr<Elem> build_edge_ptr (const unsigned int) override
+  { libmesh_not_implemented(); return std::unique_ptr<Elem>(); }
+
+  virtual std::vector<unsigned int> nodes_on_side(const unsigned int s) const override;
 
 protected:
 

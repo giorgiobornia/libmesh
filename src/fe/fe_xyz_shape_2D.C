@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -16,26 +16,12 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-// C++ inlcludes
+// C++ includes
 
 // Local includes
 #include "libmesh/fe.h"
 #include "libmesh/elem.h"
 
-
-
-
-// Anonymous namespace for persistant variables.
-// This allows us to determine when the centroid needs
-// to be recalculated.
-namespace
-{
-using namespace libMesh;
-
-static dof_id_type old_elem_id = DofObject::invalid_id;
-static Point centroid;
-static Point max_distance;
-}
 
 
 namespace libMesh
@@ -64,26 +50,14 @@ Real FE<2,XYZ>::shape(const Elem * elem,
 
   libmesh_assert(elem);
 
-  // Only recompute the centroid if the element
-  // has changed from the last one we computed.
-  // This avoids repeated centroid calculations
-  // when called in succession with the same element.
-  if (elem->id() != old_elem_id)
-    {
-      centroid = elem->centroid();
-      old_elem_id = elem->id();
-      max_distance = Point(0.,0.,0.);
-      for (unsigned int p = 0; p < elem->n_nodes(); p++)
-        for (unsigned int d = 0; d < 2; d++)
-          {
-            const Real distance = std::abs(centroid(d) - elem->point(p)(d));
-            max_distance(d) = std::max(distance, max_distance(d));
-          }
-    }
-
-  // Using static globals for old_elem_id, etc. will fail
-  // horribly with more than one thread.
-  libmesh_assert_equal_to (libMesh::n_threads(), 1);
+  Point centroid = elem->centroid();
+  Point max_distance = Point(0.,0.,0.);
+  for (unsigned int p = 0; p < elem->n_nodes(); p++)
+    for (unsigned int d = 0; d < 2; d++)
+      {
+        const Real distance = std::abs(centroid(d) - elem->point(p)(d));
+        max_distance(d) = std::max(distance, max_distance(d));
+      }
 
   const Real x  = point_in(0);
   const Real y  = point_in(1);
@@ -167,9 +141,8 @@ Real FE<2,XYZ>::shape(const Elem * elem,
       return val;
     }
 
-  libmesh_error_msg("We'll never get here!");
+#else
   return 0.;
-
 #endif
 }
 
@@ -201,26 +174,14 @@ Real FE<2,XYZ>::shape_deriv(const Elem * elem,
   libmesh_assert_less (j, 2);
   libmesh_assert(elem);
 
-  // Only recompute the centroid if the element
-  // has changed from the last one we computed.
-  // This avoids repeated centroid calculations
-  // when called in succession with the same element.
-  if (elem->id() != old_elem_id)
-    {
-      centroid = elem->centroid();
-      old_elem_id = elem->id();
-      max_distance = Point(0.,0.,0.);
-      for (unsigned int p = 0; p < elem->n_nodes(); p++)
-        for (unsigned int d = 0; d < 2; d++)
-          {
-            const Real distance = std::abs(centroid(d) - elem->point(p)(d));
-            max_distance(d) = std::max(distance, max_distance(d));
-          }
-    }
-
-  // Using static globals for old_elem_id, etc. will fail
-  // horribly with more than one thread.
-  libmesh_assert_equal_to (libMesh::n_threads(), 1);
+  Point centroid = elem->centroid();
+  Point max_distance = Point(0.,0.,0.);
+  for (unsigned int p = 0; p < elem->n_nodes(); p++)
+    for (unsigned int d = 0; d < 2; d++)
+      {
+        const Real distance = std::abs(centroid(d) - elem->point(p)(d));
+        max_distance(d) = std::max(distance, max_distance(d));
+      }
 
   const Real x  = point_in(0);
   const Real y  = point_in(1);
@@ -384,9 +345,8 @@ Real FE<2,XYZ>::shape_deriv(const Elem * elem,
       libmesh_error_msg("Invalid j = " << j);
     }
 
-  libmesh_error_msg("We'll never get here!");
+#else
   return 0.;
-
 #endif
 }
 
@@ -417,26 +377,14 @@ Real FE<2,XYZ>::shape_second_deriv(const Elem * elem,
   libmesh_assert_less_equal (j, 2);
   libmesh_assert(elem);
 
-  // Only recompute the centroid if the element
-  // has changed from the last one we computed.
-  // This avoids repeated centroid calculations
-  // when called in succession with the same element.
-  if (elem->id() != old_elem_id)
-    {
-      centroid = elem->centroid();
-      old_elem_id = elem->id();
-      max_distance = Point(0.,0.,0.);
-      for (unsigned int p = 0; p < elem->n_nodes(); p++)
-        for (unsigned int d = 0; d < 2; d++)
-          {
-            const Real distance = std::abs(centroid(d) - elem->point(p)(d));
-            max_distance(d) = std::max(distance, max_distance(d));
-          }
-    }
-
-  // Using static globals for old_elem_id, etc. will fail
-  // horribly with more than one thread.
-  libmesh_assert_equal_to (libMesh::n_threads(), 1);
+  Point centroid = elem->centroid();
+  Point max_distance = Point(0.,0.,0.);
+  for (unsigned int p = 0; p < elem->n_nodes(); p++)
+    for (unsigned int d = 0; d < 2; d++)
+      {
+        const Real distance = std::abs(centroid(d) - elem->point(p)(d));
+        max_distance(d) = std::max(distance, max_distance(d));
+      }
 
   const Real x  = point_in(0);
   const Real y  = point_in(1);
@@ -648,9 +596,8 @@ Real FE<2,XYZ>::shape_second_deriv(const Elem * elem,
       libmesh_error_msg("Invalid shape function derivative j = " << j);
     }
 
-  libmesh_error_msg("We'll never get here!");
+#else
   return 0.;
-
 #endif
 }
 

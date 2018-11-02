@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -16,7 +16,7 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-// C++ inlcludes
+// C++ includes
 
 // Local includes
 #include "libmesh/fe.h"
@@ -44,7 +44,9 @@ Real FE<2,L2_LAGRANGE>::shape(const ElemType type,
         switch (type)
           {
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             {
               // Compute quad shape functions as a tensor-product
@@ -62,6 +64,7 @@ Real FE<2,L2_LAGRANGE>::shape(const ElemType type,
             }
 
           case TRI3:
+          case TRISHELL3:
           case TRI6:
             {
               const Real zeta1 = p(0);
@@ -98,6 +101,7 @@ Real FE<2,L2_LAGRANGE>::shape(const ElemType type,
         switch (type)
           {
           case QUAD8:
+          case QUADSHELL8:
             {
               const Real xi  = p(0);
               const Real eta = p(1);
@@ -195,10 +199,6 @@ Real FE<2,L2_LAGRANGE>::shape(const ElemType type,
     default:
       libmesh_error_msg("ERROR: Unsupported 2D FE order: " << order);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
-
 #endif
 }
 
@@ -238,7 +238,9 @@ Real FE<2,L2_LAGRANGE>::shape_deriv(const ElemType type,
         switch (type)
           {
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             {
               // Compute quad shape functions as a tensor-product
@@ -269,6 +271,7 @@ Real FE<2,L2_LAGRANGE>::shape_deriv(const ElemType type,
             }
 
           case TRI3:
+          case TRISHELL3:
           case TRI6:
             {
               libmesh_assert_less (i, 3);
@@ -336,6 +339,7 @@ Real FE<2,L2_LAGRANGE>::shape_deriv(const ElemType type,
         switch (type)
           {
           case QUAD8:
+          case QUADSHELL8:
             {
               const Real xi  = p(0);
               const Real eta = p(1);
@@ -537,11 +541,6 @@ Real FE<2,L2_LAGRANGE>::shape_deriv(const ElemType type,
     default:
       libmesh_error_msg("ERROR: Unsupported 2D FE order: " << order);
     }
-
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
-
 #endif
 }
 
@@ -586,7 +585,9 @@ Real FE<2,L2_LAGRANGE>::shape_second_deriv(const ElemType type,
         switch (type)
           {
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             {
               // Compute quad shape functions as a tensor-product
@@ -620,6 +621,7 @@ Real FE<2,L2_LAGRANGE>::shape_second_deriv(const ElemType type,
             }
 
           case TRI3:
+          case TRISHELL3:
           case TRI6:
             {
               // All second derivatives for linear triangles are zero.
@@ -893,9 +895,6 @@ Real FE<2,L2_LAGRANGE>::shape_second_deriv(const ElemType type,
 
     } // end switch (order)
 
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 #endif // LIBMESH_DIM > 1
 }
 

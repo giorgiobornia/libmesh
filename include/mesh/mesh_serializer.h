@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -30,15 +30,19 @@ namespace libMesh
 class MeshBase;
 
 /**
- * Temporarily serialize a ParallelMesh for output; a distributed
+ * Temporarily serialize a DistributedMesh for output; a distributed
  * mesh is allgathered by the MeshSerializer constructor if
  * need_serial is true, then remote elements are deleted again by the
  * destructor.
+ *
+ * \author Roy Stogner
+ * \date 2011
+ * \brief Temporarily serializes a DistributedMesh for output.
  */
 class MeshSerializer
 {
 public:
-  MeshSerializer(MeshBase & mesh, bool need_serial = true);
+  MeshSerializer(MeshBase & mesh, bool need_serial = true, bool serial_only_needed_on_proc_0 = false);
 
   ~MeshSerializer();
 

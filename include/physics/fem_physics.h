@@ -1,6 +1,5 @@
-
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -73,7 +72,7 @@ public:
    * entirely.
    */
   virtual bool eulerian_residual (bool request_jacobian,
-                                  DiffContext & context) libmesh_override;
+                                  DiffContext & context) override;
 
   /**
    * Subtracts a mass vector contribution on \p elem from
@@ -90,7 +89,7 @@ public:
    * problems will need to reimplement this themselves.
    */
   virtual bool mass_residual (bool request_jacobian,
-                              DiffContext &) libmesh_override;
+                              DiffContext &) override;
 };
 
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -64,32 +64,45 @@ dof_id_type Pyramid::key (const unsigned int s) const
     case 1: // triangular face 2
     case 2: // triangular face 3
     case 3: // triangular face 4
-      return this->compute_key (this->node(Pyramid5::side_nodes_map[s][0]),
-                                this->node(Pyramid5::side_nodes_map[s][1]),
-                                this->node(Pyramid5::side_nodes_map[s][2]));
+      return this->compute_key (this->node_id(Pyramid5::side_nodes_map[s][0]),
+                                this->node_id(Pyramid5::side_nodes_map[s][1]),
+                                this->node_id(Pyramid5::side_nodes_map[s][2]));
 
     case 4:  // the quad face at z=0
-      return this->compute_key (this->node(Pyramid5::side_nodes_map[s][0]),
-                                this->node(Pyramid5::side_nodes_map[s][1]),
-                                this->node(Pyramid5::side_nodes_map[s][2]),
-                                this->node(Pyramid5::side_nodes_map[s][3]));
+      return this->compute_key (this->node_id(Pyramid5::side_nodes_map[s][0]),
+                                this->node_id(Pyramid5::side_nodes_map[s][1]),
+                                this->node_id(Pyramid5::side_nodes_map[s][2]),
+                                this->node_id(Pyramid5::side_nodes_map[s][3]));
 
     default:
       libmesh_error_msg("Invalid side s = " << s);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0;
 }
 
 
 
-UniquePtr<Elem> Pyramid::side (const unsigned int i) const
+unsigned int Pyramid::which_node_am_i(unsigned int side,
+                                      unsigned int side_node) const
+{
+  libmesh_assert_less (side, this->n_sides());
+
+  // Never more than 4 nodes per side.
+  libmesh_assert_less(side_node, 4);
+
+  // Some sides have 3 nodes.
+  libmesh_assert(side == 4 || side_node < 3);
+
+  return Pyramid5::side_nodes_map[side][side_node];
+}
+
+
+
+std::unique_ptr<Elem> Pyramid::side_ptr (const unsigned int i)
 {
   libmesh_assert_less (i, this->n_sides());
 
-  // To be returned wrapped in an UniquePtr
-  Elem * face = libmesh_nullptr;
+  // Return value
+  std::unique_ptr<Elem> face;
 
   // Set up the type of element
   switch (i)
@@ -99,12 +112,12 @@ UniquePtr<Elem> Pyramid::side (const unsigned int i) const
     case 2: // triangular face 3
     case 3: // triangular face 4
       {
-        face = new Tri3;
+        face = libmesh_make_unique<Tri3>();
         break;
       }
     case 4:  // the quad face at z=0
       {
-        face = new Quad4;
+        face = libmesh_make_unique<Quad4>();
         break;
       }
     default:
@@ -113,9 +126,9 @@ UniquePtr<Elem> Pyramid::side (const unsigned int i) const
 
   // Set the nodes
   for (unsigned n=0; n<face->n_nodes(); ++n)
-    face->set_node(n) = this->get_node(Pyramid5::side_nodes_map[i][n]);
+    face->set_node(n) = this->node_ptr(Pyramid5::side_nodes_map[i][n]);
 
-  return UniquePtr<Elem>(face);
+  return face;
 }
 
 

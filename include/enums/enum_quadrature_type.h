@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,18 +20,20 @@
 #ifndef LIBMESH_ENUM_QUADRATURE_TYPE_H
 #define LIBMESH_ENUM_QUADRATURE_TYPE_H
 
-// ------------------------------------------------------------
-// enum QuadratureType definition
 namespace libMesh {
 
 /**
  * Defines an \p enum for currently available quadrature rules.
+ *
+ * The fixed type, i.e. ": int", enumeration syntax used here allows
+ * this enum to be forward declared as
+ * enum QuadratureType : int;
+ * reducing header file dependencies.
  */
-enum QuadratureType {QGAUSS            = 0,
-
+enum QuadratureType : int {
+                     QGAUSS            = 0,
                      QJACOBI_1_0       = 1,
                      QJACOBI_2_0       = 2,
-
                      QSIMPSON          = 3,
                      QTRAP             = 4,
                      QGRID             = 5,
@@ -39,12 +41,10 @@ enum QuadratureType {QGAUSS            = 0,
                      QMONOMIAL         = 7,
                      QCONICAL          = 8,
                      QGAUSS_LOBATTO    = 9,
-
                      QCLOUGH           = 21,
-
                      QCOMPOSITE        = 31,
-
+                     // Invalid
                      INVALID_Q_RULE    = 127};
 }
 
-#endif // LIBMESH_ENUM_QUADRATURE_TYPE_H
+#endif

@@ -16,6 +16,16 @@ public:
   virtual ~FunctionParserADBase();
 
   /**
+   * This class manages its own memory, so the compiler-generated copy
+   * assignment, move assignment, and move constructor implementations
+   * are not safe to use.  We therefore explicitly delete them so they
+   * can't be called accidentally.
+   */
+  FunctionParserADBase (FunctionParserADBase &&) = delete;
+  FunctionParserADBase & operator= (const FunctionParserADBase &) = delete;
+  FunctionParserADBase & operator= (FunctionParserADBase &&) = delete;
+
+  /**
    * auto-differentiate for var
    */
   int AutoDiff(const std::string & var_name);
@@ -130,8 +140,14 @@ private:
   // user function plog
   static Value_t fp_plog(const Value_t * params);
 
+  // user function erf
+  static Value_t fp_erf(const Value_t * params);
+
   // function ID for the plog function
   unsigned int mFPlog;
+
+  // function ID for the erf function
+  unsigned int mFErf;
 
   // flags that control cache bahavior, optimization, and error reporting
   int mADFlags;

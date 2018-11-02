@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -23,8 +23,6 @@
 // Local includes
 #include "libmesh/quadrature.h"
 
-// C++ includes
-
 namespace libMesh
 {
 
@@ -32,54 +30,58 @@ namespace libMesh
  * This class creates quadrature points on a uniform grid, with
  * order+1 points on an edge.
  *
- * Unlike most libMesh quadrature rules, QGrid does *not* reduce
- * error exponentially on smooth functions as you increase the
- * quadrature order.  Instead, it reduces the error quadratically.
+ * Unlike most libMesh quadrature rules, QGrid does *not* reduce the
+ * integration error exponentially on smooth functions as you increase
+ * the quadrature order.  Instead, it reduces the error quadratically.
  * However, this error reduction is more reliable on non-smooth
  * functions.
  *
- * This quadrature type may be useful iff you are integrating
- * functions which have discontinuities or discontinuous derivatives
- * on scales smaller than your element size.
+ * This quadrature type may be useful if you are integrating functions
+ * which have discontinuities or discontinuous derivatives on scales
+ * smaller than your element size.
  *
  * \author Roy Stogner
  * \date 2005
+ * \brief Implements grid-based quadrature rules suitable for non-smooth functions.
  */
-class QGrid libmesh_final : public QBase
+class QGrid final : public QBase
 {
 public:
 
   /**
    * Constructor.  Declares the order of the quadrature rule.
    */
-  QGrid (const unsigned int _dim,
-         const Order _order=INVALID_ORDER) :
-    QBase(_dim, _order)
+  QGrid (unsigned int dim,
+         Order order=INVALID_ORDER) :
+    QBase(dim, order)
   {}
 
   /**
-   * Destructor.
+   * Copy/move ctor, copy/move assignment operator, and destructor are
+   * all explicitly defaulted for this simple class.
    */
-  ~QGrid() {}
+  QGrid (const QGrid &) = default;
+  QGrid (QGrid &&) = default;
+  QGrid & operator= (const QGrid &) = default;
+  QGrid & operator= (QGrid &&) = default;
+  virtual ~QGrid() = default;
 
   /**
-   * @returns \p QGRID
+   * \returns \p QGRID.
    */
-  virtual QuadratureType type() const libmesh_override { return QGRID; }
+  virtual QuadratureType type() const override;
 
 
 private:
 
   virtual void init_1D (const ElemType _type=INVALID_ELEM,
-                        unsigned int p_level=0) libmesh_override;
+                        unsigned int p_level=0) override;
   virtual void init_2D (const ElemType _type=INVALID_ELEM,
-                        unsigned int p_level=0) libmesh_override;
+                        unsigned int p_level=0) override;
   virtual void init_3D (const ElemType _type=INVALID_ELEM,
-                        unsigned int p_level=0) libmesh_override;
+                        unsigned int p_level=0) override;
 };
 
 } // namespace libMesh
-
-
 
 #endif // LIBMESH_QUADRATURE_GRID_H

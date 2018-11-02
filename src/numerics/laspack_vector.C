@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -106,7 +106,7 @@ NumericVector<T> & LaspackVector<T>::operator -= (const NumericVector<T> & v)
 
 
 template <typename T>
-NumericVector<T> & LaspackVector<T>::operator /= (NumericVector<T> & v)
+NumericVector<T> & LaspackVector<T>::operator /= (const NumericVector<T> & v)
 {
   libmesh_assert_equal_to(size(), v.size());
 
@@ -245,12 +245,12 @@ void LaspackVector<T>::abs()
 }
 
 template <typename T>
-T LaspackVector<T>::dot (const NumericVector<T> & V) const
+T LaspackVector<T>::dot (const NumericVector<T> & v_in) const
 {
   libmesh_assert (this->initialized());
 
   // Make sure the NumericVector passed in is really a LaspackVector
-  const LaspackVector<T> * v = cast_ptr<const LaspackVector<T> *>(&V);
+  const LaspackVector<T> * v = cast_ptr<const LaspackVector<T> *>(&v_in);
   libmesh_assert(v);
 
   return Mul_VV (const_cast<QVector*>(&(this->_vec)),
@@ -357,6 +357,19 @@ void LaspackVector<T>::localize (NumericVector<T> & v_local_in,
   libmesh_assert_less_equal (send_list.size(), v_local->size());
 
   *v_local = *this;
+}
+
+
+
+template <typename T>
+void LaspackVector<T>::localize (std::vector<T> & v_local,
+                                 const std::vector<numeric_index_type> & indices) const
+{
+  // LaspackVectors are serial, so we can just copy values
+  v_local.resize(indices.size());
+
+  for (numeric_index_type i=0; i<v_local.size(); i++)
+    v_local[i] = (*this)(indices[i]);
 }
 
 

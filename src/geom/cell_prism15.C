@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -16,14 +16,14 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-// C++ includes
-
 // Local includes
 #include "libmesh/side.h"
 #include "libmesh/cell_prism15.h"
 #include "libmesh/edge_edge3.h"
 #include "libmesh/face_quad8.h"
 #include "libmesh/face_tri6.h"
+#include "libmesh/enum_io_package.h"
+#include "libmesh/enum_order.h"
 
 namespace libMesh
 {
@@ -32,7 +32,14 @@ namespace libMesh
 
 // ------------------------------------------------------------
 // Prism15 class static member initializations
-const unsigned int Prism15::side_nodes_map[5][8] =
+const int Prism15::num_nodes;
+const int Prism15::num_sides;
+const int Prism15::num_edges;
+const int Prism15::num_children;
+const int Prism15::nodes_per_side;
+const int Prism15::nodes_per_edge;
+
+const unsigned int Prism15::side_nodes_map[Prism15::num_sides][Prism15::nodes_per_side] =
   {
     {0, 2, 1,  8,  7,  6, 99, 99}, // Side 0
     {0, 1, 4,  3,  6, 10, 12,  9}, // Side 1
@@ -41,17 +48,17 @@ const unsigned int Prism15::side_nodes_map[5][8] =
     {3, 4, 5, 12, 13, 14, 99, 99}  // Side 4
   };
 
-const unsigned int Prism15::edge_nodes_map[9][3] =
+const unsigned int Prism15::edge_nodes_map[Prism15::num_edges][Prism15::nodes_per_edge] =
   {
-    {0, 1, 6},  // Side 0
-    {1, 2, 7},  // Side 1
-    {0, 2, 8},  // Side 2
-    {0, 3, 9},  // Side 3
-    {1, 4, 10}, // Side 4
-    {2, 5, 11}, // Side 5
-    {3, 4, 12}, // Side 6
-    {4, 5, 13}, // Side 7
-    {3, 5, 14}  // Side 8
+    {0, 1,  6}, // Edge 0
+    {1, 2,  7}, // Edge 1
+    {0, 2,  8}, // Edge 2
+    {0, 3,  9}, // Edge 3
+    {1, 4, 10}, // Edge 4
+    {2, 5, 11}, // Edge 5
+    {3, 4, 12}, // Edge 6
+    {4, 5, 13}, // Edge 7
+    {3, 5, 14}  // Edge 8
   };
 
 
@@ -81,20 +88,26 @@ bool Prism15::is_node_on_side(const unsigned int n,
                               const unsigned int s) const
 {
   libmesh_assert_less (s, n_sides());
-  for (unsigned int i = 0; i != 8; ++i)
-    if (side_nodes_map[s][i] == n)
-      return true;
-  return false;
+  return std::find(std::begin(side_nodes_map[s]),
+                   std::end(side_nodes_map[s]),
+                   n) != std::end(side_nodes_map[s]);
+}
+
+std::vector<unsigned int>
+Prism15::nodes_on_side(const unsigned int s) const
+{
+  libmesh_assert_less(s, n_sides());
+  auto trim = (s > 0 && s < 4) ? 0 : 2;
+  return {std::begin(side_nodes_map[s]), std::end(side_nodes_map[s]) - trim};
 }
 
 bool Prism15::is_node_on_edge(const unsigned int n,
                               const unsigned int e) const
 {
   libmesh_assert_less (e, n_edges());
-  for (unsigned int i = 0; i != 3; ++i)
-    if (edge_nodes_map[e][i] == n)
-      return true;
-  return false;
+  return std::find(std::begin(edge_nodes_map[e]),
+                   std::end(edge_nodes_map[e]),
+                   n) != std::end(edge_nodes_map[e]);
 }
 
 
@@ -129,8 +142,31 @@ bool Prism15::has_affine_map() const
 
 
 
-UniquePtr<Elem> Prism15::build_side (const unsigned int i,
-                                     bool proxy) const
+Order Prism15::default_order() const
+{
+  return SECOND;
+}
+
+
+
+unsigned int Prism15::which_node_am_i(unsigned int side,
+                                      unsigned int side_node) const
+{
+  libmesh_assert_less (side, this->n_sides());
+
+  // Never more than 8 nodes per side.
+  libmesh_assert_less(side_node, Prism15::nodes_per_side);
+
+  // Some sides have 6 nodes.
+  libmesh_assert(!(side==0 || side==4) || side_node < 6);
+
+  return Prism15::side_nodes_map[side][side_node];
+}
+
+
+
+std::unique_ptr<Elem> Prism15::build_side_ptr (const unsigned int i,
+                                               bool proxy)
 {
   libmesh_assert_less (i, this->n_sides());
 
@@ -140,12 +176,12 @@ UniquePtr<Elem> Prism15::build_side (const unsigned int i,
         {
         case 0:  // the triangular face at z=-1
         case 4:
-          return UniquePtr<Elem>(new Side<Tri6,Prism15>(this,i));
+          return libmesh_make_unique<Side<Tri6,Prism15>>(this,i);
 
         case 1:
         case 2:
         case 3:
-          return UniquePtr<Elem>(new Side<Quad8,Prism15>(this,i));
+          return libmesh_make_unique<Side<Quad8,Prism15>>(this,i);
 
         default:
           libmesh_error_msg("Invalid side i = " << i);
@@ -154,22 +190,22 @@ UniquePtr<Elem> Prism15::build_side (const unsigned int i,
 
   else
     {
-      // Create NULL pointer to be initialized, returned later.
-      Elem * face = libmesh_nullptr;
+      // Return value
+      std::unique_ptr<Elem> face;
 
       switch (i)
         {
         case 0: // the triangular face at z=-1
         case 4: // the triangular face at z=1
           {
-            face = new Tri6;
+            face = libmesh_make_unique<Tri6>();
             break;
           }
         case 1: // the quad face at y=0
         case 2: // the other quad face
         case 3: // the quad face at x=0
           {
-            face = new Quad8;
+            face = libmesh_make_unique<Quad8>();
             break;
           }
         default:
@@ -180,21 +216,18 @@ UniquePtr<Elem> Prism15::build_side (const unsigned int i,
 
       // Set the nodes
       for (unsigned n=0; n<face->n_nodes(); ++n)
-        face->set_node(n) = this->get_node(Prism15::side_nodes_map[i][n]);
+        face->set_node(n) = this->node_ptr(Prism15::side_nodes_map[i][n]);
 
-      return UniquePtr<Elem>(face);
+      return face;
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return UniquePtr<Elem>();
 }
 
 
-UniquePtr<Elem> Prism15::build_edge (const unsigned int i) const
+std::unique_ptr<Elem> Prism15::build_edge_ptr (const unsigned int i)
 {
   libmesh_assert_less (i, this->n_edges());
 
-  return UniquePtr<Elem>(new SideEdge<Edge3,Prism15>(this,i));
+  return libmesh_make_unique<SideEdge<Edge3,Prism15>>(this,i);
 }
 
 
@@ -211,14 +244,14 @@ void Prism15::connectivity(const unsigned int libmesh_dbg_var(sc),
     case TECPLOT:
       {
         conn.resize(8);
-        conn[0] = this->node(0)+1;
-        conn[1] = this->node(1)+1;
-        conn[2] = this->node(2)+1;
-        conn[3] = this->node(2)+1;
-        conn[4] = this->node(3)+1;
-        conn[5] = this->node(4)+1;
-        conn[6] = this->node(5)+1;
-        conn[7] = this->node(5)+1;
+        conn[0] = this->node_id(0)+1;
+        conn[1] = this->node_id(1)+1;
+        conn[2] = this->node_id(2)+1;
+        conn[3] = this->node_id(2)+1;
+        conn[4] = this->node_id(3)+1;
+        conn[5] = this->node_id(4)+1;
+        conn[6] = this->node_id(5)+1;
+        conn[7] = this->node_id(5)+1;
         return;
       }
 
@@ -226,12 +259,12 @@ void Prism15::connectivity(const unsigned int libmesh_dbg_var(sc),
       {
         /*
           conn.resize(6);
-          conn[0] = this->node(0);
-          conn[1] = this->node(2);
-          conn[2] = this->node(1);
-          conn[3] = this->node(3);
-          conn[4] = this->node(5);
-          conn[5] = this->node(4);
+          conn[0] = this->node_id(0);
+          conn[1] = this->node_id(2);
+          conn[2] = this->node_id(1);
+          conn[3] = this->node_id(3);
+          conn[4] = this->node_id(5);
+          conn[5] = this->node_id(4);
         */
 
         // VTK's VTK_QUADRATIC_WEDGE first 9 nodes match, then their
@@ -239,17 +272,17 @@ void Prism15::connectivity(const unsigned int libmesh_dbg_var(sc),
         // LibMesh's.
         conn.resize(15);
         for (unsigned i=0; i<9; ++i)
-          conn[i] = this->node(i);
+          conn[i] = this->node_id(i);
 
         // top "ring" of mid-edge nodes
-        conn[9]  = this->node(12);
-        conn[10] = this->node(13);
-        conn[11] = this->node(14);
+        conn[9]  = this->node_id(12);
+        conn[10] = this->node_id(13);
+        conn[11] = this->node_id(14);
 
         // middle "ring" of mid-edge nodes
-        conn[12] = this->node(9);
-        conn[13] = this->node(10);
-        conn[14] = this->node(11);
+        conn[12] = this->node_id(9);
+        conn[13] = this->node_id(10);
+        conn[14] = this->node_id(11);
 
 
         return;
@@ -348,10 +381,10 @@ Real Prism15::volume () const
 
   // Parameters of the 2D rule
   static const Real
-    w1 = 1.1169079483900573284750350421656140e-01L,
-    w2 = 5.4975871827660933819163162450105264e-02L,
-    a1 = 4.4594849091596488631832925388305199e-01L,
-    a2 = 9.1576213509770743459571463402201508e-02L;
+    w1 = Real(1.1169079483900573284750350421656140e-01L),
+    w2 = Real(5.4975871827660933819163162450105264e-02L),
+    a1 = Real(4.4594849091596488631832925388305199e-01L),
+    a2 = Real(9.1576213509770743459571463402201508e-02L);
 
   // Points and weights of the 2D rule
   static const Real w2D[N2D] = {w1, w1, w1, w2, w2, w2};
@@ -440,7 +473,7 @@ Real Prism15::volume () const
 
 #ifdef LIBMESH_ENABLE_AMR
 
-const float Prism15::_embedding_matrix[8][15][15] =
+const float Prism15::_embedding_matrix[Prism15::num_children][Prism15::num_nodes][Prism15::num_nodes] =
   {
     // Embedding matrix for child 0
     {

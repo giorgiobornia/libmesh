@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -29,9 +29,13 @@
 #include "libmesh/cell_tet4.h"
 #include "libmesh/cell_hex8.h"
 #include "libmesh/cell_prism6.h"
+#include "libmesh/enum_io_package.h"
+#include "libmesh/enum_elem_type.h"
 
 #ifdef LIBMESH_HAVE_GZSTREAM
+# include "libmesh/ignore_warnings.h" // shadowing in gzstream.h
 # include "gzstream.h" // For reading/writing compressed streams
+# include "libmesh/restore_warnings.h"
 #endif
 
 
@@ -184,7 +188,7 @@ void UCDIO::read_implementation (std::istream & in)
            >> type;        // string describing cell type
 
         // Convert the UCD type string to a libmesh ElementType
-        std::map<std::string, ElemType>::iterator it = _reading_element_map.find(type);
+        auto it = _reading_element_map.find(type);
         if (it == _reading_element_map.end())
           libmesh_error_msg("Unsupported element type = " << type);
 
@@ -277,19 +281,16 @@ void UCDIO::write_header(std::ostream & out_stream,
 void UCDIO::write_nodes(std::ostream & out_stream,
                         const MeshBase & mesh)
 {
-  MeshBase::const_node_iterator       it  = mesh.nodes_begin();
-  const MeshBase::const_node_iterator end = mesh.nodes_end();
-
   // 1-based node number for UCD
   unsigned int n=1;
 
   // Write the node coordinates
-  for (; it != end; ++it)
+  for (auto & node : mesh.node_ptr_range())
     {
       libmesh_assert (out_stream.good());
 
       out_stream << n++ << "\t";
-      (*it)->write_unformatted(out_stream);
+      node->write_unformatted(out_stream);
     }
 }
 
@@ -298,23 +299,17 @@ void UCDIO::write_nodes(std::ostream & out_stream,
 void UCDIO::write_interior_elems(std::ostream & out_stream,
                                  const MeshBase & mesh)
 {
-  MeshBase::const_element_iterator it  = mesh.elements_begin();
-  const MeshBase::const_element_iterator end = mesh.elements_end();
-
   // 1-based element number for UCD
   unsigned int e=1;
 
   // Write element information
-  for (; it != end; ++it)
+  for (const auto & elem : mesh.element_ptr_range())
     {
       libmesh_assert (out_stream.good());
 
-      // Get pointer to Elem for convenience.
-      const Elem * elem = *it;
-
       // Look up the corresponding UCD element type in the static map.
       const ElemType etype = elem->type();
-      std::map<ElemType, std::string>::iterator it = _writing_element_map.find(etype);
+      auto it = _writing_element_map.find(etype);
       if (it == _writing_element_map.end())
         libmesh_error_msg("Error: Unsupported ElemType " << etype << " for UCDIO.");
 
@@ -368,7 +363,7 @@ void UCDIO::write_soln(std::ostream & out_stream,
 
   // First write out how many variables and how many components per variable
   out_stream << names.size();
-  for (unsigned int i = 0; i < names.size(); i++)
+  for (std::size_t i = 0; i < names.size(); i++)
     {
       libmesh_assert (out_stream.good());
       // Each named variable has only 1 component

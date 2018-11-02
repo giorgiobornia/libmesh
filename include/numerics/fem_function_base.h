@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,15 +20,14 @@
 #ifndef LIBMESH_FEM_FUNCTION_BASE_H
 #define LIBMESH_FEM_FUNCTION_BASE_H
 
-// C++ includes
-
-
-
 // Local Includes
 #include "libmesh/libmesh_common.h"
 #include "libmesh/dense_vector.h" // required to instantiate a DenseVector<> below
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
 #include "libmesh/fem_context.h"
+
+// C++ includes
+#include <memory>
 
 namespace libMesh
 {
@@ -52,15 +51,18 @@ protected:
   /**
    * Constructor.
    */
-  FEMFunctionBase () {}
+  FEMFunctionBase () = default;
 
 public:
 
   /**
-   * Destructor.
+   * The 5 special functions can be defaulted for this class.
    */
-  virtual ~FEMFunctionBase () {}
-
+  FEMFunctionBase (FEMFunctionBase &&) = default;
+  FEMFunctionBase (const FEMFunctionBase &) = default;
+  FEMFunctionBase & operator= (const FEMFunctionBase &) = default;
+  FEMFunctionBase & operator= (FEMFunctionBase &&) = default;
+  virtual ~FEMFunctionBase () = default;
 
   /**
    * Prepares a context object for use.
@@ -71,40 +73,37 @@ public:
   virtual void init_context (const FEMContext &) {}
 
   /**
-   * Returns a new copy of the function.  The new copy should be as
-   * ``deep'' as necessary to allow independent destruction and
-   * simultaneous evaluations of the copies in different threads.
+   * \returns A new copy of the function.
+   *
+   * The new copy should be as "deep" as necessary to allow
+   * independent destruction and simultaneous evaluations of the
+   * copies in different threads.
    */
-  virtual UniquePtr<FEMFunctionBase<Output> > clone () const = 0;
+  virtual std::unique_ptr<FEMFunctionBase<Output>> clone () const = 0;
 
-  // ------------------------------------------------------
-  // misc
   /**
-   * @returns the scalar value at coordinate
-   * \p p and time \p time, which defaults to zero.
-   * Purely virtual, so you have to overload it.
-   * Note that this cannot be a const method, check \p MeshFunction.
+   * \returns The scalar function value at coordinate \p p and time \p
+   * time, which defaults to zero.
+   *
+   * Pure virtual, so you have to override it.
    */
   virtual Output operator() (const FEMContext &,
                              const Point & p,
                              const Real time = 0.) = 0;
 
-
   /**
-   * Return function for vectors.
-   * Returns in \p output the values of the data at the
-   * coordinate \p p.
+   * Evaluation function for time-independent vector-valued functions.
+   * Sets output values in the passed-in \p output DenseVector.
    */
   void operator() (const FEMContext &,
                    const Point & p,
                    DenseVector<Output> & output);
 
   /**
-   * Return function for vectors.
-   * Returns in \p output the values of the data at the
-   * coordinate \p p and for time \p time.
-   * Purely virtual, so you have to overload it.
-   * Note that this cannot be a const method, check \p MeshFunction.
+   * Evaluation function for time-dependent vector-valued functions.
+   * Sets output values in the passed-in \p output DenseVector.
+   *
+   * Pure virtual, so you have to override it.
    */
   virtual void operator() (const FEMContext &,
                            const Point & p,
@@ -112,12 +111,14 @@ public:
                            DenseVector<Output> & output) = 0;
 
   /**
-   * @returns the vector component \p i at coordinate
-   * \p p and time \p time.
-   * Subclasses aren't required to overload this, since the default
+   * \returns The vector component \p i at coordinate \p p and time \p
+   * time.
+   *
+   * \note Subclasses aren't required to override this, since the default
    * implementation is based on the full vector evaluation, which is
    * often correct.
-   * Subclasses are recommended to overload this, since the default
+   *
+   * \note Subclasses are recommended to override this, since the default
    * implementation is based on a vector evaluation, which is usually
    * unnecessarily inefficient.
    */

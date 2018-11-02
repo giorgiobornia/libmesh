@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -32,6 +32,7 @@
 #include "libmesh/system.h"
 #include "libmesh/numeric_vector.h"
 #include "libmesh/string_to_enum.h"
+#include "libmesh/enum_elem_type.h"
 
 #ifdef DEBUG
 #include "libmesh/mesh_tools.h"  // for elem_types warning
@@ -61,6 +62,7 @@ void init_element_equivalence_map()
       element_equivalence_map["SPHERE"] = NODEELEM;
 
       // EDGE2 equivalences
+      element_equivalence_map["EDGE"]   = EDGE2;
       element_equivalence_map["EDGE2"]  = EDGE2;
       element_equivalence_map["TRUSS"]  = EDGE2;
       element_equivalence_map["BEAM"]   = EDGE2;
@@ -78,12 +80,16 @@ void init_element_equivalence_map()
       // QUAD4 equivalences
       element_equivalence_map["QUAD"]   = QUAD4;
       element_equivalence_map["QUAD4"]  = QUAD4;
-      // element_equivalence_map["SHELL"]  = QUAD4;
-      // element_equivalence_map["SHELL4"] = QUAD4;
+
+      // QUADSHELL4 equivalences
+      element_equivalence_map["SHELL"]  = QUADSHELL4;
+      element_equivalence_map["SHELL4"] = QUADSHELL4;
 
       // QUAD8 equivalences
       element_equivalence_map["QUAD8"]  = QUAD8;
-      // element_equivalence_map["SHELL8"] = QUAD8;
+
+      // QUADSHELL8 equivalences
+      element_equivalence_map["SHELL8"] = QUADSHELL8;
 
       // QUAD9 equivalences
       element_equivalence_map["QUAD9"]  = QUAD9;
@@ -93,8 +99,10 @@ void init_element_equivalence_map()
       element_equivalence_map["TRI"]       = TRI3;
       element_equivalence_map["TRI3"]      = TRI3;
       element_equivalence_map["TRIANGLE"]  = TRI3;
-      // element_equivalence_map["TRISHELL"]  = TRI3;
-      // element_equivalence_map["TRISHELL3"] = TRI3;
+
+      // TRISHELL3 equivalences
+      element_equivalence_map["TRISHELL"]  = TRISHELL3;
+      element_equivalence_map["TRISHELL3"] = TRISHELL3;
 
       // TRI6 equivalences
       element_equivalence_map["TRI6"]      = TRI6;
@@ -169,11 +177,14 @@ const int ExodusII_IO_Helper::ElementMaps::tri6_node_map[6]  = {0, 1, 2, 3, 4, 5
 // 2D edge map definitions
 const int ExodusII_IO_Helper::ElementMaps::tri_edge_map[3] = {0, 1, 2};
 const int ExodusII_IO_Helper::ElementMaps::quad_edge_map[4] = {0, 1, 2, 3};
-const int ExodusII_IO_Helper::ElementMaps::cubit14_plus_workaround_tri_edge_map[5] = {99, 99, 0, 1, 2};
+const int ExodusII_IO_Helper::ElementMaps::trishell3_edge_map[3] = {0, 1, 2};
+const int ExodusII_IO_Helper::ElementMaps::quadshell4_edge_map[4] = {0, 1, 2, 3};
 
 //These take a libMesh ID and turn it into an Exodus ID
 const int ExodusII_IO_Helper::ElementMaps::tri_inverse_edge_map[3] = {1, 2, 3};
 const int ExodusII_IO_Helper::ElementMaps::quad_inverse_edge_map[4] = {1, 2, 3, 4};
+const int ExodusII_IO_Helper::ElementMaps::trishell3_inverse_edge_map[3] = {3, 4, 5};
+const int ExodusII_IO_Helper::ElementMaps::quadshell4_inverse_edge_map[4] = {3, 4, 5, 6};
 
 // 3D node map definitions
 const int ExodusII_IO_Helper::ElementMaps::hex8_node_map[8]   = {0, 1, 2, 3, 4, 5, 6, 7};
@@ -216,6 +227,14 @@ const int ExodusII_IO_Helper::ElementMaps::pyramid5_node_map[5] = {0, 1, 2, 3, 4
 const int ExodusII_IO_Helper::ElementMaps::pyramid13_node_map[13] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
 const int ExodusII_IO_Helper::ElementMaps::pyramid14_node_map[14] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13};
 
+// Shell element face maps
+const int ExodusII_IO_Helper::ElementMaps::trishell3_shellface_map[2] = {0, 1};
+const int ExodusII_IO_Helper::ElementMaps::quadshell4_shellface_map[2] = {0, 1};
+
+//These take a libMesh ID and turn it into an Exodus ID
+const int ExodusII_IO_Helper::ElementMaps::trishell3_inverse_shellface_map[2] = {1, 2};
+const int ExodusII_IO_Helper::ElementMaps::quadshell4_inverse_shellface_map[2] = {1, 2};
+
 // 3D face map definitions
 const int ExodusII_IO_Helper::ElementMaps::tet_face_map[4]     = {1, 2, 3, 0};
 
@@ -223,7 +242,10 @@ const int ExodusII_IO_Helper::ElementMaps::hex_face_map[6]     = {1, 2, 3, 4, 0,
 const int ExodusII_IO_Helper::ElementMaps::hex27_face_map[6]   = {1, 2, 3, 4, 0, 5};
 //const int ExodusII_IO_Helper::ElementMaps::hex27_face_map[6]   = {1, 0, 3, 5, 4, 2};
 const int ExodusII_IO_Helper::ElementMaps::prism_face_map[5]   = {1, 2, 3, 0, 4};
-const int ExodusII_IO_Helper::ElementMaps::pyramid_face_map[5] = {-1,-1,-1,-1,-1}; // Not Implemented!
+
+// Pyramids are not included in the ExodusII specification. The ordering below matches
+// the sideset ordering that CUBIT generates.
+const int ExodusII_IO_Helper::ElementMaps::pyramid_face_map[5] = {0, 1, 2, 3, 4};
 
 //These take a libMesh ID and turn it into an Exodus ID
 const int ExodusII_IO_Helper::ElementMaps::tet_inverse_face_map[4]     = {4, 1, 2, 3};
@@ -231,7 +253,10 @@ const int ExodusII_IO_Helper::ElementMaps::hex_inverse_face_map[6]     = {5, 1, 
 const int ExodusII_IO_Helper::ElementMaps::hex27_inverse_face_map[6]   = {5, 1, 2, 3, 4, 6};
 //const int ExodusII_IO_Helper::ElementMaps::hex27_inverse_face_map[6]   = {2, 1, 6, 3, 5, 4};
 const int ExodusII_IO_Helper::ElementMaps::prism_inverse_face_map[5]   = {4, 1, 2, 3, 5};
-const int ExodusII_IO_Helper::ElementMaps::pyramid_inverse_face_map[5] = {-1,-1,-1,-1,-1}; // Not Implemented!
+
+// Pyramids are not included in the ExodusII specification. The ordering below matches
+// the sideset ordering that CUBIT generates.
+const int ExodusII_IO_Helper::ElementMaps::pyramid_inverse_face_map[5] = {1, 2, 3, 4, 5};
 
 
 
@@ -265,7 +290,6 @@ ExodusII_IO_Helper::ExodusII_IO_Helper(const ParallelObject & parent,
   verbose(v),
   opened_for_writing(false),
   opened_for_reading(false),
-  is_cubit14_plus(false),
   _run_only_on_proc0(run_only_on_proc0),
   _elem_vars_initialized(false),
   _global_vars_initialized(false),
@@ -312,10 +336,15 @@ void ExodusII_IO_Helper::open(const char * filename, bool read_only)
   // Version of Exodus you are using
   float ex_version = 0.;
 
-  // Word size in bytes of the floating point variables used in the
-  // application program.  Exodus only supports 4-byte and 8-byte
-  // floats.
-  int comp_ws = std::min(sizeof(Real), std::size_t(8));
+  int comp_ws = 0;
+
+  if (_single_precision)
+    comp_ws = cast_int<int>(sizeof(float));
+
+  // Fall back on double precision when necessary since ExodusII
+  // doesn't seem to support long double
+  else
+    comp_ws = cast_int<int>(std::min(sizeof(Real), sizeof(double)));
 
   // Word size in bytes of the floating point data as they are stored
   // in the ExodusII file.  "If this argument is 0, the word size of the
@@ -409,30 +438,6 @@ void ExodusII_IO_Helper::read_qa_records()
             }
         }
 
-      // Detect whether the file we're reading was generated by
-      // Cubit-14+, and set a flag on the helper if so.
-      for (int i=0; i<num_qa_rec; i++)
-        {
-          if (std::string(qa_record[i][0]).find("CUBIT") != std::string::npos)
-            {
-              // Try to convert field [1] of this QA record to a number.
-              char * endptr;
-              long cubit_version = std::strtol(qa_record[i][1], &endptr, /*base=*/10);
-
-              // If there were no digits at all, strtol stores the
-              // input value in endptr.  In that case, we won't assume
-              // this is a Cubit 14+ file...
-              if (endptr != qa_record[i][1])
-                {
-                  if (verbose)
-                    libMesh::out << "Detected Cubit major version " << cubit_version << std::endl;
-
-                  if (cubit_version >= 14)
-                    is_cubit14_plus = true;
-                }
-            }
-        }
-
 
       // Clean up dynamically-allocated memory
       for (int i=0; i<num_qa_rec; i++)
@@ -482,7 +487,7 @@ void ExodusII_IO_Helper::read_node_num_map ()
   node_num_map.resize(num_nodes);
 
   ex_err = exII::ex_get_node_num_map (ex_id,
-                                      node_num_map.empty() ? libmesh_nullptr : &node_num_map[0]);
+                                      node_num_map.empty() ? nullptr : &node_num_map[0]);
 
   EX_CHECK_ERR(ex_err, "Error retrieving nodal number map.");
   message("Nodal numbering map retrieved successfully.");
@@ -510,7 +515,7 @@ void ExodusII_IO_Helper::read_block_info()
   block_ids.resize(num_elem_blk);
   // Get all element block IDs.
   ex_err = exII::ex_get_elem_blk_ids(ex_id,
-                                     block_ids.empty() ? libmesh_nullptr : &block_ids[0]);
+                                     block_ids.empty() ? nullptr : &block_ids[0]);
   // Usually, there is only one
   // block since there is only
   // one type of element.
@@ -632,7 +637,7 @@ void ExodusII_IO_Helper::read_elem_num_map ()
   elem_num_map.resize(num_elem);
 
   ex_err = exII::ex_get_elem_num_map (ex_id,
-                                      elem_num_map.empty() ? libmesh_nullptr : &elem_num_map[0]);
+                                      elem_num_map.empty() ? nullptr : &elem_num_map[0]);
 
   EX_CHECK_ERR(ex_err, "Error retrieving element number map.");
   message("Element numbering map retrieved successfully.");
@@ -864,7 +869,7 @@ void ExodusII_IO_Helper::read_nodal_var_values(std::string nodal_var_name, int t
   if (!found)
     {
       libMesh::err << "Available variables: " << std::endl;
-      for (unsigned int i=0; i<nodal_var_names.size(); ++i)
+      for (std::size_t i=0; i<nodal_var_names.size(); ++i)
         libMesh::err << nodal_var_names[i] << std::endl;
 
       libmesh_error_msg("Unable to locate variable named: " << nodal_var_name);
@@ -973,24 +978,24 @@ void ExodusII_IO_Helper::write_var_names_impl(const char * var_type, int & count
   ex_err = exII::ex_put_var_param(ex_id, var_type, count);
   EX_CHECK_ERR(ex_err, "Error setting number of vars.");
 
-  if (names.size() > 0)
+  if (count > 0)
     {
-      NamesData names_table(names.size(), MAX_STR_LENGTH);
+      NamesData names_table(count, MAX_STR_LENGTH);
 
       // Store the input names in the format required by Exodus.
-      for (unsigned i=0; i<names.size(); ++i)
+      for (int i=0; i != count; ++i)
         names_table.push_back_entry(names[i]);
 
       if (verbose)
         {
           libMesh::out << "Writing variable name(s) to file: " << std::endl;
-          for (unsigned i=0; i<names.size(); ++i)
+          for (int i=0; i != count; ++i)
             libMesh::out << names_table.get_char_star(i) << std::endl;
         }
 
       ex_err = exII::ex_put_var_names(ex_id,
                                       var_type,
-                                      cast_int<int>(names.size()),
+                                      count,
                                       names_table.get_char_star_star()
                                       );
 
@@ -1007,11 +1012,11 @@ void ExodusII_IO_Helper::read_elemental_var_values(std::string elemental_var_nam
   this->read_var_names(ELEMENTAL);
 
   // See if we can find the variable we are looking for
-  unsigned var_index = 0;
+  unsigned int var_index = 0;
   bool found = false;
 
   // Do a linear search for nodal_var_name in nodal_var_names
-  for (; var_index<elem_var_names.size(); ++var_index)
+  for (; var_index != elem_var_names.size(); ++var_index)
     if (elem_var_names[var_index] == elemental_var_name)
       {
         found = true;
@@ -1021,7 +1026,7 @@ void ExodusII_IO_Helper::read_elemental_var_values(std::string elemental_var_nam
   if (!found)
     {
       libMesh::err << "Available variables: " << std::endl;
-      for (unsigned i=0; i<elem_var_names.size(); ++i)
+      for (std::size_t i=0; i<elem_var_names.size(); ++i)
         libMesh::err << elem_var_names[i] << std::endl;
 
       libmesh_error_msg("Unable to locate variable named: " << elemental_var_name);
@@ -1034,10 +1039,10 @@ void ExodusII_IO_Helper::read_elemental_var_values(std::string elemental_var_nam
     {
       ex_err = exII::ex_get_elem_block(ex_id,
                                        block_ids[i],
-                                       libmesh_nullptr,
+                                       nullptr,
                                        &num_elem_this_blk,
-                                       libmesh_nullptr,
-                                       libmesh_nullptr);
+                                       nullptr,
+                                       nullptr);
       EX_CHECK_ERR(ex_err, "Error getting number of elements in block.");
 
       std::vector<Real> block_elem_var_values(num_elem);
@@ -1078,7 +1083,7 @@ void ExodusII_IO_Helper::create(std::string filename)
         comp_ws = 0,
         io_ws = 0;
 
-      if(_single_precision)
+      if (_single_precision)
         {
           comp_ws = cast_int<int>(sizeof(float));
           io_ws = cast_int<int>(sizeof(float));
@@ -1134,31 +1139,41 @@ void ExodusII_IO_Helper::initialize(std::string str_title, const MeshBase & mesh
     }
   else
     {
-      MeshBase::const_element_iterator       it  = mesh.active_elements_begin();
-      const MeshBase::const_element_iterator end = mesh.active_elements_end();
-      for (; it!=end; ++it)
-        num_nodes += (*it)->n_nodes();
+      for (const auto & elem : mesh.active_element_ptr_range())
+        num_nodes += elem->n_nodes();
     }
 
   std::vector<boundary_id_type> unique_side_boundaries;
   std::vector<boundary_id_type> unique_node_boundaries;
 
   mesh.get_boundary_info().build_side_boundary_ids(unique_side_boundaries);
+  {
+    // Add shell face boundaries to the list of side boundaries, since ExodusII
+    // treats these the same way.
+    std::vector<boundary_id_type> shellface_boundaries;
+    mesh.get_boundary_info().build_shellface_boundary_ids(shellface_boundaries);
+    for (std::size_t i=0; i<shellface_boundaries.size(); i++)
+      unique_side_boundaries.push_back(shellface_boundaries[i]);
+  }
   mesh.get_boundary_info().build_node_boundary_ids(unique_node_boundaries);
 
   num_side_sets = cast_int<int>(unique_side_boundaries.size());
   num_node_sets = cast_int<int>(unique_node_boundaries.size());
 
   //loop through element and map between block and element vector
-  std::map<subdomain_id_type, std::vector<unsigned int>  > subdomain_map;
+  std::map<subdomain_id_type, std::vector<unsigned int>> subdomain_map;
 
-  MeshBase::const_element_iterator it = mesh.active_elements_begin();
-  const MeshBase::const_element_iterator end = mesh.active_elements_end();
-  for (; it!=end; ++it)
+  for (const auto & elem : mesh.active_element_ptr_range())
     {
-      const Elem * elem = *it;
-      subdomain_id_type cur_subdomain = elem->subdomain_id();
+      // We skip writing infinite elements to the Exodus file, so
+      // don't put them in the subdomain_map. That way the number of
+      // blocks should be correct.
+#ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
+      if (elem->infinite())
+        continue;
+#endif
 
+      subdomain_id_type cur_subdomain = elem->subdomain_id();
       subdomain_map[cur_subdomain].push_back(elem->id());
     }
   num_elem_blk = cast_int<int>(subdomain_map.size());
@@ -1217,11 +1232,9 @@ void ExodusII_IO_Helper::write_nodal_coordinates(const MeshBase & mesh, bool use
 
   if (!use_discontinuous)
     {
-      MeshBase::const_node_iterator it = mesh.nodes_begin();
-      const MeshBase::const_node_iterator end = mesh.nodes_end();
-      for (; it != end; ++it)
+      for (const auto & node_ptr : mesh.node_ptr_range())
         {
-          const Node & node = **it;
+          const Node & node = *node_ptr;
 
           x.push_back(node(0) + _coordinate_offset(0));
 
@@ -1247,35 +1260,28 @@ void ExodusII_IO_Helper::write_nodal_coordinates(const MeshBase & mesh, bool use
     }
   else
     {
-      MeshBase::const_element_iterator it  = mesh.active_elements_begin();
-      const MeshBase::const_element_iterator end = mesh.active_elements_end();
-
-      for (; it!=end; ++it)
-        {
-          const Elem * elem = *it;
-
-          for (unsigned int n=0; n<elem->n_nodes(); n++)
-            {
-              x.push_back(elem->point(n)(0));
+      for (const auto & elem : mesh.active_element_ptr_range())
+        for (unsigned int n=0; n<elem->n_nodes(); n++)
+          {
+            x.push_back(elem->point(n)(0));
 #if LIBMESH_DIM > 1
-              y.push_back(elem->point(n)(1));
+            y.push_back(elem->point(n)(1));
 #else
-              y.push_back(0.);
+            y.push_back(0.);
 #endif
 #if LIBMESH_DIM > 2
-              z.push_back(elem->point(n)(2));
+            z.push_back(elem->point(n)(2));
 #else
-              z.push_back(0.);
+            z.push_back(0.);
 #endif
 
-              // Let's skip the node_num_map in the discontinuous
-              // case, since we're effectively duplicating nodes for
-              // the sake of discontinuous visualization, so it isn't
-              // clear how to deal with node_num_map here. This means
-              // that writing discontinuous meshes won't work with
-              // element numberings that have "holes".
-            }
-        }
+            // Let's skip the node_num_map in the discontinuous
+            // case, since we're effectively duplicating nodes for
+            // the sake of discontinuous visualization, so it isn't
+            // clear how to deal with node_num_map here. This means
+            // that writing discontinuous meshes won't work with
+            // element numberings that have "holes".
+          }
     }
 
   if (_single_precision)
@@ -1286,16 +1292,16 @@ void ExodusII_IO_Helper::write_nodal_coordinates(const MeshBase & mesh, bool use
         z_single(z.begin(), z.end());
 
       ex_err = exII::ex_put_coord(ex_id,
-                                  x_single.empty() ? libmesh_nullptr : &x_single[0],
-                                  y_single.empty() ? libmesh_nullptr : &y_single[0],
-                                  z_single.empty() ? libmesh_nullptr : &z_single[0]);
+                                  x_single.empty() ? nullptr : &x_single[0],
+                                  y_single.empty() ? nullptr : &y_single[0],
+                                  z_single.empty() ? nullptr : &z_single[0]);
     }
   else
     {
       ex_err = exII::ex_put_coord(ex_id,
-                                  x.empty() ? libmesh_nullptr : &x[0],
-                                  y.empty() ? libmesh_nullptr : &y[0],
-                                  z.empty() ? libmesh_nullptr : &z[0]);
+                                  x.empty() ? nullptr : &x[0],
+                                  y.empty() ? nullptr : &y[0],
+                                  z.empty() ? nullptr : &z[0]);
     }
 
 
@@ -1321,15 +1327,20 @@ void ExodusII_IO_Helper::write_elements(const MeshBase & mesh, bool use_disconti
 
   // Map from block ID to a vector of element IDs in that block.  Element
   // IDs are now of type dof_id_type, subdomain IDs are of type subdomain_id_type.
-  typedef std::map<subdomain_id_type, std::vector<dof_id_type> > subdomain_map_type;
+  typedef std::map<subdomain_id_type, std::vector<dof_id_type>> subdomain_map_type;
   subdomain_map_type subdomain_map;
 
-  MeshBase::const_element_iterator mesh_it = mesh.active_elements_begin();
-  const MeshBase::const_element_iterator end = mesh.active_elements_end();
-  //loop through element and map between block and element vector
-  for (; mesh_it!=end; ++mesh_it)
+  // Loop through element and map between block and element vector.
+  for (const auto & elem : mesh.active_element_ptr_range())
     {
-      const Elem * elem = *mesh_it;
+      // We skip writing infinite elements to the Exodus file, so
+      // don't put them in the subdomain_map. That way the number of
+      // blocks should be correct.
+#ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
+      if (elem->infinite())
+        continue;
+#endif
+
       subdomain_map[ elem->subdomain_id() ].push_back(elem->id());
     }
 
@@ -1339,54 +1350,97 @@ void ExodusII_IO_Helper::write_elements(const MeshBase & mesh, bool use_disconti
   elem_num_map.resize(n_active_elem);
   std::vector<int>::iterator curr_elem_map_end = elem_num_map.begin();
 
+  std::vector<int> elem_blk_id;
+  std::vector<int> num_elem_this_blk_vec;
+  std::vector<int> num_nodes_per_elem_vec;
+  std::vector<int> num_attr_vec;
+  NamesData elem_type_table(num_elem_blk, MAX_STR_LENGTH);
+
   // Note: It appears that there is a bug in exodusII::ex_put_name where
-  // the index returned from the ex_id_lkup is erronously used.  For now
+  // the index returned from the ex_id_lkup is erroneously used.  For now
   // the work around is to use the alternative function ex_put_names, but
-  // this function requires a char ** datastructure.
+  // this function requires a char ** data structure.
   NamesData names_table(num_elem_blk, MAX_STR_LENGTH);
+
+  // counter indexes into the block_ids vector
+  unsigned int counter = 0;
+  for (auto & pr : subdomain_map)
+    {
+      block_ids[counter] = pr.first;
+      names_table.push_back_entry(mesh.subdomain_name(pr.first));
+
+      // Get a reference to a vector of element IDs for this subdomain.
+      subdomain_map_type::mapped_type & tmp_vec = pr.second;
+
+      // Use the first element in this block to get representative information.
+      // Note that Exodus assumes all elements in a block are of the same type!
+      // We are using that same assumption here!
+      ExodusII_IO_Helper::ElementMaps em;
+      const ExodusII_IO_Helper::Conversion conv =
+        em.assign_conversion(mesh.elem_ref(tmp_vec[0]).type());
+      num_nodes_per_elem = mesh.elem_ref(tmp_vec[0]).n_nodes();
+
+      elem_blk_id.push_back(pr.first);
+      elem_type_table.push_back_entry(conv.exodus_elem_type().c_str());
+      num_elem_this_blk_vec.push_back(cast_int<int>(tmp_vec.size()));
+      num_nodes_per_elem_vec.push_back(num_nodes_per_elem);
+      num_attr_vec.push_back(0); // we don't currently use elem block attributes.
+      ++counter;
+    }
+
+  // The "define_maps" parameter should be 0 if node_number_map and
+  // elem_number_map will not be written later, and nonzero otherwise.
+  ex_err = exII::ex_put_concat_elem_block(ex_id,
+                                          &elem_blk_id[0],
+                                          elem_type_table.get_char_star_star(),
+                                          &num_elem_this_blk_vec[0],
+                                          &num_nodes_per_elem_vec[0],
+                                          &num_attr_vec[0],
+                                          /*define_maps=*/0);
+  EX_CHECK_ERR(ex_err, "Error writing element blocks.");
 
   // This counter is used to fill up the libmesh_elem_num_to_exodus map in the loop below.
   unsigned libmesh_elem_num_to_exodus_counter = 0;
 
-  // counter indexes into the block_ids vector
-  unsigned int counter = 0;
+  // In the case of discontinuous plotting we initialize a map from (element,node) pairs
+  // to the corresponding discontinuous node index. This ordering must match the ordering
+  // used in write_nodal_coordinates.
+  std::map< std::pair<dof_id_type,unsigned int>, dof_id_type > discontinuous_node_indices;
+  if (use_discontinuous)
+  {
+    dof_id_type node_counter = 1; // Exodus numbering is 1-based
+    for (const auto & elem : mesh.active_element_ptr_range())
+      for (unsigned int n=0; n<elem->n_nodes(); n++)
+        {
+          std::pair<dof_id_type,unsigned int> id_pair;
+          id_pair.first = elem->id();
+          id_pair.second = n;
+          discontinuous_node_indices[id_pair] = node_counter;
+          node_counter++;
+        }
+  }
 
-  // node counter for discontinuous plotting
-  unsigned int node_counter = 0;
-
-  for (subdomain_map_type::iterator it=subdomain_map.begin(); it!=subdomain_map.end(); ++it)
+  for (auto & pr : subdomain_map)
     {
-      block_ids[counter] = (*it).first;
-      names_table.push_back_entry(mesh.subdomain_name((*it).first));
-
       // Get a reference to a vector of element IDs for this subdomain.
-      subdomain_map_type::mapped_type & tmp_vec = (*it).second;
-
-      ExodusII_IO_Helper::ElementMaps em(*this);
+      subdomain_map_type::mapped_type & tmp_vec = pr.second;
 
       //Use the first element in this block to get representative information.
       //Note that Exodus assumes all elements in a block are of the same type!
       //We are using that same assumption here!
-      const ExodusII_IO_Helper::Conversion conv = em.assign_conversion(mesh.elem(tmp_vec[0])->type());
-      num_nodes_per_elem = mesh.elem(tmp_vec[0])->n_nodes();
-
-      ex_err = exII::ex_put_elem_block(ex_id,
-                                       (*it).first,
-                                       conv.exodus_elem_type().c_str(),
-                                       tmp_vec.size(),
-                                       num_nodes_per_elem,
-                                       /*num_attr=*/0);
-
-      EX_CHECK_ERR(ex_err, "Error writing element block.");
+      ExodusII_IO_Helper::ElementMaps em;
+      const ExodusII_IO_Helper::Conversion conv =
+        em.assign_conversion(mesh.elem_ref(tmp_vec[0]).type());
+      num_nodes_per_elem = mesh.elem_ref(tmp_vec[0]).n_nodes();
 
       connect.resize(tmp_vec.size()*num_nodes_per_elem);
 
-      for (unsigned int i=0; i<tmp_vec.size(); i++)
+      for (std::size_t i=0; i<tmp_vec.size(); i++)
         {
           unsigned int elem_id = tmp_vec[i];
           libmesh_elem_num_to_exodus[elem_id] = ++libmesh_elem_num_to_exodus_counter; // 1-based indexing for Exodus
 
-          const Elem * elem = mesh.elem(elem_id);
+          const Elem & elem = mesh.elem_ref(elem_id);
 
           // We *might* be able to get away with writing mixed element
           // types which happen to have the same number of nodes, but
@@ -1398,10 +1452,10 @@ void ExodusII_IO_Helper::write_elements(const MeshBase & mesh, bool use_disconti
           // This needs to be more than an assert so we don't fail
           // with a mysterious segfault while trying to write mixed
           // element meshes in optimized mode.
-          if (elem->type() != conv.get_canonical_type())
+          if (elem.type() != conv.get_canonical_type())
             libmesh_error_msg("Error: Exodus requires all elements with a given subdomain ID to be the same type.\n" \
                               << "Can't write both "                  \
-                              << Utility::enum_to_string(elem->type()) \
+                              << Utility::enum_to_string(elem.type()) \
                               << " and "                              \
                               << Utility::enum_to_string(conv.get_canonical_type()) \
                               << " in the same block!");
@@ -1409,7 +1463,7 @@ void ExodusII_IO_Helper::write_elements(const MeshBase & mesh, bool use_disconti
 
           for (unsigned int j=0; j<static_cast<unsigned int>(num_nodes_per_elem); ++j)
             {
-              unsigned connect_index   = (i*num_nodes_per_elem)+j;
+              unsigned int connect_index   = cast_int<unsigned int>((i*num_nodes_per_elem)+j);
               unsigned elem_node_index = conv.get_inverse_node_map(j); // inverse node map is for writing.
               if (verbose)
                 {
@@ -1420,7 +1474,7 @@ void ExodusII_IO_Helper::write_elements(const MeshBase & mesh, bool use_disconti
               if (!use_discontinuous)
                 {
                   // The global id for the current node in libmesh.
-                  dof_id_type libmesh_node_id = elem->node(elem_node_index);
+                  dof_id_type libmesh_node_id = elem.node_id(elem_node_index);
 
                   // Find the zero-based libmesh id in the map, this
                   // should be faster than doing linear searches on
@@ -1439,18 +1493,19 @@ void ExodusII_IO_Helper::write_elements(const MeshBase & mesh, bool use_disconti
                 }
               else
                 {
-                  // FIXME: We are hard-coding the 1-based node
-                  // numbering assumption here, so writing
-                  // "discontinuous" Exodus files won't work with node
-                  // numberings that have "holes".
-                  connect[connect_index] = node_counter*num_nodes_per_elem+elem_node_index+1;
+                  std::pair<dof_id_type,unsigned int> id_pair;
+                  id_pair.first = elem_id;
+                  id_pair.second = elem_node_index;
+                  auto node_it = discontinuous_node_indices.find(id_pair);
+
+                  libmesh_assert(node_it != discontinuous_node_indices.end());
+
+                  connect[connect_index] = node_it->second;
                 }
             }
-
-          node_counter++;
         }
 
-      ex_err = exII::ex_put_elem_conn(ex_id, (*it).first, &connect[0]);
+      ex_err = exII::ex_put_elem_conn(ex_id, pr.first, &connect[0]);
       EX_CHECK_ERR(ex_err, "Error writing element connectivities");
 
       // This transform command stores its result in a range that begins at the third argument,
@@ -1464,8 +1519,6 @@ void ExodusII_IO_Helper::write_elements(const MeshBase & mesh, bool use_disconti
       // of tmp_vec into elem_map in the right location, we can use
       // std::copy().
       // curr_elem_map_end = std::copy(tmp_vec.begin(), tmp_vec.end(), curr_elem_map_end);
-
-      counter++;
     }
 
   // write out the element number map that we created
@@ -1478,6 +1531,7 @@ void ExodusII_IO_Helper::write_elements(const MeshBase & mesh, bool use_disconti
       ex_err = exII::ex_put_names(ex_id, exII::EX_ELEM_BLOCK, names_table.get_char_star_star());
       EX_CHECK_ERR(ex_err, "Error writing element names");
     }
+
 }
 
 
@@ -1488,65 +1542,102 @@ void ExodusII_IO_Helper::write_sidesets(const MeshBase & mesh)
   if ((_run_only_on_proc0) && (this->processor_id() != 0))
     return;
 
-  ExodusII_IO_Helper::ElementMaps em(*this);
-
-  std::vector< dof_id_type > el;
-  std::vector< unsigned short int > sl;
-  std::vector< boundary_id_type > il;
-
-  mesh.get_boundary_info().build_side_list(el, sl, il);
+  ExodusII_IO_Helper::ElementMaps em;
 
   // Maps from sideset id to the element and sides
-  std::map<int, std::vector<int> > elem;
-  std::map<int, std::vector<int> > side;
+  std::map<int, std::vector<int>> elem;
+  std::map<int, std::vector<int>> side;
+  std::vector<boundary_id_type> side_boundary_ids;
 
-  // Accumulate the vectors to pass into ex_put_side_set
-  for (unsigned int i=0; i<el.size(); i++)
-    {
-      std::vector<const Elem *> family;
+  {
+    // Accumulate the vectors to pass into ex_put_side_set
+    // build_side_list() returns a vector of (elem, side, bc) tuples.
+    for (const auto & t : mesh.get_boundary_info().build_side_list())
+      {
+        std::vector<const Elem *> family;
 #ifdef LIBMESH_ENABLE_AMR
-      /**
-       * We need to build up active elements if AMR is enabled and add
-       * them to the exodus sidesets instead of the potentially inactive "parent" elements
-       */
-      mesh.elem(el[i])->active_family_tree_by_side(family, sl[i], false);
+        /**
+         * We need to build up active elements if AMR is enabled and add
+         * them to the exodus sidesets instead of the potentially inactive "parent" elements
+         */
+        mesh.elem_ref(std::get<0>(t)).active_family_tree_by_side(family, std::get<1>(t), false);
 #else
-      family.push_back(mesh.elem(el[i]));
+        family.push_back(mesh.elem_ptr(std::get<0>(t)));
 #endif
 
-      for (unsigned int j=0; j<family.size(); ++j)
-        {
-          const ExodusII_IO_Helper::Conversion conv = em.assign_conversion(mesh.elem(family[j]->id())->type());
+        for (std::size_t j=0; j<family.size(); ++j)
+          {
+            const ExodusII_IO_Helper::Conversion conv =
+              em.assign_conversion(mesh.elem_ptr(family[j]->id())->type());
 
-          // Use the libmesh to exodus datastructure map to get the proper sideset IDs
-          // The datastructure contains the "collapsed" contiguous ids
-          elem[il[i]].push_back(libmesh_elem_num_to_exodus[family[j]->id()]);
-          side[il[i]].push_back(conv.get_inverse_side_map(sl[i]));
-        }
-    }
+            // Use the libmesh to exodus data structure map to get the proper sideset IDs
+            // The data structure contains the "collapsed" contiguous ids
+            elem[std::get<2>(t)].push_back(libmesh_elem_num_to_exodus[family[j]->id()]);
+            side[std::get<2>(t)].push_back(conv.get_inverse_side_map(std::get<1>(t)));
+          }
+      }
 
-  std::vector<boundary_id_type> side_boundary_ids;
-  mesh.get_boundary_info().build_side_boundary_ids(side_boundary_ids);
+    mesh.get_boundary_info().build_side_boundary_ids(side_boundary_ids);
+  }
+
+  {
+    // add data for shell faces, if needed
+
+    // Accumulate the vectors to pass into ex_put_side_set
+    for (const auto & t : mesh.get_boundary_info().build_shellface_list())
+      {
+        std::vector<const Elem *> family;
+#ifdef LIBMESH_ENABLE_AMR
+        /**
+         * We need to build up active elements if AMR is enabled and add
+         * them to the exodus sidesets instead of the potentially inactive "parent" elements
+         */
+        mesh.elem_ref(std::get<0>(t)).active_family_tree_by_side(family, std::get<1>(t), false);
+#else
+        family.push_back(mesh.elem_ptr(std::get<0>(t)));
+#endif
+
+        for (std::size_t j=0; j<family.size(); ++j)
+          {
+            const ExodusII_IO_Helper::Conversion conv =
+              em.assign_conversion(mesh.elem_ptr(family[j]->id())->type());
+
+            // Use the libmesh to exodus data structure map to get the proper sideset IDs
+            // The data structure contains the "collapsed" contiguous ids
+            elem[std::get<2>(t)].push_back(libmesh_elem_num_to_exodus[family[j]->id()]);
+            side[std::get<2>(t)].push_back(conv.get_inverse_shellface_map(std::get<1>(t)));
+          }
+      }
+
+    std::vector<boundary_id_type> shellface_boundary_ids;
+    mesh.get_boundary_info().build_shellface_boundary_ids(shellface_boundary_ids);
+    for (std::size_t i=0; i<shellface_boundary_ids.size(); i++)
+      side_boundary_ids.push_back(shellface_boundary_ids[i]);
+  }
 
   // Write out the sideset names, but only if there is something to write
   if (side_boundary_ids.size() > 0)
     {
       NamesData names_table(side_boundary_ids.size(), MAX_STR_LENGTH);
 
-      for (unsigned int i=0; i<side_boundary_ids.size(); i++)
+      std::vector<exII::ex_set> sets(side_boundary_ids.size());
+
+      for (std::size_t i=0; i<side_boundary_ids.size(); i++)
         {
           boundary_id_type ss_id = side_boundary_ids[i];
-
-          int actual_id = ss_id;
-
           names_table.push_back_entry(mesh.get_boundary_info().get_sideset_name(ss_id));
 
-          ex_err = exII::ex_put_side_set_param(ex_id, actual_id, elem[ss_id].size(), 0);
-          EX_CHECK_ERR(ex_err, "Error writing sideset parameters");
-
-          ex_err = exII::ex_put_side_set(ex_id, actual_id, &elem[ss_id][0], &side[ss_id][0]);
-          EX_CHECK_ERR(ex_err, "Error writing sidesets");
+          sets[i].id = ss_id;
+          sets[i].type = exII::EX_SIDE_SET;
+          sets[i].num_entry = elem[ss_id].size();
+          sets[i].num_distribution_factor = 0;
+          sets[i].entry_list = &elem[ss_id][0];
+          sets[i].extra_list = &side[ss_id][0];
+          sets[i].distribution_factor_list = nullptr;
         }
+
+      ex_err = exII::ex_put_sets(ex_id, side_boundary_ids.size(), &sets[0]);
+      EX_CHECK_ERR(ex_err, "Error writing sidesets");
 
       ex_err = exII::ex_put_names(ex_id, exII::EX_SIDE_SET, names_table.get_char_star_star());
       EX_CHECK_ERR(ex_err, "Error writing sideset names");
@@ -1560,17 +1651,13 @@ void ExodusII_IO_Helper::write_nodesets(const MeshBase & mesh)
   if ((_run_only_on_proc0) && (this->processor_id() != 0))
     return;
 
-  std::vector< dof_id_type > nl;
-  std::vector< boundary_id_type > il;
-
-  mesh.get_boundary_info().build_node_list(nl, il);
-
   // Maps from nodeset id to the nodes
-  std::map<boundary_id_type, std::vector<int> > node;
+  std::map<boundary_id_type, std::vector<int>> node;
 
   // Accumulate the vectors to pass into ex_put_node_set
-  for (unsigned int i=0; i<nl.size(); i++)
-    node[il[i]].push_back(nl[i]+1);
+  // build_node_list() builds a list of (node-id, bc-id) tuples.
+  for (const auto & t : mesh.get_boundary_info().build_node_list())
+    node[std::get<1>(t)].push_back(std::get<0>(t) + 1);
 
   std::vector<boundary_id_type> node_boundary_ids;
   mesh.get_boundary_info().build_node_boundary_ids(node_boundary_ids);
@@ -1580,7 +1667,7 @@ void ExodusII_IO_Helper::write_nodesets(const MeshBase & mesh)
     {
       NamesData names_table(node_boundary_ids.size(), MAX_STR_LENGTH);
 
-      for (unsigned int i=0; i<node_boundary_ids.size(); i++)
+      for (std::size_t i=0; i<node_boundary_ids.size(); i++)
         {
           boundary_id_type nodeset_id = node_boundary_ids[i];
 
@@ -1603,7 +1690,8 @@ void ExodusII_IO_Helper::write_nodesets(const MeshBase & mesh)
 
 
 
-void ExodusII_IO_Helper::initialize_element_variables(std::vector<std::string> names)
+void ExodusII_IO_Helper::initialize_element_variables(std::vector<std::string> names,
+                                                      const std::vector<std::set<subdomain_id_type>> & vars_active_subdomains)
 {
   if ((_run_only_on_proc0) && (this->processor_id() != 0))
     return;
@@ -1629,18 +1717,35 @@ void ExodusII_IO_Helper::initialize_element_variables(std::vector<std::string> n
 
   this->write_var_names(ELEMENTAL, names);
 
-  // Form the element variable truth table and send to Exodus.
-  // This tells which variables are written to which blocks,
-  // and can dramatically speed up writing element variables
-  //
-  // We really should initialize all entries in the truth table to 0
-  // and then loop over all subdomains, setting their entries to 1
-  // if a given variable exists on that subdomain.  However,
-  // we don't have that information, and the element variables
-  // passed to us are padded with zeroes for the blocks where
-  // they aren't defined.  To be consistent with that, fill
-  // the truth table with ones.
-  std::vector<int> truth_tab(num_elem_blk*num_elem_vars, 1);
+  // Use the truth table to indicate which subdomain/variable pairs are
+  // active according to vars_active_subdomains.
+  std::vector<int> truth_tab(num_elem_blk*num_elem_vars, 0);
+  for (unsigned int var_num=0; var_num<vars_active_subdomains.size(); var_num++)
+    {
+      // If the list of active subdomains is empty, it is interpreted as being
+      // active on *all* subdomains.
+      std::set<subdomain_id_type> current_set;
+      if (vars_active_subdomains[var_num].empty())
+        for (auto block_id : block_ids)
+          current_set.insert(cast_int<subdomain_id_type>(block_id));
+      else
+        current_set = vars_active_subdomains[var_num];
+
+      // Find index into the truth table for each id in current_set.
+      for (auto block_id : current_set)
+        {
+          auto it = std::find(block_ids.begin(), block_ids.end(), block_id);
+          if (it == block_ids.end())
+            libmesh_error_msg("ExodusII_IO_Helper: block id " << block_id << " not found in block_ids.");
+
+          std::size_t block_index =
+            std::distance(block_ids.begin(), it);
+
+          std::size_t truth_tab_index = block_index*num_elem_vars + var_num;
+          truth_tab[truth_tab_index] = 1;
+        }
+    }
+
   ex_err = exII::ex_put_elem_var_tab(ex_id,
                                      num_elem_blk,
                                      num_elem_vars,
@@ -1720,11 +1825,11 @@ void ExodusII_IO_Helper::check_existing_vars(ExodusVarType type,
   if (names_from_file != names)
     {
       libMesh::err << "Error! The Exodus file already contains the variables:" << std::endl;
-      for (unsigned i=0; i<names_from_file.size(); ++i)
+      for (std::size_t i=0; i<names_from_file.size(); ++i)
         libMesh::out << names_from_file[i] << std::endl;
 
       libMesh::err << "And you asked to write:" << std::endl;
-      for (unsigned i=0; i<names.size(); ++i)
+      for (std::size_t i=0; i<names.size(); ++i)
         libMesh::out << names[i] << std::endl;
 
       libmesh_error_msg("Cannot overwrite existing variables in Exodus II file.");
@@ -1738,7 +1843,15 @@ void ExodusII_IO_Helper::write_timestep(int timestep, Real time)
   if ((_run_only_on_proc0) && (this->processor_id() != 0))
     return;
 
-  ex_err = exII::ex_put_time(ex_id, timestep, &time);
+  if (_single_precision)
+    {
+      float cast_time = float(time);
+      ex_err = exII::ex_put_time(ex_id, timestep, &cast_time);
+    }
+  else
+    {
+      ex_err = exII::ex_put_time(ex_id, timestep, &time);
+    }
   EX_CHECK_ERR(ex_err, "Error writing timestep.");
 
   ex_err = exII::ex_update(ex_id);
@@ -1747,27 +1860,24 @@ void ExodusII_IO_Helper::write_timestep(int timestep, Real time)
 
 
 
-void ExodusII_IO_Helper::write_element_values(const MeshBase & mesh, const std::vector<Real> & values, int timestep)
+void ExodusII_IO_Helper::write_element_values(const MeshBase & mesh,
+                                              const std::vector<Real> & values,
+                                              int timestep,
+                                              const std::vector<std::set<subdomain_id_type>> & vars_active_subdomains)
 {
   if ((_run_only_on_proc0) && (this->processor_id() != 0))
     return;
 
   // Loop over the element blocks and write the data one block at a time
-  std::map<unsigned int, std::vector<unsigned int> > subdomain_map;
+  std::map<subdomain_id_type, std::vector<unsigned int>> subdomain_map;
 
   // Ask the file how many element vars it has, store it in the num_elem_vars variable.
   ex_err = exII::ex_get_var_param(ex_id, "e", &num_elem_vars);
   EX_CHECK_ERR(ex_err, "Error reading number of elemental variables.");
 
-  MeshBase::const_element_iterator mesh_it = mesh.active_elements_begin();
-  const MeshBase::const_element_iterator end = mesh.active_elements_end();
-
   // loop through element and map between block and element vector
-  for (; mesh_it!=end; ++mesh_it)
-    {
-      const Elem * elem = *mesh_it;
-      subdomain_map[elem->subdomain_id()].push_back(elem->id());
-    }
+  for (const auto & elem : mesh.active_element_ptr_range())
+    subdomain_map[elem->subdomain_id()].push_back(elem->id());
 
   // Use mesh.n_elem() to access into the values vector rather than
   // the number of elements the Exodus writer thinks the mesh has,
@@ -1777,13 +1887,24 @@ void ExodusII_IO_Helper::write_element_values(const MeshBase & mesh, const std::
   // For each variable, create a 'data' array which holds all the elemental variable
   // values *for a given block* on this processor, then write that data vector to file
   // before moving onto the next block.
+  libmesh_assert_equal_to(vars_active_subdomains.size(), static_cast<unsigned>(num_elem_vars));
   for (unsigned int i=0; i<static_cast<unsigned>(num_elem_vars); ++i)
     {
       // The size of the subdomain map is the number of blocks.
-      std::map<unsigned int, std::vector<unsigned int> >::iterator it = subdomain_map.begin();
+      std::map<subdomain_id_type, std::vector<unsigned int>>::iterator it = subdomain_map.begin();
 
+      const std::set<subdomain_id_type> & active_subdomains = vars_active_subdomains[i];
       for (unsigned int j=0; it!=subdomain_map.end(); ++it, ++j)
         {
+          // Skip any variable/subdomain pairs that are inactive.
+          // Note that if active_subdomains is empty, it is interpreted
+          // as being active on *all* subdomains.
+          if (!active_subdomains.empty())
+            if (active_subdomains.find(it->first) == active_subdomains.end())
+              {
+                continue;
+              }
+
           const std::vector<unsigned int> & elem_nums = (*it).second;
           const unsigned int num_elems_this_block =
             cast_int<unsigned int>(elem_nums.size());
@@ -1870,7 +1991,7 @@ void ExodusII_IO_Helper::write_information_records(const std::vector<std::string
 
       // If an entry is longer than MAX_LINE_LENGTH characters it's not an error, we just
       // write the first MAX_LINE_LENGTH characters to the file.
-      for (unsigned i=0; i<records.size(); ++i)
+      for (std::size_t i=0; i<records.size(); ++i)
         info.push_back_entry(records[i]);
 
       ex_err = exII::ex_put_info(ex_id, num_records, info.get_char_star_star());
@@ -1901,6 +2022,19 @@ void ExodusII_IO_Helper::write_global_values(const std::vector<Real> & values, i
 
   ex_err = exII::ex_update(ex_id);
   EX_CHECK_ERR(ex_err, "Error flushing buffers to file.");
+}
+
+
+
+void ExodusII_IO_Helper::read_global_values(std::vector<Real> & values, int timestep)
+{
+  if ((_run_only_on_proc0) && (this->processor_id() != 0))
+    return;
+
+  values.clear();
+  values.resize(num_global_vars);
+  ex_err = exII::ex_get_glob_vars(ex_id, timestep, num_global_vars, &values[0]);
+  EX_CHECK_ERR(ex_err, "Error reading global values.");
 }
 
 
@@ -1951,6 +2085,25 @@ std::vector<std::string> ExodusII_IO_Helper::get_complex_names(const std::vector
 
 
 
+std::vector<std::set<subdomain_id_type>> ExodusII_IO_Helper::get_complex_vars_active_subdomains(
+  const std::vector<std::set<subdomain_id_type>> & vars_active_subdomains) const
+{
+  std::vector<std::set<subdomain_id_type>> complex_vars_active_subdomains;
+
+  for (auto & s : vars_active_subdomains)
+    {
+      // Push back the same data three times to match the tripling of the variables
+      // for the real, imag, and modulus for the complex-valued solution.
+      complex_vars_active_subdomains.push_back(s);
+      complex_vars_active_subdomains.push_back(s);
+      complex_vars_active_subdomains.push_back(s);
+    }
+
+  return complex_vars_active_subdomains;
+}
+
+
+
 // ------------------------------------------------------------
 // ExodusII_IO_Helper::Conversion class members
 ExodusII_IO_Helper::Conversion ExodusII_IO_Helper::ElementMaps::assign_conversion(std::string type_str)
@@ -1967,9 +2120,6 @@ ExodusII_IO_Helper::Conversion ExodusII_IO_Helper::ElementMaps::assign_conversio
     return assign_conversion( it->second );
   else
     libmesh_error_msg("ERROR! Unrecognized element type_str: " << type_str);
-
-  libmesh_error_msg("We'll never get here!");
-  return assign_conversion (EDGE2);
 }
 
 
@@ -1984,9 +2134,9 @@ ExodusII_IO_Helper::Conversion ExodusII_IO_Helper::ElementMaps::assign_conversio
                               ARRAY_LENGTH(nodeelem_node_map),
                               nodeelem_node_map, // inverse node map same as forward node map
                               ARRAY_LENGTH(nodeelem_node_map),
-                              libmesh_nullptr, // NODELEM doesn't have any edges
+                              nullptr, // NODELEM doesn't have any edges
                               0,
-                              libmesh_nullptr,
+                              nullptr,
                               0,
                               NODEELEM, "SPHERE");
         return conv;
@@ -2033,6 +2183,25 @@ ExodusII_IO_Helper::Conversion ExodusII_IO_Helper::ElementMaps::assign_conversio
         return conv;
       }
 
+    case QUADSHELL4:
+      {
+        return Conversion(quad4_node_map,
+                          ARRAY_LENGTH(quad4_node_map), // node mapping is the same as for quad4
+                          quad4_node_map,
+                          ARRAY_LENGTH(quad4_node_map),
+                          quadshell4_edge_map,
+                          ARRAY_LENGTH(quadshell4_edge_map),
+                          quadshell4_inverse_edge_map,
+                          ARRAY_LENGTH(quadshell4_inverse_edge_map),
+                          quadshell4_shellface_map,
+                          ARRAY_LENGTH(quadshell4_shellface_map),
+                          quadshell4_inverse_shellface_map,
+                          ARRAY_LENGTH(quadshell4_inverse_shellface_map),
+                          2, // the side index offset for QUADSHELL4 is 2
+                          QUADSHELL4,
+                          "SHELL4");
+      }
+
     case QUAD8:
       {
         const Conversion conv(quad8_node_map,
@@ -2046,6 +2215,25 @@ ExodusII_IO_Helper::Conversion ExodusII_IO_Helper::ElementMaps::assign_conversio
                               QUAD8,
                               "QUAD8");
         return conv;
+      }
+
+    case QUADSHELL8:
+      {
+        return Conversion(quad8_node_map,
+                          ARRAY_LENGTH(quad8_node_map), // node mapping is the same as for quad8
+                          quad8_node_map,
+                          ARRAY_LENGTH(quad8_node_map),
+                          quadshell4_edge_map,
+                          ARRAY_LENGTH(quadshell4_edge_map),
+                          quadshell4_inverse_edge_map,
+                          ARRAY_LENGTH(quadshell4_inverse_edge_map),
+                          quadshell4_shellface_map,
+                          ARRAY_LENGTH(quadshell4_shellface_map),
+                          quadshell4_inverse_shellface_map,
+                          ARRAY_LENGTH(quadshell4_inverse_shellface_map),
+                          2, // the side index offset for QUADSHELL8 is 2
+                          QUADSHELL8,
+                          "SHELL8");
       }
 
     case QUAD9:
@@ -2065,35 +2253,35 @@ ExodusII_IO_Helper::Conversion ExodusII_IO_Helper::ElementMaps::assign_conversio
 
     case TRI3:
       {
-        // We use the workaround conversion object if we're using
-        // Cubit 14+ *and* it's a 3D Exodus file.
-        if (_helper.is_cubit14_plus && _helper.num_dim==3)
-          {
-            return Conversion(tri3_node_map,
-                              ARRAY_LENGTH(tri3_node_map),
-                              tri3_node_map,
-                              ARRAY_LENGTH(tri3_node_map),
-                              // Use mapping which works around TRISHELL side numbering on TRI3 elements in 3D.
-                              cubit14_plus_workaround_tri_edge_map,
-                              ARRAY_LENGTH(cubit14_plus_workaround_tri_edge_map),
-                              tri_inverse_edge_map,
-                              ARRAY_LENGTH(tri_inverse_edge_map),
-                              TRI3,
-                              "TRI3");
-          }
-        else
-          {
-            return Conversion(tri3_node_map,
-                              ARRAY_LENGTH(tri3_node_map),
-                              tri3_node_map, // inverse node map same as forward node map
-                              ARRAY_LENGTH(tri3_node_map),
-                              tri_edge_map,
-                              ARRAY_LENGTH(tri_edge_map),
-                              tri_inverse_edge_map,
-                              ARRAY_LENGTH(tri_inverse_edge_map),
-                              TRI3,
-                              "TRI3");
-          }
+        return Conversion(tri3_node_map,
+                          ARRAY_LENGTH(tri3_node_map),
+                          tri3_node_map, // inverse node map same as forward node map
+                          ARRAY_LENGTH(tri3_node_map),
+                          tri_edge_map,
+                          ARRAY_LENGTH(tri_edge_map),
+                          tri_inverse_edge_map,
+                          ARRAY_LENGTH(tri_inverse_edge_map),
+                          TRI3,
+                          "TRI3");
+      }
+
+    case TRISHELL3:
+      {
+        return Conversion(tri3_node_map,
+                          ARRAY_LENGTH(tri3_node_map), // node mapping is the same as for tri3
+                          tri3_node_map,
+                          ARRAY_LENGTH(tri3_node_map),
+                          trishell3_edge_map,
+                          ARRAY_LENGTH(trishell3_edge_map),
+                          trishell3_inverse_edge_map,
+                          ARRAY_LENGTH(trishell3_inverse_edge_map),
+                          trishell3_shellface_map,
+                          ARRAY_LENGTH(trishell3_shellface_map),
+                          trishell3_inverse_shellface_map,
+                          ARRAY_LENGTH(trishell3_inverse_shellface_map),
+                          2, // the side index offset for TRISHELL4 is 2
+                          TRISHELL3,
+                          "TRISHELL3");
       }
 
     case TRI3SUBDIVISION:
@@ -2294,19 +2482,6 @@ ExodusII_IO_Helper::Conversion ExodusII_IO_Helper::ElementMaps::assign_conversio
     default:
       libmesh_error_msg("Unsupported element type: " << type);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  const Conversion conv(tri3_node_map,
-                        ARRAY_LENGTH(tri3_node_map),
-                        tri3_node_map, // inverse node map same as forward node map
-                        ARRAY_LENGTH(tri3_node_map),
-                        tri_edge_map,
-                        ARRAY_LENGTH(tri_edge_map),
-                        tri_inverse_edge_map,
-                        ARRAY_LENGTH(tri_inverse_edge_map),
-                        TRI3,
-                        "TRI3");
-  return conv;
 }
 
 
@@ -2333,7 +2508,7 @@ ExodusII_IO_Helper::NamesData::NamesData(size_t n_strings, size_t string_length)
     {
       data_table[i].resize(string_length + 1);
 
-      // NULL-terminate these strings, just to be safe.
+      // Properly terminate these C-style strings, just to be safe.
       data_table[i][0] = '\0';
 
       // Set pointer into the data_table

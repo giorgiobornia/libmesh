@@ -5,11 +5,21 @@
 #include <libmesh/restore_warnings.h>
 
 #include <libmesh/equation_systems.h>
-#include <libmesh/serial_mesh.h>
 #include <libmesh/mesh_generation.h>
 #include <libmesh/node.h>
+#include <libmesh/replicated_mesh.h>
 
 #include "test_comm.h"
+
+// THE CPPUNIT_TEST_SUITE_END macro expands to code that involves
+// std::auto_ptr, which in turn produces -Wdeprecated-declarations
+// warnings.  These can be ignored in GCC as long as we wrap the
+// offending code in appropriate pragmas.  We can't get away with a
+// single ignore_warnings.h inclusion at the beginning of this file,
+// since the libmesh headers pull in a restore_warnings.h at some
+// point.  We also don't bother restoring warnings at the end of this
+// file since it's not a header.
+#include <libmesh/ignore_warnings.h>
 
 using namespace libMesh;
 
@@ -22,8 +32,12 @@ class MeshSpatialDimensionTest : public CppUnit::TestCase
 public:
   CPPUNIT_TEST_SUITE( MeshSpatialDimensionTest );
 
+#if LIBMESH_DIM > 1
   CPPUNIT_TEST( test1D );
+#endif
+#if LIBMESH_DIM > 2
   CPPUNIT_TEST( test2D );
+#endif
 
   CPPUNIT_TEST_SUITE_END();
 
@@ -39,23 +53,15 @@ public:
   void test1D()
   {
     // 1.) Test that build_line() produces a Mesh with spatial_dimension==1
-    SerialMesh mesh(*TestCommWorld);
+    ReplicatedMesh mesh(*TestCommWorld);
     MeshTools::Generation::build_line (mesh, /*n_elem=*/2, /*xmin=*/0., /*xmax=*/1., EDGE2);
     CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(1), mesh.mesh_dimension());
     CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(1), mesh.spatial_dimension());
 
     // 2.) Move the nodes in the y-direction, test that spatial_dimension==2
     // The spatial dimension is updated during prepare_for_use().
-    {
-      MeshBase::node_iterator node_it  = mesh.nodes_begin();
-      MeshBase::node_iterator node_end = mesh.nodes_end();
-
-      for (; node_it != node_end; ++node_it)
-        {
-          Node & node = **node_it;
-          node(1) = node(0)*node(0);
-        }
-    }
+    for (auto & node : mesh.node_ptr_range())
+      (*node)(1) = (*node)(0) * (*node)(0);
 
     mesh.prepare_for_use();
     CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(1), mesh.mesh_dimension());
@@ -63,16 +69,9 @@ public:
 
 
     // 3.) Move nodes back to zero, check that spatial_dimension is *not* decreased
-    {
-      MeshBase::node_iterator node_it  = mesh.nodes_begin();
-      MeshBase::node_iterator node_end = mesh.nodes_end();
+    for (auto & node : mesh.node_ptr_range())
+      (*node)(1) = 0.;
 
-      for (; node_it != node_end; ++node_it)
-        {
-          Node & node = **node_it;
-          node(1) = 0.;
-        }
-    }
     mesh.prepare_for_use();
     CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(1), mesh.mesh_dimension());
     CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(2), mesh.spatial_dimension());
@@ -80,16 +79,8 @@ public:
 
     // 4.) Move z-coordinate of nodes, check that spatial_dimension is now 3.
 #if LIBMESH_DIM == 3
-    {
-      MeshBase::node_iterator node_it  = mesh.nodes_begin();
-      MeshBase::node_iterator node_end = mesh.nodes_end();
-
-      for (; node_it != node_end; ++node_it)
-        {
-          Node & node = **node_it;
-          node(2) = node(0)*node(0);
-        }
-    }
+    for (auto & node : mesh.node_ptr_range())
+      (*node)(2) = (*node)(0) * (*node)(0);
 
     mesh.prepare_for_use();
     CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(1), mesh.mesh_dimension());
@@ -102,7 +93,7 @@ public:
   void test2D()
   {
     // 1.) Test that build_cube() produces a Mesh with spatial_dimension==2
-    SerialMesh mesh(*TestCommWorld);
+    ReplicatedMesh mesh(*TestCommWorld);
     MeshTools::Generation::build_square (mesh,
                                          /*nx=*/2, /*ny=*/2,
                                          /*xmin=*/0., /*xmax=*/1.,
@@ -110,18 +101,12 @@ public:
                                          QUAD4);
     CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(2), mesh.spatial_dimension());
 
-   // 2.) Move the nodes in the z-direction, test that spatial_dimension==3
-   // The spatial dimension is updated during prepare_for_use().
-    {
-     MeshBase::node_iterator node_it  = mesh.nodes_begin();
-     MeshBase::node_iterator node_end = mesh.nodes_end();
-
-     for (; node_it != node_end; ++node_it)
-       {
-         Node & node = **node_it;
-         node(2) = node(0)*node(0) + node(1)*node(1);
-       }
-    }
+    // 2.) Move the nodes in the z-direction, test that spatial_dimension==3
+    // The spatial dimension is updated during prepare_for_use().
+    for (auto & node : mesh.node_ptr_range())
+      (*node)(2) =
+        (*node)(0) * (*node)(0) +
+        (*node)(1) * (*node)(1);
 
     mesh.prepare_for_use();
     CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(2), mesh.mesh_dimension());
@@ -129,16 +114,9 @@ public:
 
 
     // 3.) Move nodes back to zero, check that spatial_dimension is *not* decreased
-    {
-      MeshBase::node_iterator node_it  = mesh.nodes_begin();
-      MeshBase::node_iterator node_end = mesh.nodes_end();
+    for (auto & node : mesh.node_ptr_range())
+      (*node)(2) = 0.;
 
-      for (; node_it != node_end; ++node_it)
-        {
-          Node & node = **node_it;
-          node(2) = 0.;
-        }
-    }
     mesh.prepare_for_use();
     CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(2), mesh.mesh_dimension());
     CPPUNIT_ASSERT_EQUAL(static_cast<unsigned int>(3), mesh.spatial_dimension());

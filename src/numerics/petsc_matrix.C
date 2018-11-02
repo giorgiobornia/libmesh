@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -30,17 +30,7 @@
 #include "libmesh/dense_matrix.h"
 #include "libmesh/petsc_vector.h"
 
-#if !PETSC_RELEASE_LESS_THAN(3,6,0)
-# include "libmesh/ignore_warnings.h"
-# include "petsc/private/matimpl.h"
-# include "libmesh/restore_warnings.h"
-#elif !PETSC_VERSION_LESS_THAN(3,5,0)
-# include "libmesh/ignore_warnings.h"
-# include "petsc-private/matimpl.h"
-# include "libmesh/restore_warnings.h"
-#endif
-
-// For some reason, the blocked matrix API calls below seem to break with PETSC 3.2 & presumably earier.
+// For some reason, the blocked matrix API calls below seem to break with PETSC 3.2 & presumably earlier.
 // For example:
 // [0]PETSC ERROR: --------------------- Error Message ------------------------------------
 // [0]PETSC ERROR: Nonconforming object sizes!
@@ -75,7 +65,7 @@ void transform_preallocation_arrays (const PetscInt blocksize,
   b_n_nz.clear(); /**/ b_n_nz.reserve(n_nz.size()/blocksize);
   b_n_oz.clear(); /**/ b_n_oz.reserve(n_oz.size()/blocksize);
 
-  for (unsigned int nn=0; nn<n_nz.size(); nn += blocksize)
+  for (std::size_t nn=0; nn<n_nz.size(); nn += blocksize)
     {
       b_n_nz.push_back (n_nz[nn]/blocksize);
       b_n_oz.push_back (n_oz[nn]/blocksize);
@@ -99,7 +89,8 @@ namespace libMesh
 template <typename T>
 PetscMatrix<T>::PetscMatrix(const Parallel::Communicator & comm_in) :
   SparseMatrix<T>(comm_in),
-  _destroy_mat_on_exit(true)
+  _destroy_mat_on_exit(true),
+  _mat_type(AIJ)
 {}
 
 
@@ -110,7 +101,8 @@ template <typename T>
 PetscMatrix<T>::PetscMatrix(Mat mat_in,
                             const Parallel::Communicator & comm_in) :
   SparseMatrix<T>(comm_in),
-  _destroy_mat_on_exit(false)
+  _destroy_mat_on_exit(false),
+  _mat_type(AIJ)
 {
   this->_mat = mat_in;
   this->_is_initialized = true;
@@ -125,6 +117,11 @@ PetscMatrix<T>::~PetscMatrix()
   this->clear();
 }
 
+template <typename T>
+void PetscMatrix<T>::set_matrix_type(PetscMatrixType mat_type)
+{
+  _mat_type = mat_type;
+}
 
 template <typename T>
 void PetscMatrix<T>::init (const numeric_index_type m_in,
@@ -185,12 +182,29 @@ void PetscMatrix<T>::init (const numeric_index_type m_in,
   else
 #endif
     {
-      ierr = MatSetType(_mat, MATAIJ); // Automatically chooses seqaij or mpiaij
-      LIBMESH_CHKERR(ierr);
-      ierr = MatSeqAIJSetPreallocation(_mat, n_nz, PETSC_NULL);
-      LIBMESH_CHKERR(ierr);
-      ierr = MatMPIAIJSetPreallocation(_mat, n_nz, PETSC_NULL, n_oz, PETSC_NULL);
-      LIBMESH_CHKERR(ierr);
+      switch (_mat_type) {
+        case AIJ:
+          ierr = MatSetType(_mat, MATAIJ); // Automatically chooses seqaij or mpiaij
+          LIBMESH_CHKERR(ierr);
+          ierr = MatSeqAIJSetPreallocation(_mat, n_nz, PETSC_NULL);
+          LIBMESH_CHKERR(ierr);
+          ierr = MatMPIAIJSetPreallocation(_mat, n_nz, PETSC_NULL, n_oz, PETSC_NULL);
+          LIBMESH_CHKERR(ierr);
+          break;
+
+        case HYPRE:
+#if !PETSC_VERSION_LESS_THAN(3,9,4) && LIBMESH_HAVE_PETSC_HYPRE
+          ierr = MatSetType(_mat, MATHYPRE);
+          LIBMESH_CHKERR(ierr);
+          ierr = MatHYPRESetPreallocation(_mat, n_nz, PETSC_NULL, n_oz, PETSC_NULL);
+          LIBMESH_CHKERR(ierr);
+#else
+          libmesh_error_msg("PETSc 3.9.4 or higher with hypre is required for MatHypre");
+#endif
+          break;
+
+        default: libmesh_error_msg("Unsupported petsc matrix type");
+      }
     }
 
   // Make it an error for PETSc to allocate new nonzero entries during assembly
@@ -270,33 +284,53 @@ void PetscMatrix<T>::init (const numeric_index_type m_in,
       ierr = MatSeqBAIJSetPreallocation (_mat,
                                          blocksize,
                                          0,
-                                         numeric_petsc_cast(b_n_nz.empty() ? libmesh_nullptr : &b_n_nz[0]));
+                                         numeric_petsc_cast(b_n_nz.empty() ? nullptr : &b_n_nz[0]));
       LIBMESH_CHKERR(ierr);
 
       ierr = MatMPIBAIJSetPreallocation (_mat,
                                          blocksize,
                                          0,
-                                         numeric_petsc_cast(b_n_nz.empty() ? libmesh_nullptr : &b_n_nz[0]),
+                                         numeric_petsc_cast(b_n_nz.empty() ? nullptr : &b_n_nz[0]),
                                          0,
-                                         numeric_petsc_cast(b_n_oz.empty() ? libmesh_nullptr : &b_n_oz[0]));
+                                         numeric_petsc_cast(b_n_oz.empty() ? nullptr : &b_n_oz[0]));
       LIBMESH_CHKERR(ierr);
     }
   else
 #endif
     {
+      switch (_mat_type) {
+        case AIJ:
+          ierr = MatSetType(_mat, MATAIJ); // Automatically chooses seqaij or mpiaij
+          LIBMESH_CHKERR(ierr);
+          ierr = MatSeqAIJSetPreallocation (_mat,
+                                            0,
+                                            numeric_petsc_cast(n_nz.empty() ? nullptr : &n_nz[0]));
+          LIBMESH_CHKERR(ierr);
+          ierr = MatMPIAIJSetPreallocation (_mat,
+                                            0,
+                                            numeric_petsc_cast(n_nz.empty() ? nullptr : &n_nz[0]),
+                                            0,
+                                            numeric_petsc_cast(n_oz.empty() ? nullptr : &n_oz[0]));
+          break;
 
-      ierr = MatSetType(_mat, MATAIJ); // Automatically chooses seqaij or mpiaij
-      LIBMESH_CHKERR(ierr);
-      ierr = MatSeqAIJSetPreallocation (_mat,
-                                        0,
-                                        numeric_petsc_cast(n_nz.empty() ? libmesh_nullptr : &n_nz[0]));
-      LIBMESH_CHKERR(ierr);
-      ierr = MatMPIAIJSetPreallocation (_mat,
-                                        0,
-                                        numeric_petsc_cast(n_nz.empty() ? libmesh_nullptr : &n_nz[0]),
-                                        0,
-                                        numeric_petsc_cast(n_oz.empty() ? libmesh_nullptr : &n_oz[0]));
-      LIBMESH_CHKERR(ierr);
+        case HYPRE:
+#if !PETSC_VERSION_LESS_THAN(3,9,4) && LIBMESH_HAVE_PETSC_HYPRE
+          ierr = MatSetType(_mat, MATHYPRE);
+          LIBMESH_CHKERR(ierr);
+          ierr = MatHYPRESetPreallocation (_mat,
+                                            0,
+                                            numeric_petsc_cast(n_nz.empty() ? nullptr : &n_nz[0]),
+                                            0,
+                                            numeric_petsc_cast(n_oz.empty() ? nullptr : &n_oz[0]));
+          LIBMESH_CHKERR(ierr);
+#else
+          libmesh_error_msg("PETSc 3.9.4 or higher with hypre is required for MatHypre");
+#endif
+          break;
+
+        default: libmesh_error_msg("Unsupported petsc matrix type");
+      }
+
     }
 
   // Is prefix information available somewhere? Perhaps pass in the system name?
@@ -372,34 +406,52 @@ void PetscMatrix<T>::init ()
       ierr = MatSeqBAIJSetPreallocation (_mat,
                                          blocksize,
                                          0,
-                                         numeric_petsc_cast(b_n_nz.empty() ? libmesh_nullptr : &b_n_nz[0]));
+                                         numeric_petsc_cast(b_n_nz.empty() ? nullptr : &b_n_nz[0]));
       LIBMESH_CHKERR(ierr);
 
       ierr = MatMPIBAIJSetPreallocation (_mat,
                                          blocksize,
                                          0,
-                                         numeric_petsc_cast(b_n_nz.empty() ? libmesh_nullptr : &b_n_nz[0]),
+                                         numeric_petsc_cast(b_n_nz.empty() ? nullptr : &b_n_nz[0]),
                                          0,
-                                         numeric_petsc_cast(b_n_oz.empty() ? libmesh_nullptr : &b_n_oz[0]));
+                                         numeric_petsc_cast(b_n_oz.empty() ? nullptr : &b_n_oz[0]));
       LIBMESH_CHKERR(ierr);
     }
   else
 #endif
     {
-      // no block storage case
-      ierr = MatSetType(_mat, MATAIJ); // Automatically chooses seqaij or mpiaij
-      LIBMESH_CHKERR(ierr);
+      switch (_mat_type) {
+        case AIJ:
+          ierr = MatSetType(_mat, MATAIJ); // Automatically chooses seqaij or mpiaij
+          LIBMESH_CHKERR(ierr);
+          ierr = MatSeqAIJSetPreallocation (_mat,
+                                            0,
+                                            numeric_petsc_cast(n_nz.empty() ? nullptr : &n_nz[0]));
+          LIBMESH_CHKERR(ierr);
+          ierr = MatMPIAIJSetPreallocation (_mat,
+                                            0,
+                                            numeric_petsc_cast(n_nz.empty() ? nullptr : &n_nz[0]),
+                                            0,
+                                            numeric_petsc_cast(n_oz.empty() ? nullptr : &n_oz[0]));
+          break;
 
-      ierr = MatSeqAIJSetPreallocation (_mat,
-                                        0,
-                                        numeric_petsc_cast(n_nz.empty() ? libmesh_nullptr : &n_nz[0]));
-      LIBMESH_CHKERR(ierr);
-      ierr = MatMPIAIJSetPreallocation (_mat,
-                                        0,
-                                        numeric_petsc_cast(n_nz.empty() ? libmesh_nullptr : &n_nz[0]),
-                                        0,
-                                        numeric_petsc_cast(n_oz.empty() ? libmesh_nullptr : &n_oz[0]));
-      LIBMESH_CHKERR(ierr);
+        case HYPRE:
+#if !PETSC_VERSION_LESS_THAN(3,9,4) && LIBMESH_HAVE_PETSC_HYPRE
+          ierr = MatSetType(_mat, MATHYPRE);
+          LIBMESH_CHKERR(ierr);
+          ierr = MatHYPRESetPreallocation (_mat,
+                                            0,
+                                            numeric_petsc_cast(n_nz.empty() ? nullptr : &n_nz[0]),
+                                            0,
+                                            numeric_petsc_cast(n_oz.empty() ? nullptr : &n_oz[0]));
+          LIBMESH_CHKERR(ierr);
+#else
+          libmesh_error_msg("PETSc 3.9.4 or higher with hypre is required for MatHypre");
+#endif
+          break;
+
+        default: libmesh_error_msg("Unsupported petsc matrix type");
+      }
     }
 
   // Is prefix information available somewhere? Perhaps pass in the system name?
@@ -415,45 +467,7 @@ void PetscMatrix<T>::init ()
 template <typename T>
 void PetscMatrix<T>::update_preallocation_and_zero ()
 {
-  libmesh_assert(this->_dof_map);
-  libmesh_assert(this->initialized());
-
-  const std::vector<numeric_index_type> & n_nz = this->_dof_map->get_n_nz();
-  const std::vector<numeric_index_type> & n_oz = this->_dof_map->get_n_oz();
-
-  PetscErrorCode ierr = 0;
-
-  {
-#if !PETSC_VERSION_LESS_THAN(3,5,0)
-    ierr = (*_mat->ops->destroy)(_mat);
-    LIBMESH_CHKERR(ierr);
-    _mat->ops->destroy = libmesh_nullptr;
-    _mat->preallocated = PETSC_FALSE;
-    _mat->assembled    = PETSC_FALSE;
-    _mat->was_assembled = PETSC_FALSE;
-    ++_mat->nonzerostate;
-    ierr = PetscObjectStateIncrease((PetscObject)_mat);
-    LIBMESH_CHKERR(ierr);
-#else
-    libmesh_error_msg("PetscMatrix::update_preallocation_and_zero() requires PETSc 3.5.0 or greater to work correctly.");
-#endif
-
-    ierr = MatSetType(_mat,MATAIJ);
-    LIBMESH_CHKERR(ierr);
-
-    ierr = MatSeqAIJSetPreallocation (_mat,
-                                      0,
-                                      numeric_petsc_cast(n_nz.empty() ? libmesh_nullptr : &n_nz[0]));
-    LIBMESH_CHKERR(ierr);
-    ierr = MatMPIAIJSetPreallocation (_mat,
-                                      0,
-                                      numeric_petsc_cast(n_nz.empty() ? libmesh_nullptr : &n_nz[0]),
-                                      0,
-                                      numeric_petsc_cast(n_oz.empty() ? libmesh_nullptr : &n_oz[0]));
-    LIBMESH_CHKERR(ierr);
-  }
-
-  this->zero();
+  libmesh_not_implemented();
 }
 
 
@@ -488,7 +502,7 @@ void PetscMatrix<T>::zero_rows (std::vector<numeric_index_type> & rows, T diag_v
   PetscErrorCode ierr=0;
 
 #if PETSC_RELEASE_LESS_THAN(3,1,1)
-  if(!rows.empty())
+  if (!rows.empty())
     ierr = MatZeroRows(_mat, rows.size(),
                        numeric_petsc_cast(&rows[0]), diag_value);
   else
@@ -498,7 +512,7 @@ void PetscMatrix<T>::zero_rows (std::vector<numeric_index_type> & rows, T diag_v
   // optional arguments.  The optional arguments (x,b) can be used to specify the
   // solutions for the zeroed rows (x) and right hand side (b) to update.
   // Could be useful for setting boundary conditions...
-  if(!rows.empty())
+  if (!rows.empty())
     ierr = MatZeroRows(_mat, cast_int<PetscInt>(rows.size()),
                        numeric_petsc_cast(&rows[0]), diag_value,
                        PETSC_NULL, PETSC_NULL);
@@ -581,8 +595,13 @@ void PetscMatrix<T>::print_matlab (const std::string & name) const
 
   semiparallel_only();
 
-  // libmesh_assert (this->closed());
-  this->close();
+  if (!this->closed())
+    {
+      libmesh_deprecated();
+      libmesh_warning("The matrix must be assembled before calling PetscMatrix::print_matlab().\n"
+                      "Please update your code, as this warning will become an error in a future release.");
+      const_cast<PetscMatrix<T> *>(this)->close();
+    }
 
   PetscErrorCode ierr=0;
   PetscViewer petsc_viewer;
@@ -603,8 +622,14 @@ void PetscMatrix<T>::print_matlab (const std::string & name) const
                                    &petsc_viewer);
       LIBMESH_CHKERR(ierr);
 
+#if PETSC_VERSION_LESS_THAN(3,7,0)
       ierr = PetscViewerSetFormat (petsc_viewer,
                                    PETSC_VIEWER_ASCII_MATLAB);
+#else
+      ierr = PetscViewerPushFormat (petsc_viewer,
+                                    PETSC_VIEWER_ASCII_MATLAB);
+#endif
+
       LIBMESH_CHKERR(ierr);
 
       ierr = MatView (_mat, petsc_viewer);
@@ -616,8 +641,14 @@ void PetscMatrix<T>::print_matlab (const std::string & name) const
    */
   else
     {
+#if PETSC_VERSION_LESS_THAN(3,7,0)
       ierr = PetscViewerSetFormat (PETSC_VIEWER_STDOUT_WORLD,
                                    PETSC_VIEWER_ASCII_MATLAB);
+#else
+      ierr = PetscViewerPushFormat (PETSC_VIEWER_STDOUT_WORLD,
+                                    PETSC_VIEWER_ASCII_MATLAB);
+#endif
+
       LIBMESH_CHKERR(ierr);
 
       ierr = MatView (_mat, PETSC_VIEWER_STDOUT_WORLD);
@@ -651,7 +682,13 @@ void PetscMatrix<T>::print_personal(std::ostream & os) const
   // #endif
 
   // Matrix must be in an assembled state to be printed
-  this->close();
+  if (!this->closed())
+    {
+      libmesh_deprecated();
+      libmesh_warning("The matrix must be assembled before calling PetscMatrix::print_personal().\n"
+                      "Please update your code, as this warning will become an error in a future release.");
+      const_cast<PetscMatrix<T> *>(this)->close();
+    }
 
   PetscErrorCode ierr=0;
 
@@ -816,15 +853,20 @@ void PetscMatrix<T>::_get_submatrix(SparseMatrix<T> & submatrix,
                                     const std::vector<numeric_index_type> & cols,
                                     const bool reuse_submatrix) const
 {
-  // Can only extract submatrices from closed matrices
-  this->close();
+  if (!this->closed())
+    {
+      libmesh_deprecated();
+      libmesh_warning("The matrix must be assembled before calling PetscMatrix::create_submatrix().\n"
+                      "Please update your code, as this warning will become an error in a future release.");
+      const_cast<PetscMatrix<T> *>(this)->close();
+    }
 
   // Make sure the SparseMatrix passed in is really a PetscMatrix
   PetscMatrix<T> * petsc_submatrix = cast_ptr<PetscMatrix<T> *>(&submatrix);
 
   // If we're not reusing submatrix and submatrix is already initialized
   // then we need to clear it, otherwise we get a memory leak.
-  if( !reuse_submatrix && submatrix.initialized() )
+  if (!reuse_submatrix && submatrix.initialized())
     submatrix.clear();
 
   // Construct row and column index sets.
@@ -832,26 +874,26 @@ void PetscMatrix<T>::_get_submatrix(SparseMatrix<T> & submatrix,
   IS isrow, iscol;
 
   ierr = ISCreateLibMesh(this->comm().get(),
-                         rows.size(),
+                         cast_int<PetscInt>(rows.size()),
                          numeric_petsc_cast(&rows[0]),
                          PETSC_USE_POINTER,
                          &isrow); LIBMESH_CHKERR(ierr);
 
   ierr = ISCreateLibMesh(this->comm().get(),
-                         cols.size(),
+                         cast_int<PetscInt>(cols.size()),
                          numeric_petsc_cast(&cols[0]),
                          PETSC_USE_POINTER,
                          &iscol); LIBMESH_CHKERR(ierr);
 
   // Extract submatrix
-  ierr = MatGetSubMatrix(_mat,
-                         isrow,
-                         iscol,
+  ierr = LibMeshCreateSubMatrix(_mat,
+                                isrow,
+                                iscol,
 #if PETSC_RELEASE_LESS_THAN(3,0,1)
-                         PETSC_DECIDE,
+                                PETSC_DECIDE,
 #endif
-                         (reuse_submatrix ? MAT_REUSE_MATRIX : MAT_INITIAL_MATRIX),
-                         &(petsc_submatrix->_mat));  LIBMESH_CHKERR(ierr);
+                                (reuse_submatrix ? MAT_REUSE_MATRIX : MAT_INITIAL_MATRIX),
+                                &(petsc_submatrix->_mat));  LIBMESH_CHKERR(ierr);
 
   // Specify that the new submatrix is initialized and close it.
   petsc_submatrix->_is_initialized = true;
@@ -885,7 +927,7 @@ void PetscMatrix<T>::get_transpose (SparseMatrix<T> & dest) const
 
   // If we aren't reusing the matrix then need to clear dest,
   // otherwise we get a memory leak
-  if(&petsc_dest != this)
+  if (&petsc_dest != this)
     dest.clear();
 
   PetscErrorCode ierr;
@@ -914,7 +956,7 @@ void PetscMatrix<T>::get_transpose (SparseMatrix<T> & dest) const
 
 
 template <typename T>
-void PetscMatrix<T>::close () const
+void PetscMatrix<T>::close ()
 {
   semiparallel_only();
 
@@ -930,6 +972,19 @@ void PetscMatrix<T>::close () const
   ierr = MatAssemblyBegin (_mat, MAT_FINAL_ASSEMBLY);
   LIBMESH_CHKERR(ierr);
   ierr = MatAssemblyEnd   (_mat, MAT_FINAL_ASSEMBLY);
+  LIBMESH_CHKERR(ierr);
+}
+
+template <typename T>
+void PetscMatrix<T>::flush ()
+{
+  semiparallel_only();
+
+  PetscErrorCode ierr=0;
+
+  ierr = MatAssemblyBegin (_mat, MAT_FLUSH_ASSEMBLY);
+  LIBMESH_CHKERR(ierr);
+  ierr = MatAssemblyEnd   (_mat, MAT_FLUSH_ASSEMBLY);
   LIBMESH_CHKERR(ierr);
 }
 
@@ -1049,7 +1104,7 @@ void PetscMatrix<T>::add_matrix(const DenseMatrix<T> & dm,
 
 
 template <typename T>
-void PetscMatrix<T>::add (const T a_in, SparseMatrix<T> & X_in)
+void PetscMatrix<T>::add (const T a_in, const SparseMatrix<T> & X_in)
 {
   libmesh_assert (this->initialized());
 
@@ -1059,7 +1114,7 @@ void PetscMatrix<T>::add (const T a_in, SparseMatrix<T> & X_in)
   libmesh_assert_equal_to (this->n(), X_in.n());
 
   PetscScalar a = static_cast<PetscScalar>      (a_in);
-  PetscMatrix<T> * X = cast_ptr<PetscMatrix<T> *> (&X_in);
+  const PetscMatrix<T> * X = cast_ptr<const PetscMatrix<T> *> (&X_in);
 
   libmesh_assert (X);
 

@@ -24,10 +24,8 @@ if FPARSER_SUPPORT_DEBUGGING
   FEATURE_FLAGS += -DFUNCTIONPARSER_SUPPORT_DEBUGGING
 endif
 
-# Wrap code that uses std::move in fparser for compilers that don't support it
-if HAVE_CXX11_MOVE
-  FEATURE_FLAGS += -DFP_SUPPORT_CXX11_MOVE
-endif
+# We now explicitly require compiler support for std::move
+FEATURE_FLAGS += -DFP_SUPPORT_CXX11_MOVE
 
 EXTRA_DIST      = # none, append below
 BUILT_SOURCES   = # none, append below
@@ -98,10 +96,10 @@ FPOPTIMIZER_CC_FILES=\
 EXTRA_DIST += $(FPOPTIMIZER_CC_FILES) fpoptimizer/fpoptimizer_header.txt fpoptimizer/fpoptimizer_footer.txt
 
 
-pkg_sources = fparser.cc fparser_ad.cc
+pkg_sources = fparser.cc fparser_ad.cc Faddeeva.cc Faddeeva.hh
+pkg_sources += lib/sha1.cpp
 if FPARSER_SUPPORT_JIT
-  pkg_sources += lib/sha1.cpp
-  pkg_cppflags += -DFPARSER_JIT_COMPILER="\"$(CXX)\""
+  pkg_cppflags += -DFPARSER_JIT_COMPILER="\"$(CXX) $(CXXFLAGS)\""
 endif
 
 pkg_cppflags += $(FEATURE_FLAGS)

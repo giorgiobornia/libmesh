@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -49,7 +49,7 @@ const Real radius = 0.5;
 Real distance (const Point & p)
 {
   Point cent(0.8, 0.9);
-  return ((p-cent).size() - radius);
+  return ((p-cent).norm() - radius);
 }
 
 Real integrand (const Point & p)
@@ -62,7 +62,7 @@ Real integrand (const Point & p)
 // Begin the main program.
 int main (int argc, char ** argv)
 {
-  // Initialize libMesh and any dependent libaries, like in example 2.
+  // Initialize libMesh and any dependent libraries, like in example 2.
   LibMeshInit init (argc, argv);
 
   // This example requires Adaptive Mesh Refinement support - although
@@ -120,25 +120,21 @@ int main (int argc, char ** argv)
 void integrate_function (const MeshBase & mesh)
 {
 #if defined(LIBMESH_HAVE_TRIANGLE) && defined(LIBMESH_HAVE_TETGEN)
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
 
   std::vector<Real> vertex_distance;
 
   QComposite<QGauss> qrule (mesh.mesh_dimension(), FIRST);
   //QGauss qrule (mesh.mesh_dimension(), FIRST);
 
-  UniquePtr<FEBase> fe (FEBase::build (mesh.mesh_dimension(), FEType (FIRST, LAGRANGE)));
+  std::unique_ptr<FEBase> fe (FEBase::build (mesh.mesh_dimension(), FEType (FIRST, LAGRANGE)));
 
   Real int_val=0.;
 
   const std::vector<Point> & q_points = fe->get_xyz();
   const std::vector<Real>  & JxW      = fe->get_JxW();
 
-  for (; el!=end_el; ++el)
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      const Elem * elem = *el;
-
       vertex_distance.clear();
 
       for (unsigned int v=0; v<elem->n_vertices(); v++)
@@ -155,7 +151,7 @@ void integrate_function (const MeshBase & mesh)
       // from smallest to largest JxW value to help prevent
       // ... large + small + large + large + small ...
       // type truncation errors?
-      for (unsigned int qp=0; qp<q_points.size(); qp++)
+      for (std::size_t qp=0; qp<q_points.size(); qp++)
         int_val += JxW[qp] * integrand(q_points[qp]);
     }
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -68,33 +68,46 @@ dof_id_type Prism::key (const unsigned int s) const
     {
     case 0: // the triangular face at z=0
     case 4: // the triangular face at z=1
-      return this->compute_key (this->node(Prism6::side_nodes_map[s][0]),
-                                this->node(Prism6::side_nodes_map[s][1]),
-                                this->node(Prism6::side_nodes_map[s][2]));
+      return this->compute_key (this->node_id(Prism6::side_nodes_map[s][0]),
+                                this->node_id(Prism6::side_nodes_map[s][1]),
+                                this->node_id(Prism6::side_nodes_map[s][2]));
 
     case 1: // the quad face at y=0
     case 2: // the other quad face
     case 3: // the quad face at x=0
-      return this->compute_key (this->node(Prism6::side_nodes_map[s][0]),
-                                this->node(Prism6::side_nodes_map[s][1]),
-                                this->node(Prism6::side_nodes_map[s][2]),
-                                this->node(Prism6::side_nodes_map[s][3]));
+      return this->compute_key (this->node_id(Prism6::side_nodes_map[s][0]),
+                                this->node_id(Prism6::side_nodes_map[s][1]),
+                                this->node_id(Prism6::side_nodes_map[s][2]),
+                                this->node_id(Prism6::side_nodes_map[s][3]));
 
     default:
       libmesh_error_msg("Invalid side " << s);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0;
 }
 
 
 
-UniquePtr<Elem> Prism::side (const unsigned int i) const
+unsigned int Prism::which_node_am_i(unsigned int side,
+                                    unsigned int side_node) const
+{
+  libmesh_assert_less (side, this->n_sides());
+
+  // Never more than 4 nodes per side.
+  libmesh_assert_less(side_node, 4);
+
+  // Some sides have 3 nodes.
+  libmesh_assert(!(side==0 || side==4) || side_node < 3);
+
+  return Prism6::side_nodes_map[side][side_node];
+}
+
+
+
+std::unique_ptr<Elem> Prism::side_ptr (const unsigned int i)
 {
   libmesh_assert_less (i, this->n_sides());
 
-  Elem * face = libmesh_nullptr;
+  std::unique_ptr<Elem> face;
 
   // Set up the type of element
   switch (i)
@@ -102,14 +115,14 @@ UniquePtr<Elem> Prism::side (const unsigned int i) const
     case 0: // the triangular face at z=0
     case 4: // the triangular face at z=1
       {
-        face = new Tri3;
+        face = libmesh_make_unique<Tri3>();
         break;
       }
     case 1: // the quad face at y=0
     case 2: // the other quad face
     case 3: // the quad face at x=0
       {
-        face = new Quad4;
+        face = libmesh_make_unique<Quad4>();
         break;
       }
     default:
@@ -118,9 +131,9 @@ UniquePtr<Elem> Prism::side (const unsigned int i) const
 
   // Set the nodes
   for (unsigned n=0; n<face->n_nodes(); ++n)
-    face->set_node(n) = this->get_node(Prism6::side_nodes_map[i][n]);
+    face->set_node(n) = this->node_ptr(Prism6::side_nodes_map[i][n]);
 
-  return UniquePtr<Elem>(face);
+  return face;
 }
 
 

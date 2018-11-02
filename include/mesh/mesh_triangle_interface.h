@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -25,9 +25,17 @@
 #ifdef LIBMESH_HAVE_TRIANGLE
 
 // Local Includes
-#include "libmesh/enum_elem_type.h"
 #include "libmesh/libmesh.h"
 #include "libmesh/mesh_serializer.h"
+
+#ifdef LIBMESH_FORWARD_DECLARE_ENUMS
+namespace libMesh
+{
+enum ElemType : int;
+}
+#else
+#include "libmesh/enum_elem_type.h"
+#endif
 
 // C++ includes
 #include <cstddef>
@@ -37,7 +45,6 @@ namespace libMesh
 {
 
 // Forward Declarations
-
 class UnstructuredMesh;
 
 /**
@@ -66,7 +73,7 @@ public:
 
   /**
    * The TriangulationType is used with the general triangulate function
-   * defind below.
+   * defined below.
    */
   enum TriangulationType
     {
@@ -163,9 +170,9 @@ public:
    * segments[1] = (1,2)
    * segments[2] = (2,3)
    * segments[3] = (3,0)
-   * Note: for this case, you could use the implicit ordering!
+   * For this case you could actually use the implicit ordering!
    */
-  std::vector<std::pair<unsigned int, unsigned int> > segments;
+  std::vector<std::pair<unsigned int, unsigned int>> segments;
 
 private:
   /**
@@ -174,7 +181,7 @@ private:
   UnstructuredMesh & _mesh;
 
   /**
-   * A pointer to a vector of Hole*s.  If this is NULL, there
+   * A pointer to a vector of Hole*s.  If this is nullptr, there
    * are no holes!
    */
   const std::vector<Hole*> * _holes;

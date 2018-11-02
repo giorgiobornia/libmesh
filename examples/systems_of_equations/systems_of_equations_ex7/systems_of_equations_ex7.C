@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -65,6 +65,7 @@
 #include "libmesh/mesh_generation.h"
 #include "libmesh/dirichlet_boundaries.h"
 #include "libmesh/zero_function.h"
+#include "libmesh/enum_solver_package.h"
 
 // The nonlinear solver and system we will be using
 #include "libmesh/nonlinear_solver.h"
@@ -142,17 +143,17 @@ public:
     const DofMap & dof_map = system.get_dof_map();
 
     FEType fe_type = dof_map.variable_type(u_var);
-    UniquePtr<FEBase> fe (FEBase::build(dim, fe_type));
+    std::unique_ptr<FEBase> fe (FEBase::build(dim, fe_type));
     QGauss qrule (dim, fe_type.default_quadrature_order());
     fe->attach_quadrature_rule (&qrule);
 
-    UniquePtr<FEBase> fe_face (FEBase::build(dim, fe_type));
+    std::unique_ptr<FEBase> fe_face (FEBase::build(dim, fe_type));
     QGauss qface (dim-1, fe_type.default_quadrature_order());
     fe_face->attach_quadrature_rule (&qface);
 
     const std::vector<Real> & JxW = fe->get_JxW();
-    const std::vector<std::vector<Real> > & phi = fe->get_phi();
-    const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+    const std::vector<std::vector<Real>> & phi = fe->get_phi();
+    const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
     DenseMatrix<Number> Ke;
     DenseSubMatrix<Number> Ke_var[3][3] =
@@ -163,16 +164,12 @@ public:
       };
 
     std::vector<dof_id_type> dof_indices;
-    std::vector<std::vector<dof_id_type> > dof_indices_var(3);
+    std::vector<std::vector<dof_id_type>> dof_indices_var(3);
 
     jacobian.zero();
 
-    MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-    const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-    for ( ; el != end_el; ++el)
+    for (const auto & elem : mesh.active_local_element_ptr_range())
       {
-        const Elem * elem = *el;
         dof_map.dof_indices (elem, dof_indices);
         for (unsigned int var=0; var<3; var++)
           dof_map.dof_indices (elem, dof_indices_var[var], var);
@@ -285,17 +282,17 @@ public:
     const DofMap & dof_map = system.get_dof_map();
 
     FEType fe_type = dof_map.variable_type(u_var);
-    UniquePtr<FEBase> fe (FEBase::build(dim, fe_type));
+    std::unique_ptr<FEBase> fe (FEBase::build(dim, fe_type));
     QGauss qrule (dim, fe_type.default_quadrature_order());
     fe->attach_quadrature_rule (&qrule);
 
-    UniquePtr<FEBase> fe_face (FEBase::build(dim, fe_type));
+    std::unique_ptr<FEBase> fe_face (FEBase::build(dim, fe_type));
     QGauss qface (dim-1, fe_type.default_quadrature_order());
     fe_face->attach_quadrature_rule (&qface);
 
     const std::vector<Real> & JxW = fe->get_JxW();
-    const std::vector<std::vector<Real> > & phi = fe->get_phi();
-    const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+    const std::vector<std::vector<Real>> & phi = fe->get_phi();
+    const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
     DenseVector<Number> Re;
 
@@ -305,16 +302,12 @@ public:
        DenseSubVector<Number>(Re)};
 
     std::vector<dof_id_type> dof_indices;
-    std::vector< std::vector<dof_id_type> > dof_indices_var(3);
+    std::vector<std::vector<dof_id_type>> dof_indices_var(3);
 
     residual.zero();
 
-    MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-    const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-    for ( ; el != end_el; ++el)
+    for (const auto & elem : mesh.active_local_element_ptr_range())
       {
-        const Elem * elem = *el;
         dof_map.dof_indices (elem, dof_indices);
         for (unsigned int var=0; var<3; var++)
           dof_map.dof_indices (elem, dof_indices_var[var], var);
@@ -416,12 +409,12 @@ public:
 
     const DofMap & dof_map = system.get_dof_map();
     FEType fe_type = dof_map.variable_type(u_var);
-    UniquePtr<FEBase> fe (FEBase::build(dim, fe_type));
+    std::unique_ptr<FEBase> fe (FEBase::build(dim, fe_type));
     QGauss qrule (dim, fe_type.default_quadrature_order());
     fe->attach_quadrature_rule (&qrule);
 
     const std::vector<Real> & JxW = fe->get_JxW();
-    const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+    const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
     // Also, get a reference to the ExplicitSystem
     ExplicitSystem & stress_system = es.get_system<ExplicitSystem>("StressSystem");
@@ -435,19 +428,14 @@ public:
     sigma_vars[5] = stress_system.variable_number ("sigma_22");
 
     // Storage for the stress dof indices on each element
-    std::vector< std::vector<dof_id_type> > dof_indices_var(system.n_vars());
+    std::vector<std::vector<dof_id_type>> dof_indices_var(system.n_vars());
     std::vector<dof_id_type> stress_dof_indices_var;
 
     // To store the stress tensor on each element
     DenseMatrix<Number> elem_avg_stress_tensor(3, 3);
 
-    MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-    const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-    for ( ; el != end_el; ++el)
+    for (const auto & elem : mesh.active_local_element_ptr_range())
       {
-        const Elem * elem = *el;
-
         for (unsigned int var=0; var<3; var++)
           dof_map.dof_indices (elem, dof_indices_var[var], displacement_vars[var]);
 
@@ -540,6 +528,9 @@ int main (int argc, char ** argv)
   // This example requires the PETSc nonlinear solvers
   libmesh_example_requires(libMesh::default_solver_package() == PETSC_SOLVERS, "--enable-petsc");
 
+  // We use a 3D domain.
+  libmesh_example_requires(LIBMESH_DIM > 2, "--disable-1D-only --disable-2D-only");
+
   GetPot infile("systems_of_equations_ex7.in");
   const Real x_length = infile("x_length", 0.);
   const Real y_length = infile("y_length", 0.);
@@ -627,7 +618,11 @@ int main (int argc, char ** argv)
 
   ZeroFunction<Number> zero;
 
-  system.get_dof_map().add_dirichlet_boundary(DirichletBoundary (clamped_boundaries, uvw, &zero));
+  // Most DirichletBoundary users will want to supply a "locally
+  // indexed" functor
+  system.get_dof_map().add_dirichlet_boundary
+    (DirichletBoundary (clamped_boundaries, uvw, zero,
+                        LOCAL_VARIABLE_ORDER));
 
   equation_systems.init();
   equation_systems.print_info();
@@ -661,9 +656,11 @@ int main (int argc, char ** argv)
 
       lde.compute_stresses();
 
+#ifdef LIBMESH_HAVE_EXODUS_API
       std::stringstream filename;
       filename << "solution_" << count << ".exo";
       ExodusII_IO (mesh).write_equation_systems(filename.str(), equation_systems);
+#endif
     }
 
   return 0;

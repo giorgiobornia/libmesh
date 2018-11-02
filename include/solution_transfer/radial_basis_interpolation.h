@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -25,16 +25,21 @@
 #include "libmesh/libmesh_common.h"
 #include "libmesh/meshfree_interpolation.h"
 #include "libmesh/radial_basis_functions.h"
-#include "libmesh/mesh_tools.h"
+#include "libmesh/bounding_box.h"
 
 
 
 namespace libMesh
 {
+
 /**
- * Radial Basis Function interplation.
+ * Radial Basis Function interpolation.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2013
+ * \brief Does radial basis function interpolation using Nanoflann.
  */
-template <unsigned int KDDim, class RBF = WendlandRBF<KDDim, 2> >
+template <unsigned int KDDim, class RBF = WendlandRBF<KDDim, 2>>
 class RadialBasisInterpolation : public InverseDistanceInterpolation<KDDim>
 {
   /**
@@ -49,7 +54,7 @@ protected:
   /**
    * Bounding box for our source points.
    */
-  MeshTools::BoundingBox _src_bbox;
+  BoundingBox _src_bbox;
 
   /**
    * basis coefficients.
@@ -82,20 +87,20 @@ public:
    * Clears all internal data structures and restores to a
    * pristine state.
    */
-  virtual void clear() libmesh_override;
+  virtual void clear() override;
 
   /**
    * Prepares data structures for use.
    */
-  virtual void prepare_for_use () libmesh_override;
+  virtual void prepare_for_use () override;
 
   /**
    * Interpolate source data at target points.
-   * Pure virtual, must be overriden in derived classes.
+   * Pure virtual, must be overridden in derived classes.
    */
   virtual void interpolate_field_data (const std::vector<std::string> & field_names,
                                        const std::vector<Point> & tgt_pts,
-                                       std::vector<Number> & tgt_vals) const libmesh_override;
+                                       std::vector<Number> & tgt_vals) const override;
 };
 
 } // namespace libMesh

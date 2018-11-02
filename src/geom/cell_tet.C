@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -16,12 +16,11 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-// C++ includes
-
 // Local includes
 #include "libmesh/cell_tet.h"
 #include "libmesh/cell_tet4.h"
 #include "libmesh/face_tri3.h"
+#include "libmesh/enum_elem_quality.h"
 
 namespace libMesh
 {
@@ -56,23 +55,34 @@ dof_id_type Tet::key (const unsigned int s) const
 {
   libmesh_assert_less (s, this->n_sides());
 
-  return this->compute_key(this->node(Tet4::side_nodes_map[s][0]),
-                           this->node(Tet4::side_nodes_map[s][1]),
-                           this->node(Tet4::side_nodes_map[s][2]));
+  return this->compute_key(this->node_id(Tet4::side_nodes_map[s][0]),
+                           this->node_id(Tet4::side_nodes_map[s][1]),
+                           this->node_id(Tet4::side_nodes_map[s][2]));
 }
 
 
 
-UniquePtr<Elem> Tet::side (const unsigned int i) const
+unsigned int Tet::which_node_am_i(unsigned int side,
+                                  unsigned int side_node) const
+{
+  libmesh_assert_less (side, this->n_sides());
+  libmesh_assert_less (side_node, 3);
+
+  return Tet4::side_nodes_map[side][side_node];
+}
+
+
+
+std::unique_ptr<Elem> Tet::side_ptr (const unsigned int i)
 {
   libmesh_assert_less (i, this->n_sides());
 
-  Elem * face = new Tri3;
+  std::unique_ptr<Elem> face = libmesh_make_unique<Tri3>();
 
   for (unsigned n=0; n<face->n_nodes(); ++n)
-    face->set_node(n) = this->get_node(Tet4::side_nodes_map[i][n]);
+    face->set_node(n) = this->node_ptr(Tet4::side_nodes_map[i][n]);
 
-  return UniquePtr<Elem>(face);
+  return face;
 }
 
 

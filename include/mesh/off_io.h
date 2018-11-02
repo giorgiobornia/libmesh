@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,20 +22,19 @@
 #include "libmesh/libmesh_common.h"
 #include "libmesh/mesh_input.h"
 
-// C++ headers
-
 namespace libMesh
 {
 
 // Forward declarations
 class MeshBase;
 
-
-
 /**
- * This class is repsonsible for reading an unstructured,
- * triangulated surface in the
- * standard OFF OOGL format.
+ * This class is responsible for reading an unstructured, triangulated
+ * surface in the standard OFF OOGL format.
+ *
+ * \author John W. Peterson
+ * \date 2004
+ * \brief Reads OOF OOGL triangulated surface files.
  */
 class OFFIO : public MeshInput<MeshBase>
 {
@@ -51,7 +50,7 @@ public:
    * Reads in an OFF OOGL data file based on the string
    * you pass it.
    */
-  virtual void read (const std::string & name) libmesh_override;
+  virtual void read (const std::string & name) override;
 
 private:
   /**

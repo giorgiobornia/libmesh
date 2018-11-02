@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -48,7 +48,7 @@ extern "C"
   PetscErrorCode
   __libmesh_tao_objective (Tao /*tao*/, Vec x, PetscReal * objective, void * ctx)
   {
-    START_LOG("objective()", "TaoOptimizationSolver");
+    LOG_SCOPE("objective()", "TaoOptimizationSolver");
 
     PetscErrorCode ierr = 0;
 
@@ -67,21 +67,24 @@ extern "C"
     PetscVector<Number> & X_sys = *cast_ptr<PetscVector<Number> *>(sys.solution.get());
     PetscVector<Number> X(x, sys.comm());
 
-    // Perform a swap so that sys.solution points to X
+    // Perform a swap so that sys.solution points to the input vector
+    // "x", update sys.current_local_solution based on "x", then swap
+    // back.
     X.swap(X_sys);
-    // Impose constraints on X
-    sys.get_dof_map().enforce_constraints_exactly(sys);
-    // Update sys.current_local_solution based on X
     sys.update();
-    // Swap back
     X.swap(X_sys);
 
-    if (solver->objective_object != libmesh_nullptr)
+    // Enforce constraints (if any) exactly on the
+    // current_local_solution.  This is the solution vector that is
+    // actually used in the computation of the objective function
+    // below, and is not locked by debug-enabled PETSc the way that
+    // the solution vector is.
+    sys.get_dof_map().enforce_constraints_exactly(sys, sys.current_local_solution.get());
+
+    if (solver->objective_object != nullptr)
       (*objective) = solver->objective_object->objective(*(sys.current_local_solution), sys);
     else
       libmesh_error_msg("Objective function not defined in __libmesh_tao_objective");
-
-    STOP_LOG("objective()", "TaoOptimizationSolver");
 
     return ierr;
   }
@@ -93,7 +96,7 @@ extern "C"
   PetscErrorCode
   __libmesh_tao_gradient(Tao /*tao*/, Vec x, Vec g, void * ctx)
   {
-    START_LOG("gradient()", "TaoOptimizationSolver");
+    LOG_SCOPE("gradient()", "TaoOptimizationSolver");
 
     PetscErrorCode ierr = 0;
 
@@ -112,13 +115,11 @@ extern "C"
     PetscVector<Number> & X_sys = *cast_ptr<PetscVector<Number> *>(sys.solution.get());
     PetscVector<Number> X(x, sys.comm());
 
-    // Perform a swap so that sys.solution points to X
+    // Perform a swap so that sys.solution points to the input vector
+    // "x", update sys.current_local_solution based on "x", then swap
+    // back.
     X.swap(X_sys);
-    // Impose constraints on X
-    sys.get_dof_map().enforce_constraints_exactly(sys);
-    // Update sys.current_local_solution based on X
     sys.update();
-    // Swap back
     X.swap(X_sys);
 
     // We'll also pass the gradient in to the assembly routine
@@ -128,14 +129,15 @@ extern "C"
     // Clear the gradient prior to assembly
     gradient.zero();
 
-    if (solver->gradient_object != libmesh_nullptr)
+    // Enforce constraints exactly on the current_local_solution.
+    sys.get_dof_map().enforce_constraints_exactly(sys, sys.current_local_solution.get());
+
+    if (solver->gradient_object != nullptr)
       solver->gradient_object->gradient(*(sys.current_local_solution), gradient, sys);
     else
       libmesh_error_msg("Gradient function not defined in __libmesh_tao_gradient");
 
     gradient.close();
-
-    STOP_LOG("gradient()", "TaoOptimizationSolver");
 
     return ierr;
   }
@@ -145,7 +147,7 @@ extern "C"
   PetscErrorCode
   __libmesh_tao_hessian(Tao /*tao*/, Vec x, Mat h, Mat pc, void * ctx)
   {
-    START_LOG("hessian()", "TaoOptimizationSolver");
+    LOG_SCOPE("hessian()", "TaoOptimizationSolver");
 
     PetscErrorCode ierr = 0;
 
@@ -165,13 +167,11 @@ extern "C"
     PetscVector<Number> & X_sys = *cast_ptr<PetscVector<Number> *>(sys.solution.get());
     PetscVector<Number> X(x, sys.comm());
 
-    // Perform a swap so that sys.solution points to X
+    // Perform a swap so that sys.solution points to the input vector
+    // "x", update sys.current_local_solution based on "x", then swap
+    // back.
     X.swap(X_sys);
-    // Impose constraints on X
-    sys.get_dof_map().enforce_constraints_exactly(sys);
-    // Update sys.current_local_solution based on X
     sys.update();
-    // Swap back
     X.swap(X_sys);
 
     // Let's also wrap pc and h in PetscMatrix objects for convenience
@@ -180,7 +180,10 @@ extern "C"
     PC.attach_dof_map(sys.get_dof_map());
     hessian.attach_dof_map(sys.get_dof_map());
 
-    if (solver->hessian_object != libmesh_nullptr)
+    // Enforce constraints exactly on the current_local_solution.
+    sys.get_dof_map().enforce_constraints_exactly(sys, sys.current_local_solution.get());
+
+    if (solver->hessian_object != nullptr)
       {
         // Following PetscNonlinearSolver by passing in PC. It's not clear
         // why we pass in PC and not hessian though?
@@ -192,8 +195,6 @@ extern "C"
     PC.close();
     hessian.close();
 
-    STOP_LOG("hessian()", "TaoOptimizationSolver");
-
     return ierr;
   }
 
@@ -203,7 +204,7 @@ extern "C"
   PetscErrorCode
   __libmesh_tao_equality_constraints(Tao /*tao*/, Vec x, Vec ce, void * ctx)
   {
-    START_LOG("equality_constraints()", "TaoOptimizationSolver");
+    LOG_SCOPE("equality_constraints()", "TaoOptimizationSolver");
 
     PetscErrorCode ierr = 0;
 
@@ -222,13 +223,11 @@ extern "C"
     PetscVector<Number> & X_sys = *cast_ptr<PetscVector<Number> *>(sys.solution.get());
     PetscVector<Number> X(x, sys.comm());
 
-    // Perform a swap so that sys.solution points to X
+    // Perform a swap so that sys.solution points to the input vector
+    // "x", update sys.current_local_solution based on "x", then swap
+    // back.
     X.swap(X_sys);
-    // Impose constraints on X
-    sys.get_dof_map().enforce_constraints_exactly(sys);
-    // Update sys.current_local_solution based on X
     sys.update();
-    // Swap back
     X.swap(X_sys);
 
     // We'll also pass the constraints vector ce into the assembly routine
@@ -238,14 +237,15 @@ extern "C"
     // Clear the gradient prior to assembly
     eq_constraints.zero();
 
-    if (solver->equality_constraints_object != libmesh_nullptr)
+    // Enforce constraints exactly on the current_local_solution.
+    sys.get_dof_map().enforce_constraints_exactly(sys, sys.current_local_solution.get());
+
+    if (solver->equality_constraints_object != nullptr)
       solver->equality_constraints_object->equality_constraints(*(sys.current_local_solution), eq_constraints, sys);
     else
       libmesh_error_msg("Constraints function not defined in __libmesh_tao_equality_constraints");
 
     eq_constraints.close();
-
-    STOP_LOG("equality_constraints()", "TaoOptimizationSolver");
 
     return ierr;
   }
@@ -256,7 +256,7 @@ extern "C"
   PetscErrorCode
   __libmesh_tao_equality_constraints_jacobian(Tao /*tao*/, Vec x, Mat J, Mat Jpre, void * ctx)
   {
-    START_LOG("equality_constraints_jacobian()", "TaoOptimizationSolver");
+    LOG_SCOPE("equality_constraints_jacobian()", "TaoOptimizationSolver");
 
     PetscErrorCode ierr = 0;
 
@@ -275,28 +275,27 @@ extern "C"
     PetscVector<Number> & X_sys = *cast_ptr<PetscVector<Number> *>(sys.solution.get());
     PetscVector<Number> X(x, sys.comm());
 
-    // Perform a swap so that sys.solution points to X
+    // Perform a swap so that sys.solution points to the input vector
+    // "x", update sys.current_local_solution based on "x", then swap
+    // back.
     X.swap(X_sys);
-    // Impose constraints on X
-    sys.get_dof_map().enforce_constraints_exactly(sys);
-    // Update sys.current_local_solution based on X
     sys.update();
-    // Swap back
     X.swap(X_sys);
 
     // Let's also wrap J and Jpre in PetscMatrix objects for convenience
     PetscMatrix<Number> J_petsc(J, sys.comm());
     PetscMatrix<Number> Jpre_petsc(Jpre, sys.comm());
 
-    if (solver->equality_constraints_jacobian_object != libmesh_nullptr)
+    // Enforce constraints exactly on the current_local_solution.
+    sys.get_dof_map().enforce_constraints_exactly(sys, sys.current_local_solution.get());
+
+    if (solver->equality_constraints_jacobian_object != nullptr)
       solver->equality_constraints_jacobian_object->equality_constraints_jacobian(*(sys.current_local_solution), J_petsc, sys);
     else
       libmesh_error_msg("Constraints function not defined in __libmesh_tao_equality_constraints_jacobian");
 
     J_petsc.close();
     Jpre_petsc.close();
-
-    STOP_LOG("equality_constraints_jacobian()", "TaoOptimizationSolver");
 
     return ierr;
   }
@@ -306,7 +305,7 @@ extern "C"
   PetscErrorCode
   __libmesh_tao_inequality_constraints(Tao /*tao*/, Vec x, Vec cineq, void * ctx)
   {
-    START_LOG("inequality_constraints()", "TaoOptimizationSolver");
+    LOG_SCOPE("inequality_constraints()", "TaoOptimizationSolver");
 
     PetscErrorCode ierr = 0;
 
@@ -325,13 +324,11 @@ extern "C"
     PetscVector<Number> & X_sys = *cast_ptr<PetscVector<Number> *>(sys.solution.get());
     PetscVector<Number> X(x, sys.comm());
 
-    // Perform a swap so that sys.solution points to X
+    // Perform a swap so that sys.solution points to the input vector
+    // "x", update sys.current_local_solution based on "x", then swap
+    // back.
     X.swap(X_sys);
-    // Impose constraints on X
-    sys.get_dof_map().enforce_constraints_exactly(sys);
-    // Update sys.current_local_solution based on X
     sys.update();
-    // Swap back
     X.swap(X_sys);
 
     // We'll also pass the constraints vector ce into the assembly routine
@@ -341,14 +338,15 @@ extern "C"
     // Clear the gradient prior to assembly
     ineq_constraints.zero();
 
-    if (solver->inequality_constraints_object != libmesh_nullptr)
+    // Enforce constraints exactly on the current_local_solution.
+    sys.get_dof_map().enforce_constraints_exactly(sys, sys.current_local_solution.get());
+
+    if (solver->inequality_constraints_object != nullptr)
       solver->inequality_constraints_object->inequality_constraints(*(sys.current_local_solution), ineq_constraints, sys);
     else
       libmesh_error_msg("Constraints function not defined in __libmesh_tao_inequality_constraints");
 
     ineq_constraints.close();
-
-    STOP_LOG("inequality_constraints()", "TaoOptimizationSolver");
 
     return ierr;
   }
@@ -359,7 +357,7 @@ extern "C"
   PetscErrorCode
   __libmesh_tao_inequality_constraints_jacobian(Tao /*tao*/, Vec x, Mat J, Mat Jpre, void * ctx)
   {
-    START_LOG("inequality_constraints_jacobian()", "TaoOptimizationSolver");
+    LOG_SCOPE("inequality_constraints_jacobian()", "TaoOptimizationSolver");
 
     PetscErrorCode ierr = 0;
 
@@ -378,28 +376,27 @@ extern "C"
     PetscVector<Number> & X_sys = *cast_ptr<PetscVector<Number> *>(sys.solution.get());
     PetscVector<Number> X(x, sys.comm());
 
-    // Perform a swap so that sys.solution points to X
+    // Perform a swap so that sys.solution points to the input vector
+    // "x", update sys.current_local_solution based on "x", then swap
+    // back.
     X.swap(X_sys);
-    // Impose constraints on X
-    sys.get_dof_map().enforce_constraints_exactly(sys);
-    // Update sys.current_local_solution based on X
     sys.update();
-    // Swap back
     X.swap(X_sys);
 
     // Let's also wrap J and Jpre in PetscMatrix objects for convenience
     PetscMatrix<Number> J_petsc(J, sys.comm());
     PetscMatrix<Number> Jpre_petsc(Jpre, sys.comm());
 
-    if (solver->inequality_constraints_jacobian_object != libmesh_nullptr)
+    // Enforce constraints exactly on the current_local_solution.
+    sys.get_dof_map().enforce_constraints_exactly(sys, sys.current_local_solution.get());
+
+    if (solver->inequality_constraints_jacobian_object != nullptr)
       solver->inequality_constraints_jacobian_object->inequality_constraints_jacobian(*(sys.current_local_solution), J_petsc, sys);
     else
       libmesh_error_msg("Constraints function not defined in __libmesh_tao_inequality_constraints_jacobian");
 
     J_petsc.close();
     Jpre_petsc.close();
-
-    STOP_LOG("inequality_constraints_jacobian()", "TaoOptimizationSolver");
 
     return ierr;
   }
@@ -412,8 +409,7 @@ extern "C"
 //---------------------------------------------------------------------
 // TaoOptimizationSolver<> methods
 template <typename T>
-TaoOptimizationSolver<T>::TaoOptimizationSolver (OptimizationSystem & system_in)
-  :
+TaoOptimizationSolver<T>::TaoOptimizationSolver (OptimizationSystem & system_in) :
   OptimizationSolver<T>(system_in),
   _reason(TAO_CONVERGED_USER) // Arbitrary initial value...
 {
@@ -463,7 +459,7 @@ void TaoOptimizationSolver<T>::init ()
 template <typename T>
 void TaoOptimizationSolver<T>::solve ()
 {
-  START_LOG("solve()", "TaoOptimizationSolver");
+  LOG_SCOPE("solve()", "TaoOptimizationSolver");
 
   this->init ();
 
@@ -488,7 +484,7 @@ void TaoOptimizationSolver<T>::solve ()
   // programmatically set tolerance and max. function evaluation
   // values when "-tao_type ipm" was specified on the command line: we
   // call TaoSetFromOptions twice (both before and after setting
-  // custom options programatically)
+  // custom options programmatically)
   ierr = TaoSetFromOptions(_tao);
   LIBMESH_CHKERR(ierr);
 
@@ -500,8 +496,9 @@ void TaoOptimizationSolver<T>::solve ()
   // ||g(X)|| / ||g(X0)||                <= gttol
   // Command line equivalents: -tao_fatol, -tao_frtol, -tao_gatol, -tao_grtol, -tao_gttol
   ierr = TaoSetTolerances(_tao,
-#if PETSC_RELEASE_LESS_THAN(3,6,4)
-                          // Releases up to 3.6.3 had fatol and frtol, after that they were removed.
+#if PETSC_RELEASE_LESS_THAN(3,7,0)
+                          // Releases up to 3.X.Y had fatol and frtol, after that they were removed.
+                          // Hopefully we'll be able to know X and Y soon. Guessing at 3.7.0.
                           /*fatol=*/PETSC_DEFAULT,
                           /*frtol=*/PETSC_DEFAULT,
 #endif
@@ -532,19 +529,19 @@ void TaoOptimizationSolver<T>::solve ()
   ierr = TaoSetObjectiveRoutine(_tao, __libmesh_tao_objective, this);
   LIBMESH_CHKERR(ierr);
 
-  if ( this->gradient_object )
+  if (this->gradient_object)
     {
       ierr = TaoSetGradientRoutine(_tao, __libmesh_tao_gradient, this);
       LIBMESH_CHKERR(ierr);
     }
 
-  if ( this->hessian_object )
+  if (this->hessian_object)
     {
       ierr = TaoSetHessianRoutine(_tao, hessian->mat(), hessian->mat(), __libmesh_tao_hessian, this);
       LIBMESH_CHKERR(ierr);
     }
 
-  if ( this->lower_and_upper_bounds_object )
+  if (this->lower_and_upper_bounds_object)
     {
       // Need to actually compute the bounds vectors first
       this->lower_and_upper_bounds_object->lower_and_upper_bounds(this->system());
@@ -555,13 +552,13 @@ void TaoOptimizationSolver<T>::solve ()
       LIBMESH_CHKERR(ierr);
     }
 
-  if ( this->equality_constraints_object )
+  if (this->equality_constraints_object)
     {
       ierr = TaoSetEqualityConstraintsRoutine(_tao, ceq->vec(), __libmesh_tao_equality_constraints, this);
       LIBMESH_CHKERR(ierr);
     }
 
-  if ( this->equality_constraints_jacobian_object )
+  if (this->equality_constraints_jacobian_object)
     {
       ierr = TaoSetJacobianEqualityRoutine(_tao,
                                            ceq_jac->mat(),
@@ -572,14 +569,14 @@ void TaoOptimizationSolver<T>::solve ()
     }
 
   // Optionally set inequality constraints
-  if ( this->inequality_constraints_object )
+  if (this->inequality_constraints_object)
     {
       ierr = TaoSetInequalityConstraintsRoutine(_tao, cineq->vec(), __libmesh_tao_inequality_constraints, this);
       LIBMESH_CHKERR(ierr);
     }
 
   // Optionally set inequality constraints Jacobian
-  if ( this->inequality_constraints_jacobian_object )
+  if (this->inequality_constraints_jacobian_object)
     {
       ierr = TaoSetJacobianInequalityRoutine(_tao,
                                              cineq_jac->mat(),
@@ -597,18 +594,22 @@ void TaoOptimizationSolver<T>::solve ()
   ierr = TaoSolve(_tao);
   LIBMESH_CHKERR(ierr);
 
+  // Enforce constraints exactly now that the solve is done.  We have
+  // been enforcing them on the current_local_solution during the
+  // solve, but now need to be sure they are enforced on the parallel
+  // solution vector as well.
+  this->system().get_dof_map().enforce_constraints_exactly(this->system());
+
   // Store the convergence/divergence reason
   ierr = TaoGetConvergedReason(_tao, &_reason);
   LIBMESH_CHKERR(ierr);
-
-  STOP_LOG("solve()", "TaoOptimizationSolver");
 }
 
 
 template <typename T>
 void TaoOptimizationSolver<T>::get_dual_variables()
 {
-  START_LOG("get_dual_variables()", "TaoOptimizationSolver");
+  LOG_SCOPE("get_dual_variables()", "TaoOptimizationSolver");
 
   PetscVector<T> * lambda_eq_petsc =
     cast_ptr<PetscVector<T> *>(this->system().lambda_eq.get());
@@ -623,8 +624,6 @@ void TaoOptimizationSolver<T>::get_dual_variables()
                              &lambda_eq_petsc_vec,
                              &lambda_ineq_petsc_vec);
   LIBMESH_CHKERR(ierr);
-
-  STOP_LOG("get_dual_variables()", "TaoOptimizationSolver");
 }
 
 

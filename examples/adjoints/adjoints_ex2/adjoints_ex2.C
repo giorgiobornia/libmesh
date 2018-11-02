@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -70,6 +70,8 @@
 #include "libmesh/numeric_vector.h"
 #include "libmesh/steady_solver.h"
 #include "libmesh/system_norm.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
+#include "libmesh/enum_solver_package.h"
 
 // Sensitivity Calculation related includes
 #include "libmesh/parameter_vector.h"
@@ -86,6 +88,7 @@
 // libMesh I/O includes
 #include "libmesh/getpot.h"
 #include "libmesh/gmv_io.h"
+#include "libmesh/exodusII_io.h"
 
 // Local includes
 #include "femparameters.h"
@@ -103,21 +106,62 @@ using namespace libMesh;
 // Write gmv output
 void write_output(EquationSystems & es,
                   unsigned int a_step, // The adaptive step count
-                  std::string solution_type) // primal or adjoint solve
+                  std::string solution_type, // primal or adjoint solve
+                  FEMParameters & param)
 {
+  // Ignore parameters when there are no output formats available.
+  libmesh_ignore(es);
+  libmesh_ignore(a_step);
+  libmesh_ignore(solution_type);
+  libmesh_ignore(param);
+
 #ifdef LIBMESH_HAVE_GMV
-  MeshBase & mesh = es.get_mesh();
+  if (param.output_gmv)
+    {
+      MeshBase & mesh = es.get_mesh();
 
-  std::ostringstream file_name_gmv;
-  file_name_gmv << solution_type
-                << ".out.gmv."
-                << std::setw(2)
-                << std::setfill('0')
-                << std::right
-                << a_step;
+      std::ostringstream file_name_gmv;
+      file_name_gmv << solution_type
+                    << ".out.gmv."
+                    << std::setw(2)
+                    << std::setfill('0')
+                    << std::right
+                    << a_step;
 
-  GMVIO(mesh).write_equation_systems(file_name_gmv.str(), es);
+      GMVIO(mesh).write_equation_systems(file_name_gmv.str(), es);
+    }
+#endif
 
+#ifdef LIBMESH_HAVE_EXODUS_API
+  if (param.output_exodus)
+    {
+      MeshBase & mesh = es.get_mesh();
+
+      // We write out one file per adaptive step. The files are named in
+      // the following way:
+      // foo.e
+      // foo.e-s002
+      // foo.e-s003
+      // ...
+      // so that, if you open the first one with Paraview, it actually
+      // opens the entire sequence of adapted files.
+      std::ostringstream file_name_exodus;
+
+      file_name_exodus << solution_type << ".e";
+      if (a_step > 0)
+        file_name_exodus << "-s"
+                         << std::setw(3)
+                         << std::setfill('0')
+                         << std::right
+                         << a_step + 1;
+
+      // We write each adaptive step as a pseudo "time" step, where the
+      // time simply matches the (1-based) adaptive step we are on.
+      ExodusII_IO(mesh).write_timestep(file_name_exodus.str(),
+                                       es,
+                                       1,
+                                       /*time=*/a_step + 1);
+    }
 #endif
 }
 
@@ -143,13 +187,12 @@ void set_system_parameters(LaplaceSystem & system, FEMParameters & param)
   system.print_jacobians      = param.print_jacobians;
 
   // No transient time solver
-  system.time_solver =
-    UniquePtr<TimeSolver>(new SteadySolver(system));
+  system.time_solver = libmesh_make_unique<SteadySolver>(system);
 
   // Nonlinear solver options
   {
     NewtonSolver * solver = new NewtonSolver(system);
-    system.time_solver->diff_solver() = UniquePtr<DiffSolver>(solver);
+    system.time_solver->diff_solver() = std::unique_ptr<DiffSolver>(solver);
 
     solver->quiet                       = param.solver_quiet;
     solver->max_nonlinear_iterations    = param.max_nonlinear_iterations;
@@ -175,8 +218,8 @@ void set_system_parameters(LaplaceSystem & system, FEMParameters & param)
 
 #ifdef LIBMESH_ENABLE_AMR
 
-UniquePtr<MeshRefinement> build_mesh_refinement(MeshBase & mesh,
-                                                FEMParameters & param)
+std::unique_ptr<MeshRefinement> build_mesh_refinement(MeshBase & mesh,
+                                                      FEMParameters & param)
 {
   MeshRefinement * mesh_refinement = new MeshRefinement(mesh);
   mesh_refinement->coarsen_by_parents() = true;
@@ -186,7 +229,7 @@ UniquePtr<MeshRefinement> build_mesh_refinement(MeshBase & mesh,
   mesh_refinement->coarsen_fraction()  = param.coarsen_fraction;
   mesh_refinement->coarsen_threshold() = param.coarsen_threshold;
 
-  return UniquePtr<MeshRefinement>(mesh_refinement);
+  return std::unique_ptr<MeshRefinement>(mesh_refinement);
 }
 
 #endif // LIBMESH_ENABLE_AMR
@@ -198,13 +241,13 @@ UniquePtr<MeshRefinement> build_mesh_refinement(MeshBase & mesh,
 // forward and adjoint weights. The H1 seminorm component of the error is used
 // as dictated by the weak form the Laplace equation.
 
-UniquePtr<ErrorEstimator> build_error_estimator(FEMParameters & param)
+std::unique_ptr<ErrorEstimator> build_error_estimator(FEMParameters & param)
 {
   if (param.indicator_type == "kelly")
     {
       libMesh::out << "Using Kelly Error Estimator" << std::endl;
 
-      return UniquePtr<ErrorEstimator>(new KellyErrorEstimator);
+      return libmesh_make_unique<KellyErrorEstimator>();
     }
   else if (param.indicator_type == "adjoint_residual")
     {
@@ -224,7 +267,7 @@ UniquePtr<ErrorEstimator> build_error_estimator(FEMParameters & param)
 
       adjoint_residual_estimator->dual_error_estimator()->error_norm.set_type(0, H1_SEMINORM);
 
-      return UniquePtr<ErrorEstimator>(adjoint_residual_estimator);
+      return std::unique_ptr<ErrorEstimator>(adjoint_residual_estimator);
     }
   else
     libmesh_error_msg("Unknown indicator_type = " << param.indicator_type);
@@ -235,6 +278,10 @@ int main (int argc, char ** argv)
 {
   // Initialize libMesh.
   LibMeshInit init (argc, argv);
+
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
 
   // Skip adaptive examples on a non-adaptive libMesh build
 #ifndef LIBMESH_ENABLE_AMR
@@ -263,7 +310,7 @@ int main (int argc, char ** argv)
   Mesh mesh(init.comm());
 
   // And an object to refine it
-  UniquePtr<MeshRefinement> mesh_refinement =
+  std::unique_ptr<MeshRefinement> mesh_refinement =
     build_mesh_refinement(mesh, param);
 
   // And an EquationSystems to run on it
@@ -330,7 +377,7 @@ int main (int argc, char ** argv)
         system.solve();
 
         // Write out the computed primal solution
-        write_output(equation_systems, a_step, "primal");
+        write_output(equation_systems, a_step, "primal", param);
 
         // Get a pointer to the primal solution vector
         NumericVector<Number> & primal_solution = *system.solution;
@@ -348,7 +395,7 @@ int main (int argc, char ** argv)
         // Compute the sensitivities
         system.adjoint_qoi_parameter_sensitivity(qois, system.get_parameter_vector(), sensitivities);
 
-        // Now that we have solved the adjoint, set the adjoint_already_solved boolean to true, so we dont solve unneccesarily in the error estimator
+        // Now that we have solved the adjoint, set the adjoint_already_solved boolean to true, so we dont solve unnecessarily in the error estimator
         system.set_adjoint_already_solved(true);
 
         GetPot infile_l_shaped("l-shaped.in");
@@ -390,7 +437,7 @@ int main (int argc, char ** argv)
 
         // Swap the primal and dual solutions so we can write out the adjoint solution
         primal_solution.swap(dual_solution_0);
-        write_output(equation_systems, a_step, "adjoint_0");
+        write_output(equation_systems, a_step, "adjoint_0", param);
 
         // Swap back
         primal_solution.swap(dual_solution_0);
@@ -413,7 +460,7 @@ int main (int argc, char ** argv)
             ErrorVector error;
 
             // Build an error estimator object
-            UniquePtr<ErrorEstimator> error_estimator =
+            std::unique_ptr<ErrorEstimator> error_estimator =
               build_error_estimator(param);
 
             // Estimate the error in each element using the Adjoint Residual or Kelly error estimator
@@ -430,7 +477,7 @@ int main (int argc, char ** argv)
             ErrorVector error;
 
             // Build an error estimator object
-            UniquePtr<ErrorEstimator> error_estimator =
+            std::unique_ptr<ErrorEstimator> error_estimator =
               build_error_estimator(param);
 
             // Estimate the error in each element using the Adjoint Residual or Kelly error estimator
@@ -463,7 +510,7 @@ int main (int argc, char ** argv)
       {
         system.solve();
 
-        write_output(equation_systems, a_step, "primal");
+        write_output(equation_systems, a_step, "primal", param);
 
         NumericVector<Number> & primal_solution = *system.solution;
 
@@ -477,7 +524,7 @@ int main (int argc, char ** argv)
 
         system.adjoint_qoi_parameter_sensitivity(qois, system.get_parameter_vector(), sensitivities);
 
-        // Now that we have solved the adjoint, set the adjoint_already_solved boolean to true, so we dont solve unneccesarily in the error estimator
+        // Now that we have solved the adjoint, set the adjoint_already_solved boolean to true, so we dont solve unnecessarily in the error estimator
         system.set_adjoint_already_solved(true);
 
         GetPot infile_l_shaped("l-shaped.in");
@@ -522,7 +569,7 @@ int main (int argc, char ** argv)
         NumericVector<Number> & dual_solution_0 = system.get_adjoint_solution(0);
 
         primal_solution.swap(dual_solution_0);
-        write_output(equation_systems, a_step, "adjoint_0");
+        write_output(equation_systems, a_step, "adjoint_0", param);
 
         primal_solution.swap(dual_solution_0);
       }

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -21,9 +21,10 @@
 #define LIBMESH_PARAMETER_POINTER_H
 
 
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/libmesh_common.h"
 #include "libmesh/parameter_accessor.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
 
 namespace libMesh
 {
@@ -35,6 +36,10 @@ namespace libMesh
  * This is the "default" ParameterAccessor subclass: it simply stores
  * a user-provided pointer to the parameter, and modifies the value at
  * that location in memory.
+ *
+ * \author Roy Stogner
+ * \date 2015
+ * \brief Stores/modifies a user-provided pointer to a parameter.
  */
 template <typename T=Number>
 class ParameterPointer : public ParameterAccessor<T>
@@ -47,33 +52,37 @@ public:
   /**
    * Setter: change the value of the parameter we access.
    */
-  virtual void set (const T & new_value) libmesh_override
+  virtual void set (const T & new_value) override
   { libmesh_assert(_ptr); *_ptr = new_value; }
 
   /**
    * Getter: get the value of the parameter we access.
    */
-  virtual const T & get () const libmesh_override
+  virtual const T & get () const override
   { libmesh_assert(_ptr); return *_ptr; }
 
   /**
    * Reseater: change the location of the parameter we access.
-   * This is included for backward compatibility, but is deprecated.
+   *
+   * \deprecated This is included for backward compatibility, but
+   * should no longer be used.
    */
+#ifdef LIBMESH_ENABLE_DEPRECATED
   virtual ParameterAccessor<T> &
-  operator= (T * new_ptr) libmesh_override
+  operator= (T * new_ptr) override
   {
     libmesh_deprecated();
     _ptr = new_ptr;
     return *this;
   }
+#endif
 
   /**
-   * Returns a new copy of the accessor.
+   * \returns A new copy of the accessor.
    */
-  virtual UniquePtr<ParameterAccessor<T> > clone() const libmesh_override
+  virtual std::unique_ptr<ParameterAccessor<T>> clone() const override
   {
-    return UniquePtr<ParameterAccessor<T> >(new ParameterPointer<T>(_ptr));
+    return libmesh_make_unique<ParameterPointer<T>>(_ptr);
   }
 
 private:

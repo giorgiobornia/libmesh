@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -25,7 +25,15 @@
 
 // Local Includes
 #include "libmesh/libmesh_common.h" // Real
-#include "libmesh/enum_elem_type.h" // For ElemType declaration below
+
+#ifdef LIBMESH_FORWARD_DECLARE_ENUMS
+namespace libMesh
+{
+enum ElemType : int;
+}
+#else
+#include "libmesh/enum_elem_type.h"
+#endif
 
 // C++ includes
 #include <cstddef>
@@ -42,6 +50,10 @@ typedef Real REAL;
  * A special namespace for wrapping the standard Triangle API,
  * as well as some helper functions for initializing/destroying
  * the structs triangle uses to communicate.
+ *
+ * \author John W. Peterson
+ * \date 2011
+ * \brief Namespace that wraps the Triangle mesh generator's API.
  */
 namespace TriangleWrapper
 {
@@ -56,7 +68,7 @@ enum IO_Type {
   BOTH   = 2};
 
 /**
- * Initializes the fields of t to NULL/0 as necessary.
+ * Initializes the fields of t to nullptr/0 as necessary.
  * This is helpful for preventing the access of uninitialized
  * memory when working with C, which has no constructors or
  * destructors.
@@ -64,20 +76,19 @@ enum IO_Type {
 void init(triangulateio & t);
 
 /**
- * Frees any memory which has been dynamically allocated by
- * Triangle.  Note the following facts:
- * 1) Triangle does not free any memory itself
- * 2) It is always safe to call free on a NULL pointer.
+ * Frees any memory which has been dynamically allocated by Triangle.
  *
- * However, triangle *does* shallow-copy (for example)
- * the holelist pointer from the input to output struct **without**
- * performing a deep copy of the holelist itself.  Therefore, double-free
- * will occur without additional care!
+ * \note Triangle does not free any memory itself.
+ * \note It is always safe to call free on a nullptr.
+ * \note Triangle \e does shallow-copy (for example) the holelist
+ * pointer from the input to output struct \e without performing a
+ * deep copy of the holelist itself.  Therefore, double-free will
+ * occur without additional care!
  */
 void destroy(triangulateio & t, IO_Type);
 
 /**
- * Copies triangulation data computed by triange from a triangulateio object
+ * Copies triangulation data computed by triangle from a triangulateio object
  * to a LibMesh mesh.   This routine is used internally by the
  * MeshTools::Generation::build_delaunay_square(...) and
  * MeshTools::Generation::build_delaunay_square_with_hole(...) routines.

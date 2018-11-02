@@ -26,10 +26,11 @@
 // libMesh includes
 #include "libmesh/dense_matrix.h"
 #include "libmesh/dense_vector.h"
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
 #include "libmesh/parallel_object.h"
 
 // C++ includes
+#include <memory>
 
 namespace libMesh
 {
@@ -55,8 +56,7 @@ public:
   /**
    * Constructor.
    */
-  RBEvaluation (const Parallel::Communicator & comm
-                LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
+  RBEvaluation (const Parallel::Communicator & comm);
 
   /**
    * Destructor.
@@ -67,7 +67,7 @@ public:
    * Clear this RBEvaluation object. Delete the basis functions
    * and clear and extra data in subclasses.
    */
-  virtual void clear() libmesh_override;
+  virtual void clear() override;
 
   /**
    * Set the RBThetaExpansion object.
@@ -80,16 +80,15 @@ public:
   RBThetaExpansion & get_rb_theta_expansion();
 
   /**
-   * @return true if the theta expansion has been initialized.
+   * \returns \p true if the theta expansion has been initialized.
    */
   bool is_rb_theta_expansion_initialized() const;
 
   /**
-   * Resize and clear the data vectors corresponding to the
-   * value of \p Nmax. Optionally resize the data structures
-   * required for the error bound.
-   * Overload to also clear and resize any extra
-   * data in subclasses.
+   * Resize and clear the data vectors corresponding to the value of
+   * \p Nmax. Optionally resize the data structures required for the
+   * error bound.  Override to also clear and resize any extra data in
+   * subclasses.
    */
   virtual void resize_data_structures(const unsigned int Nmax,
                                       bool resize_error_bound_data=true);
@@ -102,7 +101,7 @@ public:
   /**
    * Perform online solve with the N RB basis functions, for the
    * set of parameters in current_params, where 0 <= N <= RB_size.
-   * @return the (absolute) error bound associated with
+   * \returns The (absolute) error bound associated with
    * the RB approximation.
    * With an empty RB space (N=0), our RB solution is zero, but we
    * still obtain a meaningful error bound associated with the
@@ -111,9 +110,10 @@ public:
   virtual Real rb_solve(unsigned int N);
 
   /**
-   * Return the norm of RB_solution.
+   * \returns A scaling factor that we can use to provide a consistent
+   * scaling of the RB error bound across different parameter values.
    */
-  virtual Real get_rb_solution_norm();
+  virtual Real get_error_bound_normalization();
 
   /**
    * Compute the dual norm of the residual for the solution
@@ -123,7 +123,7 @@ public:
 
   /**
    * Specifies the residual scaling on the denominator to
-   * be used in the a posteriori error bound. Overload
+   * be used in the a posteriori error bound. Override
    * in subclass in order to obtain the desired error bound.
    */
   virtual Real residual_scaling_denom(Real alpha_LB);
@@ -150,7 +150,7 @@ public:
    * Set the number of basis functions. Useful when reading in
    * stored data.
    */
-  virtual void set_n_basis_functions(unsigned int n_bfs) { basis_functions.resize(n_bfs); }
+  virtual void set_n_basis_functions(unsigned int n_bfs);
 
   /**
    * Clear all the Riesz representors that are used to compute the RB residual
@@ -162,7 +162,8 @@ public:
   /**
    * Write out all the data to text files in order to segregate the
    * Offline stage from the Online stage.
-   * Note: This is a legacy method, use RBDataSerialization instead.
+   *
+   * \note This is a legacy method, use RBDataSerialization instead.
    */
   virtual void legacy_write_offline_data_to_files(const std::string & directory_name = "offline_data",
                                                   const bool write_binary_data=true);
@@ -170,7 +171,8 @@ public:
   /**
    * Read in the saved Offline reduced basis data
    * to initialize the system for Online solves.
-   * Note: This is a legacy method, use RBDataSerialization instead.
+   *
+   * \note This is a legacy method, use RBDataSerialization instead.
    */
   virtual void legacy_read_offline_data_from_files(const std::string & directory_name = "offline_data",
                                                    bool read_error_bound_data=true,
@@ -192,17 +194,17 @@ public:
    * written.
    */
   virtual void write_out_vectors(System & sys,
-                                 std::vector<NumericVector<Number> *> & vectors,
+                                 std::vector<NumericVector<Number>*> & vectors,
                                  const std::string & directory_name = "offline_data",
                                  const std::string & data_name = "bf",
                                  const bool write_binary_basis_functions = true);
 
   /**
    * Read in all the basis functions from file.
-   * \p sys is used for file IO
-   * \p directory_name specifies which directory to write files to
-   * \p read_binary_basis_functions indicates whether to expect
-   * binary or ASCII data
+   *
+   * \param sys Used for file IO.
+   * \param directory_name Specifies which directory to write files to.
+   * \param read_binary_basis_functions Indicates whether to expect binary or ASCII data.
    */
   virtual void read_in_basis_functions(System & sys,
                                        const std::string & directory_name = "offline_data",
@@ -214,27 +216,22 @@ public:
    * that need to be read in.
    */
   void read_in_vectors(System & sys,
-                       std::vector<NumericVector<Number> *> & vectors,
+                       std::vector<std::unique_ptr<NumericVector<Number>>> & vectors,
                        const std::string & directory_name,
                        const std::string & data_name,
                        const bool read_binary_vectors);
 
   /**
    * Performs read_in_vectors for a list of directory names and data names.
-   * Reading in vectors requires us to renumber the dofs in a partition-indepdent
+   * Reading in vectors requires us to renumber the dofs in a partition-independent
    * way. This function only renumbers the dofs once at the start (and reverts
    * it at the end), which can save a lot of work compared to renumbering on every read.
    */
   void read_in_vectors_from_multiple_files(System & sys,
-                                           std::vector<std::vector<NumericVector<Number> *> *> multiple_vectors,
+                                           std::vector<std::vector<std::unique_ptr<NumericVector<Number>>> *> multiple_vectors,
                                            const std::vector<std::string> & multiple_directory_names,
                                            const std::vector<std::string> & multiple_data_names,
                                            const bool read_binary_vectors);
-
-  /**
-   * Version string that we need to use for writing/reading basis functions.
-   */
-  static std::string get_io_version_string();
 
   //----------- PUBLIC DATA MEMBERS -----------//
 
@@ -242,7 +239,7 @@ public:
    * The libMesh vectors storing the finite element coefficients
    * of the RB basis functions.
    */
-  std::vector<NumericVector<Number> *> basis_functions;
+  std::vector<std::unique_ptr<NumericVector<Number>>> basis_functions;
 
   /**
    * The list of parameters selected by the Greedy algorithm in generating
@@ -261,12 +258,12 @@ public:
   /**
    * Dense matrices for the RB computations.
    */
-  std::vector<DenseMatrix<Number> > RB_Aq_vector;
+  std::vector<DenseMatrix<Number>> RB_Aq_vector;
 
   /**
    * Dense vector for the RHS.
    */
-  std::vector<DenseVector<Number> > RB_Fq_vector;
+  std::vector<DenseVector<Number>> RB_Fq_vector;
 
   /**
    * The RB solution vector.
@@ -276,14 +273,14 @@ public:
   /**
    * The vectors storing the RB output vectors.
    */
-  std::vector<std::vector<DenseVector<Number> > > RB_output_vectors;
+  std::vector<std::vector<DenseVector<Number>>> RB_output_vectors;
 
   /**
    * The vectors storing the RB output values and
    * corresponding error bounds.
    */
-  std::vector< Number > RB_outputs;
-  std::vector< Real > RB_output_error_bounds;
+  std::vector<Number > RB_outputs;
+  std::vector<Real > RB_output_error_bounds;
 
   /**
    * Vectors storing the residual representor inner products
@@ -300,8 +297,8 @@ public:
    * on a reduced basis space. The basis independent representors
    * are stored in RBSystem.
    */
-  std::vector< std::vector< std::vector<Number> > > Fq_Aq_representor_innerprods;
-  std::vector< std::vector< std::vector<Number> > > Aq_Aq_representor_innerprods;
+  std::vector<std::vector<std::vector<Number>>> Fq_Aq_representor_innerprods;
+  std::vector<std::vector<std::vector<Number>>> Aq_Aq_representor_innerprods;
 
   /**
    * The vector storing the dual norm inner product terms
@@ -309,7 +306,7 @@ public:
    * These values are independent of a basis, hence they can
    * be copied over directly from an RBSystem.
    */
-  std::vector< std::vector< Number > > output_dual_innerprods;
+  std::vector<std::vector<Number >> output_dual_innerprods;
 
   /**
    * Vector storing the residual representors associated with the
@@ -317,7 +314,7 @@ public:
    * These are basis dependent and hence stored here, whereas
    * the Fq_representors are stored in RBSystem.
    */
-  std::vector< std::vector< NumericVector<Number> *> > Aq_representor;
+  std::vector<std::vector<std::unique_ptr<NumericVector<Number>>>> Aq_representor;
 
   /**
    * Boolean to indicate whether we evaluate a posteriori error bounds
@@ -341,8 +338,9 @@ private:
 
   /**
    * A pointer to to the object that stores the theta expansion.
-   * This is not an UniquePtr since we may want to share it.
-   * (Note: a shared_ptr would be a good option here.)
+   * This is not a std::unique_ptr since we may want to share it.
+   *
+   * \note A \p shared_ptr would be a good option here.
    */
   RBThetaExpansion * rb_theta_expansion;
 

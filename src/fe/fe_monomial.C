@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -126,9 +126,12 @@ unsigned int monomial_n_dofs(const ElemType t, const Order o)
             return 2;
 
           case TRI3:
+          case TRISHELL3:
           case TRI6:
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             return 3;
 
@@ -169,9 +172,12 @@ unsigned int monomial_n_dofs(const ElemType t, const Order o)
             return 3;
 
           case TRI3:
+          case TRISHELL3:
           case TRI6:
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             return 6;
 
@@ -212,9 +218,12 @@ unsigned int monomial_n_dofs(const ElemType t, const Order o)
             return 4;
 
           case TRI3:
+          case TRISHELL3:
           case TRI6:
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             return 10;
 
@@ -254,9 +263,12 @@ unsigned int monomial_n_dofs(const ElemType t, const Order o)
             return 5;
 
           case TRI3:
+          case TRISHELL3:
           case TRI6:
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             return 15;
 
@@ -295,9 +307,12 @@ unsigned int monomial_n_dofs(const ElemType t, const Order o)
             return (order+1);
 
           case TRI3:
+          case TRISHELL3:
           case TRI6:
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             return (order+1)*(order+2)/2;
 
@@ -322,9 +337,6 @@ unsigned int monomial_n_dofs(const ElemType t, const Order o)
           }
       }
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0;
 } // monomial_n_dofs()
 
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -18,7 +18,6 @@
 
 // Local includes
 #include "libmesh/libmesh.h"
-#include "libmesh/auto_ptr.h"
 #include "libmesh/getpot.h"
 #include "libmesh/parallel.h"
 #include "libmesh/reference_counter.h"
@@ -26,7 +25,7 @@
 #include "libmesh/remote_elem.h"
 #include "libmesh/threads.h"
 #include "libmesh/print_trace.h"
-
+#include "libmesh/enum_solver_package.h"
 
 // C/C++ includes
 #include <iostream>
@@ -66,24 +65,35 @@
 #include "libmesh/petscdmlibmesh.h"
 #endif
 # if defined(LIBMESH_HAVE_SLEPC)
+// Ignore unused variable warnings from SLEPc
+#  include "libmesh/ignore_warnings.h"
 #  include "libmesh/slepc_macro.h"
 #  include <slepc.h>
+#  include "libmesh/restore_warnings.h"
 # endif // #if defined(LIBMESH_HAVE_SLEPC)
 #endif // #if defined(LIBMESH_HAVE_PETSC)
 
+// If we're using MPI and VTK has been detected, we need to do some
+// MPI initialize/finalize stuff for VTK.
+#if defined(LIBMESH_HAVE_MPI) && defined(LIBMESH_HAVE_VTK)
+#include "libmesh/ignore_warnings.h"
+# include "vtkMPIController.h"
+#include "libmesh/restore_warnings.h"
+#endif
+
 // --------------------------------------------------------
-// Local anonymous namespace to hold miscelaneous bits
+// Local anonymous namespace to hold miscellaneous bits
 namespace {
 
-libMesh::UniquePtr<GetPot> command_line;
-libMesh::UniquePtr<std::ofstream> _ofstream;
+std::unique_ptr<GetPot> command_line;
+std::unique_ptr<std::ofstream> _ofstream;
 // If std::cout and std::cerr are redirected, we need to
 // be a little careful and save the original streambuf objects,
 // replacing them in the destructor before program termination.
-std::streambuf * out_buf (libmesh_nullptr);
-std::streambuf * err_buf (libmesh_nullptr);
+std::streambuf * out_buf (nullptr);
+std::streambuf * err_buf (nullptr);
 
-libMesh::UniquePtr<libMesh::Threads::task_scheduler_init> task_scheduler;
+std::unique_ptr<libMesh::Threads::task_scheduler_init> task_scheduler;
 #if defined(LIBMESH_HAVE_MPI)
 bool libmesh_initialized_mpi = false;
 #endif
@@ -99,6 +109,7 @@ bool libmesh_initialized_slepc = false;
 /**
  * Floating point exception handler -- courtesy of Cody Permann & MOOSE team
  */
+#if LIBMESH_HAVE_DECL_SIGACTION
 void libmesh_handleFPE(int /*signo*/, siginfo_t * info, void * /*context*/)
 {
   libMesh::err << std::endl;
@@ -141,6 +152,7 @@ void libmesh_handleSEGV(int /*signo*/, siginfo_t * info, void * /*context*/)
                     << "  run ...\n"                                    \
                     << "  bt");
 }
+#endif
 }
 
 
@@ -178,27 +190,12 @@ extern SolverPackage _solver_package;
 
 
 // ------------------------------------------------------------
-// libMeshdata initialization
+// libMesh data initialization
 #ifdef LIBMESH_HAVE_MPI
-#ifndef LIBMESH_DISABLE_COMMWORLD
-MPI_Comm           COMM_WORLD = MPI_COMM_NULL;
-#endif
 MPI_Comm           GLOBAL_COMM_WORLD = MPI_COMM_NULL;
 #else
-#ifndef LIBMESH_DISABLE_COMMWORLD
-int                COMM_WORLD = 0;
-#endif
 int                GLOBAL_COMM_WORLD = 0;
 #endif
-
-#ifdef LIBMESH_DISABLE_COMMWORLD
-Parallel::FakeCommunicator CommWorld;
-Parallel::FakeCommunicator & Parallel::Communicator_World = CommWorld;
-#else
-Parallel::Communicator CommWorld;
-Parallel::Communicator & Parallel::Communicator_World = CommWorld;
-#endif
-
 
 OStreamProxy out(std::cout);
 OStreamProxy err(std::cerr);
@@ -243,7 +240,7 @@ bool          libMesh::libMeshPrivateData::_is_initialized = false;
 SolverPackage libMesh::libMeshPrivateData::_solver_package =
 #if   defined(LIBMESH_HAVE_PETSC)    // PETSc is the default
   PETSC_SOLVERS;
-#elif defined(LIBMESH_HAVE_TRILINOS) // Use Trilinos if PETSc isn't there
+#elif defined(LIBMESH_TRILINOS_HAVE_AZTECOO) // Use Trilinos if PETSc isn't there
 TRILINOS_SOLVERS;
 #elif defined(LIBMESH_HAVE_EIGEN)    // Use Eigen if neither are there
 EIGEN_SOLVERS;
@@ -359,6 +356,16 @@ LibMeshInit::LibMeshInit (int argc, const char * const * argv,
     libMesh::libMeshPrivateData::_n_threads =
       libMesh::command_line_value (n_threads, 1);
 
+    // If there's no threading model active, force _n_threads==1
+#if !LIBMESH_USING_THREADS
+    if (libMesh::libMeshPrivateData::_n_threads != 1)
+      {
+        libMesh::libMeshPrivateData::_n_threads = 1;
+        libmesh_warning("Warning: You requested --n-threads>1 but no threading model is active!\n"
+                        << "Forcing --n-threads==1 instead!");
+      }
+#endif
+
     // Set the number of OpenMP threads to the same as the number of threads libMesh is going to use
 #ifdef LIBMESH_HAVE_OPENMP
     omp_set_num_threads(libMesh::libMeshPrivateData::_n_threads);
@@ -382,18 +389,18 @@ LibMeshInit::LibMeshInit (int argc, const char * const * argv,
       // Check whether the calling program has already initialized
       // MPI, and avoid duplicate Init/Finalize
       int flag;
-      MPI_Initialized (&flag);
+      libmesh_call_mpi(MPI_Initialized (&flag));
 
       if (!flag)
         {
-#if MPI_VERSION > 1
           int mpi_thread_provided;
           const int mpi_thread_requested = libMesh::n_threads() > 1 ?
             MPI_THREAD_FUNNELED :
             MPI_THREAD_SINGLE;
 
-          MPI_Init_thread (&argc, const_cast<char ***>(&argv),
-                           mpi_thread_requested, &mpi_thread_provided);
+          libmesh_call_mpi
+            (MPI_Init_thread (&argc, const_cast<char ***>(&argv),
+                              mpi_thread_requested, &mpi_thread_provided));
 
           if ((libMesh::n_threads() > 1) &&
               (mpi_thread_provided < MPI_THREAD_FUNNELED))
@@ -416,16 +423,6 @@ LibMeshInit::LibMeshInit (int argc, const char * const * argv,
               // libMesh::libMeshPrivateData::_n_threads = 1;
               // task_scheduler.reset (new Threads::task_scheduler_init(libMesh::n_threads()));
             }
-#else
-          if (libMesh::libMeshPrivateData::_n_threads > 1)
-            {
-              libmesh_warning("Warning: using MPI1 for threaded code.\n" <<
-                              "Be sure your library is funneled-thread-safe..." <<
-                              std::endl);
-            }
-
-          MPI_Init (&argc, const_cast<char ***>(&argv));
-#endif
           libmesh_initialized_mpi = true;
         }
 
@@ -435,11 +432,6 @@ LibMeshInit::LibMeshInit (int argc, const char * const * argv,
       this->_comm = COMM_WORLD_IN;
 
       libMesh::GLOBAL_COMM_WORLD = COMM_WORLD_IN;
-
-#ifndef LIBMESH_DISABLE_COMMWORLD
-      libMesh::COMM_WORLD = COMM_WORLD_IN;
-      Parallel::Communicator_World = COMM_WORLD_IN;
-#endif
 
       //MPI_Comm_set_name not supported in at least SGI MPT's MPI implementation
       //MPI_Comm_set_name (libMesh::COMM_WORLD, "libMesh::COMM_WORLD");
@@ -453,15 +445,12 @@ LibMeshInit::LibMeshInit (int argc, const char * const * argv,
       // into a debugger with a proper stack when an MPI error occurs.
       if (libMesh::on_command_line ("--handle-mpi-errors"))
         {
-#if MPI_VERSION > 1
-          MPI_Comm_create_errhandler(libMesh_MPI_Handler, &libmesh_errhandler);
-          MPI_Comm_set_errhandler(libMesh::GLOBAL_COMM_WORLD, libmesh_errhandler);
-          MPI_Comm_set_errhandler(MPI_COMM_WORLD, libmesh_errhandler);
-#else
-          MPI_Errhandler_create(libMesh_MPI_Handler, &libmesh_errhandler);
-          MPI_Errhandler_set(libMesh::GLOBAL_COMM_WORLD, libmesh_errhandler);
-          MPI_Errhandler_set(MPI_COMM_WORLD, libmesh_errhandler);
-#endif // #if MPI_VERSION > 1
+          libmesh_call_mpi
+            (MPI_Comm_create_errhandler(libMesh_MPI_Handler, &libmesh_errhandler));
+          libmesh_call_mpi
+            (MPI_Comm_set_errhandler(libMesh::GLOBAL_COMM_WORLD, libmesh_errhandler));
+          libmesh_call_mpi
+            (MPI_Comm_set_errhandler(MPI_COMM_WORLD, libmesh_errhandler));
         }
     }
 
@@ -509,14 +498,14 @@ LibMeshInit::LibMeshInit (int argc, const char * const * argv,
       // which it does in the versions we've checked.
       if (!SlepcInitializeCalled)
         {
-          ierr = SlepcInitialize  (&argc, const_cast<char ***>(&argv), libmesh_nullptr, libmesh_nullptr);
+          ierr = SlepcInitialize  (&argc, const_cast<char ***>(&argv), nullptr, nullptr);
           CHKERRABORT(libMesh::GLOBAL_COMM_WORLD,ierr);
           libmesh_initialized_slepc = true;
         }
 # else
       if (libmesh_initialized_petsc)
         {
-          ierr = PetscInitialize (&argc, const_cast<char ***>(&argv), libmesh_nullptr, libmesh_nullptr);
+          ierr = PetscInitialize (&argc, const_cast<char ***>(&argv), nullptr, nullptr);
           CHKERRABORT(libMesh::GLOBAL_COMM_WORLD,ierr);
         }
 # endif
@@ -532,17 +521,29 @@ LibMeshInit::LibMeshInit (int argc, const char * const * argv,
     }
 #endif
 
+#if defined(LIBMESH_HAVE_MPI) && defined(LIBMESH_HAVE_VTK)
+  // Do MPI initialization for VTK.
+  _vtk_mpi_controller = vtkMPIController::New();
+  _vtk_mpi_controller->Initialize(&argc, const_cast<char ***>(&argv), /*initialized_externally=*/1);
+  _vtk_mpi_controller->SetGlobalController(_vtk_mpi_controller);
+#endif
+
   // Re-parse the command-line arguments.  Note that PETSc and MPI
   // initialization above may have removed command line arguments
   // that are not relevant to this application in the above calls.
   // We don't want a false-positive by detecting those arguments.
-  command_line->parse_command_line (argc, argv);
+  //
+  // Note: this seems overly paranoid/like it should be unnecessary,
+  // plus we were doing it wrong for many years and not clearing the
+  // existing GetPot object before re-parsing the command line, so all
+  // the command line arguments appeared twice in the GetPot object...
+  command_line.reset (new GetPot (argc, argv));
 
   // The following line is an optimization when simultaneous
   // C and C++ style access to output streams is not required.
   // The amount of benefit which occurs is probably implementation
   // defined, and may be nothing.  On the other hand, I have seen
-  // some IO tests where IO peformance improves by a factor of two.
+  // some IO tests where IO performance improves by a factor of two.
   if (!libMesh::on_command_line ("--sync-with-stdio"))
     std::ios::sync_with_stdio(false);
 
@@ -561,15 +562,46 @@ LibMeshInit::LibMeshInit (int argc, const char * const * argv,
       libMesh::err = *newerr;
     }
 
-  // Honor the --redirect-stdout command-line option.
-  // When this is specified each processor sends
-  // libMesh::out/libMesh::err messages to
-  // stdout.processor.####
-  if (libMesh::on_command_line ("--redirect-stdout"))
+  // Process command line arguments for redirecting stdout/stderr.
+  bool
+    cmdline_has_redirect_stdout = libMesh::on_command_line ("--redirect-stdout"),
+    cmdline_has_redirect_output = libMesh::on_command_line ("--redirect-output");
+
+  // The --redirect-stdout command-line option has been deprecated in
+  // favor of "--redirect-output basename".
+  if (cmdline_has_redirect_stdout)
+    libmesh_warning("The --redirect-stdout command line option has been deprecated. "
+                    "Use '--redirect-output basename' instead.");
+
+  // Honor the "--redirect-stdout" and "--redirect-output basename"
+  // command-line options.  When one of these is specified, each
+  // processor sends libMesh::out/libMesh::err messages to
+  // stdout.processor.#### (default) or basename.processor.####.
+  if (cmdline_has_redirect_stdout || cmdline_has_redirect_output)
     {
+      std::string basename = "stdout";
+
+      // Look for following argument if using new API
+      if (cmdline_has_redirect_output)
+        {
+          // Set the cursor to the correct location in the list of command line arguments.
+          command_line->search(1, "--redirect-output");
+
+          // Get the next option on the command line as a string.
+          std::string next_string = "";
+          next_string = command_line->next(next_string);
+
+          // If the next string starts with a dash, we assume it's
+          // another flag and not a file basename requested by the
+          // user.
+          if (next_string.size() > 0 && next_string.find_first_of("-") != 0)
+            basename = next_string;
+        }
+
       std::ostringstream filename;
-      filename << "stdout.processor." << libMesh::global_processor_id();
+      filename << basename << ".processor." << libMesh::global_processor_id();
       _ofstream.reset (new std::ofstream (filename.str().c_str()));
+
       // Redirect, saving the original streambufs!
       out_buf = libMesh::out.rdbuf (_ofstream->rdbuf());
       err_buf = libMesh::err.rdbuf (_ofstream->rdbuf());
@@ -580,11 +612,19 @@ LibMeshInit::LibMeshInit (int argc, const char * const * argv,
   // not to via the --keep-cout command-line argument.
   if (libMesh::global_processor_id() != 0)
     if (!libMesh::on_command_line ("--keep-cout"))
-      libMesh::out.rdbuf (libmesh_nullptr);
+      libMesh::out.rdbuf (nullptr);
+
+  // Similarly, the user can request to drop cerr on all non-0 ranks.
+  // By default, errors are printed on all ranks, but this can lead to
+  // interleaved/unpredictable outputs when doing parallel regression
+  // testing, which this option is designed to support.
+  if (libMesh::global_processor_id() != 0)
+    if (libMesh::on_command_line ("--drop-cerr"))
+      libMesh::err.rdbuf (nullptr);
 
   // Check command line to override printing
   // of reference count information.
-  if(libMesh::on_command_line("--disable-refcount-printing") )
+  if (libMesh::on_command_line("--disable-refcount-printing"))
     ReferenceCounter::disable_print_counter_info();
 
 #ifdef LIBMESH_ENABLE_EXCEPTIONS
@@ -615,6 +655,16 @@ LibMeshInit::LibMeshInit (int argc, const char * const * argv,
 
 LibMeshInit::~LibMeshInit()
 {
+  // Every processor had better be ready to exit at the same time.
+  // This would be a libmesh_parallel_only() function, except that
+  // libmesh_parallel_only() uses libmesh_assert() which throws an
+  // exception() which causes compilers to scream about exceptions
+  // inside destructors.
+
+  // Even if we're not doing parallel_only debugging, we don't want
+  // one processor to try to exit until all others are done working.
+  this->comm().barrier();
+
   // We can't delete, finalize, etc. more than once without
   // reinitializing in between
   libmesh_exceptionless_assert(!libMesh::closed());
@@ -624,10 +674,6 @@ LibMeshInit::~LibMeshInit()
 
   // Clear the thread task manager we started
   task_scheduler.reset();
-
-  // Let's be sure we properly close on every processor at once:
-  libmesh_parallel_only(this->comm());
-
 
   // Force the \p ReferenceCounter to print
   // its reference count information.  This allows
@@ -670,7 +716,8 @@ LibMeshInit::~LibMeshInit()
   // Set the initialized() flag to false
   libMeshPrivateData::_is_initialized = false;
 
-  if (libMesh::on_command_line ("--redirect-stdout"))
+  if (libMesh::on_command_line ("--redirect-stdout") ||
+      libMesh::on_command_line ("--redirect-output"))
     {
       // If stdout/stderr were redirected to files, reset them now.
       libMesh::out.rdbuf (out_buf);
@@ -715,18 +762,32 @@ LibMeshInit::~LibMeshInit()
     }
 #endif
 
+#if defined(LIBMESH_HAVE_MPI) && defined(LIBMESH_HAVE_VTK)
+  _vtk_mpi_controller->Finalize(/*finalized_externally=*/1);
+  _vtk_mpi_controller->Delete();
+#endif
 
 #if defined(LIBMESH_HAVE_MPI)
   // Allow the user to bypass MPI finalization
   if (!libMesh::on_command_line ("--disable-mpi"))
     {
       this->_comm.clear();
-#ifndef LIBMESH_DISABLE_COMMWORLD
-      Parallel::Communicator_World.clear();
-#endif
 
       if (libmesh_initialized_mpi)
-        MPI_Finalize();
+        {
+          // We can't just libmesh_assert here because destructor,
+          // but we ought to report any errors
+          unsigned int error_code = MPI_Finalize();
+          if (error_code != MPI_SUCCESS)
+            {
+              char error_string[MPI_MAX_ERROR_STRING+1];
+              int error_string_len;
+              MPI_Error_string(error_code, error_string,
+                               &error_string_len);
+              std::cerr << "Failure from MPI_Finalize():\n"
+                        << error_string << std::endl;
+            }
+        }
     }
 #endif
 }
@@ -744,8 +805,6 @@ void enableFPE(bool on)
 
   if (on)
     {
-      struct sigaction new_action, old_action;
-
 #ifdef LIBMESH_HAVE_FEENABLEEXCEPT
       feenableexcept(FE_DIVBYZERO | FE_INVALID);
 #elif  LIBMESH_HAVE_XMMINTRIN_H
@@ -755,15 +814,18 @@ void enableFPE(bool on)
 #  endif
 #endif
 
+#if LIBMESH_HAVE_DECL_SIGACTION
+      struct sigaction new_action, old_action;
 
       // Set up the structure to specify the new action.
       new_action.sa_sigaction = libmesh_handleFPE;
       sigemptyset (&new_action.sa_mask);
       new_action.sa_flags = SA_SIGINFO;
 
-      sigaction (SIGFPE, libmesh_nullptr, &old_action);
+      sigaction (SIGFPE, nullptr, &old_action);
       if (old_action.sa_handler != SIG_IGN)
-        sigaction (SIGFPE, &new_action, libmesh_nullptr);
+        sigaction (SIGFPE, &new_action, nullptr);
+#endif
     }
   else
     {
@@ -783,6 +845,7 @@ void enableFPE(bool on)
 // (potentially instead of PETSc)
 void enableSEGV(bool on)
 {
+#if LIBMESH_HAVE_DECL_SIGACTION
   static struct sigaction old_action;
   static bool was_on = false;
 
@@ -801,18 +864,43 @@ void enableSEGV(bool on)
   else if (was_on)
     {
       was_on = false;
-      sigaction (SIGSEGV, &old_action, libmesh_nullptr);
+      sigaction (SIGSEGV, &old_action, nullptr);
     }
+#else
+  libmesh_error_msg("System call sigaction not supported.");
+#endif
 }
 
 
 
-bool on_command_line (const std::string & arg)
+bool on_command_line (std::string arg)
 {
   // Make sure the command line parser is ready for use
   libmesh_assert(command_line.get());
 
-  return command_line->search (arg);
+  // Users had better not be asking about an empty string
+  libmesh_assert(!arg.empty());
+
+  bool found_it = command_line->search(arg);
+
+  if (!found_it)
+    {
+      // Try with all dashes instead of underscores
+      std::replace(arg.begin(), arg.end(), '_', '-');
+      found_it = command_line->search(arg);
+    }
+
+  if (!found_it)
+    {
+      // OK, try with all underscores instead of dashes
+      auto name_begin = arg.begin();
+      while (*name_begin == '-')
+        ++name_begin;
+      std::replace(name_begin, arg.end(), '-', '_');
+      found_it = command_line->search(arg);
+    }
+
+  return found_it;
 }
 
 
@@ -837,10 +925,10 @@ T command_line_value (const std::vector<std::string> & name, T value)
   libmesh_assert(command_line.get());
 
   // Check for multiple options (return the first that matches)
-  for (std::vector<std::string>::const_iterator i=name.begin(); i != name.end(); ++i)
-    if (command_line->have_variable(i->c_str()))
+  for (const auto & entry : name)
+    if (command_line->have_variable(entry.c_str()))
       {
-        value = (*command_line)(i->c_str(), value);
+        value = (*command_line)(entry.c_str(), value);
         break;
       }
 
@@ -850,13 +938,12 @@ T command_line_value (const std::vector<std::string> & name, T value)
 
 
 template <typename T>
-T command_line_next (const std::string & name, T value)
+T command_line_next (std::string name, T value)
 {
-  // Make sure the command line parser is ready for use
-  libmesh_assert(command_line.get());
-
-  if (command_line->search(1, name.c_str()))
-    value = command_line->next(value);
+  // on_command_line also puts the command_line cursor in the spot we
+  // need
+  if (on_command_line(name))
+    return command_line->next(value);
 
   return value;
 }
@@ -898,7 +985,7 @@ SolverPackage default_solver_package ()
         libMeshPrivateData::_solver_package = PETSC_SOLVERS;
 #endif
 
-#ifdef LIBMESH_HAVE_TRILINOS
+#ifdef LIBMESH_TRILINOS_HAVE_AZTECOO
       if (libMesh::on_command_line ("--use-trilinos") ||
           libMesh::on_command_line ("--disable-petsc"))
         libMeshPrivateData::_solver_package = TRILINOS_SOLVERS;
@@ -945,21 +1032,39 @@ SolverPackage default_solver_package ()
 
 
 //-------------------------------------------------------------------------------
-template int          command_line_value<int>         (const std::string &, int);
-template float        command_line_value<float>       (const std::string &, float);
-template double       command_line_value<double>      (const std::string &, double);
-template long double  command_line_value<long double> (const std::string &, long double);
-template std::string  command_line_value<std::string> (const std::string &, std::string);
+template unsigned short command_line_value<unsigned short> (const std::string &, unsigned short);
+template unsigned int   command_line_value<unsigned int>   (const std::string &, unsigned int);
+template short          command_line_value<short>          (const std::string &, short);
+template int            command_line_value<int>            (const std::string &, int);
+template float          command_line_value<float>          (const std::string &, float);
+template double         command_line_value<double>         (const std::string &, double);
+template long double    command_line_value<long double>    (const std::string &, long double);
+template std::string    command_line_value<std::string>    (const std::string &, std::string);
 
-template int          command_line_next<int>         (const std::string &, int);
-template float        command_line_next<float>       (const std::string &, float);
-template double       command_line_next<double>      (const std::string &, double);
-template long double  command_line_next<long double> (const std::string &, long double);
-template std::string  command_line_next<std::string> (const std::string &, std::string);
+template unsigned short command_line_value<unsigned short> (const std::vector<std::string> &, unsigned short);
+template unsigned int   command_line_value<unsigned int>   (const std::vector<std::string> &, unsigned int);
+template short          command_line_value<short>          (const std::vector<std::string> &, short);
+template int            command_line_value<int>            (const std::vector<std::string> &, int);
+template float          command_line_value<float>          (const std::vector<std::string> &, float);
+template double         command_line_value<double>         (const std::vector<std::string> &, double);
+template long double    command_line_value<long double>    (const std::vector<std::string> &, long double);
+template std::string    command_line_value<std::string>    (const std::vector<std::string> &, std::string);
 
-template void         command_line_vector<int>         (const std::string &, std::vector<int> &);
-template void         command_line_vector<float>       (const std::string &, std::vector<float> &);
-template void         command_line_vector<double>      (const std::string &, std::vector<double> &);
-template void         command_line_vector<long double> (const std::string &, std::vector<long double> &);
+template unsigned short command_line_next<unsigned short>  (std::string, unsigned short);
+template unsigned int   command_line_next<unsigned int>    (std::string, unsigned int);
+template short          command_line_next<short>           (std::string, short);
+template int            command_line_next<int>             (std::string, int);
+template float          command_line_next<float>           (std::string, float);
+template double         command_line_next<double>          (std::string, double);
+template long double    command_line_next<long double>     (std::string, long double);
+template std::string    command_line_next<std::string>     (std::string, std::string);
+
+template void         command_line_vector<unsigned short>  (const std::string &, std::vector<unsigned short> &);
+template void         command_line_vector<unsigned int>    (const std::string &, std::vector<unsigned int> &);
+template void         command_line_vector<short>           (const std::string &, std::vector<short> &);
+template void         command_line_vector<int>             (const std::string &, std::vector<int> &);
+template void         command_line_vector<float>           (const std::string &, std::vector<float> &);
+template void         command_line_vector<double>          (const std::string &, std::vector<double> &);
+template void         command_line_vector<long double>     (const std::string &, std::vector<long double> &);
 
 } // namespace libMesh

@@ -81,7 +81,7 @@ public:
     // Generate a DirichletBoundary object
     dirichlet_bc = build_zero_dirichlet_boundary_object();
 
-    // Set the Dirichet boundary condition
+    // Set the Dirichlet boundary condition
     dirichlet_bc->b.insert(BOUNDARY_ID_MIN_X); // Dirichlet boundary at x=0
     dirichlet_bc->variables.push_back(u_var);
     dirichlet_bc->variables.push_back(v_var);
@@ -107,7 +107,7 @@ public:
     // For efficiency, we should prerequest all
     // the data we will need to build the
     // linear system before doing an element loop.
-    FEBase * elem_fe = libmesh_nullptr;
+    FEBase * elem_fe = nullptr;
     c.get_element_fe(u_var, elem_fe);
 
     elem_fe->get_JxW();
@@ -135,7 +135,7 @@ public:
   /**
    * The object that defines which degrees of freedom are on a Dirichlet boundary.
    */
-  UniquePtr<DirichletBoundary> dirichlet_bc;
+  std::unique_ptr<DirichletBoundary> dirichlet_bc;
 };
 
 #endif

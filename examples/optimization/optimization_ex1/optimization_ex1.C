@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -139,26 +139,21 @@ void AssembleOptimization::assemble_A_and_F()
 
   const DofMap & dof_map = _sys.get_dof_map();
   FEType fe_type = dof_map.variable_type(u_var);
-  UniquePtr<FEBase> fe (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe (FEBase::build(dim, fe_type));
   QGauss qrule (dim, fe_type.default_quadrature_order());
   fe->attach_quadrature_rule (&qrule);
 
   const std::vector<Real> & JxW = fe->get_JxW();
-  const std::vector<std::vector<Real> > & phi = fe->get_phi();
-  const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+  const std::vector<std::vector<Real>> & phi = fe->get_phi();
+  const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
   std::vector<dof_id_type> dof_indices;
 
   DenseMatrix<Number> Ke;
   DenseVector<Number> Fe;
 
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-  for ( ; el != end_el; ++el)
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      const Elem * elem = *el;
-
       dof_map.dof_indices (elem, dof_indices);
 
       const unsigned int n_dofs = dof_indices.size();
@@ -205,7 +200,7 @@ void AssembleOptimization::assemble_A_and_F()
 Number AssembleOptimization::objective (const NumericVector<Number> & soln,
                                         OptimizationSystem & /*sys*/)
 {
-  UniquePtr< NumericVector<Number> > AxU = soln.zero_clone();
+  std::unique_ptr<NumericVector<Number>> AxU = soln.zero_clone();
 
   A_matrix->vector_mult(*AxU, soln);
 
@@ -222,7 +217,7 @@ void AssembleOptimization::gradient (const NumericVector<Number> & soln,
 {
   grad_f.zero();
 
-  // Since we've enforced constaints on soln, A and F,
+  // Since we've enforced constraints on soln, A and F,
   // this automatically sets grad_f to zero for constrained
   // dofs.
   A_matrix->vector_mult(grad_f, soln);
@@ -247,6 +242,10 @@ int main (int argc, char ** argv)
 
   libmesh_example_requires(false, "PETSc >= 3.5.0 with built-in TAO support");
 
+#elif !defined(LIBMESH_ENABLE_GHOSTED)
+
+  libmesh_example_requires(false, "--enable-ghosted");
+
 #elif LIBMESH_USE_COMPLEX_NUMBERS
 
   // According to
@@ -256,6 +255,8 @@ int main (int argc, char ** argv)
 
 #endif
 
+  // We use a 2D domain.
+  libmesh_example_requires(LIBMESH_DIM > 1, "--disable-1D-only");
 
   if (libMesh::on_command_line ("--use-eigen"))
     {
@@ -291,7 +292,7 @@ int main (int argc, char ** argv)
     const std::string optimization_solver_type = infile("optimization_solver_type",
                                                         "PETSC_SOLVERS");
     SolverPackage sp = Utility::string_to_enum<SolverPackage>(optimization_solver_type);
-    UniquePtr<OptimizationSolver<Number> > new_solver =
+    std::unique_ptr<OptimizationSolver<Number>> new_solver =
       OptimizationSolver<Number>::build(system, sp);
     system.optimization_solver.reset(new_solver.release());
   }
@@ -330,9 +331,11 @@ int main (int argc, char ** argv)
   std::vector<unsigned int> variables;
   variables.push_back(u_var);
   ZeroFunction<> zf;
-  DirichletBoundary dirichlet_bc(boundary_ids,
-                                 variables,
-                                 &zf);
+
+  // Most DirichletBoundary users will want to supply a "locally
+  // indexed" functor
+  DirichletBoundary dirichlet_bc(boundary_ids, variables, zf,
+                                 LOCAL_VARIABLE_ORDER);
   system.get_dof_map().add_dirichlet_boundary(dirichlet_bc);
 
 
@@ -349,9 +352,11 @@ int main (int argc, char ** argv)
   // Print convergence information
   system.optimization_solver->print_converged_reason();
 
+#ifdef LIBMESH_HAVE_EXODUS_API
   std::stringstream filename;
   ExodusII_IO (mesh).write_equation_systems("optimization_soln.exo",
                                             equation_systems);
+#endif
 
   return 0;
 }

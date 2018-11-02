@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -123,9 +123,12 @@ unsigned int xyz_n_dofs(const ElemType t, const Order o)
             return 2;
 
           case TRI3:
+          case TRISHELL3:
           case TRI6:
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             return 3;
 
@@ -166,9 +169,12 @@ unsigned int xyz_n_dofs(const ElemType t, const Order o)
             return 3;
 
           case TRI3:
+          case TRISHELL3:
           case TRI6:
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             return 6;
 
@@ -209,9 +215,12 @@ unsigned int xyz_n_dofs(const ElemType t, const Order o)
             return 4;
 
           case TRI3:
+          case TRISHELL3:
           case TRI6:
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             return 10;
 
@@ -251,9 +260,12 @@ unsigned int xyz_n_dofs(const ElemType t, const Order o)
             return 5;
 
           case TRI3:
+          case TRISHELL3:
           case TRI6:
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             return 15;
 
@@ -292,9 +304,12 @@ unsigned int xyz_n_dofs(const ElemType t, const Order o)
             return (order+1);
 
           case TRI3:
+          case TRISHELL3:
           case TRI6:
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             return (order+1)*(order+2)/2;
 
@@ -319,9 +334,6 @@ unsigned int xyz_n_dofs(const ElemType t, const Order o)
           }
       }
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0;
 }
 
 
@@ -354,9 +366,12 @@ unsigned int xyz_n_dofs_per_elem(const ElemType t,
 
             // 2D linears have 3 DOFs per element
           case TRI3:
+          case TRISHELL3:
           case TRI6:
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             return 3;
 
@@ -400,9 +415,12 @@ unsigned int xyz_n_dofs_per_elem(const ElemType t,
 
             // 2D quadratics have 6 DOFs per element
           case TRI3:
+          case TRISHELL3:
           case TRI6:
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             return 6;
 
@@ -444,9 +462,12 @@ unsigned int xyz_n_dofs_per_elem(const ElemType t,
             return 4;
 
           case TRI3:
+          case TRISHELL3:
           case TRI6:
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             return 10;
 
@@ -487,9 +508,12 @@ unsigned int xyz_n_dofs_per_elem(const ElemType t,
             return 5;
 
           case TRI3:
+          case TRISHELL3:
           case TRI6:
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             return 15;
 
@@ -527,9 +551,12 @@ unsigned int xyz_n_dofs_per_elem(const ElemType t,
             return (order+1);
 
           case TRI3:
+          case TRISHELL3:
           case TRI6:
           case QUAD4:
+          case QUADSHELL4:
           case QUAD8:
+          case QUADSHELL8:
           case QUAD9:
             return (order+1)*(order+2)/2;
 
@@ -584,8 +611,7 @@ void FEXYZ<Dim>::init_shape_functions(const std::vector<Point> & qp,
 #endif // LIBMESH_ENABLE_SECOND_DERIVATIVES
 
   // Start logging the shape function initialization
-  START_LOG("init_shape_functions()", "FE");
-
+  LOG_SCOPE("init_shape_functions()", "FE");
 
   // The number of quadrature points.
   const std::size_t n_qp = qp.size();
@@ -673,9 +699,6 @@ void FEXYZ<Dim>::init_shape_functions(const std::vector<Point> & qp,
 
   }
 #endif // ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
-
-  // Stop logging the shape function initialization
-  STOP_LOG("init_shape_functions()", "FE");
 }
 
 
@@ -693,7 +716,7 @@ void FEXYZ<Dim>::compute_shape_functions (const Elem * elem,
   // have already been computed via init_shape_functions
 
   // Start logging the shape function computation
-  START_LOG("compute_shape_functions()", "FE");
+  LOG_SCOPE("compute_shape_functions()", "FE");
 
   const std::vector<Point> & xyz_qp = this->get_xyz();
 
@@ -704,12 +727,16 @@ void FEXYZ<Dim>::compute_shape_functions (const Elem * elem,
     case 1:
       {
         if (this->calculate_phi)
-          for (unsigned int i=0; i<this->phi.size(); i++)
-            for (unsigned int p=0; p<this->phi[i].size(); p++)
+          for (unsigned int i=0,
+               n_phi = cast_int<unsigned int>(this->phi.size());
+               i != n_phi; i++)
+            for (std::size_t p=0; p<this->phi[i].size(); p++)
               this->phi[i][p] = FE<Dim,XYZ>::shape (elem, this->fe_type.order, i, xyz_qp[p]);
         if (this->calculate_dphi)
-          for (unsigned int i=0; i<this->dphi.size(); i++)
-            for (unsigned int p=0; p<this->dphi[i].size(); p++)
+          for (unsigned int i=0,
+               n_dphi = cast_int<unsigned int>(this->dphi.size());
+               i != n_dphi; i++)
+            for (std::size_t p=0; p<this->dphi[i].size(); p++)
               {
                 this->dphi[i][p](0) =
                   this->dphidx[i][p] = FE<Dim,XYZ>::shape_deriv (elem, this->fe_type.order, i, 0, xyz_qp[p]);
@@ -719,8 +746,10 @@ void FEXYZ<Dim>::compute_shape_functions (const Elem * elem,
               }
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
         if (this->calculate_d2phi)
-          for (unsigned int i=0; i<this->d2phi.size(); i++)
-            for (unsigned int p=0; p<this->d2phi[i].size(); p++)
+          for (unsigned int i=0,
+               n_d2phi = cast_int<unsigned int>(this->d2phi.size());
+               i != n_d2phi; i++)
+            for (std::size_t p=0; p<this->d2phi[i].size(); p++)
               {
                 this->d2phi[i][p](0,0) =
                   this->d2phidx2[i][p] = FE<Dim,XYZ>::shape_second_deriv (elem, this->fe_type.order, i, 0, xyz_qp[p]);
@@ -747,12 +776,16 @@ void FEXYZ<Dim>::compute_shape_functions (const Elem * elem,
     case 2:
       {
         if (this->calculate_phi)
-          for (unsigned int i=0; i<this->phi.size(); i++)
-            for (unsigned int p=0; p<this->phi[i].size(); p++)
+          for (unsigned int i=0,
+               n_phi = cast_int<unsigned int>(this->phi.size());
+               i != n_phi; i++)
+            for (std::size_t p=0; p<this->phi[i].size(); p++)
               this->phi[i][p] = FE<Dim,XYZ>::shape (elem, this->fe_type.order, i, xyz_qp[p]);
         if (this->calculate_dphi)
-          for (unsigned int i=0; i<this->dphi.size(); i++)
-            for (unsigned int p=0; p<this->dphi[i].size(); p++)
+          for (unsigned int i=0,
+               n_dphi = cast_int<unsigned int>(this->dphi.size());
+               i != n_dphi; i++)
+            for (std::size_t p=0; p<this->dphi[i].size(); p++)
               {
                 this->dphi[i][p](0) =
                   this->dphidx[i][p] = FE<Dim,XYZ>::shape_deriv (elem, this->fe_type.order, i, 0, xyz_qp[p]);
@@ -767,8 +800,10 @@ void FEXYZ<Dim>::compute_shape_functions (const Elem * elem,
               }
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
         if (this->calculate_d2phi)
-          for (unsigned int i=0; i<this->d2phi.size(); i++)
-            for (unsigned int p=0; p<this->d2phi[i].size(); p++)
+          for (unsigned int i=0,
+               n_d2phi = cast_int<unsigned int>(this->d2phi.size());
+               i != n_d2phi; i++)
+            for (std::size_t p=0; p<this->d2phi[i].size(); p++)
               {
                 this->d2phi[i][p](0,0) =
                   this->d2phidx2[i][p] = FE<Dim,XYZ>::shape_second_deriv (elem, this->fe_type.order, i, 0, xyz_qp[p]);
@@ -794,13 +829,17 @@ void FEXYZ<Dim>::compute_shape_functions (const Elem * elem,
     case 3:
       {
         if (this->calculate_phi)
-          for (unsigned int i=0; i<this->phi.size(); i++)
-            for (unsigned int p=0; p<this->phi[i].size(); p++)
+          for (unsigned int i=0,
+               n_phi = cast_int<unsigned int>(this->phi.size());
+               i != n_phi; i++)
+            for (std::size_t p=0; p<this->phi[i].size(); p++)
               this->phi[i][p] = FE<Dim,XYZ>::shape (elem, this->fe_type.order, i, xyz_qp[p]);
 
         if (this->calculate_dphi)
-          for (unsigned int i=0; i<this->dphi.size(); i++)
-            for (unsigned int p=0; p<this->dphi[i].size(); p++)
+          for (unsigned int i=0,
+               n_dphi = cast_int<unsigned int>(this->dphi.size());
+               i != n_dphi; i++)
+            for (std::size_t p=0; p<this->dphi[i].size(); p++)
               {
                 this->dphi[i][p](0) =
                   this->dphidx[i][p] = FE<Dim,XYZ>::shape_deriv (elem, this->fe_type.order, i, 0, xyz_qp[p]);
@@ -813,8 +852,10 @@ void FEXYZ<Dim>::compute_shape_functions (const Elem * elem,
               }
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
         if (this->calculate_d2phi)
-          for (unsigned int i=0; i<this->d2phi.size(); i++)
-            for (unsigned int p=0; p<this->d2phi[i].size(); p++)
+          for (unsigned int i=0,
+               n_d2phi = cast_int<unsigned int>(this->d2phi.size());
+               i != n_d2phi; i++)
+            for (std::size_t p=0; p<this->d2phi[i].size(); p++)
               {
                 this->d2phi[i][p](0,0) =
                   this->d2phidx2[i][p] = FE<Dim,XYZ>::shape_second_deriv (elem, this->fe_type.order, i, 0, xyz_qp[p]);
@@ -838,9 +879,6 @@ void FEXYZ<Dim>::compute_shape_functions (const Elem * elem,
     default:
       libmesh_error_msg("ERROR: Invalid dimension " << this->dim);
     }
-
-  // Stop logging the shape function computation
-  STOP_LOG("compute_shape_functions()", "FE");
 }
 
 

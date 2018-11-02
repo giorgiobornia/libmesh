@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -16,10 +16,6 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-// C++ includes
-
-
-
 // Local includes
 #include "libmesh/quadrature_clough.h"
 #include "libmesh/quadrature_gauss.h"
@@ -32,6 +28,8 @@
 #include "libmesh/quadrature_gauss_lobatto.h"
 #include "libmesh/quadrature_conical.h"
 #include "libmesh/string_to_enum.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
+#include "libmesh/enum_quadrature_type.h"
 
 namespace libMesh
 {
@@ -39,9 +37,9 @@ namespace libMesh
 
 
 //---------------------------------------------------------------
-UniquePtr<QBase> QBase::build (const std::string & type,
-                               const unsigned int _dim,
-                               const Order _order)
+std::unique_ptr<QBase> QBase::build (const std::string & type,
+                                     const unsigned int _dim,
+                                     const Order _order)
 {
   return QBase::build (Utility::string_to_enum<QuadratureType> (type),
                        _dim,
@@ -50,9 +48,9 @@ UniquePtr<QBase> QBase::build (const std::string & type,
 
 
 
-UniquePtr<QBase> QBase::build(const QuadratureType _qt,
-                              const unsigned int _dim,
-                              const Order _order)
+std::unique_ptr<QBase> QBase::build(const QuadratureType _qt,
+                                    const unsigned int _dim,
+                                    const Order _order)
 {
   switch (_qt)
     {
@@ -67,7 +65,7 @@ UniquePtr<QBase> QBase::build(const QuadratureType _qt,
           }
 #endif
 
-        return UniquePtr<QBase>(new QClough(_dim, _order));
+        return libmesh_make_unique<QClough>(_dim, _order);
       }
 
     case QGAUSS:
@@ -81,7 +79,7 @@ UniquePtr<QBase> QBase::build(const QuadratureType _qt,
           }
 #endif
 
-        return UniquePtr<QBase>(new QGauss(_dim, _order));
+        return libmesh_make_unique<QGauss>(_dim, _order);
       }
 
     case QJACOBI_1_0:
@@ -101,7 +99,7 @@ UniquePtr<QBase> QBase::build(const QuadratureType _qt,
           }
 #endif
 
-        return UniquePtr<QBase>(new QJacobi(_dim, _order, 1, 0));
+        return libmesh_make_unique<QJacobi>(_dim, _order, 1, 0);
       }
 
     case QJACOBI_2_0:
@@ -121,7 +119,7 @@ UniquePtr<QBase> QBase::build(const QuadratureType _qt,
           }
 #endif
 
-        return UniquePtr<QBase>(new QJacobi(_dim, _order, 2, 0));
+        return libmesh_make_unique<QJacobi>(_dim, _order, 2, 0);
       }
 
     case QSIMPSON:
@@ -135,7 +133,7 @@ UniquePtr<QBase> QBase::build(const QuadratureType _qt,
           }
 #endif
 
-        return UniquePtr<QBase>(new QSimpson(_dim));
+        return libmesh_make_unique<QSimpson>(_dim);
       }
 
     case QTRAP:
@@ -149,31 +147,27 @@ UniquePtr<QBase> QBase::build(const QuadratureType _qt,
           }
 #endif
 
-        return UniquePtr<QBase>(new QTrap(_dim));
+        return libmesh_make_unique<QTrap>(_dim);
       }
 
     case QGRID:
-      return UniquePtr<QBase>(new QGrid(_dim, _order));
+      return libmesh_make_unique<QGrid>(_dim, _order);
 
     case QGRUNDMANN_MOLLER:
-      return UniquePtr<QBase>(new QGrundmann_Moller(_dim, _order));
+      return libmesh_make_unique<QGrundmann_Moller>(_dim, _order);
 
     case QMONOMIAL:
-      return UniquePtr<QBase>(new QMonomial(_dim, _order));
+      return libmesh_make_unique<QMonomial>(_dim, _order);
 
     case QGAUSS_LOBATTO:
-      return UniquePtr<QBase>(new QGaussLobatto(_dim, _order));
+      return libmesh_make_unique<QGaussLobatto>(_dim, _order);
 
     case QCONICAL:
-      return UniquePtr<QBase>(new QConical(_dim, _order));
+      return libmesh_make_unique<QConical>(_dim, _order);
 
     default:
       libmesh_error_msg("ERROR: Bad qt=" << _qt);
     }
-
-
-  libmesh_error_msg("We'll never get here!");
-  return UniquePtr<QBase>();
 }
 
 } // namespace libMesh

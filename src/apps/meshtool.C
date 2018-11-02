@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,7 +22,7 @@
 #include <fstream>
 #ifdef LIBMESH_HAVE_GETOPT_H
 // GCC 2.95.3 (and maybe others) do not include
-// getopt.h in unistd.h...  Hower IBM xlC has no
+// getopt.h in unistd.h...  However IBM xlC has no
 // getopt.h!  This works around that.
 #include <getopt.h>
 #endif
@@ -43,16 +43,14 @@
 #include "libmesh/elem_quality.h"
 #include "libmesh/gmv_io.h"
 #include "libmesh/inf_elem_builder.h"
-#include "libmesh/legacy_xdr_io.h"
 #include "libmesh/libmesh.h"
 #include "libmesh/mesh.h"
-#include "libmesh/mesh_data.h"
 #include "libmesh/mesh_modification.h"
 #include "libmesh/mesh_refinement.h"
 #include "libmesh/perfmon.h"
 #include "libmesh/statistics.h"
 #include "libmesh/string_to_enum.h"
-
+#include "libmesh/enum_elem_quality.h"
 
 using namespace libMesh;
 
@@ -61,7 +59,7 @@ using namespace libMesh;
  * convenient enum for the mode in which the boundary mesh
  * should be written
  */
-enum BoundaryMeshWriteMode {BM_DISABLED=0, BM_MESH_ONLY, BM_WITH_MESHDATA};
+enum BoundaryMeshWriteMode {BM_DISABLED=0, BM_MESH_ONLY};
 
 
 void usage(const std::string & progName)
@@ -78,7 +76,6 @@ void usage(const std::string & progName)
            << "    -o <string>                   Output file name\n"
            << "    -s <string>                   Solution file name\n"
            << "\n    -b                            Write the boundary conditions\n"
-           << "    -B                            Like -b, but with activated MeshData\n"
            << "    -D <factor>                   Randomly move interior nodes by D*hmin\n"
            << "    -h                            Print help menu\n"
            << "    -p <count>                    Partition into <count> subdomains\n"
@@ -90,6 +87,9 @@ void usage(const std::string & progName)
            << "                                  boundary with the correct node ids)\n"
            << "    -v                            Verbose\n"
            << "    -q <metric>                   Evaluates the named element quality metric\n"
+           << "    -1                            Converts a mesh of higher order elements\n"
+           << "                                  to their first-order counterparts:\n"
+           << "                                  Quad8 -> Quad4, Tet10 -> Tet4 etc\n"
            << "    -2                            Converts a mesh of linear elements\n"
            << "                                  to their second-order counterparts:\n"
            << "                                  Quad4 -> Quad8, Tet4 -> Tet10 etc\n"
@@ -109,14 +109,14 @@ void usage(const std::string & progName)
     // <<   "    -L                            Build the script L connectivity matrix \n"
            << "\n"
            << "\n"
-           << " This program is used to convert and partions from/to a variety of\n"
+           << " This program is used to convert and partition from/to a variety of\n"
            << " formats.  File types are inferred from file extensions.  For example,\n"
            << " the command:\n"
            << "\n"
-           << "  ./meshtool -d 2 -i in.exd -o out.plt\n"
+           << "  ./meshtool -d 2 -i in.e -o out.plt\n"
            << "\n"
            << " will read a 2D mesh in the ExodusII format (from Cubit, for example)\n"
-           << " from the file in.exd.  It will then write the mesh in the Tecplot\n"
+           << " from the file in.e.  It will then write the mesh in the Tecplot\n"
            << " binary format to out.plt.\n"
            << "\n"
            << " and\n"
@@ -143,8 +143,7 @@ void usage(const std::string & progName)
            << " Currently this program supports the following formats:\n"
            << "\n"
            << "INPUT:\n"
-           << "     .exd -- Sandia's ExodusII binary grid format\n"
-           << "     .mgf -- MGF binary mesh format\n"
+           << "     .e   -- Sandia's ExodusII binary grid format\n"
            << "     .ucd -- AVS unstructured ASCII grid format\n"
            << "     .unv -- SDRC I-Deas Universal File ASCII format\n"
            << "     .xda -- libMesh human-readable ASCII format\n"
@@ -157,13 +156,11 @@ void usage(const std::string & progName)
            << "     .fro   -- ACDL's .fro format\n"
            << "     .gmv   -- LANL's General Mesh Viewer format\n"
            << "     .mesh  -- MEdit mesh format\n"
-           << "     .mgf   -- MGF binary mesh format\n"
            << "     .msh   -- GMSH ASCII file\n"
            << "     .plt   -- Tecplot binary format\n"
            << "     .poly  -- TetGen ASCII file\n"
            << "     .pvtu  -- Paraview VTK format\n"
            << "     .ucd   -- AVS's ASCII UCD format\n"
-           << "     .ugrid -- Kelly's DIVA ASCII format (3D only)\n"
            << "     .unv   -- I-deas Universal format\n"
            << "     .xda   -- libMesh ASCII format\n"
            << "     .xdr   -- libMesh binary format\n"
@@ -185,6 +182,7 @@ void process_cmd_line(int argc,
                       double & dist_fact,
                       bool & verbose,
                       BoundaryMeshWriteMode & write_bndry,
+                      bool & convert_first_order,
                       unsigned int & convert_second_order,
                       bool & triangulate,
                       bool & do_quality,
@@ -216,16 +214,15 @@ void process_cmd_line(int argc,
   x_sym           = y_sym           = z_sym           = false;
 
   char optionStr[] =
-    "i:o:s:d:D:r:p:tbB23vlLm?h";
+    "i:o:s:d:D:r:p:tbB123vlLm?h";
 
 #else
 
   char optionStr[] =
-    "i:o:q:s:d:D:r:p:tbB23a::x:y:z:XYZvlLm?h";
+    "i:o:q:s:d:D:r:p:tbB123a::x:y:z:XYZvlLm?h";
 
 #endif
 
-  bool b_mesh_b_given = false;
   bool b_mesh_B_given = false;
 
   int opt;
@@ -248,7 +245,7 @@ void process_cmd_line(int argc,
             if (names.empty())
               names.push_back(optarg);
             else
-              libmesh_error_msg("ERROR: Input name must preceed output name!");
+              libmesh_error_msg("ERROR: Input name must precede output name!");
             break;
           }
 
@@ -260,7 +257,7 @@ void process_cmd_line(int argc,
             if (!names.empty())
               names.push_back(optarg);
             else
-              libmesh_error_msg("ERROR: Input name must preceed output name!");
+              libmesh_error_msg("ERROR: Input name must precede output name!");
             break;
           }
 
@@ -272,7 +269,7 @@ void process_cmd_line(int argc,
             if (names.size() == 2)
               names.push_back(optarg);
             else
-              libmesh_error_msg("ERROR: Input and output names must preceed solution name!");
+              libmesh_error_msg("ERROR: Input and output names must precede solution name!");
             break;
           }
 
@@ -349,22 +346,17 @@ void process_cmd_line(int argc,
             if (b_mesh_B_given)
               libmesh_error_msg("ERROR: Do not use -b and -B concurrently!");
 
-            b_mesh_b_given = true;
             write_bndry = BM_MESH_ONLY;
             break;
           }
 
           /**
-           * Try to write the boundary,
-           * but copy also the MeshData
+           * Convert elements to first-order
+           * counterparts
            */
-        case 'B':
+        case '1':
           {
-            if (b_mesh_b_given)
-              libmesh_error_msg("ERROR: Do not use -b and -B concurrently!");
-
-            b_mesh_B_given = true;
-            write_bndry = BM_WITH_MESHDATA;
+            convert_first_order = true;
             break;
           }
 
@@ -466,9 +458,9 @@ void process_cmd_line(int argc,
 // and this is just one way to get them...
 void construct_mesh_of_active_elements(Mesh & new_mesh, const Mesh & mesh)
 {
-  MeshBase::const_element_iterator       it     = mesh.active_elements_begin();
-  const MeshBase::const_element_iterator it_end = mesh.active_elements_end();
-  mesh.create_submesh(new_mesh, it, it_end);
+  mesh.create_submesh(new_mesh,
+                      mesh.active_elements_begin(),
+                      mesh.active_elements_end());
 }
 
 
@@ -488,6 +480,7 @@ int main (int argc, char ** argv)
   double dist_fact = 0.;
   bool verbose = false;
   BoundaryMeshWriteMode write_bndry = BM_DISABLED;
+  bool convert_first_order = false;
   unsigned int convert_second_order = 0;
   bool addinfelems = false;
   bool triangulate = false;
@@ -512,6 +505,7 @@ int main (int argc, char ** argv)
   process_cmd_line(argc, argv, names,
                    n_subdomains, n_rsteps, dim,
                    dist_fact, verbose, write_bndry,
+                   convert_first_order,
                    convert_second_order,
 
                    triangulate,
@@ -527,7 +521,7 @@ int main (int argc, char ** argv)
 
                    x_sym, y_sym, z_sym);
 
-  UniquePtr<Mesh> mesh_ptr;
+  std::unique_ptr<Mesh> mesh_ptr;
   if (dim == static_cast<unsigned char>(-1))
     {
       mesh_ptr.reset(new Mesh(init.comm()));
@@ -538,27 +532,12 @@ int main (int argc, char ** argv)
     }
 
   Mesh & mesh = *mesh_ptr;
-  MeshData mesh_data(mesh);
 
   /**
    * Read the input mesh
    */
   if (!names.empty())
     {
-      /*
-       * activate the MeshData of the dim mesh,
-       * so that it can be copied to the boundary
-       */
-
-      if (write_bndry == BM_WITH_MESHDATA)
-        {
-          mesh_data.activate();
-
-          if (verbose)
-            mesh_data.print_info();
-        }
-
-
       mesh.read(names[0]);
 
       if (verbose)
@@ -579,7 +558,7 @@ int main (int argc, char ** argv)
 
 #ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
 
-  if(addinfelems)
+  if (addinfelems)
     {
       if (names.size() == 3)
         libmesh_error_msg("ERROR: Invalid combination: Building infinite elements\n"
@@ -623,12 +602,16 @@ int main (int argc, char ** argv)
 
 
   /**
-   * Possibly read the solution
+   * Possibly read the solution (-s option).
    */
   if (names.size() == 3)
-    LegacyXdrIO(mesh,true).read_mgf_soln(names[2],
-                                         soln,
-                                         var_names);
+    {
+      // TODO: Read XDR/A mesh file, construct an EquationSystems
+      // object, read XDR/A solution file by calling
+      // es.read(file, READ_HEADER|READ_DATA|READ_ADDITIONAL_DATA);
+      // then store a localized copy of the solution vector into 'soln'.
+      libmesh_error_msg("Importing an XDA solution file with -s is not supported.");
+    }
 
 
 
@@ -655,7 +638,7 @@ int main (int argc, char ** argv)
       libMesh::out << "Quality type is: " << Quality::name(quality_type) << std::endl;
 
       // What are the quality bounds for this element?
-      std::pair<Real, Real> bounds = mesh.elem(0)->qual_bounds(quality_type);
+      std::pair<Real, Real> bounds = mesh.elem_ref(0).qual_bounds(quality_type);
       libMesh::out << "Quality bounds for this element type are: ("
                    << bounds.first
                    << ", "
@@ -663,13 +646,8 @@ int main (int argc, char ** argv)
                    << ") "
                    << std::endl;
 
-      MeshBase::const_element_iterator it  = mesh.active_elements_begin(),
-        end = mesh.active_elements_end();
-      for (; it != end; ++it)
-        {
-          Elem * e = *it;
-          sv.push_back(e->quality(quality_type));
-        }
+      for (const auto & elem : mesh.active_element_ptr_range())
+        sv.push_back(elem->quality(quality_type));
 
       const unsigned int n_bins = 10;
       libMesh::out << "Avg. shape quality: " << sv.mean() << std::endl;
@@ -680,12 +658,6 @@ int main (int argc, char ** argv)
       libMesh::out << "Found " << bad_elts.size()
                    << " of " << mesh.n_elem()
                    << " elements below the cutoff." << std::endl;
-
-      /*
-        for (unsigned int i=0; i<bad_elts.size(); i++)
-        libMesh::out << bad_elts[i] << " ";
-        libMesh::out << std::endl;
-      */
 
       // Compute the histogram for this distribution
       std::vector<dof_id_type> histogram;
@@ -733,6 +705,24 @@ int main (int argc, char ** argv)
         }
     }
 
+
+  /**
+   * Possibly convert all linear
+   * elements to second-order counterparts
+   */
+  if (convert_first_order)
+    {
+      if (verbose)
+        libMesh::out << "Converting elements to first order counterparts\n";
+
+      mesh.all_first_order();
+
+      if (verbose)
+        {
+          mesh.print_info();
+          mesh.get_boundary_info().print_summary();
+        }
+    }
 
   /**
    * Possibly convert all linear
@@ -798,7 +788,7 @@ int main (int argc, char ** argv)
    */
   if (dist_fact > 0.)
     {
-      libMesh::out << "Distoring the mesh by a factor of "
+      libMesh::out << "Distorting the mesh by a factor of "
                    << dist_fact
                    << std::endl;
 
@@ -823,22 +813,22 @@ int main (int argc, char ** argv)
     const Point p(x,y);
 
     for (unsigned int e=0; e<mesh.n_elem(); e++)
-    if (mesh.elem(e)->active())
-    mesh.elem(e)->set_refinement_flag() = -1;
+    if (mesh.elem_ref(e).active())
+    mesh.elem_ref(e).set_refinement_flag() = -1;
 
 
 
     for (unsigned int e=0; e<mesh.n_elem(); e++)
-    if (mesh.elem(e)->active())
+    if (mesh.elem_ref(e).active())
     {
-    const Point diff = mesh.elem(e)->centroid(mesh) - p;
+    const Point diff = mesh.elem_ref(e).centroid(mesh) - p;
 
     if (diff.size() < .5)
     {
-    if (mesh.elem(e)->level() < 4)
-    mesh.elem(e)->set_refinement_flag() = 1;
-    else if (mesh.elem(e)->level() == 4)
-    mesh.elem(e)->set_refinement_flag() = 0;
+    if (mesh.elem_ref(e).level() < 4)
+    mesh.elem_ref(e).set_refinement_flag() = 1;
+    else if (mesh.elem_ref(e).level() == 4)
+    mesh.elem_ref(e).set_refinement_flag() = 0;
     }
     }
 
@@ -883,7 +873,7 @@ int main (int argc, char ** argv)
             if (verbose)
               libMesh::out << " Mesh got refined, will write only _active_ elements." << std::endl;
 
-            Mesh new_mesh (init.comm(), mesh.mesh_dimension());
+            Mesh new_mesh (init.comm(), cast_int<unsigned char>(mesh.mesh_dimension()));
 
             construct_mesh_of_active_elements(new_mesh, mesh);
 
@@ -914,16 +904,12 @@ int main (int argc, char ** argv)
           {
             BoundaryMesh boundary_mesh
               (mesh.comm(), cast_int<unsigned char>(mesh.mesh_dimension()-1));
-            MeshData boundary_mesh_data (boundary_mesh);
 
             std::string boundary_name = "bndry_";
             boundary_name += names[1];
 
             if (write_bndry == BM_MESH_ONLY)
               mesh.get_boundary_info().sync(boundary_mesh);
-
-            else if  (write_bndry == BM_WITH_MESHDATA)
-              mesh.get_boundary_info().sync(boundary_mesh, &boundary_mesh_data, &mesh_data);
 
             else
               libmesh_error_msg("Invalid value write_bndry = " << write_bndry);
@@ -935,12 +921,6 @@ int main (int argc, char ** argv)
           }
       }
   };
-
-  /*
-    libMesh::out << "Infinite loop, look at memory footprint" << std::endl;
-    for (;;)
-    ;
-  */
 
   return 0;
 }

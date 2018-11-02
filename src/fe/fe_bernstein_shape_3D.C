@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -91,6 +91,7 @@ Real FE<3,BERNSTEIN>::shape(const Elem * elem,
             }
 
             // Bernstein shape functions on the hexahedral.
+          case HEX8:
           case HEX20:
           case HEX27:
             {
@@ -274,12 +275,12 @@ Real FE<3,BERNSTEIN>::shape(const Elem * elem,
 
             //       // handle the edge orientation
 
-            //       if ((i== 4||i== 5) && elem->node(0) > elem->node(1))shape= 9-i;   //Edge 0
-            //       if ((i== 6||i== 7) && elem->node(1) > elem->node(2))shape=13-i;   //Edge 1
-            //       if ((i== 8||i== 9) && elem->node(0) > elem->node(2))shape=17-i;   //Edge 2
-            //       if ((i==10||i==11) && elem->node(0) > elem->node(3))shape=21-i;   //Edge 3
-            //       if ((i==12||i==13) && elem->node(1) > elem->node(3))shape=25-i;   //Edge 4
-            //       if ((i==14||i==15) && elem->node(2) > elem->node(3))shape=29-i;   //Edge 5
+            //       if ((i== 4||i== 5) && elem->node_id(0) > elem->node_id(1))shape= 9-i;   //Edge 0
+            //       if ((i== 6||i== 7) && elem->node_id(1) > elem->node_id(2))shape=13-i;   //Edge 1
+            //       if ((i== 8||i== 9) && elem->node_id(0) > elem->node_id(2))shape=17-i;   //Edge 2
+            //       if ((i==10||i==11) && elem->node_id(0) > elem->node_id(3))shape=21-i;   //Edge 3
+            //       if ((i==12||i==13) && elem->node_id(1) > elem->node_id(3))shape=25-i;   //Edge 4
+            //       if ((i==14||i==15) && elem->node_id(2) > elem->node_id(3))shape=29-i;   //Edge 5
 
             //       // No need to handle face orientation in 3rd order.
 
@@ -350,7 +351,7 @@ Real FE<3,BERNSTEIN>::shape(const Elem * elem,
               // handle the edge orientation
               {
                 // Edge 0
-                if ( (i0[i] >= 2) && (i1[i] == 0) && (i2[i] == 0))
+                if ((i0[i] >= 2) && (i1[i] == 0) && (i2[i] == 0))
                   {
                     if (elem->point(0) != std::min(elem->point(0), elem->point(1)))
                       xi_mapped = -xi;
@@ -427,7 +428,7 @@ Real FE<3,BERNSTEIN>::shape(const Elem * elem,
               // handle the face orientation
               {
                 // Face 0
-                if (     (i2[i] == 0) && (i0[i] >= 2) && (i1[i] >= 2))
+                if ((i2[i] == 0) && (i0[i] >= 2) && (i1[i] >= 2))
                   {
                     const Point min_point = std::min(elem->point(1),
                                                      std::min(elem->point(2),
@@ -874,7 +875,7 @@ Real FE<3,BERNSTEIN>::shape(const Elem * elem,
               // handle the edge orientation
               {
                 // Edge 0
-                if ( (i0[i] >= 2) && (i1[i] == 0) && (i2[i] == 0))
+                if ((i0[i] >= 2) && (i1[i] == 0) && (i2[i] == 0))
                   {
                     if (elem->point(0) != std::min(elem->point(0), elem->point(1)))
                       xi_mapped = -xi;
@@ -951,7 +952,7 @@ Real FE<3,BERNSTEIN>::shape(const Elem * elem,
               // handle the face orientation
               {
                 // Face 0
-                if (     (i2[i] == 0) && (i0[i] >= 2) && (i1[i] >= 2))
+                if ((i2[i] == 0) && (i0[i] >= 2) && (i1[i] >= 2))
                   {
                     const Point min_point = std::min(elem->point(1),
                                                      std::min(elem->point(2),
@@ -1372,9 +1373,6 @@ Real FE<3,BERNSTEIN>::shape(const Elem * elem,
     }
 
 #endif
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -1467,6 +1465,7 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
 
 
             // Bernstein shape functions on the hexahedral.
+          case HEX8:
           case HEX20:
           case HEX27:
             {
@@ -1877,73 +1876,73 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             // // Edge 0
             // if ((i1[i] == 0) && (i2[i] == 0))
             //   {
-            //     if (elem->node(0) != std::min(elem->node(0), elem->node(1)))
+            //     if (elem->node_id(0) != std::min(elem->node_id(0), elem->node_id(1)))
             //       xi_mapped = -xi;
             //   }
             // // Edge 1
             // else if ((i0[i] == 1) && (i2[i] == 0))
             //   {
-            //     if (elem->node(1) != std::min(elem->node(1), elem->node(2)))
+            //     if (elem->node_id(1) != std::min(elem->node_id(1), elem->node_id(2)))
             //       eta_mapped = -eta;
             //   }
             // // Edge 2
             // else if ((i1[i] == 1) && (i2[i] == 0))
             //   {
-            //     if (elem->node(3) != std::min(elem->node(3), elem->node(2)))
+            //     if (elem->node_id(3) != std::min(elem->node_id(3), elem->node_id(2)))
             //       xi_mapped = -xi;
             //   }
             // // Edge 3
             // else if ((i0[i] == 0) && (i2[i] == 0))
             //   {
-            //     if (elem->node(0) != std::min(elem->node(0), elem->node(3)))
+            //     if (elem->node_id(0) != std::min(elem->node_id(0), elem->node_id(3)))
             //       eta_mapped = -eta;
             //   }
             // // Edge 4
             // else if ((i0[i] == 0) && (i1[i] == 0))
             //   {
-            //     if (elem->node(0) != std::min(elem->node(0), elem->node(4)))
+            //     if (elem->node_id(0) != std::min(elem->node_id(0), elem->node_id(4)))
             //       zeta_mapped = -zeta;
             //   }
             // // Edge 5
             // else if ((i0[i] == 1) && (i1[i] == 0))
             //   {
-            //     if (elem->node(1) != std::min(elem->node(1), elem->node(5)))
+            //     if (elem->node_id(1) != std::min(elem->node_id(1), elem->node_id(5)))
             //       zeta_mapped = -zeta;
             //   }
             // // Edge 6
             // else if ((i0[i] == 1) && (i1[i] == 1))
             //   {
-            //     if (elem->node(2) != std::min(elem->node(2), elem->node(6)))
+            //     if (elem->node_id(2) != std::min(elem->node_id(2), elem->node_id(6)))
             //       zeta_mapped = -zeta;
             //   }
             // // Edge 7
             // else if ((i0[i] == 0) && (i1[i] == 1))
             //   {
-            //     if (elem->node(3) != std::min(elem->node(3), elem->node(7)))
+            //     if (elem->node_id(3) != std::min(elem->node_id(3), elem->node_id(7)))
             //       zeta_mapped = -zeta;
             //   }
             // // Edge 8
             // else if ((i1[i] == 0) && (i2[i] == 1))
             //   {
-            //     if (elem->node(4) != std::min(elem->node(4), elem->node(5)))
+            //     if (elem->node_id(4) != std::min(elem->node_id(4), elem->node_id(5)))
             //       xi_mapped = -xi;
             //   }
             // // Edge 9
             // else if ((i0[i] == 1) && (i2[i] == 1))
             //   {
-            //     if (elem->node(5) != std::min(elem->node(5), elem->node(6)))
+            //     if (elem->node_id(5) != std::min(elem->node_id(5), elem->node_id(6)))
             //       eta_mapped = -eta;
             //   }
             // // Edge 10
             // else if ((i1[i] == 1) && (i2[i] == 1))
             //   {
-            //     if (elem->node(7) != std::min(elem->node(7), elem->node(6)))
+            //     if (elem->node_id(7) != std::min(elem->node_id(7), elem->node_id(6)))
             //       xi_mapped = -xi;
             //   }
             // // Edge 11
             // else if ((i0[i] == 0) && (i2[i] == 1))
             //   {
-            //     if (elem->node(4) != std::min(elem->node(4), elem->node(7)))
+            //     if (elem->node_id(4) != std::min(elem->node_id(4), elem->node_id(7)))
             //       eta_mapped = -eta;
             //   }
             //       }
@@ -1952,14 +1951,14 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //       // handle the face orientation
             //       {
             // // Face 0
-            // if (     (i2[i] == 0) && (i0[i] >= 2) && (i1[i] >= 2))
+            // if ((i2[i] == 0) && (i0[i] >= 2) && (i1[i] >= 2))
             //   {
-            //     const unsigned int min_node = std::min(elem->node(1),
-            //    std::min(elem->node(2),
-            //     std::min(elem->node(0),
-            //      elem->node(3))));
-            //     if (elem->node(0) == min_node)
-            //       if (elem->node(1) == std::min(elem->node(1), elem->node(3)))
+            //     const unsigned int min_node = std::min(elem->node_id(1),
+            //    std::min(elem->node_id(2),
+            //     std::min(elem->node_id(0),
+            //      elem->node_id(3))));
+            //     if (elem->node_id(0) == min_node)
+            //       if (elem->node_id(1) == std::min(elem->node_id(1), elem->node_id(3)))
             // {
             //   // Case 1
             //   xi_mapped  = xi;
@@ -1972,8 +1971,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   eta_mapped = xi;
             // }
 
-            //     else if (elem->node(3) == min_node)
-            //       if (elem->node(0) == std::min(elem->node(0), elem->node(2)))
+            //     else if (elem->node_id(3) == min_node)
+            //       if (elem->node_id(0) == std::min(elem->node_id(0), elem->node_id(2)))
             // {
             //   // Case 3
             //   xi_mapped  = -eta;
@@ -1986,8 +1985,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   eta_mapped = -eta;
             // }
 
-            //     else if (elem->node(2) == min_node)
-            //       if (elem->node(3) == std::min(elem->node(3), elem->node(1)))
+            //     else if (elem->node_id(2) == min_node)
+            //       if (elem->node_id(3) == std::min(elem->node_id(3), elem->node_id(1)))
             // {
             //   // Case 5
             //   xi_mapped  = -xi;
@@ -2000,8 +1999,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   eta_mapped = -xi;
             // }
 
-            //     else if (elem->node(1) == min_node)
-            //       if (elem->node(2) == std::min(elem->node(2), elem->node(0)))
+            //     else if (elem->node_id(1) == min_node)
+            //       if (elem->node_id(2) == std::min(elem->node_id(2), elem->node_id(0)))
             // {
             //   // Case 7
             //   xi_mapped  = eta;
@@ -2019,12 +2018,12 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             // // Face 1
             // else if ((i1[i] == 0) && (i0[i] >= 2) && (i2[i] >= 2))
             //   {
-            //     const unsigned int min_node = std::min(elem->node(0),
-            //    std::min(elem->node(1),
-            //     std::min(elem->node(5),
-            //      elem->node(4))));
-            //     if (elem->node(0) == min_node)
-            //       if (elem->node(1) == std::min(elem->node(1), elem->node(4)))
+            //     const unsigned int min_node = std::min(elem->node_id(0),
+            //    std::min(elem->node_id(1),
+            //     std::min(elem->node_id(5),
+            //      elem->node_id(4))));
+            //     if (elem->node_id(0) == min_node)
+            //       if (elem->node_id(1) == std::min(elem->node_id(1), elem->node_id(4)))
             // {
             //   // Case 1
             //   xi_mapped   = xi;
@@ -2037,8 +2036,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = xi;
             // }
 
-            //     else if (elem->node(1) == min_node)
-            //       if (elem->node(5) == std::min(elem->node(5), elem->node(0)))
+            //     else if (elem->node_id(1) == min_node)
+            //       if (elem->node_id(5) == std::min(elem->node_id(5), elem->node_id(0)))
             // {
             //   // Case 3
             //   xi_mapped   = zeta;
@@ -2051,8 +2050,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = zeta;
             // }
 
-            //     else if (elem->node(5) == min_node)
-            //       if (elem->node(4) == std::min(elem->node(4), elem->node(1)))
+            //     else if (elem->node_id(5) == min_node)
+            //       if (elem->node_id(4) == std::min(elem->node_id(4), elem->node_id(1)))
             // {
             //   // Case 5
             //   xi_mapped   = -xi;
@@ -2065,8 +2064,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = -xi;
             // }
 
-            //     else if (elem->node(4) == min_node)
-            //       if (elem->node(0) == std::min(elem->node(0), elem->node(5)))
+            //     else if (elem->node_id(4) == min_node)
+            //       if (elem->node_id(0) == std::min(elem->node_id(0), elem->node_id(5)))
             // {
             //   // Case 7
             //   xi_mapped   = -xi;
@@ -2084,12 +2083,12 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             // // Face 2
             // else if ((i0[i] == 1) && (i1[i] >= 2) && (i2[i] >= 2))
             //   {
-            //     const unsigned int min_node = std::min(elem->node(1),
-            //    std::min(elem->node(2),
-            //     std::min(elem->node(6),
-            //      elem->node(5))));
-            //     if (elem->node(1) == min_node)
-            //       if (elem->node(2) == std::min(elem->node(2), elem->node(5)))
+            //     const unsigned int min_node = std::min(elem->node_id(1),
+            //    std::min(elem->node_id(2),
+            //     std::min(elem->node_id(6),
+            //      elem->node_id(5))));
+            //     if (elem->node_id(1) == min_node)
+            //       if (elem->node_id(2) == std::min(elem->node_id(2), elem->node_id(5)))
             // {
             //   // Case 1
             //   eta_mapped  = eta;
@@ -2102,8 +2101,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = eta;
             // }
 
-            //     else if (elem->node(2) == min_node)
-            //       if (elem->node(6) == std::min(elem->node(6), elem->node(1)))
+            //     else if (elem->node_id(2) == min_node)
+            //       if (elem->node_id(6) == std::min(elem->node_id(6), elem->node_id(1)))
             // {
             //   // Case 3
             //   eta_mapped  = zeta;
@@ -2116,8 +2115,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = zeta;
             // }
 
-            //     else if (elem->node(6) == min_node)
-            //       if (elem->node(5) == std::min(elem->node(5), elem->node(2)))
+            //     else if (elem->node_id(6) == min_node)
+            //       if (elem->node_id(5) == std::min(elem->node_id(5), elem->node_id(2)))
             // {
             //   // Case 5
             //   eta_mapped  = -eta;
@@ -2130,8 +2129,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = -eta;
             // }
 
-            //     else if (elem->node(5) == min_node)
-            //       if (elem->node(1) == std::min(elem->node(1), elem->node(6)))
+            //     else if (elem->node_id(5) == min_node)
+            //       if (elem->node_id(1) == std::min(elem->node_id(1), elem->node_id(6)))
             // {
             //   // Case 7
             //   eta_mapped  = -zeta;
@@ -2149,12 +2148,12 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             // // Face 3
             // else if ((i1[i] == 1) && (i0[i] >= 2) && (i2[i] >= 2))
             //   {
-            //     const unsigned int min_node = std::min(elem->node(2),
-            //    std::min(elem->node(3),
-            //     std::min(elem->node(7),
-            //      elem->node(6))));
-            //     if (elem->node(3) == min_node)
-            //       if (elem->node(2) == std::min(elem->node(2), elem->node(7)))
+            //     const unsigned int min_node = std::min(elem->node_id(2),
+            //    std::min(elem->node_id(3),
+            //     std::min(elem->node_id(7),
+            //      elem->node_id(6))));
+            //     if (elem->node_id(3) == min_node)
+            //       if (elem->node_id(2) == std::min(elem->node_id(2), elem->node_id(7)))
             // {
             //   // Case 1
             //   xi_mapped   = xi;
@@ -2167,8 +2166,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = xi;
             // }
 
-            //     else if (elem->node(7) == min_node)
-            //       if (elem->node(3) == std::min(elem->node(3), elem->node(6)))
+            //     else if (elem->node_id(7) == min_node)
+            //       if (elem->node_id(3) == std::min(elem->node_id(3), elem->node_id(6)))
             // {
             //   // Case 3
             //   xi_mapped   = -zeta;
@@ -2181,8 +2180,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = -zeta;
             // }
 
-            //     else if (elem->node(6) == min_node)
-            //       if (elem->node(7) == std::min(elem->node(7), elem->node(2)))
+            //     else if (elem->node_id(6) == min_node)
+            //       if (elem->node_id(7) == std::min(elem->node_id(7), elem->node_id(2)))
             // {
             //   // Case 5
             //   xi_mapped   = -xi;
@@ -2195,8 +2194,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = -xi;
             // }
 
-            //     else if (elem->node(2) == min_node)
-            //       if (elem->node(6) == std::min(elem->node(3), elem->node(6)))
+            //     else if (elem->node_id(2) == min_node)
+            //       if (elem->node_id(6) == std::min(elem->node_id(3), elem->node_id(6)))
             // {
             //   // Case 7
             //   xi_mapped   = zeta;
@@ -2214,12 +2213,12 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             // // Face 4
             // else if ((i0[i] == 0) && (i1[i] >= 2) && (i2[i] >= 2))
             //   {
-            //     const unsigned int min_node = std::min(elem->node(3),
-            //    std::min(elem->node(0),
-            //     std::min(elem->node(4),
-            //      elem->node(7))));
-            //     if (elem->node(0) == min_node)
-            //       if (elem->node(3) == std::min(elem->node(3), elem->node(4)))
+            //     const unsigned int min_node = std::min(elem->node_id(3),
+            //    std::min(elem->node_id(0),
+            //     std::min(elem->node_id(4),
+            //      elem->node_id(7))));
+            //     if (elem->node_id(0) == min_node)
+            //       if (elem->node_id(3) == std::min(elem->node_id(3), elem->node_id(4)))
             // {
             //   // Case 1
             //   eta_mapped  = eta;
@@ -2232,8 +2231,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = eta;
             // }
 
-            //     else if (elem->node(4) == min_node)
-            //       if (elem->node(0) == std::min(elem->node(0), elem->node(7)))
+            //     else if (elem->node_id(4) == min_node)
+            //       if (elem->node_id(0) == std::min(elem->node_id(0), elem->node_id(7)))
             // {
             //   // Case 3
             //   eta_mapped  = -zeta;
@@ -2246,8 +2245,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = -zeta;
             // }
 
-            //     else if (elem->node(7) == min_node)
-            //       if (elem->node(4) == std::min(elem->node(4), elem->node(3)))
+            //     else if (elem->node_id(7) == min_node)
+            //       if (elem->node_id(4) == std::min(elem->node_id(4), elem->node_id(3)))
             // {
             //   // Case 5
             //   eta_mapped  = -eta;
@@ -2260,8 +2259,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = -eta;
             // }
 
-            //     else if (elem->node(3) == min_node)
-            //       if (elem->node(7) == std::min(elem->node(7), elem->node(0)))
+            //     else if (elem->node_id(3) == min_node)
+            //       if (elem->node_id(7) == std::min(elem->node_id(7), elem->node_id(0)))
             // {
             //   // Case 7
             //   eta_mapped   = zeta;
@@ -2279,12 +2278,12 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             // // Face 5
             // else if ((i2[i] == 1) && (i0[i] >= 2) && (i1[i] >= 2))
             //   {
-            //     const unsigned int min_node = std::min(elem->node(4),
-            //    std::min(elem->node(5),
-            //     std::min(elem->node(6),
-            //      elem->node(7))));
-            //     if (elem->node(4) == min_node)
-            //       if (elem->node(5) == std::min(elem->node(5), elem->node(7)))
+            //     const unsigned int min_node = std::min(elem->node_id(4),
+            //    std::min(elem->node_id(5),
+            //     std::min(elem->node_id(6),
+            //      elem->node_id(7))));
+            //     if (elem->node_id(4) == min_node)
+            //       if (elem->node_id(5) == std::min(elem->node_id(5), elem->node_id(7)))
             // {
             //   // Case 1
             //   xi_mapped  = xi;
@@ -2297,8 +2296,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   eta_mapped = xi;
             // }
 
-            //     else if (elem->node(5) == min_node)
-            //       if (elem->node(6) == std::min(elem->node(6), elem->node(4)))
+            //     else if (elem->node_id(5) == min_node)
+            //       if (elem->node_id(6) == std::min(elem->node_id(6), elem->node_id(4)))
             // {
             //   // Case 3
             //   xi_mapped  = eta;
@@ -2311,8 +2310,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   eta_mapped = eta;
             // }
 
-            //     else if (elem->node(6) == min_node)
-            //       if (elem->node(7) == std::min(elem->node(7), elem->node(5)))
+            //     else if (elem->node_id(6) == min_node)
+            //       if (elem->node_id(7) == std::min(elem->node_id(7), elem->node_id(5)))
             // {
             //   // Case 5
             //   xi_mapped  = -xi;
@@ -2325,8 +2324,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   eta_mapped = -xi;
             // }
 
-            //     else if (elem->node(7) == min_node)
-            //       if (elem->node(4) == std::min(elem->node(4), elem->node(6)))
+            //     else if (elem->node_id(7) == min_node)
+            //       if (elem->node_id(4) == std::min(elem->node_id(4), elem->node_id(6)))
             // {
             //   // Case 7
             //   xi_mapped  = -eta;
@@ -2451,73 +2450,73 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             // // Edge 0
             // if ((i1[i] == 0) && (i2[i] == 0))
             //   {
-            //     if (elem->node(0) != std::min(elem->node(0), elem->node(1)))
+            //     if (elem->node_id(0) != std::min(elem->node_id(0), elem->node_id(1)))
             //       xi_mapped = -xi;
             //   }
             // // Edge 1
             // else if ((i0[i] == 1) && (i2[i] == 0))
             //   {
-            //     if (elem->node(1) != std::min(elem->node(1), elem->node(2)))
+            //     if (elem->node_id(1) != std::min(elem->node_id(1), elem->node_id(2)))
             //       eta_mapped = -eta;
             //   }
             // // Edge 2
             // else if ((i1[i] == 1) && (i2[i] == 0))
             //   {
-            //     if (elem->node(3) != std::min(elem->node(3), elem->node(2)))
+            //     if (elem->node_id(3) != std::min(elem->node_id(3), elem->node_id(2)))
             //       xi_mapped = -xi;
             //   }
             // // Edge 3
             // else if ((i0[i] == 0) && (i2[i] == 0))
             //   {
-            //     if (elem->node(0) != std::min(elem->node(0), elem->node(3)))
+            //     if (elem->node_id(0) != std::min(elem->node_id(0), elem->node_id(3)))
             //       eta_mapped = -eta;
             //   }
             // // Edge 4
             // else if ((i0[i] == 0) && (i1[i] == 0))
             //   {
-            //     if (elem->node(0) != std::min(elem->node(0), elem->node(4)))
+            //     if (elem->node_id(0) != std::min(elem->node_id(0), elem->node_id(4)))
             //       zeta_mapped = -zeta;
             //   }
             // // Edge 5
             // else if ((i0[i] == 1) && (i1[i] == 0))
             //   {
-            //     if (elem->node(1) != std::min(elem->node(1), elem->node(5)))
+            //     if (elem->node_id(1) != std::min(elem->node_id(1), elem->node_id(5)))
             //       zeta_mapped = -zeta;
             //   }
             // // Edge 6
             // else if ((i0[i] == 1) && (i1[i] == 1))
             //   {
-            //     if (elem->node(2) != std::min(elem->node(2), elem->node(6)))
+            //     if (elem->node_id(2) != std::min(elem->node_id(2), elem->node_id(6)))
             //       zeta_mapped = -zeta;
             //   }
             // // Edge 7
             // else if ((i0[i] == 0) && (i1[i] == 1))
             //   {
-            //     if (elem->node(3) != std::min(elem->node(3), elem->node(7)))
+            //     if (elem->node_id(3) != std::min(elem->node_id(3), elem->node_id(7)))
             //       zeta_mapped = -zeta;
             //   }
             // // Edge 8
             // else if ((i1[i] == 0) && (i2[i] == 1))
             //   {
-            //     if (elem->node(4) != std::min(elem->node(4), elem->node(5)))
+            //     if (elem->node_id(4) != std::min(elem->node_id(4), elem->node_id(5)))
             //       xi_mapped = -xi;
             //   }
             // // Edge 9
             // else if ((i0[i] == 1) && (i2[i] == 1))
             //   {
-            //     if (elem->node(5) != std::min(elem->node(5), elem->node(6)))
+            //     if (elem->node_id(5) != std::min(elem->node_id(5), elem->node_id(6)))
             //       eta_mapped = -eta;
             //   }
             // // Edge 10
             // else if ((i1[i] == 1) && (i2[i] == 1))
             //   {
-            //     if (elem->node(7) != std::min(elem->node(7), elem->node(6)))
+            //     if (elem->node_id(7) != std::min(elem->node_id(7), elem->node_id(6)))
             //       xi_mapped = -xi;
             //   }
             // // Edge 11
             // else if ((i0[i] == 0) && (i2[i] == 1))
             //   {
-            //     if (elem->node(4) != std::min(elem->node(4), elem->node(7)))
+            //     if (elem->node_id(4) != std::min(elem->node_id(4), elem->node_id(7)))
             //       eta_mapped = -eta;
             //   }
             //       }
@@ -2526,14 +2525,14 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //       // handle the face orientation
             //       {
             // // Face 0
-            // if (     (i2[i] == 0) && (i0[i] >= 2) && (i1[i] >= 2))
+            // if ((i2[i] == 0) && (i0[i] >= 2) && (i1[i] >= 2))
             //   {
-            //     const unsigned int min_node = std::min(elem->node(1),
-            //    std::min(elem->node(2),
-            //     std::min(elem->node(0),
-            //      elem->node(3))));
-            //     if (elem->node(0) == min_node)
-            //       if (elem->node(1) == std::min(elem->node(1), elem->node(3)))
+            //     const unsigned int min_node = std::min(elem->node_id(1),
+            //    std::min(elem->node_id(2),
+            //     std::min(elem->node_id(0),
+            //      elem->node_id(3))));
+            //     if (elem->node_id(0) == min_node)
+            //       if (elem->node_id(1) == std::min(elem->node_id(1), elem->node_id(3)))
             // {
             //   // Case 1
             //   xi_mapped  = xi;
@@ -2546,8 +2545,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   eta_mapped = xi;
             // }
 
-            //     else if (elem->node(3) == min_node)
-            //       if (elem->node(0) == std::min(elem->node(0), elem->node(2)))
+            //     else if (elem->node_id(3) == min_node)
+            //       if (elem->node_id(0) == std::min(elem->node_id(0), elem->node_id(2)))
             // {
             //   // Case 3
             //   xi_mapped  = -eta;
@@ -2560,8 +2559,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   eta_mapped = -eta;
             // }
 
-            //     else if (elem->node(2) == min_node)
-            //       if (elem->node(3) == std::min(elem->node(3), elem->node(1)))
+            //     else if (elem->node_id(2) == min_node)
+            //       if (elem->node_id(3) == std::min(elem->node_id(3), elem->node_id(1)))
             // {
             //   // Case 5
             //   xi_mapped  = -xi;
@@ -2574,8 +2573,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   eta_mapped = -xi;
             // }
 
-            //     else if (elem->node(1) == min_node)
-            //       if (elem->node(2) == std::min(elem->node(2), elem->node(0)))
+            //     else if (elem->node_id(1) == min_node)
+            //       if (elem->node_id(2) == std::min(elem->node_id(2), elem->node_id(0)))
             // {
             //   // Case 7
             //   xi_mapped  = eta;
@@ -2593,12 +2592,12 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             // // Face 1
             // else if ((i1[i] == 0) && (i0[i] >= 2) && (i2[i] >= 2))
             //   {
-            //     const unsigned int min_node = std::min(elem->node(0),
-            //    std::min(elem->node(1),
-            //     std::min(elem->node(5),
-            //      elem->node(4))));
-            //     if (elem->node(0) == min_node)
-            //       if (elem->node(1) == std::min(elem->node(1), elem->node(4)))
+            //     const unsigned int min_node = std::min(elem->node_id(0),
+            //    std::min(elem->node_id(1),
+            //     std::min(elem->node_id(5),
+            //      elem->node_id(4))));
+            //     if (elem->node_id(0) == min_node)
+            //       if (elem->node_id(1) == std::min(elem->node_id(1), elem->node_id(4)))
             // {
             //   // Case 1
             //   xi_mapped   = xi;
@@ -2611,8 +2610,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = xi;
             // }
 
-            //     else if (elem->node(1) == min_node)
-            //       if (elem->node(5) == std::min(elem->node(5), elem->node(0)))
+            //     else if (elem->node_id(1) == min_node)
+            //       if (elem->node_id(5) == std::min(elem->node_id(5), elem->node_id(0)))
             // {
             //   // Case 3
             //   xi_mapped   = zeta;
@@ -2625,8 +2624,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = zeta;
             // }
 
-            //     else if (elem->node(5) == min_node)
-            //       if (elem->node(4) == std::min(elem->node(4), elem->node(1)))
+            //     else if (elem->node_id(5) == min_node)
+            //       if (elem->node_id(4) == std::min(elem->node_id(4), elem->node_id(1)))
             // {
             //   // Case 5
             //   xi_mapped   = -xi;
@@ -2639,8 +2638,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = -xi;
             // }
 
-            //     else if (elem->node(4) == min_node)
-            //       if (elem->node(0) == std::min(elem->node(0), elem->node(5)))
+            //     else if (elem->node_id(4) == min_node)
+            //       if (elem->node_id(0) == std::min(elem->node_id(0), elem->node_id(5)))
             // {
             //   // Case 7
             //   xi_mapped   = -xi;
@@ -2658,12 +2657,12 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             // // Face 2
             // else if ((i0[i] == 1) && (i1[i] >= 2) && (i2[i] >= 2))
             //   {
-            //     const unsigned int min_node = std::min(elem->node(1),
-            //    std::min(elem->node(2),
-            //     std::min(elem->node(6),
-            //      elem->node(5))));
-            //     if (elem->node(1) == min_node)
-            //       if (elem->node(2) == std::min(elem->node(2), elem->node(5)))
+            //     const unsigned int min_node = std::min(elem->node_id(1),
+            //    std::min(elem->node_id(2),
+            //     std::min(elem->node_id(6),
+            //      elem->node_id(5))));
+            //     if (elem->node_id(1) == min_node)
+            //       if (elem->node_id(2) == std::min(elem->node_id(2), elem->node_id(5)))
             // {
             //   // Case 1
             //   eta_mapped  = eta;
@@ -2676,8 +2675,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = eta;
             // }
 
-            //     else if (elem->node(2) == min_node)
-            //       if (elem->node(6) == std::min(elem->node(6), elem->node(1)))
+            //     else if (elem->node_id(2) == min_node)
+            //       if (elem->node_id(6) == std::min(elem->node_id(6), elem->node_id(1)))
             // {
             //   // Case 3
             //   eta_mapped  = zeta;
@@ -2690,8 +2689,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = zeta;
             // }
 
-            //     else if (elem->node(6) == min_node)
-            //       if (elem->node(5) == std::min(elem->node(5), elem->node(2)))
+            //     else if (elem->node_id(6) == min_node)
+            //       if (elem->node_id(5) == std::min(elem->node_id(5), elem->node_id(2)))
             // {
             //   // Case 5
             //   eta_mapped  = -eta;
@@ -2704,8 +2703,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = -eta;
             // }
 
-            //     else if (elem->node(5) == min_node)
-            //       if (elem->node(1) == std::min(elem->node(1), elem->node(6)))
+            //     else if (elem->node_id(5) == min_node)
+            //       if (elem->node_id(1) == std::min(elem->node_id(1), elem->node_id(6)))
             // {
             //   // Case 7
             //   eta_mapped  = -zeta;
@@ -2723,12 +2722,12 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             // // Face 3
             // else if ((i1[i] == 1) && (i0[i] >= 2) && (i2[i] >= 2))
             //   {
-            //     const unsigned int min_node = std::min(elem->node(2),
-            //    std::min(elem->node(3),
-            //     std::min(elem->node(7),
-            //      elem->node(6))));
-            //     if (elem->node(3) == min_node)
-            //       if (elem->node(2) == std::min(elem->node(2), elem->node(7)))
+            //     const unsigned int min_node = std::min(elem->node_id(2),
+            //    std::min(elem->node_id(3),
+            //     std::min(elem->node_id(7),
+            //      elem->node_id(6))));
+            //     if (elem->node_id(3) == min_node)
+            //       if (elem->node_id(2) == std::min(elem->node_id(2), elem->node_id(7)))
             // {
             //   // Case 1
             //   xi_mapped   = xi;
@@ -2741,8 +2740,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = xi;
             // }
 
-            //     else if (elem->node(7) == min_node)
-            //       if (elem->node(3) == std::min(elem->node(3), elem->node(6)))
+            //     else if (elem->node_id(7) == min_node)
+            //       if (elem->node_id(3) == std::min(elem->node_id(3), elem->node_id(6)))
             // {
             //   // Case 3
             //   xi_mapped   = -zeta;
@@ -2755,8 +2754,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = -zeta;
             // }
 
-            //     else if (elem->node(6) == min_node)
-            //       if (elem->node(7) == std::min(elem->node(7), elem->node(2)))
+            //     else if (elem->node_id(6) == min_node)
+            //       if (elem->node_id(7) == std::min(elem->node_id(7), elem->node_id(2)))
             // {
             //   // Case 5
             //   xi_mapped   = -xi;
@@ -2769,8 +2768,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = -xi;
             // }
 
-            //     else if (elem->node(2) == min_node)
-            //       if (elem->node(6) == std::min(elem->node(3), elem->node(6)))
+            //     else if (elem->node_id(2) == min_node)
+            //       if (elem->node_id(6) == std::min(elem->node_id(3), elem->node_id(6)))
             // {
             //   // Case 7
             //   xi_mapped   = zeta;
@@ -2788,12 +2787,12 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             // // Face 4
             // else if ((i0[i] == 0) && (i1[i] >= 2) && (i2[i] >= 2))
             //   {
-            //     const unsigned int min_node = std::min(elem->node(3),
-            //    std::min(elem->node(0),
-            //     std::min(elem->node(4),
-            //      elem->node(7))));
-            //     if (elem->node(0) == min_node)
-            //       if (elem->node(3) == std::min(elem->node(3), elem->node(4)))
+            //     const unsigned int min_node = std::min(elem->node_id(3),
+            //    std::min(elem->node_id(0),
+            //     std::min(elem->node_id(4),
+            //      elem->node_id(7))));
+            //     if (elem->node_id(0) == min_node)
+            //       if (elem->node_id(3) == std::min(elem->node_id(3), elem->node_id(4)))
             // {
             //   // Case 1
             //   eta_mapped  = eta;
@@ -2806,8 +2805,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = eta;
             // }
 
-            //     else if (elem->node(4) == min_node)
-            //       if (elem->node(0) == std::min(elem->node(0), elem->node(7)))
+            //     else if (elem->node_id(4) == min_node)
+            //       if (elem->node_id(0) == std::min(elem->node_id(0), elem->node_id(7)))
             // {
             //   // Case 3
             //   eta_mapped  = -zeta;
@@ -2820,8 +2819,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = -zeta;
             // }
 
-            //     else if (elem->node(7) == min_node)
-            //       if (elem->node(4) == std::min(elem->node(4), elem->node(3)))
+            //     else if (elem->node_id(7) == min_node)
+            //       if (elem->node_id(4) == std::min(elem->node_id(4), elem->node_id(3)))
             // {
             //   // Case 5
             //   eta_mapped  = -eta;
@@ -2834,8 +2833,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   zeta_mapped = -eta;
             // }
 
-            //     else if (elem->node(3) == min_node)
-            //       if (elem->node(7) == std::min(elem->node(7), elem->node(0)))
+            //     else if (elem->node_id(3) == min_node)
+            //       if (elem->node_id(7) == std::min(elem->node_id(7), elem->node_id(0)))
             // {
             //   // Case 7
             //   eta_mapped   = zeta;
@@ -2853,12 +2852,12 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             // // Face 5
             // else if ((i2[i] == 1) && (i0[i] >= 2) && (i1[i] >= 2))
             //   {
-            //     const unsigned int min_node = std::min(elem->node(4),
-            //    std::min(elem->node(5),
-            //     std::min(elem->node(6),
-            //      elem->node(7))));
-            //     if (elem->node(4) == min_node)
-            //       if (elem->node(5) == std::min(elem->node(5), elem->node(7)))
+            //     const unsigned int min_node = std::min(elem->node_id(4),
+            //    std::min(elem->node_id(5),
+            //     std::min(elem->node_id(6),
+            //      elem->node_id(7))));
+            //     if (elem->node_id(4) == min_node)
+            //       if (elem->node_id(5) == std::min(elem->node_id(5), elem->node_id(7)))
             // {
             //   // Case 1
             //   xi_mapped  = xi;
@@ -2871,8 +2870,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   eta_mapped = xi;
             // }
 
-            //     else if (elem->node(5) == min_node)
-            //       if (elem->node(6) == std::min(elem->node(6), elem->node(4)))
+            //     else if (elem->node_id(5) == min_node)
+            //       if (elem->node_id(6) == std::min(elem->node_id(6), elem->node_id(4)))
             // {
             //   // Case 3
             //   xi_mapped  = eta;
@@ -2885,8 +2884,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   eta_mapped = eta;
             // }
 
-            //     else if (elem->node(6) == min_node)
-            //       if (elem->node(7) == std::min(elem->node(7), elem->node(5)))
+            //     else if (elem->node_id(6) == min_node)
+            //       if (elem->node_id(7) == std::min(elem->node_id(7), elem->node_id(5)))
             // {
             //   // Case 5
             //   xi_mapped  = -xi;
@@ -2899,8 +2898,8 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
             //   eta_mapped = -xi;
             // }
 
-            //     else if (elem->node(7) == min_node)
-            //       if (elem->node(4) == std::min(elem->node(4), elem->node(6)))
+            //     else if (elem->node_id(7) == min_node)
+            //       if (elem->node_id(4) == std::min(elem->node_id(4), elem->node_id(6)))
             // {
             //   // Case 7
             //   xi_mapped  = -eta;
@@ -2958,9 +2957,6 @@ Real FE<3,BERNSTEIN>::shape_deriv(const Elem * elem,
     }
 
 #endif
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 

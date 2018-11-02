@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -41,6 +41,7 @@ namespace libMesh
  *
  * \author Benjamin Kirk
  * \date 2003
+ * \brief Data object managed by PerfLog
  */
 class PerfData
 {
@@ -98,6 +99,7 @@ public:
   void   start ();
   void   restart ();
   double pause ();
+  double pause_for(PerfData & other);
   double stopit ();
 
   int called_recursively;
@@ -113,11 +115,12 @@ protected:
  * The \p PerfLog class allows monitoring of specific events.
  * An event is defined by a unique string that functions as
  * a label.  Each time the event is executed data are recorded.
- * This class is particulary useful for finding performance
+ * This class is particularly useful for finding performance
  * bottlenecks.
  *
  * \author Benjamin Kirk
  * \date 2003
+ * \brief Responsible for timing and summarizing events.
  */
 class PerfLog
 {
@@ -139,7 +142,7 @@ public:
   ~PerfLog();
 
   /**
-   * Clears all the internal data and returns the
+   * Clears all the internal data and restores the
    * data structures to a pristine state.  This function
    * checks to see if it is currently monitoring any
    * events, and if so errors.  Be sure you are not
@@ -158,30 +161,67 @@ public:
   void enable_logging() { log_events = true; }
 
   /**
-   * Returns true iff performance logging is enabled
+   * \returns \p true iff performance logging is enabled
    */
   bool logging_enabled() const { return log_events; }
 
   /**
    * Push the event \p label onto the stack, pausing any active event.
+   *
+   * Note - for speed the PerfLog directly considers the *pointers*
+   * here.  Supply pointers to string literals or other character
+   * arrays whose lifetime will exceed the lifetime of the PerfLog
+   * object, not to temporarily allocated arrays.
+   */
+  void fast_push (const char * label,
+                  const char * header="");
+
+  /**
+   * Push the event \p label onto the stack, pausing any active event.
+   *
+   * This method will eventually be deprecated.  For backwards
+   * compatibility, the PerfLog must copy the contents of these
+   * character arrays into strings, which ironically damages the
+   * performance we are trying to profile.  Use fast_push() (with
+   * compatible long-lived character array data) instead.
    */
   void push (const char * label,
              const char * header="");
 
   /**
    * Push the event \p label onto the stack, pausing any active event.
+   *
+   * This method will eventually be deprecated.  String manipulation
+   * is too low performance to use when performance monitoring hot
+   * spots.  Use fast_push() instead.
    */
   void push (const std::string & label,
              const std::string & header="");
 
   /**
    * Pop the event \p label off the stack, resuming any lower event.
+   *
+   * This method must be passed the exact same pointers as were passed
+   * to fast_push, not merely pointers to identical strings.
+   */
+  void fast_pop (const char * label,
+                 const char * header="");
+
+  /**
+   * Pop the event \p label off the stack, resuming any lower event.
+   *
+   * This method will eventually be deprecated.  Use fast_pop() (with
+   * the exact same pointers supplied to fast_push()) instead.
    */
   void pop (const char * label,
             const char * header="");
 
   /**
    * Pop the event \p label off the stack, resuming any lower event.
+   *
+   * This method will eventually be deprecated.  String manipulation
+   * is too low performance to use when performance monitoring hot
+   * spots.  Use fast_pop() instead.
    */
   void pop (const std::string & label,
             const std::string & header="");
@@ -211,19 +251,19 @@ public:
                      const std::string & header="");
 
   /**
-   * @returns a string containing:
+   * \returns A string containing:
    * (1) Basic machine information (if first call)
    * (2) The performance log
    */
   std::string get_log() const;
 
   /**
-   * @returns a string containing ONLY the information header.
+   * \returns A string containing ONLY the information header.
    */
   std::string get_info_header() const;
 
   /**
-   * @returns a string containing ONLY the log information
+   * \returns A string containing ONLY the log information
    */
   std::string get_perf_info() const;
 
@@ -233,12 +273,12 @@ public:
   void print_log() const;
 
   /**
-   * @returns the total time spent on this event.
+   * \returns The total time spent on this event.
    */
   double get_elapsed_time() const;
 
   /**
-   * @returns the active time
+   * \returns The active time
    */
   double get_active_time() const;
 
@@ -246,6 +286,28 @@ public:
    * Return the PerfData object associated with a label and header.
    */
   PerfData get_perf_data(const std::string & label, const std::string & header="");
+
+  /**
+   * Typdef for the underlying logging data structure.
+   */
+  typedef std::map<std::pair<const char *,
+                             const char *>,
+                   PerfData> log_type;
+  /**
+   * \returns the raw underlying data structure for the entire performance log.
+   *
+   * \deprecated because encapsulation is good.
+   *
+   * Also probably broken by the switch from string to const char *,
+   * though users who are liberal with "auto" might be safe.
+   */
+#ifdef LIBMESH_ENABLE_DEPRECATED
+  const log_type & get_log_raw() const
+  {
+    libmesh_deprecated();
+    return log;
+  }
+#endif
 
 private:
 
@@ -272,10 +334,12 @@ private:
 
   /**
    * The actual log.
+   *
+   * An unsorted_map would work fine here and would be asymptotically
+   * faster, but in my tests for our log sizes there was no
+   * improvement.
    */
-  std::map<std::pair<std::string,
-                     std::string>,
-           PerfData> log;
+  log_type log;
 
   /**
    * A stack to hold the current performance log trace.
@@ -295,18 +359,28 @@ private:
    */
   void split_on_whitespace(const std::string & input,
                            std::vector<std::string> & output) const;
+
+  /**
+   * Workaround to give us fixed pointers to character arrays for
+   * every string.  Using std::set instead might work: it won't
+   * invalidate iterators, which I *think* means it doesn't have any
+   * reason to modify or copy their contents or otherwise invalidate
+   * their c_str() pointers... but I can't prove it from the standards
+   * doc, so let's be safe.
+   */
+  std::map<std::string, const char *> non_temporary_strings;
 };
 
 
 
 // ------------------------------------------------------------
-// PerfData class member funcions
+// PerfData class member functions
 inline
 void PerfData::start ()
 {
   this->count++;
   this->called_recursively++;
-  gettimeofday (&(this->tstart), libmesh_nullptr);
+  gettimeofday (&(this->tstart), nullptr);
   this->tstart_incl_sub = this->tstart;
 }
 
@@ -315,7 +389,7 @@ void PerfData::start ()
 inline
 void PerfData::restart ()
 {
-  gettimeofday (&(this->tstart), libmesh_nullptr);
+  gettimeofday (&(this->tstart), nullptr);
 }
 
 
@@ -336,20 +410,38 @@ double PerfData::stop_or_pause(const bool do_stop)
     tstart_tv_sec  = this->tstart.tv_sec,
     tstart_tv_usec = this->tstart.tv_usec;
 
-  gettimeofday (&(this->tstart), libmesh_nullptr);
+  gettimeofday (&(this->tstart), nullptr);
 
   const double elapsed_time = (static_cast<double>(this->tstart.tv_sec  - tstart_tv_sec) +
                                static_cast<double>(this->tstart.tv_usec - tstart_tv_usec)*1.e-6);
 
   this->tot_time += elapsed_time;
 
-  if(do_stop)
+  if (do_stop)
     {
       const double elapsed_time_incl_sub = (static_cast<double>(this->tstart.tv_sec  - this->tstart_incl_sub.tv_sec) +
                                             static_cast<double>(this->tstart.tv_usec - this->tstart_incl_sub.tv_usec)*1.e-6);
 
       this->tot_time_incl_sub += elapsed_time_incl_sub;
     }
+
+  return elapsed_time;
+}
+
+
+
+inline
+double PerfData::pause_for(PerfData & other)
+{
+  gettimeofday (&(other.tstart), nullptr);
+
+  const double elapsed_time = (static_cast<double>(other.tstart.tv_sec  - this->tstart.tv_sec) +
+                               static_cast<double>(other.tstart.tv_usec - this->tstart.tv_usec)*1.e-6);
+  this->tot_time += elapsed_time;
+
+  other.count++;
+  other.called_recursively++;
+  other.tstart_incl_sub = other.tstart;
 
   return elapsed_time;
 }
@@ -369,10 +461,10 @@ double PerfData::stopit ()
 
 
 // ------------------------------------------------------------
-// PerfLog class inline member funcions
+// PerfLog class inline member functions
 inline
-void PerfLog::push (const std::string & label,
-                    const std::string & header)
+void PerfLog::fast_push (const char * label,
+                         const char * header)
 {
   if (this->log_events)
     {
@@ -381,10 +473,9 @@ void PerfLog::push (const std::string & label,
       PerfData * perf_data = &(log[std::make_pair(header,label)]);
 
       if (!log_stack.empty())
-        total_time +=
-          log_stack.top()->pause();
-
-      perf_data->start();
+        total_time += log_stack.top()->pause_for(*perf_data);
+      else
+        perf_data->start();
       log_stack.push(perf_data);
     }
 }
@@ -392,18 +483,8 @@ void PerfLog::push (const std::string & label,
 
 
 inline
-void PerfLog::push (const char * label,
-                    const char * header)
-{
-  if (this->log_events)
-    this->push(std::string(label), std::string(header));
-}
-
-
-
-inline
-void PerfLog::pop (const std::string & libmesh_dbg_var(label),
-                   const std::string & libmesh_dbg_var(header))
+void PerfLog::fast_pop(const char * libmesh_dbg_var(label),
+                       const char * libmesh_dbg_var(header))
 {
   if (this->log_events)
     {
@@ -415,11 +496,9 @@ void PerfLog::pop (const std::string & libmesh_dbg_var(label),
         {
           libMesh::err << "PerfLog can't pop (" << header << ',' << label << ')' << std::endl;
           libMesh::err << "From top of stack of running logs:" << std::endl;
-          std::map<std::pair<std::string, std::string>, PerfData>::iterator
-            i = log.begin(), endi = log.end();
-          for (; i != endi; ++i)
-            if (&(i->second) == log_stack.top())
-              libMesh::err << '(' << i->first.first << ',' << i->first.second << ')' << std::endl;
+          for (auto i : log)
+            if (&(i.second) == log_stack.top())
+              libMesh::err << '(' << i.first.first << ',' << i.first.second << ')' << std::endl;
 
           libmesh_assert_equal_to (perf_data, log_stack.top());
         }
@@ -437,21 +516,11 @@ void PerfLog::pop (const std::string & libmesh_dbg_var(label),
 
 
 inline
-void PerfLog::pop(const char * label,
-                  const char * header)
-{
-  if (this->log_events)
-    this->pop(std::string(label), std::string(header));
-}
-
-
-
-inline
 double PerfLog::get_elapsed_time () const
 {
   struct timeval tnow;
 
-  gettimeofday (&tnow, libmesh_nullptr);
+  gettimeofday (&tnow, nullptr);
 
   const double elapsed_time = (static_cast<double>(tnow.tv_sec  - tstart.tv_sec) +
                                static_cast<double>(tnow.tv_usec - tstart.tv_usec)*1.e-6);

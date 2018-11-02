@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -28,7 +28,7 @@
 #include "libmesh/string_to_enum.h"
 #include "libmesh/boundary_info.h"
 #include "libmesh/utility.h"
-#include LIBMESH_INCLUDE_UNORDERED_MAP
+#include <unordered_map>
 
 // Anonymous namespace to hold mapping Data for Abaqus/libMesh element types
 namespace
@@ -85,7 +85,7 @@ void add_eletype_entry(ElemType libmesh_elem_type,
 void init_eletypes ()
 {
   // This should happen only once.  The first time this method is
-  // called the eletypes data struture will be empty, and we will
+  // called the eletypes data structure will be empty, and we will
   // fill it.  Any subsequent calls will find an initialized
   // eletypes map and will do nothing.
   if (eletypes.empty())
@@ -309,11 +309,18 @@ void AbaqusIO::read (const std::string & fname)
               if (nset_name == "")
                 libmesh_error_msg("Unnamed nset encountered!");
 
+              // Is this a "generated" nset, i.e. one which has three
+              // entries corresponding to (first, last, stride)?
+              bool is_generated = this->detect_generated_set(upper);
+
               // Process any lines of comments that may be present
               this->process_and_discard_comments();
 
               // Read the IDs, storing them in _nodeset_ids
-              this->read_ids(nset_name, _nodeset_ids);
+              if (is_generated)
+                this->generate_ids(nset_name, _nodeset_ids);
+              else
+                this->read_ids(nset_name, _nodeset_ids);
             } // *Nodeset
 
 
@@ -328,11 +335,18 @@ void AbaqusIO::read (const std::string & fname)
               if (elset_name == "")
                 libmesh_error_msg("Unnamed elset encountered!");
 
+              // Is this a "generated" elset, i.e. one which has three
+              // entries corresponding to (first, last, stride)?
+              bool is_generated = this->detect_generated_set(upper);
+
               // Process any lines of comments that may be present
               this->process_and_discard_comments();
 
               // Read the IDs, storing them in _elemset_ids
-              this->read_ids(elset_name, _elemset_ids);
+              if (is_generated)
+                this->generate_ids(elset_name, _elemset_ids);
+              else
+                this->read_ids(elset_name, _elemset_ids);
             } // *Elset
 
 
@@ -376,11 +390,11 @@ void AbaqusIO::read (const std::string & fname)
   // Assign sideset values in the BoundaryInfo object
   this->assign_sideset_ids();
 
-  // Abaqus files only contain nodesets by default.  To be useful in
-  // applying most types of BCs in libmesh, we will definitely need
-  // sidesets.  So we can call the new BoundaryInfo function which
-  // generates sidesets from nodesets.
-  if (build_sidesets_from_nodesets)
+  // If the Abaqus file contains only nodesets, we can have libmesh
+  // generate sidesets from them. This BoundaryInfo function currently
+  // *overwrites* existing sidesets in surprising ways, so we don't
+  // call it if there are already sidesets present in the original file.
+  if (build_sidesets_from_nodesets && the_mesh.get_boundary_info().n_boundary_conds() == 0)
     the_mesh.get_boundary_info().build_side_list_from_node_list();
 
   // Delete lower-dimensional elements from the Mesh.  We assume these
@@ -389,16 +403,9 @@ void AbaqusIO::read (const std::string & fname)
   {
     unsigned char max_dim = this->max_elem_dimension_seen();
 
-    MeshBase::element_iterator       el     = the_mesh.elements_begin();
-    const MeshBase::element_iterator end_el = the_mesh.elements_end();
-
-    for (; el != end_el; ++el)
-      {
-        Elem * elem = *el;
-
-        if (elem->dim() < max_dim)
-          the_mesh.delete_elem(elem);
-      }
+    for (auto & elem : the_mesh.element_ptr_range())
+      if (elem->dim() < max_dim)
+        the_mesh.delete_elem(elem);
   }
 }
 
@@ -423,7 +430,7 @@ void AbaqusIO::read_nodes(std::string nset_name)
 
   // Temporary variables for parsing lines of text
   char c;
-  std::string dummy;
+  std::string line;
 
   // Defines the sequential node numbering used by libmesh.  Since
   // there can be multiple *NODE sections in an Abaqus file, we always
@@ -434,7 +441,7 @@ void AbaqusIO::read_nodes(std::string nset_name)
   // We need to duplicate some of the read_ids code if this *NODE
   // section also defines an NSET.  We'll set up the id_storage
   // pointer and push back IDs into this vector in the loop below...
-  std::vector<dof_id_type> * id_storage = libmesh_nullptr;
+  std::vector<dof_id_type> * id_storage = nullptr;
   if (nset_name != "")
     id_storage = &(_nodeset_ids[nset_name]);
 
@@ -443,30 +450,38 @@ void AbaqusIO::read_nodes(std::string nset_name)
   // TODO: Is Abaqus guaranteed to start the line with '*' or can there be leading white space?
   while (_in.peek() != '*' && _in.peek() != EOF)
     {
-      // Re-Initialize variables to be read in from file
+      // Read an entire line which corresponds to a single point's id
+      // and (x,y,z) values.
+      std::getline(_in, line);
+
+      // Remove all whitespace characters from the line.  This way we
+      // can do the remaining parsing without worrying about tabs,
+      // different numbers of spaces, etc.
+      line.erase(std::remove_if(line.begin(), line.end(), isspace), line.end());
+
+      // Make a stream out of the modified line so we can stream values
+      // from it in the usual way.
+      std::stringstream ss(line);
+
+      // Values to be read in from file
       dof_id_type abaqus_node_id=0;
       Real x=0, y=0, z=0;
 
       // Note: we assume *at least* 2D points here, should we worry about
       // trying to read 1D Abaqus meshes?
-      _in >> abaqus_node_id >> c >> x >> c >> y;
+      ss >> abaqus_node_id >> c >> x >> c >> y;
 
       // Peek at the next character.  If it is a comma, then there is another
       // value to read!
-      if (_in.peek() == ',')
-        _in >> c >> z;
-
-      // Read (and discard) the rest of the line, including the newline.
-      // This is required so that our 'peek()' at the beginning of this
-      // loop doesn't read the newline character, for example.
-      std::getline(_in, dummy);
+      if (ss.peek() == ',')
+        ss >> c >> z;
 
       // If this *NODE section defines an NSET, also store the abaqus ID in id_storage
       if (id_storage)
         id_storage->push_back(abaqus_node_id);
 
       // Set up the abaqus -> libmesh node mapping.  This is usually just the
-      // "off-by-one" map.
+      // "off-by-one" map, but it doesn't have to be.
       _abaqus_to_libmesh_node_mapping[abaqus_node_id] = libmesh_node_id;
 
       // Add the point to the mesh using libmesh's numbering,
@@ -491,57 +506,91 @@ void AbaqusIO::read_elements(std::string upper, std::string elset_name)
   unsigned n_nodes_per_elem = 0;
 
   // Within s, we should have "type=XXXX"
-  if (upper.find("T3D2") != std::string::npos)
+  if (upper.find("T3D2") != std::string::npos ||
+      upper.find("B31") != std::string::npos)
     {
       elem_type = EDGE2;
       n_nodes_per_elem = 2;
       elems_of_dimension[1] = true;
     }
-  else if (upper.find("CPE4") != std::string::npos ||
-           upper.find("CPS4") != std::string::npos)
+  else if (upper.find("B32") != std::string::npos)
     {
-      elem_type = QUAD4;
-      n_nodes_per_elem = 4;
-      elems_of_dimension[2] = true;
+      elem_type = EDGE3;
+      n_nodes_per_elem = 3;
+      elems_of_dimension[1] = true;
     }
-  else if (upper.find("CPS3") != std::string::npos ||
-           upper.find("S3R") != std::string::npos)
+  else if (upper.find("S3") != std::string::npos ||
+           upper.find("CPE3") != std::string::npos ||
+           upper.find("2D3") != std::string::npos)
     {
       elem_type = TRI3;
       n_nodes_per_elem = 3;
       elems_of_dimension[2] = true;
     }
-  else if (upper.find("C3D8") != std::string::npos)
+  else if (upper.find("CPE4") != std::string::npos ||
+           upper.find("S4") != std::string::npos ||
+           upper.find("CPEG4") != std::string::npos ||
+           upper.find("2D4") != std::string::npos)
+    {
+      elem_type = QUAD4;
+      n_nodes_per_elem = 4;
+      elems_of_dimension[2] = true;
+    }
+  else if (upper.find("CPE6") != std::string::npos ||
+           upper.find("S6") != std::string::npos ||
+           upper.find("CPEG6") != std::string::npos ||
+           upper.find("2D6") != std::string::npos)
+    {
+      elem_type = TRI6;
+      n_nodes_per_elem = 6;
+      elems_of_dimension[2] = true;
+    }
+  else if (upper.find("CPE8") != std::string::npos ||
+           upper.find("S8") != std::string::npos ||
+           upper.find("CPEG8") != std::string::npos ||
+           upper.find("2D8") != std::string::npos)
+    {
+      elem_type = QUAD8;
+      n_nodes_per_elem = 8;
+      elems_of_dimension[2] = true;
+    }
+  else if (upper.find("3D8") != std::string::npos)
     {
       elem_type = HEX8;
       n_nodes_per_elem = 8;
       elems_of_dimension[3] = true;
     }
-  else if (upper.find("C3D4") != std::string::npos)
+  else if (upper.find("3D4") != std::string::npos)
     {
       elem_type = TET4;
       n_nodes_per_elem = 4;
       elems_of_dimension[3] = true;
     }
-  else if (upper.find("C3D20") != std::string::npos)
+  else if (upper.find("3D20") != std::string::npos)
     {
       elem_type = HEX20;
       n_nodes_per_elem = 20;
       elems_of_dimension[3] = true;
     }
-  else if (upper.find("C3D6") != std::string::npos)
+  else if (upper.find("3D27") != std::string::npos)
+    {
+      elem_type = HEX27;
+      n_nodes_per_elem = 27;
+      elems_of_dimension[3] = true;
+    }
+  else if (upper.find("3D6") != std::string::npos)
     {
       elem_type = PRISM6;
       n_nodes_per_elem = 6;
       elems_of_dimension[3] = true;
     }
-  else if (upper.find("C3D15") != std::string::npos)
+  else if (upper.find("3D15") != std::string::npos)
     {
       elem_type = PRISM15;
       n_nodes_per_elem = 15;
       elems_of_dimension[3] = true;
     }
-  else if (upper.find("C3D10") != std::string::npos)
+  else if (upper.find("3D10") != std::string::npos)
     {
       elem_type = TET10;
       n_nodes_per_elem = 10;
@@ -611,10 +660,10 @@ void AbaqusIO::read_elements(std::string upper, std::string elset_name)
                   // Grab the node pointer from the mesh for this ID
                   Node * node = the_mesh.node_ptr(libmesh_global_node_id);
 
-                  // If node_ptr() returns NULL, it may mean we have not yet read the
+                  // If node_ptr() returns nullptr, it may mean we have not yet read the
                   // *Nodes section, though I assumed that always came before the *Elements section...
-                  if (node == libmesh_nullptr)
-                    libmesh_error_msg("Error!  Mesh returned NULL Node pointer.  Either no node exists with ID " \
+                  if (node == nullptr)
+                    libmesh_error_msg("Error!  Mesh::node_ptr() returned nullptr.  Either no node exists with ID " \
                                       << libmesh_global_node_id         \
                                       << " or perhaps this input file has *Elements defined before *Nodes?");
 
@@ -650,7 +699,7 @@ void AbaqusIO::read_elements(std::string upper, std::string elset_name)
 
 
 
-std::string AbaqusIO::parse_label(std::string line, std::string label_name)
+std::string AbaqusIO::parse_label(std::string line, std::string label_name) const
 {
   // Handle files which have weird line endings from e.g. windows.
   // You can check what kind of line endings you have with 'cat -vet'.
@@ -695,6 +744,23 @@ std::string AbaqusIO::parse_label(std::string line, std::string label_name)
 
 
 
+bool AbaqusIO::detect_generated_set(std::string upper) const
+{
+  // Avoid issues with weird line endings, spaces before commas, etc.
+  upper.erase(std::remove_if(upper.begin(), upper.end(), isspace), upper.end());
+
+  // Check each comma-separated value in "upper" to see if it is the generate flag.
+  std::string cell;
+  std::stringstream line_stream(upper);
+  while (std::getline(line_stream, cell, ','))
+    if (cell == "GENERATE")
+      return true;
+
+  return false;
+}
+
+
+
 void AbaqusIO::read_ids(std::string set_name, container_t & container)
 {
   // Grab a reference to a vector that will hold all the IDs
@@ -715,7 +781,7 @@ void AbaqusIO::read_ids(std::string set_name, container_t & container)
         {
           // If no conversion can be performed by strtol, 0 is returned.
           //
-          // If endptr is not NULL, strtol() stores the address of the
+          // If endptr is not nullptr, strtol() stores the address of the
           // first invalid character in *endptr.  If there were no
           // digits at all, however, strtol() stores the original
           // value of str in *endptr.
@@ -740,10 +806,47 @@ void AbaqusIO::read_ids(std::string set_name, container_t & container)
 
 
 
+void AbaqusIO::generate_ids(std::string set_name, container_t & container)
+{
+  // Grab a reference to a vector that will hold all the IDs
+  std::vector<dof_id_type> & id_storage = container[set_name];
+
+  // Read until the start of another section is detected, or EOF is
+  // encountered.  "generate" sections seem to only have one line,
+  // although I suppose it's possible they could have more.
+  while (_in.peek() != '*' && _in.peek() != EOF)
+    {
+      // Read entire comma-separated line into a string
+      std::string csv_line;
+      std::getline(_in, csv_line);
+
+      // Remove all whitespaces from csv_line.
+      csv_line.erase(std::remove_if(csv_line.begin(), csv_line.end(), isspace), csv_line.end());
+
+      // Create a new stringstream object from the string, and stream
+      // in the comma-separated values.
+      char c;
+      dof_id_type start, end, stride;
+      std::stringstream line_stream(csv_line);
+      line_stream >> start >> c >> end >> c >> stride;
+
+      // Generate entries in the id_storage.  Note: each element can
+      // only belong to a single Elset (since this corresponds to the
+      // subdomain_id) so if an element appears in multiple Elsets,
+      // the "last" one (alphabetically, based on set name) in the
+      // _elemset_ids map will "win".
+      for (dof_id_type current = start; current <= end; current += stride)
+        id_storage.push_back(current);
+    }
+}
+
+
+
+
 void AbaqusIO::read_sideset(std::string sideset_name, sideset_container_t & container)
 {
   // Grab a reference to a vector that will hold all the IDs
-  std::vector<std::pair<dof_id_type, unsigned> > & id_storage = container[sideset_name];
+  std::vector<std::pair<dof_id_type, unsigned>> & id_storage = container[sideset_name];
 
   // Variables for storing values read in from file
   dof_id_type elem_id=0;
@@ -786,8 +889,8 @@ void AbaqusIO::assign_subdomain_ids()
   std::map<ElemType, unsigned> elem_types_map;
   {
     unsigned ctr=0;
-    for (std::set<ElemType>::iterator it=_elem_types.begin(); it!=_elem_types.end(); ++it)
-      elem_types_map[*it] = ctr++;
+    for (const auto & type : _elem_types)
+      elem_types_map[type] = ctr++;
   }
 
   // Loop over each Elemset and assign subdomain IDs to Mesh elements
@@ -808,11 +911,8 @@ void AbaqusIO::assign_subdomain_ids()
             // Map the id_vector[i]'th element ID (Abaqus numbering) to LibMesh numbering
             dof_id_type libmesh_elem_id = _abaqus_to_libmesh_elem_mapping[ id_vector[i] ];
 
-            // Get pointer to that element
-            Elem * elem = the_mesh.elem(libmesh_elem_id);
-
-            if (elem == libmesh_nullptr)
-              libmesh_error_msg("Mesh returned NULL pointer for Elem " << libmesh_elem_id);
+            // Get reference to that element
+            Elem & elem = the_mesh.elem_ref(libmesh_elem_id);
 
             // We won't assign subdomain ids to lower-dimensional
             // elements, as they are assumed to represent boundary
@@ -820,22 +920,22 @@ void AbaqusIO::assign_subdomain_ids()
             // appear in multiple sidesets, it doesn't make sense to
             // assign them a single subdomain id... only the last one
             // assigned would actually "stick".
-            if (elem->dim() < max_dim)
+            if (elem.dim() < max_dim)
               break;
 
             // Compute the proper subdomain ID, based on the formula in the
             // documentation for this function.
             subdomain_id_type computed_id = cast_int<subdomain_id_type>
-              (elemset_id + (elem_types_map[elem->type()] * n_elemsets));
+              (elemset_id + (elem_types_map[elem.type()] * n_elemsets));
 
             // Assign this ID to the element in question
-            elem->subdomain_id() = computed_id;
+            elem.subdomain_id() = computed_id;
 
             // We will also assign a unique name to the computed_id,
             // which is created by appending the geometric element
             // name to the elset name provided by the user in the
             // Abaqus file.
-            std::string computed_name = it->first + "_" + Utility::enum_to_string(elem->type());
+            std::string computed_name = it->first + "_" + Utility::enum_to_string(elem.type());
             the_mesh.subdomain_name(computed_id) = computed_name;
           }
       }
@@ -868,8 +968,8 @@ void AbaqusIO::assign_boundary_node_ids()
           // Get node pointer from the mesh
           Node * node = the_mesh.node_ptr(libmesh_global_node_id);
 
-          if (node == libmesh_nullptr)
-            libmesh_error_msg("Error! Mesh returned NULL node pointer!");
+          if (node == nullptr)
+            libmesh_error_msg("Error! Mesh::node_ptr() returned nullptr!");
 
           // Add this node with the current_id (which is determined by the
           // alphabetical ordering of the map) to the BoundaryInfo object
@@ -898,7 +998,7 @@ void AbaqusIO::assign_sideset_ids()
         the_mesh.get_boundary_info().sideset_name(current_id) = it->first;
 
         // Get a reference to the current vector of nodeset ID values
-        std::vector<std::pair<dof_id_type,unsigned> > & sideset_ids = it->second;
+        std::vector<std::pair<dof_id_type,unsigned>> & sideset_ids = it->second;
 
         for (std::size_t i=0; i<sideset_ids.size(); ++i)
           {
@@ -910,21 +1010,17 @@ void AbaqusIO::assign_sideset_ids()
             // Map the Abaqus element ID to LibMesh numbering
             dof_id_type libmesh_elem_id = _abaqus_to_libmesh_elem_mapping[ abaqus_elem_id ];
 
-            // Get pointer to that element
-            Elem * elem = the_mesh.elem(libmesh_elem_id);
-
-            // Check that the pointer returned from the Mesh is non-NULL
-            if (elem == libmesh_nullptr)
-              libmesh_error_msg("Mesh returned NULL pointer for Elem " << libmesh_elem_id);
+            // Get a reference to that element
+            Elem & elem = the_mesh.elem_ref(libmesh_elem_id);
 
             // Grab a reference to the element definition for this element type
-            const ElementDefinition & eledef = eletypes[elem->type()];
+            const ElementDefinition & eledef = eletypes[elem.type()];
 
             // If the element definition was not found, the call above would have
             // created one with an uninitialized struct.  Check for that here...
             if (eledef.abaqus_zero_based_side_id_to_libmesh_side_id.size() == 0)
               libmesh_error_msg("No Abaqus->LibMesh mapping information for ElemType " \
-                                << Utility::enum_to_string(elem->type())  \
+                                << Utility::enum_to_string(elem.type())  \
                                 << "!");
 
             // Add this node with the current_id (which is determined by the
@@ -932,7 +1028,7 @@ void AbaqusIO::assign_sideset_ids()
             // so we subtract 1 here before passing the abaqus side number to the
             // mapping array
             the_mesh.get_boundary_info().add_side
-              (elem,
+              (&elem,
                eledef.abaqus_zero_based_side_id_to_libmesh_side_id[abaqus_side_number-1],
                current_id);
           }
@@ -954,8 +1050,7 @@ void AbaqusIO::assign_sideset_ids()
     // because the lower-dimensional elements can belong to more than
     // 1 sideset, and multiple lower-dimensional elements can hash to
     // the same value, but this is very rare.
-    typedef LIBMESH_BEST_UNORDERED_MULTIMAP<dof_id_type,
-                                            std::pair<Elem *, boundary_id_type> > provide_bcs_t;
+    typedef std::unordered_multimap<dof_id_type, std::pair<Elem *, boundary_id_type>> provide_bcs_t;
     provide_bcs_t provide_bcs;
 
     // The elemset_id counter assigns a logical numbering to the
@@ -973,28 +1068,25 @@ void AbaqusIO::assign_sideset_ids()
             // Map the id_vector[i]'th element ID (Abaqus numbering) to LibMesh numbering
             dof_id_type libmesh_elem_id = _abaqus_to_libmesh_elem_mapping[ id_vector[i] ];
 
-            // Get pointer to that element
-            Elem * elem = the_mesh.elem(libmesh_elem_id);
-
-            if (elem == libmesh_nullptr)
-              libmesh_error_msg("Mesh returned NULL pointer for Elem " << libmesh_elem_id);
+            // Get a reference to that element
+            Elem & elem = the_mesh.elem_ref(libmesh_elem_id);
 
             // If the element dimension is equal to the maximum
             // dimension seen, we can break out of this for loop --
             // this elset does not contain sideset information.
-            if (elem->dim() == max_dim)
+            if (elem.dim() == max_dim)
               break;
 
             // We can only handle elements that are *exactly*
             // one dimension lower than the max element
             // dimension.  Not sure if "edge" BCs in 3D
             // actually make sense/are required...
-            if (elem->dim()+1 != max_dim)
-              libmesh_error_msg("ERROR: Expected boundary element of dimension " << max_dim-1 << " but got " << elem->dim());
+            if (elem.dim()+1 != max_dim)
+              libmesh_error_msg("ERROR: Expected boundary element of dimension " << max_dim-1 << " but got " << elem.dim());
 
             // Insert the current (key, pair(elem,id)) into the multimap.
-            provide_bcs.insert(std::make_pair(elem->key(),
-                                              std::make_pair(elem,
+            provide_bcs.insert(std::make_pair(elem.key(),
+                                              std::make_pair(&elem,
                                                              elemset_id)));
 
             // Associate the name of this sideset with the ID we've
@@ -1006,49 +1098,35 @@ void AbaqusIO::assign_sideset_ids()
       }
 
     // Loop over elements and try to assign boundary information
-    {
-      MeshBase::element_iterator       e_it  = the_mesh.active_elements_begin();
-      const MeshBase::element_iterator end = the_mesh.active_elements_end();
-      for ( ; e_it != end; ++e_it)
-        {
-          Elem * elem = *e_it;
+    for (auto & elem : the_mesh.active_element_ptr_range())
+      if (elem->dim() == max_dim)
+        for (auto sn : elem->side_index_range())
+          {
+            // This is a max-dimension element that may require BCs.
+            // For each of its sides, including internal sides, we'll
+            // see if a lower-dimensional element provides boundary
+            // information for it.  Note that we have not yet called
+            // find_neighbors(), so we can't use elem->neighbor(sn) in
+            // this algorithm...
+            std::pair<provide_bcs_t::const_iterator,
+                      provide_bcs_t::const_iterator>
+              bounds = provide_bcs.equal_range (elem->key(sn));
 
-          if (elem->dim() == max_dim)
-            {
-              // This is a max-dimension element that may require BCs.
-              // For each of its sides, including internal sides, we'll
-              // see if a lower-dimensional element provides boundary
-              // information for it.  Note that we have not yet called
-              // find_neighbors(), so we can't use elem->neighbor(sn) in
-              // this algorithm...
-              for (unsigned short sn=0; sn<elem->n_sides(); sn++)
-                {
-                  std::pair<provide_bcs_t::const_iterator,
-                            provide_bcs_t::const_iterator>
-                    range = provide_bcs.equal_range (elem->key(sn));
+            // Add boundary information for each side in the range.
+            for (const auto & pr : as_range(bounds))
+              {
+                // We'll need to compare the lower dimensional element against the current side.
+                std::unique_ptr<Elem> side (elem->build_side_ptr(sn));
 
-                  // Add boundary information for each side in the range.
-                  for (provide_bcs_t::const_iterator s_it = range.first;
-                       s_it != range.second; ++s_it)
-                    {
-                      // We'll need to compare the lower dimensional element against the current side.
-                      UniquePtr<Elem> side (elem->build_side(sn));
+                // Extract the relevant data. We don't need the key for anything.
+                Elem * lower_dim_elem = pr.second.first;
+                boundary_id_type bid = pr.second.second;
 
-                      // Get the value mapped by the iterator.
-                      std::pair<Elem *, boundary_id_type> p = s_it->second;
-
-                      // Extract the relevant data from the iterator.
-                      Elem * lower_dim_elem = p.first;
-                      boundary_id_type bid = p.second;
-
-                      // This was a hash, so it might not be perfect.  Let's verify...
-                      if (*lower_dim_elem == *side)
-                        the_mesh.get_boundary_info().add_side(elem, sn, bid);
-                    }
-                }
-            }
-        }
-    }
+                // This was a hash, so it might not be perfect.  Let's verify...
+                if (*lower_dim_elem == *side)
+                  the_mesh.get_boundary_info().add_side(elem, sn, bid);
+              }
+          }
   }
 }
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -15,12 +15,12 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-// C++ includes
-
 // Local includes
 #include "libmesh/side.h"
 #include "libmesh/edge_edge2.h"
 #include "libmesh/face_quad4.h"
+#include "libmesh/enum_io_package.h"
+#include "libmesh/enum_order.h"
 
 namespace libMesh
 {
@@ -29,8 +29,13 @@ namespace libMesh
 
 
 // ------------------------------------------------------------
-// Quad class static member initialization
-const unsigned int Quad4::side_nodes_map[4][2] =
+// Quad4 class static member initialization
+const int Quad4::num_nodes;
+const int Quad4::num_sides;
+const int Quad4::num_children;
+const int Quad4::nodes_per_side;
+
+const unsigned int Quad4::side_nodes_map[Quad4::num_sides][Quad4::nodes_per_side] =
   {
     {0, 1}, // Side 0
     {1, 2}, // Side 1
@@ -41,7 +46,7 @@ const unsigned int Quad4::side_nodes_map[4][2] =
 
 #ifdef LIBMESH_ENABLE_AMR
 
-const float Quad4::_embedding_matrix[4][4][4] =
+const float Quad4::_embedding_matrix[Quad4::num_children][Quad4::num_nodes][Quad4::num_nodes] =
   {
     // embedding matrix for child 0
     {
@@ -108,13 +113,17 @@ bool Quad4::is_node_on_side(const unsigned int n,
                             const unsigned int s) const
 {
   libmesh_assert_less (s, n_sides());
-  for (unsigned int i = 0; i != 2; ++i)
-    if (side_nodes_map[s][i] == n)
-      return true;
-  return false;
+  return std::find(std::begin(side_nodes_map[s]),
+                   std::end(side_nodes_map[s]),
+                   n) != std::end(side_nodes_map[s]);
 }
 
-
+std::vector<unsigned>
+Quad4::nodes_on_side(const unsigned int s) const
+{
+  libmesh_assert_less(s, n_sides());
+  return {std::begin(side_nodes_map[s]), std::end(side_nodes_map[s])};
+}
 
 bool Quad4::has_affine_map() const
 {
@@ -124,28 +133,32 @@ bool Quad4::has_affine_map() const
 
 
 
-UniquePtr<Elem> Quad4::build_side (const unsigned int i,
-                                   bool proxy) const
+Order Quad4::default_order() const
+{
+  return FIRST;
+}
+
+
+
+std::unique_ptr<Elem> Quad4::build_side_ptr (const unsigned int i,
+                                             bool proxy)
 {
   libmesh_assert_less (i, this->n_sides());
 
   if (proxy)
-    return UniquePtr<Elem>(new Side<Edge2,Quad4>(this,i));
+    return libmesh_make_unique<Side<Edge2,Quad4>>(this,i);
 
   else
     {
-      Elem * edge = new Edge2;
+      std::unique_ptr<Elem> edge = libmesh_make_unique<Edge2>();
       edge->subdomain_id() = this->subdomain_id();
 
       // Set the nodes
       for (unsigned n=0; n<edge->n_nodes(); ++n)
-        edge->set_node(n) = this->get_node(Quad4::side_nodes_map[i][n]);
+        edge->set_node(n) = this->node_ptr(Quad4::side_nodes_map[i][n]);
 
-      return UniquePtr<Elem>(edge);
+      return edge;
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return UniquePtr<Elem>();
 }
 
 
@@ -166,19 +179,19 @@ void Quad4::connectivity(const unsigned int libmesh_dbg_var(sf),
     {
     case TECPLOT:
       {
-        conn[0] = this->node(0)+1;
-        conn[1] = this->node(1)+1;
-        conn[2] = this->node(2)+1;
-        conn[3] = this->node(3)+1;
+        conn[0] = this->node_id(0)+1;
+        conn[1] = this->node_id(1)+1;
+        conn[2] = this->node_id(2)+1;
+        conn[3] = this->node_id(3)+1;
         return;
       }
 
     case VTK:
       {
-        conn[0] = this->node(0);
-        conn[1] = this->node(1);
-        conn[2] = this->node(2);
-        conn[3] = this->node(3);
+        conn[0] = this->node_id(0);
+        conn[1] = this->node_id(1);
+        conn[2] = this->node_id(2);
+        conn[3] = this->node_id(3);
         return;
       }
 
@@ -220,9 +233,17 @@ Real Quad4::volume () const
   Real vol=0.;
   for (unsigned int i=0; i<2; ++i)
     for (unsigned int j=0; j<2; ++j)
-      vol += (q[j]*a1 + b1).cross(q[i]*a2 + b2).norm();
+      vol += cross_norm(q[j]*a1 + b1,
+                        q[i]*a2 + b2);
 
   return vol;
 }
+
+BoundingBox
+Quad4::loose_bounding_box () const
+{
+  return Elem::loose_bounding_box();
+}
+
 
 } // namespace libMesh

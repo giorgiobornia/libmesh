@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -39,9 +39,15 @@ namespace libMesh
 /**
  * An allocator which can be used in standard containers.  Uses
  * pool-based memory allocation to efficiently allocate many small
- * objects.  Note that object destruction returns memory to the pool
- * rather than deallocate it.  It must be explicitly deallocated
- * prior to program termination.
+ * objects.
+ *
+ * \note Object destruction returns memory to the pool rather than
+ * deallocate it.  It must be explicitly deallocated prior to program
+ * termination.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2011
+ * \brief Boost-derived allocator that can be used with std::containers.
  */
 template <typename T>
 class PoolAllocator : public boost::pool_allocator<T>
@@ -67,7 +73,7 @@ public:
 
   /**
    * Frees every memory block that doesn't have any allocated chunks.
-   * Returns true if at least one memory block was freed.
+   * \returns \p true if at least one memory block was freed.
    */
   static bool release_memory ()
   {
@@ -76,7 +82,9 @@ public:
 
   /**
    * Frees every memory block. This function invalidates any pointers previously returned
-   * by allocation functions. Returns true if at least one memory block was freed.
+   * by allocation functions.
+   *
+   * \returns \p true if at least one memory block was freed.
    */
   static bool purge_memory ()
   {
@@ -89,9 +97,15 @@ public:
 /**
  * An allocator which can be used in standard containers.  Uses
  * pool-based memory allocation to efficiently allocate many small
- * objects.  Note that object destruction returns memory to the pool
- * rather than deallocate it.  It must be explicitly deallocated
- * prior to program termination.
+ * objects.
+ *
+ * \note Object destruction returns memory to the pool rather than
+ * deallocate it.  It must be explicitly deallocated prior to program
+ * termination.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2011
+ * \brief Boost-derived allocator that can be used with std::containers.
  */
 template <typename T>
 class FastPoolAllocator : public boost::fast_pool_allocator<T>
@@ -118,7 +132,7 @@ public:
 
   /**
    * Frees every memory block that doesn't have any allocated chunks.
-   * Returns true if at least one memory block was freed.
+   * \returns \p true if at least one memory block was freed.
    */
   static bool release_memory ()
   {
@@ -127,7 +141,9 @@ public:
 
   /**
    * Frees every memory block. This function invalidates any pointers previously returned
-   * by allocation functions. Returns true if at least one memory block was freed.
+   * by allocation functions.
+   *
+   * \returns \p true if at least one memory block was freed.
    */
   static bool purge_memory ()
   {
@@ -141,6 +157,10 @@ public:
 /**
  * An allocator which can be used in standard containers.
  * A wrapper for \p std::allocator<> when Boost is not available.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2011
+ * \brief PoolAllocator is std::allocator when Boost is not available.
  */
 template <typename T>
 class PoolAllocator : public std::allocator<T>
@@ -165,13 +185,15 @@ public:
 
   /**
    * Frees every memory block that doesn't have any allocated chunks.
-   * Returns true if at least one memory block was freed.
+   * \returns \p true if at least one memory block was freed.
    */
   static bool release_memory () { /* no-op for std::allocator<> - already freed. */ return false; }
 
   /**
    * Frees every memory block. This function invalidates any pointers previously returned
-   * by allocation functions. Returns true if at least one memory block was freed.
+   * by allocation functions.
+   *
+   * \returns \p true if at least one memory block was freed.
    */
   static bool purge_memory ()   { /* no-op for std::allocator<> - already freed. */ return false; }
 };
@@ -181,6 +203,10 @@ public:
 /**
  * An allocator which can be used in standard containers.
  * A wrapper for \p std::allocator<> when Boost is not available.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2011
+ * \brief FastPoolAllocator is std::allocator when Boost is not available.
  */
 template <typename T>
 class FastPoolAllocator : public std::allocator<T>
@@ -205,13 +231,15 @@ public:
 
   /**
    * Frees every memory block that doesn't have any allocated chunks.
-   * Returns true if at least one memory block was freed.
+   * \returns \p true if at least one memory block was freed.
    */
   static bool release_memory () { /* no-op for std::allocator<> - already freed. */ return false; }
 
   /**
    * Frees every memory block. This function invalidates any pointers previously returned
-   * by allocation functions. Returns true if at least one memory block was freed.
+   * by allocation functions.
+   *
+   * \returns \p true if at least one memory block was freed.
    */
   static bool purge_memory ()   { /* no-op for std::allocator<> - already freed. */ return false; }
 };

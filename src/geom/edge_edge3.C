@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -19,9 +19,15 @@
 
 // Local includes
 #include "libmesh/edge_edge3.h"
+#include "libmesh/enum_io_package.h"
+#include "libmesh/enum_order.h"
 
 namespace libMesh
 {
+
+// Edge3 class static member initializations
+const int Edge3::num_nodes;
+const int Edge3::num_children;
 
 #ifdef LIBMESH_ENABLE_AMR
 
@@ -69,7 +75,7 @@ bool Edge3::is_node_on_side(const unsigned int n,
                             const unsigned int s) const
 {
   libmesh_assert_less (s, 2);
-  libmesh_assert_less (n, 3);
+  libmesh_assert_less (n, Edge3::num_nodes);
   return (s == n);
 }
 
@@ -86,6 +92,13 @@ bool Edge3::has_affine_map() const
 {
   return (this->point(2).relative_fuzzy_equals
           ((this->point(0) + this->point(1))/2));
+}
+
+
+
+Order Edge3::default_order() const
+{
+  return SECOND;
 }
 
 
@@ -108,13 +121,13 @@ void Edge3::connectivity(const unsigned int sc,
         switch (sc)
           {
           case 0:
-            conn[0] = this->node(0)+1;
-            conn[1] = this->node(2)+1;
+            conn[0] = this->node_id(0)+1;
+            conn[1] = this->node_id(2)+1;
             return;
 
           case 1:
-            conn[0] = this->node(2)+1;
-            conn[1] = this->node(1)+1;
+            conn[0] = this->node_id(2)+1;
+            conn[1] = this->node_id(1)+1;
             return;
 
           default:
@@ -126,23 +139,23 @@ void Edge3::connectivity(const unsigned int sc,
     case VTK:
       {
         conn.resize(3);
-        conn[0] = this->node(0);
-        conn[1] = this->node(1);
-        conn[2] = this->node(2);
+        conn[0] = this->node_id(0);
+        conn[1] = this->node_id(1);
+        conn[2] = this->node_id(2);
         return;
 
         /*
           switch (sc)
           {
           case 0:
-          conn[0] = this->node(0);
-          conn[1] = this->node(2);
+          conn[0] = this->node_id(0);
+          conn[1] = this->node_id(2);
 
           return;
 
           case 1:
-          conn[0] = this->node(2);
-          conn[1] = this->node(1);
+          conn[0] = this->node_id(2);
+          conn[1] = this->node_id(1);
 
           return;
 
@@ -175,13 +188,13 @@ Real Edge3::volume () const
   Point B = (this->point(1) - this->point(0))/2;
 
   const Real a = A.norm_sq();
-  const Real b = 2.*(A*B);
   const Real c = B.norm_sq();
 
   // Degenerate straight line case
-  if (a < TOLERANCE*TOLERANCE*TOLERANCE)
-    return (this->point(1) - this->point(0)).norm();
+  if (a < TOLERANCE*TOLERANCE)
+    return 2. * std::sqrt(c);
 
+  const Real b = 2.*(A*B);
   const Real ba=b/a;
   const Real ca=c/a;
 
@@ -190,17 +203,42 @@ Real Edge3::volume () const
   const Real s1 = std::sqrt(1. - ba + ca);
   const Real s2 = std::sqrt(1. + ba + ca);
 
+  Real log_term = (1. - 0.5*ba + s1) / (-1. - 0.5*ba + s2);
+  libmesh_assert(!libmesh_isnan(log_term) && log_term > 0.);
+
   return 0.5*std::sqrt(a)*((1.-0.5*ba)*s1 +
                            (1.+0.5*ba)*s2 +
-                           (ca - 0.25*ba*ba)*std::log( (1.-0.5*ba+s1)/(-1.-0.5*ba+s2) )
+                           (ca - 0.25*ba*ba)*std::log(log_term)
                            );
+}
+
+
+
+BoundingBox Edge3::loose_bounding_box () const
+{
+  // This might be a curved line through 2-space or 3-space, in which
+  // case the full bounding box can be larger than the bounding box of
+  // just the nodes.
+  Point pmin, pmax;
+
+  for (unsigned d=0; d<LIBMESH_DIM; ++d)
+    {
+      Real center = this->point(2)(d);
+      Real hd = std::max(std::abs(center - this->point(0)(d)),
+                         std::abs(center - this->point(1)(d)));
+
+      pmin(d) = center - hd;
+      pmax(d) = center + hd;
+    }
+
+  return BoundingBox(pmin, pmax);
 }
 
 
 
 dof_id_type Edge3::key () const
 {
-  return this->compute_key(this->node(2));
+  return this->compute_key(this->node_id(2));
 }
 
 

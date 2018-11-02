@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -66,6 +66,7 @@
 #include "libmesh/solver_configuration.h"
 #include "libmesh/petsc_linear_solver.h"
 #include "libmesh/petsc_macro.h"
+#include "libmesh/enum_solver_package.h"
 
 #define x_scaling 1.3
 
@@ -98,10 +99,10 @@ public:
   {
     PetscErrorCode ierr = 0;
     ierr = KSPSetType (_petsc_linear_solver.ksp(), const_cast<KSPType>(KSPCG));
-    libmesh_assert(ierr == 0);
+    LIBMESH_CHKERR(ierr);
 
     ierr = PCSetType (_petsc_linear_solver.pc(), const_cast<PCType>(PCBJACOBI));
-    libmesh_assert(ierr == 0);
+    LIBMESH_CHKERR(ierr);
   }
 
   // The linear solver object that we are configuring
@@ -165,17 +166,17 @@ public:
 
     const DofMap & dof_map = system.get_dof_map();
     FEType fe_type = dof_map.variable_type(u_var);
-    UniquePtr<FEBase> fe (FEBase::build(dim, fe_type));
+    std::unique_ptr<FEBase> fe (FEBase::build(dim, fe_type));
     QGauss qrule (dim, fe_type.default_quadrature_order());
     fe->attach_quadrature_rule (&qrule);
 
-    UniquePtr<FEBase> fe_face (FEBase::build(dim, fe_type));
+    std::unique_ptr<FEBase> fe_face (FEBase::build(dim, fe_type));
     QGauss qface(dim-1, fe_type.default_quadrature_order());
     fe_face->attach_quadrature_rule (&qface);
 
     const std::vector<Real> & JxW = fe->get_JxW();
-    const std::vector<std::vector<Real> > & phi = fe->get_phi();
-    const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+    const std::vector<std::vector<Real>> & phi = fe->get_phi();
+    const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
     DenseMatrix<Number> Ke;
     DenseSubMatrix<Number> Ke_var[3][3] =
@@ -193,15 +194,10 @@ public:
        DenseSubVector<Number>(Fe)};
 
     std::vector<dof_id_type> dof_indices;
-    std::vector< std::vector<dof_id_type> > dof_indices_var(3);
+    std::vector<std::vector<dof_id_type>> dof_indices_var(3);
 
-    MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-    const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-    for ( ; el != end_el; ++el)
+    for (const auto & elem : mesh.active_local_element_ptr_range())
       {
-        const Elem * elem = *el;
-
         dof_map.dof_indices (elem, dof_indices);
         for (unsigned int var=0; var<3; var++)
           dof_map.dof_indices (elem, dof_indices_var[var], var);
@@ -248,10 +244,10 @@ public:
         g_vec(1) = 0.;
         g_vec(2) = -1.;
         {
-          for (unsigned int side=0; side<elem->n_sides(); side++)
-            if (elem->neighbor(side) == libmesh_nullptr)
+          for (auto side : elem->side_index_range())
+            if (elem->neighbor_ptr(side) == nullptr)
               {
-                const std::vector<std::vector<Real> > & phi_face = fe_face->get_phi();
+                const std::vector<std::vector<Real>> & phi_face = fe_face->get_phi();
                 const std::vector<Real> & JxW_face = fe_face->get_JxW();
 
                 fe_face->reinit(elem, side);
@@ -288,12 +284,13 @@ public:
 
     const DofMap & dof_map = system.get_dof_map();
     FEType fe_type = dof_map.variable_type(u_var);
-    UniquePtr<FEBase> fe (FEBase::build(dim, fe_type));
+    std::unique_ptr<FEBase> fe (FEBase::build(dim, fe_type));
     QGauss qrule (dim, fe_type.default_quadrature_order());
     fe->attach_quadrature_rule (&qrule);
 
     const std::vector<Real> & JxW = fe->get_JxW();
-    const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+    const std::vector<std::vector<Real>> & phi = fe->get_phi();
+    const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
     // Also, get a reference to the ExplicitSystem
     ExplicitSystem & stress_system = es.get_system<ExplicitSystem>("StressSystem");
@@ -308,19 +305,12 @@ public:
     unsigned int vonMises_var = stress_system.variable_number ("vonMises");
 
     // Storage for the stress dof indices on each element
-    std::vector< std::vector<dof_id_type> > dof_indices_var(system.n_vars());
+    std::vector<std::vector<dof_id_type>> dof_indices_var(system.n_vars());
     std::vector<dof_id_type> stress_dof_indices_var;
+    std::vector<dof_id_type> vonmises_dof_indices_var;
 
-    // To store the stress tensor on each element
-    DenseMatrix<Number> elem_avg_stress_tensor(3, 3);
-
-    MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-    const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-    for ( ; el != end_el; ++el)
+    for (const auto & elem : mesh.active_local_element_ptr_range())
       {
-        const Elem * elem = *el;
-
         for (unsigned int var=0; var<3; var++)
           dof_map.dof_indices (elem, dof_indices_var[var], displacement_vars[var]);
 
@@ -328,68 +318,94 @@ public:
 
         fe->reinit (elem);
 
-        // clear the stress tensor
-        elem_avg_stress_tensor.resize(3, 3);
-
+        std::vector<DenseMatrix<Number>> stress_tensor_qp(qrule.n_points());
         for (unsigned int qp=0; qp<qrule.n_points(); qp++)
           {
-            DenseMatrix<Number> grad_u(3, 3);
+            stress_tensor_qp[qp].resize(3,3);
 
             // Row is variable u1, u2, or u3, column is x, y, or z
+            DenseMatrix<Number> grad_u(3,3);
             for (unsigned int var_i=0; var_i<3; var_i++)
               for (unsigned int var_j=0; var_j<3; var_j++)
                 for (unsigned int j=0; j<n_var_dofs; j++)
                   grad_u(var_i,var_j) += dphi[j][qp](var_j) * system.current_solution(dof_indices_var[var_i][j]);
 
-            DenseMatrix<Number> stress_tensor(3, 3);
-
-            for (unsigned int i=0; i<3; i++)
-              for (unsigned int j=0; j<3; j++)
+            for (unsigned int var_i=0; var_i<3; var_i++)
+              for (unsigned int var_j=0; var_j<3; var_j++)
                 for (unsigned int k=0; k<3; k++)
                   for (unsigned int l=0; l<3; l++)
-                    stress_tensor(i,j) += elasticity_tensor(i,j,k,l) * grad_u(k,l);
-
-            // stress_tensor now holds the stress at point qp.
-            // We want to plot the average stress on each element, hence
-            // we integrate stress_tensor
-            elem_avg_stress_tensor.add(JxW[qp], stress_tensor);
+                    stress_tensor_qp[qp](var_i,var_j) += elasticity_tensor(var_i,var_j,k,l) * grad_u(k,l);
           }
 
-        // Get the average stress per element by dividing by volume
-        elem_avg_stress_tensor.scale(1./elem->volume());
+        stress_dof_map.dof_indices (elem, vonmises_dof_indices_var, vonMises_var);
+        std::vector<DenseMatrix<Number>> elem_sigma_vec(vonmises_dof_indices_var.size());
+        for (std::size_t index=0; index<elem_sigma_vec.size(); index++)
+          elem_sigma_vec[index].resize(3,3);
 
-        // load elem_sigma data into stress_system
+        // Below we project each component of the stress tensor onto a L2_LAGRANGE discretization.
+        // Note that this gives a discontinuous stress plot on element boundaries, which is
+        // appropriate. We then also get the von Mises stress from the projected stress tensor.
         unsigned int stress_var_index = 0;
-        for (unsigned int i=0; i<3; i++)
-          for (unsigned int j=i; j<3; j++)
+        for (unsigned int var_i=0; var_i<3; var_i++)
+          for (unsigned int var_j=var_i; var_j<3; var_j++)
             {
               stress_dof_map.dof_indices (elem, stress_dof_indices_var, sigma_vars[stress_var_index]);
 
-              // We are using CONSTANT MONOMIAL basis functions, hence we only need to get
-              // one dof index per variable
-              dof_id_type dof_index = stress_dof_indices_var[0];
+              const unsigned int n_proj_dofs = stress_dof_indices_var.size();
 
-              if ((stress_system.solution->first_local_index() <= dof_index) &&
-                  (dof_index < stress_system.solution->last_local_index()))
-                stress_system.solution->set(dof_index, elem_avg_stress_tensor(i,j));
+              DenseMatrix<Real> Me(n_proj_dofs, n_proj_dofs);
+              for (unsigned int qp=0; qp<qrule.n_points(); qp++)
+                {
+                  for(unsigned int i=0; i<n_proj_dofs; i++)
+                    for(unsigned int j=0; j<n_proj_dofs; j++)
+                      {
+                        Me(i,j) += JxW[qp]*(phi[i][qp]*phi[j][qp]);
+                      }
+                }
+
+              DenseVector<Number> Fe(n_proj_dofs);
+              for (unsigned int qp=0; qp<qrule.n_points(); qp++)
+                for(unsigned int i=0; i<n_proj_dofs; i++)
+                  {
+                    Fe(i) += JxW[qp] * stress_tensor_qp[qp](var_i,var_j) * phi[i][qp];
+                  }
+
+              DenseVector<Number> projected_data;
+              Me.cholesky_solve(Fe, projected_data);
+
+              for(unsigned int index=0; index<n_proj_dofs; index++)
+                {
+                  dof_id_type dof_index = stress_dof_indices_var[index];
+                  if ((stress_system.solution->first_local_index() <= dof_index) &&
+                      (dof_index < stress_system.solution->last_local_index()))
+                    stress_system.solution->set(dof_index, projected_data(index));
+
+                  elem_sigma_vec[index](var_i,var_j) = projected_data(index);
+                }
 
               stress_var_index++;
             }
 
-        // Also, the von Mises stress
-        Number vonMises_value = std::sqrt(0.5*(pow(elem_avg_stress_tensor(0,0) - elem_avg_stress_tensor(1,1), 2.) +
-                                               pow(elem_avg_stress_tensor(1,1) - elem_avg_stress_tensor(2,2), 2.) +
-                                               pow(elem_avg_stress_tensor(2,2) - elem_avg_stress_tensor(0,0), 2.) +
-                                               6.*(pow(elem_avg_stress_tensor(0,1), 2.) +
-                                                   pow(elem_avg_stress_tensor(1,2), 2.) +
-                                                   pow(elem_avg_stress_tensor(2,0), 2.))));
+        for (std::size_t index=0; index<elem_sigma_vec.size(); index++)
+          {
+            elem_sigma_vec[index](1,0) = elem_sigma_vec[index](0,1);
+            elem_sigma_vec[index](2,0) = elem_sigma_vec[index](0,2);
+            elem_sigma_vec[index](2,1) = elem_sigma_vec[index](1,2);
 
-        stress_dof_map.dof_indices (elem, stress_dof_indices_var, vonMises_var);
-        dof_id_type dof_index = stress_dof_indices_var[0];
+            // Get the von Mises stress from the projected stress tensor
+            Number vonMises_value = std::sqrt(0.5*(pow(elem_sigma_vec[index](0,0) - elem_sigma_vec[index](1,1), 2.) +
+                                                   pow(elem_sigma_vec[index](1,1) - elem_sigma_vec[index](2,2), 2.) +
+                                                   pow(elem_sigma_vec[index](2,2) - elem_sigma_vec[index](0,0), 2.) +
+                                                   6.*(pow(elem_sigma_vec[index](0,1), 2.) +
+                                                       pow(elem_sigma_vec[index](1,2), 2.) +
+                                                       pow(elem_sigma_vec[index](2,0), 2.))));
 
-        if ((stress_system.solution->first_local_index() <= dof_index) &&
-            (dof_index < stress_system.solution->last_local_index()))
-          stress_system.solution->set(dof_index, vonMises_value);
+            dof_id_type dof_index = vonmises_dof_indices_var[index];
+
+            if ((stress_system.solution->first_local_index() <= dof_index) &&
+                (dof_index < stress_system.solution->last_local_index()))
+              stress_system.solution->set(dof_index, vonMises_value);
+          }
       }
 
     // Should call close and update when we set vector entries directly
@@ -405,6 +421,10 @@ int main (int argc, char ** argv)
   // Initialize libMesh and any dependent libraries
   LibMeshInit init (argc, argv);
 
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
+
   // Initialize the cantilever mesh
   const unsigned int dim = 3;
 
@@ -414,25 +434,22 @@ int main (int argc, char ** argv)
   // Create a 3D mesh distributed across the default MPI communicator.
   Mesh mesh(init.comm(), dim);
   MeshTools::Generation::build_cube (mesh,
-                                     40,
-                                     10,
-                                     5,
+                                     32,
+                                     8,
+                                     4,
                                      0., 1.*x_scaling,
                                      0., 0.3,
                                      0., 0.1,
                                      HEX8);
 
-
   // Print information about the mesh to the screen.
   mesh.print_info();
 
   // Let's add some node and edge boundary conditions
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-  for ( ; el != end_el; ++el)
+  // Each processor should know about each boundary condition it can
+  // see, so we loop over all elements, not just local elements.
+  for (const auto & elem : mesh.element_ptr_range())
     {
-      const Elem * elem = *el;
-
       unsigned int
         side_max_x = 0, side_min_y = 0,
         side_max_y = 0, side_max_z = 0;
@@ -441,7 +458,7 @@ int main (int argc, char ** argv)
         found_side_max_x = false, found_side_max_y = false,
         found_side_min_y = false, found_side_max_z = false;
 
-      for (unsigned int side=0; side<elem->n_sides(); side++)
+      for (auto side : elem->side_index_range())
         {
           if (mesh.get_boundary_info().has_boundary_id(elem, side, BOUNDARY_ID_MAX_X))
             {
@@ -472,18 +489,18 @@ int main (int argc, char ** argv)
       // BOUNDARY_ID_MAX_X, BOUNDARY_ID_MAX_Y, BOUNDARY_ID_MAX_Z
       // then let's set a node boundary condition
       if (found_side_max_x && found_side_max_y && found_side_max_z)
-        for (unsigned int n=0; n<elem->n_nodes(); n++)
+        for (auto n : elem->node_index_range())
           if (elem->is_node_on_side(n, side_max_x) &&
               elem->is_node_on_side(n, side_max_y) &&
               elem->is_node_on_side(n, side_max_z))
-            mesh.get_boundary_info().add_node(elem->get_node(n), NODE_BOUNDARY_ID);
+            mesh.get_boundary_info().add_node(elem->node_ptr(n), NODE_BOUNDARY_ID);
 
 
       // If elem has sides on boundaries
       // BOUNDARY_ID_MAX_X and BOUNDARY_ID_MIN_Y
       // then let's set an edge boundary condition
       if (found_side_max_x && found_side_min_y)
-        for (unsigned int e=0; e<elem->n_edges(); e++)
+        for (auto e : elem->edge_index_range())
           if (elem->is_edge_on_side(e, side_max_x) &&
               elem->is_edge_on_side(e, side_min_y))
             mesh.get_boundary_info().add_edge(elem, e, EDGE_BOUNDARY_ID);
@@ -500,7 +517,7 @@ int main (int argc, char ** argv)
 #ifdef LIBMESH_HAVE_PETSC
   // Attach a SolverConfiguration object to system.linear_solver
   PetscLinearSolver<Number> * petsc_linear_solver =
-    libmesh_cast_ptr<PetscLinearSolver<Number>*>(system.get_linear_solver());
+    cast_ptr<PetscLinearSolver<Number>*>(system.get_linear_solver());
   libmesh_assert(petsc_linear_solver);
   PetscSolverConfiguration petsc_solver_config(*petsc_linear_solver);
   petsc_linear_solver->set_solver_configuration(petsc_solver_config);
@@ -528,9 +545,10 @@ int main (int argc, char ** argv)
   // Create a ZeroFunction to initialize dirichlet_bc
   ZeroFunction<> zf;
 
-  DirichletBoundary dirichlet_bc(boundary_ids,
-                                 variables,
-                                 &zf);
+  // Most DirichletBoundary users will want to supply a "locally
+  // indexed" functor
+  DirichletBoundary dirichlet_bc(boundary_ids, variables, zf,
+                                 LOCAL_VARIABLE_ORDER);
 
   // We must add the Dirichlet boundary condition _before_
   // we call equation_systems.init()
@@ -540,13 +558,13 @@ int main (int argc, char ** argv)
   ExplicitSystem & stress_system =
     equation_systems.add_system<ExplicitSystem> ("StressSystem");
 
-  stress_system.add_variable("sigma_00", CONSTANT, MONOMIAL);
-  stress_system.add_variable("sigma_01", CONSTANT, MONOMIAL);
-  stress_system.add_variable("sigma_02", CONSTANT, MONOMIAL);
-  stress_system.add_variable("sigma_11", CONSTANT, MONOMIAL);
-  stress_system.add_variable("sigma_12", CONSTANT, MONOMIAL);
-  stress_system.add_variable("sigma_22", CONSTANT, MONOMIAL);
-  stress_system.add_variable("vonMises", CONSTANT, MONOMIAL);
+  stress_system.add_variable("sigma_00", FIRST, L2_LAGRANGE);
+  stress_system.add_variable("sigma_01", FIRST, L2_LAGRANGE);
+  stress_system.add_variable("sigma_02", FIRST, L2_LAGRANGE);
+  stress_system.add_variable("sigma_11", FIRST, L2_LAGRANGE);
+  stress_system.add_variable("sigma_12", FIRST, L2_LAGRANGE);
+  stress_system.add_variable("sigma_22", FIRST, L2_LAGRANGE);
+  stress_system.add_variable("vonMises", FIRST, L2_LAGRANGE);
 
   // Initialize the data structures for the equation system.
   equation_systems.init();
@@ -565,14 +583,7 @@ int main (int argc, char ** argv)
 
   // Use single precision in this case (reduces the size of the exodus file)
   ExodusII_IO exo_io(mesh, /*single_precision=*/true);
-
-  // First plot the displacement field using a nodal plot
-  std::set<std::string> system_names;
-  system_names.insert("Elasticity");
-  exo_io.write_equation_systems("displacement_and_stress.exo", equation_systems, &system_names);
-
-  // then append element-based discontinuous plots of the stresses
-  exo_io.write_element_data(equation_systems);
+  exo_io.write_discontinuous_exodusII("displacement_and_stress.exo", equation_systems);
 
 #endif // #ifdef LIBMESH_HAVE_EXODUS_API
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -17,8 +17,8 @@
 
 
 // Open the mesh named in command line arguments,
-// update ids of one or more of the following enties
-// as perscribed on the command line:
+// update ids of one or more of the following entries
+// as prescribed on the command line:
 // blocks, sidesets and nodesets
 
 #include <iostream>
@@ -29,8 +29,11 @@
 
 #ifdef LIBMESH_HAVE_EXODUS_API
 
+#include "libmesh/ignore_warnings.h"
 #include "exodusII.h"
 #include "exodusII_int.h"
+#include "libmesh/restore_warnings.h"
+
 #include "libmesh/getpot.h"
 
 #define EXODUS_DIM 0x8
@@ -54,21 +57,21 @@ int main(int argc, char ** argv)
   GetPot cl(argc, argv);
 
   // Command line parsing
-  if(!cl.search("--input"))
+  if (!cl.search("--input"))
     {
       std::cerr << "No --input argument found!" << std::endl;
       usage_error(argv[0]);
     }
   const char * meshname = cl.next("");
 
-  if(!cl.search("--oldid"))
+  if (!cl.search("--oldid"))
     {
       std::cerr << "No --oldid argument found!" << std::endl;
       usage_error(argv[0]);
     }
   long oldid = cl.next(0);
 
-  if(!cl.search("--newid"))
+  if (!cl.search("--newid"))
     {
       std::cerr << "No --newid argument found!" << std::endl;
       usage_error(argv[0]);
@@ -111,7 +114,7 @@ int main(int argc, char ** argv)
 
   for (unsigned char mask = 8; mask; mask/=2)
     {
-      // These are char *'s #defined in exodsuII_int.h
+      // These are char *'s #defined in exodusII_int.h
       switch (flags & mask)
         {
         case BLOCKS:
@@ -142,7 +145,7 @@ int main(int argc, char ** argv)
       status = nc_inq_dimlen (nc_id, dim_id, &dim_len);
       if (status != NC_NOERR) handle_error(status, "Error while inquiring about a dimension's length.");
 
-      if ( (flags & mask) != EXODUS_DIM)
+      if ((flags & mask) != EXODUS_DIM)
         {
           // Now get the variable values themselves
           std::vector<long> var_vals(dim_len);
@@ -222,7 +225,7 @@ int main(int, char **)
 
 void handle_error(int error, std::string message)
 {
-  std::cout << "Error " << error << " occured while working with the netCDF API" << std::endl;
+  std::cout << "Error " << error << " occurred while working with the netCDF API" << std::endl;
   std::cout << message << std::endl;
 
   exit(1);
@@ -248,7 +251,7 @@ void gen_random_string(std::string & s, const int len)
     "abcdefghijklmnopqrstuvwxyz";
 
   // Seed the random number generator with the current time
-  srand( static_cast<unsigned>(time(libmesh_nullptr)) );
+  srand( static_cast<unsigned>(time(nullptr)) );
 
   s.resize(len);
   for (int i = 0; i < len; ++i)

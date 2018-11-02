@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -65,13 +65,14 @@
 #include "libmesh/getpot.h"
 
 // This example will solve a linear transient system,
-// so we need to include the \p TransientLinearImplicitSystem definition.
+// so we need to include the TransientLinearImplicitSystem definition.
 #include "libmesh/transient_system.h"
 #include "libmesh/linear_implicit_system.h"
 #include "libmesh/vector_value.h"
 
 // The definition of a geometric element
 #include "libmesh/elem.h"
+#include "libmesh/enum_solver_package.h"
 
 // Bring in everything from the libMesh namespace
 using namespace libMesh;
@@ -158,26 +159,17 @@ int main (int argc, char ** argv)
   for (unsigned int i=0; i<2; i++)
     {
       MeshRefinement mesh_refinement(mesh);
-      MeshBase::element_iterator       elem_it  = mesh.elements_begin();
-      const MeshBase::element_iterator elem_end = mesh.elements_end();
-      for (; elem_it != elem_end; ++elem_it)
+      for (auto & elem : mesh.element_ptr_range())
         {
-          Elem * elem = *elem_it;
           if (elem->active())
             {
               if ((elem->id()%20)>8)
-                {
-                  elem->set_refinement_flag(Elem::REFINE);
-                }
+                elem->set_refinement_flag(Elem::REFINE);
               else
-                {
-                  elem->set_refinement_flag(Elem::DO_NOTHING);
-                }
+                elem->set_refinement_flag(Elem::DO_NOTHING);
             }
           else
-            {
-              elem->set_refinement_flag(Elem::INACTIVE);
-            }
+            elem->set_refinement_flag(Elem::INACTIVE);
         }
       mesh_refinement.refine_elements();
       equation_systems.reinit();
@@ -186,7 +178,7 @@ int main (int argc, char ** argv)
   // Prints information about the system to the screen.
   equation_systems.print_info();
 
-  // Before the assemblation of the matrix, we have to clear the two
+  // Before assembling the matrix, we have to clear the two
   // vectors that form the tensor matrix (since this is not performed
   // automatically).
   system.get_vector("v").init(system.n_dofs(), system.n_local_dofs());
@@ -241,6 +233,10 @@ int main (int argc, char ** argv)
 void assemble (EquationSystems & es,
                const std::string & system_name)
 {
+  // Ignore unused parameter warnings when !LIBMESH_ENABLE_AMR.
+  libmesh_ignore(es);
+  libmesh_ignore(system_name);
+
 #ifdef LIBMESH_ENABLE_AMR
   // It is a good idea to make sure we are assembling
   // the proper system.
@@ -261,14 +257,14 @@ void assemble (EquationSystems & es,
   FEType fe_type = system.variable_type(0);
 
   // Build a Finite Element object of the specified type.  Since the
-  // \p FEBase::build() member dynamically creates memory we will
-  // store the object as an \p UniquePtr<FEBase>.  This can be thought
+  // FEBase::build() member dynamically creates memory we will
+  // store the object as a std::unique_ptr<FEBase>.  This can be thought
   // of as a pointer that will clean up after itself.
-  UniquePtr<FEBase> fe      (FEBase::build(dim, fe_type));
-  UniquePtr<FEBase> fe_face (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe      (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe_face (FEBase::build(dim, fe_type));
 
   // A Gauss quadrature rule for numerical integration.
-  // Let the \p FEType object decide what order rule is appropriate.
+  // Let the FEType object decide what order rule is appropriate.
   QGauss qrule (dim,   fe_type.default_quadrature_order());
   QGauss qface (dim-1, fe_type.default_quadrature_order());
 
@@ -283,19 +279,19 @@ void assemble (EquationSystems & es,
   const std::vector<Real> & JxW_face = fe_face->get_JxW();
 
   // The element shape functions evaluated at the quadrature points.
-  const std::vector<std::vector<Real> > & phi = fe->get_phi();
-  const std::vector<std::vector<Real> > & psi = fe_face->get_phi();
+  const std::vector<std::vector<Real>> & phi = fe->get_phi();
+  const std::vector<std::vector<Real>> & psi = fe_face->get_phi();
 
   // The element shape function gradients evaluated at the quadrature
   // points.
-  const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+  const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
   // The XY locations of the quadrature points used for face integration
   //const std::vector<Point>& qface_points = fe_face->get_xyz();
 
-  // A reference to the \p DofMap object for this system.  The \p DofMap
+  // A reference to the DofMap object for this system.  The DofMap
   // object handles the index translation from node and element numbers
-  // to degree of freedom numbers.  We will talk more about the \p DofMap
+  // to degree of freedom numbers.  We will talk more about the DofMap
   // in future examples.
   const DofMap & dof_map = system.get_dof_map();
 
@@ -320,16 +316,9 @@ void assemble (EquationSystems & es,
   // live on the local processor. We will compute the element
   // matrix and right-hand-side contribution.  Since the mesh
   // will be refined we want to only consider the ACTIVE elements,
-  // hence we use a variant of the \p active_elem_iterator.
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-  for ( ; el != end_el; ++el)
+  // hence we use a variant of the active_elem_iterator.
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      // Store a pointer to the element we are currently
-      // working on.  This allows for nicer syntax later.
-      const Elem * elem = *el;
-
       // Get the degree of freedom indices for the
       // current element.  These define where in the global
       // matrix and right-hand-side this element will
@@ -348,12 +337,14 @@ void assemble (EquationSystems & es,
       // the last element.  Note that this will be the case if the
       // element type is different (i.e. the last element was a
       // triangle, now we are on a quadrilateral).
-      Ke.resize (dof_indices.size(),
-                 dof_indices.size());
+      const unsigned int n_dofs =
+        cast_int<unsigned int>(dof_indices.size());
 
-      Fe.resize (dof_indices.size());
-      Ve.resize (dof_indices.size());
-      We.resize (dof_indices.size());
+      Ke.resize (n_dofs, n_dofs);
+
+      Fe.resize (n_dofs);
+      Ve.resize (n_dofs);
+      We.resize (n_dofs);
 
       // Now we will build the element matrix and right-hand-side.
       // Constructing the RHS requires the solution and its
@@ -364,12 +355,12 @@ void assemble (EquationSystems & es,
       for (unsigned int qp=0; qp<qrule.n_points(); qp++)
         {
           // Now compute the element matrix and RHS contributions.
-          for (unsigned int i=0; i<phi.size(); i++)
+          for (unsigned int i=0; i<n_dofs; i++)
             {
               // The RHS contribution
               Fe(i) += JxW[qp]*phi[i][qp];
 
-              for (unsigned int j=0; j<phi.size(); j++)
+              for (unsigned int j=0; j<n_dofs; j++)
                 {
                   // The matrix contribution
                   Ke(i,j) += JxW[qp]*(
@@ -400,16 +391,16 @@ void assemble (EquationSystems & es,
         // The following loops over the sides of the element.
         // If the element has no neighbor on a side then that
         // side MUST live on a boundary of the domain.
-        for (unsigned int s=0; s<elem->n_sides(); s++)
-          if (elem->neighbor(s) == libmesh_nullptr)
+        for (auto s : elem->side_index_range())
+          if (elem->neighbor_ptr(s) == nullptr)
             {
               fe_face->reinit(elem, s);
 
               for (unsigned int qp=0; qp<qface.n_points(); qp++)
                 {
                   // Matrix contribution
-                  for (unsigned int i=0; i<psi.size(); i++)
-                    for (unsigned int j=0; j<psi.size(); j++)
+                  for (unsigned int i=0; i<n_dofs; i++)
+                    for (unsigned int j=0; j<n_dofs; j++)
                       Ke(i,j) += penalty*JxW_face[qp]*psi[i][qp]*psi[j][qp];
                 }
             }
@@ -422,12 +413,12 @@ void assemble (EquationSystems & es,
       // solution continuity, i.e. they are not really "free".  We need
       // to constrain those DOFs in terms of non-constrained DOFs to
       // ensure a continuous solution.  The
-      // \p DofMap::constrain_element_matrix_and_vector() method does
+      // DofMap::constrain_element_matrix_and_vector() method does
       // just that.
 
       // However, constraining both the sparse matrix (and right hand
       // side) plus the rank 1 matrix is tricky.  The dof_indices
-      // vector has to be backuped for that because the constraining
+      // vector has to be backed up for that because the constraining
       // functions modify it.
 
       std::vector<dof_id_type> dof_indices_backup(dof_indices);
@@ -437,15 +428,15 @@ void assemble (EquationSystems & es,
 
       // The element matrix and right-hand-side are now built
       // for this element.  Add them to the global matrix and
-      // right-hand-side vector.  The \p SparseMatrix::add_matrix()
-      // and \p NumericVector::add_vector() members do this for us.
+      // right-hand-side vector.  The SparseMatrix::add_matrix()
+      // and NumericVector::add_vector() members do this for us.
       system.matrix->add_matrix (Ke, dof_indices);
       system.get_matrix("Preconditioner").add_matrix (Ke, dof_indices);
       system.rhs->add_vector (Fe, dof_indices);
       system.get_vector("v").add_vector(Ve, dof_indices);
       system.get_vector("w").add_vector(We, dof_indices);
     }
-  // Finished computing the sytem matrix and right-hand side.
+  // Finished computing the system matrix and right-hand side.
 
   // Matrices and vectors must be closed manually.  This is necessary
   // because the matrix is not directly used as the system matrix (in

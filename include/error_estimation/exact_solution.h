@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -21,11 +21,20 @@
 
 // Local Includes
 #include "libmesh/libmesh_common.h" // for Number
+
+#ifdef LIBMESH_FORWARD_DECLARE_ENUMS
+namespace libMesh
+{
+enum FEMNormType : int;
+}
+#else
 #include "libmesh/enum_norm_type.h"
+#endif
 
 // C++ includes
 #include <map>
 #include <vector>
+#include <memory>
 
 namespace libMesh
 {
@@ -48,13 +57,13 @@ typedef VectorValue<Number> NumberVectorValue;
 typedef NumberVectorValue   Gradient;
 
 /**
- * This class handles the computation of the L2 and/or H1
- * error for the Systems in the EquationSystems object
- * which is passed to it.  Note that for it to be useful,
- * the user must attach at least one, and possibly two functions
- * which can compute the exact solution and its derivative
- * for any component of any system.  These are the exact_value
- * and exact_deriv functions below.
+ * This class handles the computation of the L2 and/or H1 error for
+ * the Systems in the EquationSystems object which is passed to it.
+ *
+ * \note For this to be useful, the user must attach at least one, and
+ * possibly two, functions which can compute the exact solution and
+ * its derivative for any component of any system.  These are the \p
+ * exact_value and \p exact_deriv functions below.
  *
  * \author Benjamin S. Kirk
  * \author John W. Peterson (modifications for libmesh)
@@ -73,10 +82,21 @@ public:
   ExactSolution (const EquationSystems & es);
 
   /**
-   * Destructor.
+   * The copy constructor and copy/move assignment operators are
+   * deleted.  This class has containers of unique_ptrs so it can't be
+   * default (shallow) copied, and it has a const reference so it
+   * can't be assigned to after creation.
    */
-  ~ExactSolution();
+  ExactSolution(const ExactSolution &) = delete;
+  ExactSolution & operator= (const ExactSolution &) = delete;
+  ExactSolution & operator= (ExactSolution &&) = delete;
 
+  /**
+   * Move constructor and destructor are defaulted out-of-line (in the
+   * C file) to play nicely with our forward declarations.
+   */
+  ExactSolution(ExactSolution &&);
+  ~ExactSolution();
 
   /**
    * Attach function similar to system.h which
@@ -102,10 +122,11 @@ public:
    * Attach an arbitrary function which computes the exact value of
    * the solution at any point.
    */
-  void attach_exact_value (Number fptr(const Point & p,
-                                       const Parameters & Parameters,
-                                       const std::string & sys_name,
-                                       const std::string & unknown_name));
+  typedef Number (*ValueFunctionPointer)(const Point & p,
+                                         const Parameters & Parameters,
+                                         const std::string & sys_name,
+                                         const std::string & unknown_name);
+  void attach_exact_value (ValueFunctionPointer fptr);
 
   /**
    * Clone and attach arbitrary functors which compute the exact
@@ -124,10 +145,11 @@ public:
    * Attach an arbitrary function which computes the exact gradient of
    * the solution at any point.
    */
-  void attach_exact_deriv (Gradient gptr(const Point & p,
-                                         const Parameters & parameters,
-                                         const std::string & sys_name,
-                                         const std::string & unknown_name));
+  typedef Gradient (*GradientFunctionPointer)(const Point & p,
+                                              const Parameters & parameters,
+                                              const std::string & sys_name,
+                                              const std::string & unknown_name);
+  void attach_exact_deriv (GradientFunctionPointer gptr);
 
   /**
    * Clone and attach arbitrary functors which compute the exact
@@ -146,10 +168,11 @@ public:
    * Attach an arbitrary function which computes the exact second
    * derivatives of the solution at any point.
    */
-  void attach_exact_hessian (Tensor hptr(const Point & p,
-                                         const Parameters & parameters,
-                                         const std::string & sys_name,
-                                         const std::string & unknown_name));
+  typedef Tensor (*HessianFunctionPointer)(const Point & p,
+                                           const Parameters & parameters,
+                                           const std::string & sys_name,
+                                           const std::string & unknown_name);
+  void attach_exact_hessian (HessianFunctionPointer hptr);
 
   /**
    * Increases or decreases the order of the quadrature rule used for numerical
@@ -169,75 +192,95 @@ public:
                      const std::string & unknown_name);
 
   /**
-   * This function returns the integrated L2 error for the system
-   * sys_name for the unknown unknown_name.  Note that no error computations
-   * are actually performed, you must call compute_error() for that.
+   * \returns The integrated L2 error for the system \p sys_name for the
+   * unknown \p unknown_name.
+   *
+   * \note No error computations are actually performed, you must call
+   * \p compute_error() for that.
    */
   Real l2_error(const std::string & sys_name,
                 const std::string & unknown_name);
 
   /**
-   * This function returns the integrated L1 error for the system
-   * sys_name for the unknown unknown_name.  Note that no error computations
-   * are actually performed, you must call compute_error() for that.
+   * \returns The integrated L1 error for the system \p sys_name for
+   * the unknown \p unknown_name.
+   *
+   * \note No error computations are actually performed, you must call
+   * \p compute_error() for that.
    */
   Real l1_error(const std::string & sys_name,
                 const std::string & unknown_name);
 
   /**
-   * This function returns the L_INF error for the system sys_name for
-   * the unknown unknown_name.  Note that no error computations are
-   * actually performed, you must call compute_error() for that.  Note
-   * also that the result (as for the other norms as well) is not
-   * exact, but an approximation based on the chosen quadrature rule:
-   * to compute it, we take the max of the absolute value of the error
+   * \returns The L_INF error for the system \p sys_name for
+   * the unknown \p unknown_name.
+   *
+   * \note No error computations are actually performed, you must call
+   * compute_error() for that.
+   *
+   * \note The result (as for the other norms as well) is not exact,
+   * but an approximation based on the chosen quadrature rule: to
+   * compute it, we take the max of the absolute value of the error
    * over all the quadrature points.
    */
   Real l_inf_error(const std::string & sys_name,
                    const std::string & unknown_name);
 
   /**
-   * This function computes and returns the H1 error for the system
-   * sys_name for the unknown unknown_name.  Note that no error computations
-   * are actually performed, you must call compute_error() for that.
+   * \returns The H1 error for the system \p sys_name for the unknown
+   * \p unknown_name.
+   *
+   * \note No error computations are actually performed, you must call
+   * \p compute_error() for that.
    */
   Real h1_error(const std::string & sys_name,
                 const std::string & unknown_name);
 
   /**
-   * This function computes and returns the HCurl error for the system
-   * sys_name for the unknown unknown_name.  Note that no error computations
-   * are actually performed, you must call compute_error() for that. This
-   * is only valid for vector-valued element. An error is thrown if requested
-   * for scalar-valued elements.
+   * \returns The H(curl) error for the system \p sys_name for the
+   * unknown \p unknown_name.
+   *
+   * \note No error computations are actually performed, you must call
+   * \p compute_error() for that.
+   *
+   * \note This is only valid for vector-valued elements. An error is
+   * thrown if requested for scalar-valued elements.
    */
   Real hcurl_error(const std::string & sys_name,
                    const std::string & unknown_name);
 
   /**
-   * This function computes and returns the HDiv error for the system
-   * sys_name for the unknown unknown_name.  Note that no error computations
-   * are actually performed, you must call compute_error() for that. This
-   * is only valid for vector-valued element. An error is thrown if requested
-   * for scalar-valued elements.
+   * \returns The H(div) error for the system \p sys_name for the
+   * unknown \p unknown_name.
+   *
+   * \note No error computations are actually performed, you must call
+   * \p compute_error() for that.
+   *
+   * \note This is only valid for vector-valued elements. An error is
+   * thrown if requested for scalar-valued elements.
    */
   Real hdiv_error(const std::string & sys_name,
                   const std::string & unknown_name);
 
   /**
-   * This function computes and returns the H2 error for the system
-   * sys_name for the unknown unknown_name.  Note that no error computations
-   * are actually performed, you must call compute_error() for that.
+   * \returns The H2 error for the system \p sys_name for the unknown
+   * \p unknown_name.
+   *
+   * \note No error computations are actually performed, you must call
+   * \p compute_error() for that.
    */
   Real h2_error(const std::string & sys_name,
                 const std::string & unknown_name);
 
   /**
-   * This function returns the error in the requested norm for the system
-   * sys_name for the unknown unknown_name.  Note that no error computations
-   * are actually performed, you must call compute_error() for that.
-   * Note also that the result is not exact, but an approximation
-   * based on the chosen quadrature rule.
+   * \returns The error in the requested norm for the system \p
+   * sys_name for the unknown \p unknown_name.
+   *
+   * \note No error computations are actually performed, you must call
+   * \p compute_error() for that.
+   *
+   * \note The result is not exact, but an approximation based on the
+   * chosen quadrature rule.
    */
   Real error_norm(const std::string & sys_name,
                   const std::string & unknown_name,
@@ -256,9 +299,10 @@ private:
                       std::vector<Real> & error_vals);
 
   /**
-   * This function is responsible for checking the validity of
-   * the sys_name and unknown_name inputs, and returning a
-   * reference to the proper vector for storing the values.
+   * This function is responsible for checking the validity of the \p
+   * sys_name and \p unknown_name inputs.
+   *
+   * \returns A reference to the proper vector for storing the values.
    */
   std::vector<Real> & _check_inputs(const std::string & sys_name,
                                     const std::string & unknown_name);
@@ -267,19 +311,19 @@ private:
    * User-provided functors which compute the exact value of the
    * solution for each system.
    */
-  std::vector<FunctionBase<Number> *> _exact_values;
+  std::vector<std::unique_ptr<FunctionBase<Number>>> _exact_values;
 
   /**
    * User-provided functors which compute the exact derivative of the
    * solution for each system.
    */
-  std::vector<FunctionBase<Gradient> *> _exact_derivs;
+  std::vector<std::unique_ptr<FunctionBase<Gradient>>> _exact_derivs;
 
   /**
    * User-provided functors which compute the exact hessians of the
    * solution for each system.
    */
-  std::vector<FunctionBase<Tensor> *> _exact_hessians;
+  std::vector<std::unique_ptr<FunctionBase<Tensor>>> _exact_hessians;
 
   /**
    * Data structure which stores the errors:
@@ -289,7 +333,7 @@ private:
    * The name of the unknown is
    * the key for the map.
    */
-  typedef std::map<std::string, std::vector<Real> > SystemErrorMap;
+  typedef std::map<std::string, std::vector<Real>> SystemErrorMap;
 
   /**
    * A map of SystemErrorMaps, which contains entries

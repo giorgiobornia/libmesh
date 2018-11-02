@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -17,16 +17,17 @@
 
 
 
-// Local includes
 #include "libmesh/libmesh_config.h"
+
 #ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
 
-
-// Local includes cont'd
+// Local includes
 #include "libmesh/face_inf_quad6.h"
 #include "libmesh/edge_edge3.h"
 #include "libmesh/side.h"
 #include "libmesh/edge_inf_edge2.h"
+#include "libmesh/enum_io_package.h"
+#include "libmesh/enum_order.h"
 
 namespace libMesh
 {
@@ -36,11 +37,16 @@ namespace libMesh
 
 // ------------------------------------------------------------
 // InfQuad6 class static member initializations
-const unsigned int InfQuad6::side_nodes_map[3][3] =
+const int InfQuad6::num_nodes;
+const int InfQuad6::num_sides;
+const int InfQuad6::num_children;
+const int InfQuad6::nodes_per_side;
+
+const unsigned int InfQuad6::side_nodes_map[InfQuad6::num_sides][InfQuad6::nodes_per_side] =
   {
-    {0, 1, 4}, // Side 0
-    {1, 3},    // Side 1
-    {0, 2}     // Side 2
+    {0, 1, 4},  // Side 0
+    {1, 3, 99}, // Side 1
+    {0, 2, 99}  // Side 2
   };
 
 
@@ -70,15 +76,22 @@ bool InfQuad6::is_node_on_side(const unsigned int n,
                                const unsigned int s) const
 {
   libmesh_assert_less (s, n_sides());
-  for (unsigned int i = 0; i != 3; ++i)
-    if (side_nodes_map[s][i] == n)
-      return true;
-  return false;
+  return std::find(std::begin(side_nodes_map[s]),
+                   std::end(side_nodes_map[s]),
+                   n) != std::end(side_nodes_map[s]);
+}
+
+std::vector<unsigned>
+InfQuad6::nodes_on_side(const unsigned int s) const
+{
+  libmesh_assert_less(s, n_sides());
+  auto trim = (s == 0) ? 0 : 1;
+  return {std::begin(side_nodes_map[s]), std::end(side_nodes_map[s]) - trim};
 }
 
 #ifdef LIBMESH_ENABLE_AMR
 
-const float InfQuad6::_embedding_matrix[2][6][6] =
+const float InfQuad6::_embedding_matrix[InfQuad6::num_children][InfQuad6::num_nodes][InfQuad6::num_nodes] =
   {
     // embedding matrix for child 0
     {
@@ -108,6 +121,13 @@ const float InfQuad6::_embedding_matrix[2][6][6] =
 
 
 
+Order InfQuad6::default_order() const
+{
+  return SECOND;
+}
+
+
+
 dof_id_type InfQuad6::key (const unsigned int s) const
 {
   libmesh_assert_less (s, this->n_sides());
@@ -116,7 +136,7 @@ dof_id_type InfQuad6::key (const unsigned int s) const
     {
       // Edge3 side
     case 0:
-      return this->compute_key (this->node(4));
+      return this->compute_key (this->node_id(4));
 
       // InfEdge
     case 1:
@@ -126,15 +146,23 @@ dof_id_type InfQuad6::key (const unsigned int s) const
     default:
       libmesh_error_msg("Invalid side s = " << s);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0;
 }
 
 
 
-UniquePtr<Elem> InfQuad6::build_side (const unsigned int i,
-                                      bool proxy) const
+unsigned int InfQuad6::which_node_am_i(unsigned int side,
+                                       unsigned int side_node) const
+{
+  libmesh_assert_less (side, this->n_sides());
+  libmesh_assert ((side == 0 && side_node < InfQuad6::nodes_per_side) || (side_node < 2));
+
+  return InfQuad6::side_nodes_map[side][side_node];
+}
+
+
+
+std::unique_ptr<Elem> InfQuad6::build_side_ptr (const unsigned int i,
+                                                bool proxy)
 {
   // libmesh_assert_less (i, this->n_sides());
 
@@ -143,11 +171,11 @@ UniquePtr<Elem> InfQuad6::build_side (const unsigned int i,
       switch (i)
         {
         case 0:
-          return UniquePtr<Elem>(new Side<Edge3,InfQuad6>(this,i));
+          return libmesh_make_unique<Side<Edge3,InfQuad6>>(this,i);
 
         case 1:
         case 2:
-          return UniquePtr<Elem>(new Side<InfEdge2,InfQuad6>(this,i));
+          return libmesh_make_unique<Side<InfEdge2,InfQuad6>>(this,i);
 
         default:
           libmesh_error_msg("Invalid side i = " << i);
@@ -156,14 +184,14 @@ UniquePtr<Elem> InfQuad6::build_side (const unsigned int i,
 
   else
     {
-      // Create NULL pointer to be initialized, returned later.
-      Elem * edge = libmesh_nullptr;
+      // Return value
+      std::unique_ptr<Elem> edge;
 
       switch (i)
         {
         case 0:
           {
-            edge = new Edge3;
+            edge = libmesh_make_unique<Edge3>();
             break;
           }
 
@@ -171,7 +199,7 @@ UniquePtr<Elem> InfQuad6::build_side (const unsigned int i,
         case 1:
         case 2:
           {
-            edge = new InfEdge2;
+            edge = libmesh_make_unique<InfEdge2>();
             break;
           }
 
@@ -183,13 +211,10 @@ UniquePtr<Elem> InfQuad6::build_side (const unsigned int i,
 
       // Set the nodes
       for (unsigned n=0; n<edge->n_nodes(); ++n)
-        edge->set_node(n) = this->get_node(InfQuad6::side_nodes_map[i][n]);
+        edge->set_node(n) = this->node_ptr(InfQuad6::side_nodes_map[i][n]);
 
-      return UniquePtr<Elem>(edge);
+      return edge;
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return UniquePtr<Elem>();
 }
 
 
@@ -212,19 +237,19 @@ void InfQuad6::connectivity(const unsigned int sf,
           {
           case 0:
             // linear sub-quad 0
-            conn[0] = this->node(0)+1;
-            conn[1] = this->node(4)+1;
-            conn[2] = this->node(5)+1;
-            conn[3] = this->node(2)+1;
+            conn[0] = this->node_id(0)+1;
+            conn[1] = this->node_id(4)+1;
+            conn[2] = this->node_id(5)+1;
+            conn[3] = this->node_id(2)+1;
 
             return;
 
           case 1:
             // linear sub-quad 1
-            conn[0] = this->node(4)+1;
-            conn[1] = this->node(1)+1;
-            conn[2] = this->node(3)+1;
-            conn[3] = this->node(5)+1;
+            conn[0] = this->node_id(4)+1;
+            conn[1] = this->node_id(1)+1;
+            conn[2] = this->node_id(3)+1;
+            conn[3] = this->node_id(5)+1;
 
             return;
 

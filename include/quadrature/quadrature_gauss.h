@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -23,65 +23,69 @@
 // Local includes
 #include "libmesh/quadrature.h"
 
-// C++ includes
-
 namespace libMesh
 {
 
 /**
- * This class implemenets specific orders of Gauss quadrature.
- * Gauss quadrature rules of Order \p p have the property of
- * integrating polynomials of degree \p p exactly.
+ * This class implements specific orders of Gauss quadrature.  The
+ * rules of Order \p p are capable of integrating polynomials of
+ * degree \p p exactly.
  *
  * \author Benjamin Kirk
  * \author John W. Peterson
  * \date 2003
+ * \brief Implements 1, 2, and 3D "Gaussian" quadrature rules.
  */
 class QGauss : public QBase
 {
 public:
 
   /**
-   * Constructor.  Declares the order of the quadrature rule.
+   * Constructor.  Declares the order of the quadrature rule.  We
+   * explicitly call the \p init function in 1D since the other
+   * tensor-product rules require this one.
+   *
+   * \note The element type, EDGE2, will not be used internally,
+   * however if we called the function with INVALID_ELEM it would try
+   * to be smart and return, thinking it had already done the work.
    */
-  QGauss (const unsigned int _dim,
-          const Order _order=INVALID_ORDER) :
-    QBase(_dim, _order)
+  QGauss (unsigned int dim,
+          Order order=INVALID_ORDER) :
+    QBase(dim, order)
   {
-    // explicitly call the init function in 1D since the
-    // other tensor-product rules require this one.
-    // note that EDGE will not be used internally, however
-    // if we called the function with INVALID_ELEM it would try to
-    // be smart and return, thinking it had already done the work.
-    if (_dim == 1)
+    if (dim == 1)
       init(EDGE2);
   }
 
   /**
-   * Destructor.
+   * Copy/move ctor, copy/move assignment operator, and destructor are
+   * all explicitly defaulted for this simple class.
    */
-  ~QGauss() {}
+  QGauss (const QGauss &) = default;
+  QGauss (QGauss &&) = default;
+  QGauss & operator= (const QGauss &) = default;
+  QGauss & operator= (QGauss &&) = default;
+  virtual ~QGauss() = default;
 
   /**
-   * @returns \p QGAUSS
+   * \returns \p QGAUSS.
    */
-  virtual QuadratureType type() const libmesh_override { return QGAUSS; }
+  virtual QuadratureType type() const override;
 
 
 private:
 
   virtual void init_1D (const ElemType _type=INVALID_ELEM,
-                        unsigned int p_level=0) libmesh_override;
+                        unsigned int p_level=0) override;
   virtual void init_2D (const ElemType _type=INVALID_ELEM,
-                        unsigned int p_level=0) libmesh_override;
+                        unsigned int p_level=0) override;
   virtual void init_3D (const ElemType _type=INVALID_ELEM,
-                        unsigned int p_level=0) libmesh_override;
+                        unsigned int p_level=0) override;
 
   /**
-   * The Dunavant rule is for triangles.  It takes permutation points and
-   * weights in a specific format as input and fills the pre-sized _points and _weights
-   * vectors.  This function is only used internally by the TRI geometric
-   * elements.
+   * The Dunavant rules are for triangles. This function takes
+   * permutation points and weights in a specific format as input and
+   * fills the _points and _weights vectors.
    */
   void dunavant_rule(const Real rule_data[][4],
                      const unsigned int n_pts);
@@ -93,10 +97,9 @@ private:
                       const unsigned int n_wts);
 
   /**
-   * The Keast rule is for tets.  It takes permutation points and weights
-   * in a specific format as input and fills the pre-sized _points and _weights
-   * vectors.  This function is only used internally by the TET geometric
-   * elements.
+   * The Keast rules are for tets. This function takes permutation
+   * points and weights in a specific format as input and fills the
+   * _points and _weights vectors.
    */
   void keast_rule(const Real rule_data[][4],
                   const unsigned int n_pts);

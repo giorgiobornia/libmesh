@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -21,12 +21,13 @@
 #define LIBMESH_UNSTEADY_SOLVER_H
 
 // Local includes
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
 #include "libmesh/libmesh_common.h"
 #include "libmesh/numeric_vector.h"
 #include "libmesh/time_solver.h"
 
 // C++ includes
+#include <memory>
 
 namespace libMesh
 {
@@ -64,27 +65,27 @@ public:
    * The initialization function.  This method is used to
    * initialize internal data structures before a simulation begins.
    */
-  virtual void init () libmesh_override;
+  virtual void init () override;
 
   /**
    * The data initialization function.  This method is used to
    * initialize internal data structures after the underlying System
    * has been initialized
    */
-  virtual void init_data () libmesh_override;
+  virtual void init_data () override;
 
   /**
    * The reinitialization function.  This method is used to
    * resize internal data vectors after a mesh change.
    */
-  virtual void reinit () libmesh_override;
+  virtual void reinit () override;
 
   /**
    * This method solves for the solution at the next timestep.
    * Usually we will only need to solve one (non)linear system per timestep,
    * but more complex subclasses may override this.
    */
-  virtual void solve () libmesh_override;
+  virtual void solve () override;
 
   /**
    * This method advances the solution to the next timestep, after a
@@ -92,20 +93,20 @@ public:
    * UnsteadySolver::solve(), but adaptive mesh refinement and/or adaptive
    * time step selection may require some solve() steps to be repeated.
    */
-  virtual void advance_timestep () libmesh_override;
+  virtual void advance_timestep () override;
 
   /**
    * This method advances the adjoint solution to the previous
    * timestep, after an adjoint_solve() has been performed.  This will
    * be done before every UnsteadySolver::adjoint_solve().
    */
-  virtual void adjoint_advance_timestep () libmesh_override;
+  virtual void adjoint_advance_timestep () override;
 
   /**
    * This method retrieves all the stored solutions at the current
    * system.time
    */
-  virtual void retrieve_timestep () libmesh_override;
+  virtual void retrieve_timestep () override;
 
   /**
    * This method should return the expected convergence order of the
@@ -117,14 +118,16 @@ public:
   virtual Real error_order () const = 0;
 
   /**
-   * Returns the maximum order of time derivatives for which the
-   * UnsteadySolver subclass is capable of handling. E.g. EulerSolver
-   * will have time_order = 1 and NewmarkSolver will have time_order = 2
+   * \returns The maximum order of time derivatives for which the
+   * UnsteadySolver subclass is capable of handling.
+   *
+   * For example, EulerSolver will have \p time_order() = 1 and
+   * NewmarkSolver will have \p time_order() = 2.
    */
   virtual unsigned int time_order () const = 0;
 
   /**
-   * @returns the old nonlinear solution for the specified global
+   * \returns The old nonlinear solution for the specified global
    * DOF.
    */
   Number old_nonlinear_solution (const dof_id_type global_dof_number) const;
@@ -132,23 +135,23 @@ public:
   /**
    * Serial vector of _system.get_vector("_old_nonlinear_solution")
    */
-  UniquePtr<NumericVector<Number> > old_local_nonlinear_solution;
+  std::unique_ptr<NumericVector<Number>> old_local_nonlinear_solution;
 
   /**
    * Computes the size of ||u^{n+1} - u^{n}|| in some norm.
    *
-   * Note that, while you can always call this function, its
+   * \note While you can always call this function, its
    * result may or may not be very meaningful.  For example, if
    * you call this function right after calling advance_timestep()
    * then you'll get a result of zero since old_nonlinear_solution
    * is set equal to nonlinear_solution in this function.
    */
-  virtual Real du(const SystemNorm & norm) const libmesh_override;
+  virtual Real du(const SystemNorm & norm) const override;
 
   /**
    * This is not a steady-state solver.
    */
-  virtual bool is_steady() const libmesh_override { return false; }
+  virtual bool is_steady() const override { return false; }
 
 protected:
 

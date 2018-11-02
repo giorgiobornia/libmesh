@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -21,18 +21,18 @@
 #define LIBMESH_HP_COARSENTEST_H
 
 // Local Includes
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
 #include "libmesh/dense_matrix.h"
 #include "libmesh/dense_vector.h"
 #include "libmesh/hp_selector.h"
 #include "libmesh/id_types.h"
 #include "libmesh/libmesh_common.h"
-
-#include "libmesh/fe.h"         // MipsPro requires fe.h and quadrature.h in order to
-#include "libmesh/quadrature.h" //  delete UniquePtrs<> upon destruction
+#include "libmesh/fe.h"         // MipsPro requires fe.h and quadrature.h
+#include "libmesh/quadrature.h" // Required for inline deletion std::unique_ptrs<> in destructor
 
 // C++ includes
 #include <vector>
+#include <memory>
 
 #ifdef LIBMESH_ENABLE_AMR
 
@@ -78,10 +78,19 @@ public:
   }
 
   /**
-   * Destructor.
+   * This class cannot be (default) copy constructed/assigned because
+   * it has unique_ptr members. Explicitly deleting these functions is
+   * the best way to document this fact.
    */
-  virtual ~HPCoarsenTest() {}
+  HPCoarsenTest (const HPCoarsenTest &) = delete;
+  HPCoarsenTest & operator= (const HPCoarsenTest &) = delete;
 
+  /**
+   * Defaulted move ctor, move assignment operator, and destructor.
+   */
+  HPCoarsenTest (HPCoarsenTest &&) = default;
+  HPCoarsenTest & operator= (HPCoarsenTest &&) = default;
+  virtual ~HPCoarsenTest() = default;
 
   /**
    * This pure virtual function must be redefined
@@ -89,7 +98,7 @@ public:
    * refinement and potentially change the desired
    * refinement type.
    */
-  virtual void select_refinement (System & system) libmesh_override;
+  virtual void select_refinement (System & system) override;
 
   /**
    * Because the coarsening test seems to always choose p refinement, we're
@@ -117,14 +126,14 @@ protected:
   /**
    * The finite element objects for fine and coarse elements
    */
-  UniquePtr<FEBase> fe, fe_coarse;
+  std::unique_ptr<FEBase> fe, fe_coarse;
 
   /**
    * The shape functions and their derivatives
    */
-  const std::vector<std::vector<Real> > * phi, * phi_coarse;
-  const std::vector<std::vector<RealGradient> > * dphi, * dphi_coarse;
-  const std::vector<std::vector<RealTensor> > * d2phi, * d2phi_coarse;
+  const std::vector<std::vector<Real>> * phi, * phi_coarse;
+  const std::vector<std::vector<RealGradient>> * dphi, * dphi_coarse;
+  const std::vector<std::vector<RealTensor>> * d2phi, * d2phi_coarse;
 
   /**
    * Mapping jacobians
@@ -140,7 +149,7 @@ protected:
   /**
    * The quadrature rule for the fine element
    */
-  UniquePtr<QBase> qrule;
+  std::unique_ptr<QBase> qrule;
 
   /**
    * Linear system for projections

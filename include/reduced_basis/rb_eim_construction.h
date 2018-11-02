@@ -77,13 +77,13 @@ public:
   /**
    * Clear this object.
    */
-  virtual void clear() libmesh_override;
+  virtual void clear() override;
 
   /**
    * Read parameters in from file and set up this system
    * accordingly.
    */
-  virtual void process_parameters_file (const std::string & parameters_filename) libmesh_override;
+  virtual void process_parameters_file (const std::string & parameters_filename) override;
 
   /**
    * Specify which type of "best fit" we use to guide the EIM
@@ -94,19 +94,19 @@ public:
   /**
    * Print out info that describes the current setup of this RBConstruction.
    */
-  virtual void print_info() libmesh_override;
+  virtual void print_info() override;
 
   /**
    * Initialize this system so that we can perform
    * the Construction stage of the RB method.
    */
   virtual void initialize_rb_construction(bool skip_matrix_assembly=false,
-                                          bool skip_vector_assembly=false) libmesh_override;
+                                          bool skip_vector_assembly=false) override;
 
   /**
    * Override train_reduced_basis to first initialize _parametrized_functions_in_training_set.
    */
-  virtual Real train_reduced_basis(const bool resize_rb_eval_data=true) libmesh_override;
+  virtual Real train_reduced_basis(const bool resize_rb_eval_data=true) override;
 
   /**
    * Load the truth representation of the parametrized function
@@ -116,14 +116,14 @@ public:
    * If \p plot_solution > 0 the solution will be plotted
    * to an output file.
    */
-  virtual Real truth_solve(int plot_solution) libmesh_override;
+  virtual Real truth_solve(int plot_solution) override;
 
   /**
    * We compute the best fit of parametrized_function
    * into the EIM space and then evaluate the error
    * in the norm defined by inner_product_matrix.
    *
-   * @return the error in the best fit
+   * \returns The error in the best fit
    */
   virtual Real compute_best_fit_error();
 
@@ -151,6 +151,17 @@ public:
                                 Point p);
 
   /**
+   * Set a point locator tolerance to be used in this class's MeshFunction, and
+   * other operations that require a PointLocator.
+   */
+  void set_point_locator_tol(Real point_locator_tol);
+
+  /**
+   * \returns The point locator tolerance.
+   */
+  Real get_point_locator_tol() const;
+
+  /**
    * Build a vector of ElemAssembly objects that accesses the basis
    * functions stored in this RBEIMConstruction object. This is useful
    * for performing the Offline stage of the Reduced Basis method where
@@ -159,9 +170,9 @@ public:
   virtual void initialize_eim_assembly_objects();
 
   /**
-   * @return the vector of assembly objects that point to this RBEIMConstruction.
+   * \returns The vector of assembly objects that point to this RBEIMConstruction.
    */
-  std::vector<ElemAssembly *> get_eim_assembly_objects();
+  std::vector<std::unique_ptr<ElemAssembly>> & get_eim_assembly_objects();
 
   /**
    * Build an element assembly object that will access basis function
@@ -169,40 +180,42 @@ public:
    * This is pure virtual, override in subclasses to specify the appropriate
    * ElemAssembly object.
    */
-  virtual UniquePtr<ElemAssembly> build_eim_assembly(unsigned int bf_index) = 0;
+  virtual std::unique_ptr<ElemAssembly> build_eim_assembly(unsigned int bf_index) = 0;
 
   /**
    * Get the ExplicitSystem associated with this system.
    */
-  ExplicitSystem& get_explicit_system();
+  ExplicitSystem & get_explicit_system();
 
   /**
    * Load the i^th RB function into the RBConstruction
    * solution vector.
    * Override to load the basis function into the ExplicitSystem.
    */
-  virtual void load_basis_function(unsigned int i) libmesh_override;
+  virtual void load_basis_function(unsigned int i) override;
 
   /**
    * Load the RB solution from the most recent solve with rb_eval
    * into this system's solution vector.
    * Override to load the solution into the ExplicitSystem.
    */
-  virtual void load_rb_solution() libmesh_override;
+  virtual void load_rb_solution() override;
 
   /**
    * Load \p source into the subvector of \p dest corresponding
    * to var \p var.
    */
-  void set_explicit_sys_subvector(
-    NumericVector<Number>& dest, unsigned int var, NumericVector<Number>& source);
+  void set_explicit_sys_subvector(NumericVector<Number>& dest,
+                                  unsigned int var,
+                                  NumericVector<Number>& source);
 
   /**
    * Load the subvector of \p localized_source corresponding to variable \p var into
    * \p dest. We require localized_source to be localized before we call this method.
    */
-  void get_explicit_sys_subvector(
-    NumericVector<Number>& dest, unsigned int var, NumericVector<Number>& localized_source);
+  void get_explicit_sys_subvector(NumericVector<Number>& dest,
+                                  unsigned int var,
+                                  NumericVector<Number>& localized_source);
 
   /**
    * Set up the index map between the implicit and explicit systems.
@@ -214,7 +227,7 @@ public:
    * in _parametrized_functions_in_training_set. \p pathname
    * provides the path to where the plot data will be saved.
    */
-  void plot_parametrized_functions_in_training_set(const std::string& pathname);
+  void plot_parametrized_functions_in_training_set(const std::string & pathname);
 
   //----------- PUBLIC DATA MEMBERS -----------//
 
@@ -224,7 +237,7 @@ public:
    * a) projection: Find the best fit in the inner product
    * b) eim: Use empirical interpolation to find a "best fit"
    *
-   * @return the error associated with the "best fit" in the
+   * \returns The error associated with the "best fit" in the
    * norm induced by inner_product_matrix.
    */
   BEST_FIT_TYPE best_fit_type_flag;
@@ -234,38 +247,32 @@ protected:
   /**
    * Override to initialize the coupling matrix to decouple variables in this system.
    */
-  virtual void init_data() libmesh_override;
+  virtual void init_data() override;
 
   /**
-   * Add a new basis function to the RB space. Overload
+   * Add a new basis function to the RB space. Override
    * to enrich with the EIM basis functions.
    */
-  virtual void enrich_RB_space() libmesh_override;
+  virtual void enrich_RB_space() override;
 
   /**
    * Update the system after enriching the RB space; this calls
    * a series of functions to update the system properly.
    */
-  virtual void update_system() libmesh_override;
+  virtual void update_system() override;
 
   /**
    * Compute the reduced basis matrices for the current basis.
-   * Overload to update the inner product matrix that
+   * Override to update the inner product matrix that
    * is used to compute the best fit to parametrized_function.
    */
-  virtual void update_RB_system_matrices() libmesh_override;
+  virtual void update_RB_system_matrices() override;
 
   /**
-   * Overload to return the best fit error. This function is used in
+   * Override to return the best fit error. This function is used in
    * the Greedy algorithm to select the next parameter.
    */
-  virtual Real get_RB_error_bound() libmesh_override;
-
-  /**
-   * Function that indicates when to terminate the Greedy
-   * basis training. Overload in subclasses to specialize.
-   */
-  virtual bool greedy_termination_test(Real training_greedy_error, int count) libmesh_override;
+  virtual Real get_RB_error_bound() override;
 
   /**
    * Loop over the training set and compute the parametrized function for each
@@ -283,28 +290,20 @@ protected:
    * The libMesh vectors storing the finite element coefficients
    * of the RB basis functions.
    */
-  std::vector< NumericVector<Number> * > _parametrized_functions_in_training_set;
+  std::vector<std::unique_ptr<NumericVector<Number>>> _parametrized_functions_in_training_set;
 
 private:
 
   /**
    * A mesh function to interpolate on the mesh.
    */
-  MeshFunction * _mesh_function;
-
-  /**
-   * This flag indicates that we're in the process of
-   * performing one extra Greedy step in order to compute
-   * the data needed for the EIM a posteriori error bound
-   * in the case that we use all of our basis functions.
-   */
-  bool _performing_extra_greedy_step;
+  std::unique_ptr<MeshFunction> _mesh_function;
 
   /**
    * We also need an extra vector in which we can store a ghosted
    * copy of the vector that we wish to use MeshFunction on.
    */
-  UniquePtr< NumericVector<Number> > _ghosted_meshfunction_vector;
+  std::unique_ptr<NumericVector<Number>> _ghosted_meshfunction_vector;
 
   /**
    * We initialize RBEIMConstruction so that it has an "empty" RBAssemblyExpansion,
@@ -316,7 +315,7 @@ private:
    * The vector of assembly objects that are created to point to
    * this RBEIMConstruction.
    */
-  std::vector<ElemAssembly *> _rb_eim_assembly_objects;
+  std::vector<std::unique_ptr<ElemAssembly>> _rb_eim_assembly_objects;
 
   /**
    * We use an ExplicitSystem to store the EIM basis functions.
@@ -330,14 +329,18 @@ private:
   /**
    * The index map between the explicit system and the implicit system.
    */
-  std::vector< std::vector<dof_id_type> > _dof_map_between_systems;
+  std::vector<std::vector<dof_id_type>> _dof_map_between_systems;
 
   /**
    * This vector is used to store inner_product_matrix * basis_function[i] for each i,
    * since we frequently use this data.
    */
-  std::vector< NumericVector<Number>* > _matrix_times_bfs;
+  std::vector<std::unique_ptr<NumericVector<Number>>> _matrix_times_bfs;
 
+  /**
+   * The point locator tolerance.
+   */
+  Real _point_locator_tol;
 };
 
 } // namespace libMesh

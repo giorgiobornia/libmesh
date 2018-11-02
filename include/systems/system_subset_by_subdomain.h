@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -108,7 +108,7 @@ public:
      * Method that decides whether a given subdomain id is included in
      * the subset or nor.
      */
-    virtual bool operator() (const subdomain_id_type & subdomain_id) const libmesh_override;
+    virtual bool operator() (const subdomain_id_type & subdomain_id) const override;
 
   protected:
     /**
@@ -121,25 +121,25 @@ public:
    * Constructor.  The subset will consist of those dofs which are
    * associated to at least one mesh element that has a subdomain id
    * contained in the \p subdomain_selection.  If \p var_nums is not a
-   * \p NULL pointer, dofs that are associated to a variable number
+   * \p nullptr, dofs that are associated to a variable number
    * that is not contained in \p var_nums will not contain to the
    * subset, no matter what elements they belong to.
    */
   SystemSubsetBySubdomain (const System & system,
                            const SubdomainSelection & subdomain_selection,
-                           const std::set<unsigned int> * const var_nums = libmesh_nullptr);
+                           const std::set<unsigned int> * const var_nums = nullptr);
 
   /**
    * Constructor.  The subset will consist of those dofs which are
    * associated to at least one mesh element that has a subdomain id
    * contained in the set \p subdomain_ids.  If \p var_nums is not a
-   * \p NULL pointer, dofs that are associated to a variable number
+   * \p nullptr, dofs that are associated to a variable number
    * that is not contained in \p var_nums will not contain to the
    * subset, no matter what elements they belong to.
    */
   SystemSubsetBySubdomain (const System & system,
                            const std::set<subdomain_id_type> & subdomain_ids,
-                           const std::set<unsigned int> * const var_nums = libmesh_nullptr);
+                           const std::set<unsigned int> * const var_nums = nullptr);
 
   /**
    * Destructor.
@@ -147,11 +147,12 @@ public:
   virtual ~SystemSubsetBySubdomain ();
 
   /**
-   * Method that returns the actual set of dofs that the subset
-   * consists of.  The result will contain local dofs on each
-   * processor only and will not contain duplictates.
+   * \returns The actual set of dofs that the subset consists of.
+   *
+   * The result will contain local dofs on each processor only and
+   * will not contain duplicates.
    */
-  virtual const std::vector<unsigned int> & dof_ids () const libmesh_override;
+  virtual const std::vector<unsigned int> & dof_ids () const override;
 
   /**
    * Initializes the class.  Will be called by the constructors.  Can
@@ -175,14 +176,14 @@ protected:
 
   /**
    * Sets \p _var_nums to either a copy of \p var_nums or, if that is
-   * \p NULL, a set of all variable numbers that occur in the system.
+   * \p nullptr, a set of all variable numbers that occur in the system.
    */
   void set_var_nums (const std::set<unsigned int> * const var_nums);
 
   /**
    * The set of all variable numbers that are contained in the subset.
    * This will be set by the constructor to either a copy of its \p
-   * var_nums argument or, if that is \p NULL, a set of all variable
+   * var_nums argument or, if that is \p nullptr, a set of all variable
    * numbers that occur in the system.
    */
   std::set<unsigned int> _var_nums;

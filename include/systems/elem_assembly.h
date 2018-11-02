@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -19,6 +19,7 @@
 #define LIBMESH_ELEM_ASSEMBLY_H
 
 #include "libmesh/reference_counted_object.h"
+#include "libmesh/dense_matrix.h"
 
 namespace libMesh
 {
@@ -42,7 +43,8 @@ public:
    * Constructor.  Initializes required
    * data structures.
    */
-  ElemAssembly () {}
+  ElemAssembly ()
+  {}
 
   /**
    * Destructor.
@@ -60,17 +62,21 @@ public:
   virtual void boundary_assembly(FEMContext &) { }
 
   /**
-   * Get values to add to the RHS vector based on \p node.
-   * This allows one to impose point loads, for example.
+   * Get values to add to the matrix or rhs vector based on \p node.
+   * This allows one to impose point loads or springs, for example.
    */
   virtual void
-  get_nodal_rhs_values(std::map<numeric_index_type, Number> & values,
-                       const System &,
-                       const Node &)
+  get_nodal_values(std::vector<dof_id_type>& ,
+                   DenseMatrix<Number>& ,
+                   DenseVector<Number>& ,
+                   const System & ,
+                   const Node &)
   {
-    // By default, just clear the values map
-    values.clear();
+    // Do nothing by default
   }
+
+protected:
+
 };
 
 }

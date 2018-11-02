@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -39,6 +39,9 @@
 #include "libmesh/mesh_generation.h"
 #include "libmesh/mesh_refinement.h"
 #include "libmesh/uniform_refinement_estimator.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
+#include "libmesh/enum_solver_package.h"
+#include "libmesh/enum_norm_type.h"
 
 // The systems and solvers we may use
 #include "naviersystem.h"
@@ -54,6 +57,10 @@ int main (int argc, char ** argv)
 {
   // Initialize libMesh.
   LibMeshInit init (argc, argv);
+
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
 
   // This example fails without at least double precision FP
 #ifdef LIBMESH_DEFAULT_SINGLE_PRECISION
@@ -108,7 +115,7 @@ int main (int argc, char ** argv)
 
   // Use the MeshTools::Generation mesh generator to create a uniform
   // grid on the square [-1,1]^D.  We instruct the mesh generator
-  // to build a mesh of 8x8 \p Quad9 elements in 2D, or \p Hex27
+  // to build a mesh of 8x8 Quad9 elements in 2D, or Hex27
   // elements in 3D.  Building these higher-order elements allows
   // us to use higher-order approximation, as in example 3.
   if (dim == 2)
@@ -142,12 +149,10 @@ int main (int argc, char ** argv)
 
   // Solve this as a time-dependent or steady system
   if (transient)
-    system.time_solver =
-      UniquePtr<TimeSolver>(new EulerSolver(system));
+    system.time_solver = libmesh_make_unique<EulerSolver>(system);
   else
     {
-      system.time_solver =
-        UniquePtr<TimeSolver>(new SteadySolver(system));
+      system.time_solver = libmesh_make_unique<SteadySolver>(system);
       libmesh_assert_equal_to (n_timesteps, 1);
     }
 
@@ -200,7 +205,7 @@ int main (int argc, char ** argv)
 
           ErrorVector error;
 
-          UniquePtr<ErrorEstimator> error_estimator;
+          std::unique_ptr<ErrorEstimator> error_estimator;
 
           // To solve to a tolerance in this problem we
           // need a better estimator than Kelly

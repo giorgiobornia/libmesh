@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -83,7 +83,7 @@ void MeshfreeInterpolation::add_field_data (const std::vector<std::string> & fie
       if (_names.size() != field_names.size())
         libmesh_error_msg("ERROR:  when adding field data to an existing list the \nvariable list must be the same!");
 
-      for (unsigned int v=0; v<_names.size(); v++)
+      for (std::size_t v=0; v<_names.size(); v++)
         if (_names[v] != field_names[v])
           libmesh_error_msg("ERROR:  when adding field data to an existing list the \nvariable list must be the same!");
     }
@@ -138,12 +138,10 @@ void MeshfreeInterpolation::gather_remote_data ()
   // This function must be run on all processors at once
   parallel_object_only();
 
-  START_LOG ("gather_remote_data()", "MeshfreeInterpolation");
+  LOG_SCOPE ("gather_remote_data()", "MeshfreeInterpolation");
 
   this->comm().allgather(_src_pts);
   this->comm().allgather(_src_vals);
-
-  STOP_LOG  ("gather_remote_data()", "MeshfreeInterpolation");
 
 #endif // LIBMESH_HAVE_MPI
 }
@@ -157,19 +155,17 @@ void InverseDistanceInterpolation<KDDim>::construct_kd_tree ()
 {
 #ifdef LIBMESH_HAVE_NANOFLANN
 
-  START_LOG ("construct_kd_tree()", "InverseDistanceInterpolation<>");
+  LOG_SCOPE ("construct_kd_tree()", "InverseDistanceInterpolation<>");
 
   // Initialize underlying KD tree
-  if (_kd_tree.get() == libmesh_nullptr)
+  if (_kd_tree.get() == nullptr)
     _kd_tree.reset (new kd_tree_t (KDDim,
                                    _point_list_adaptor,
                                    nanoflann::KDTreeSingleIndexAdaptorParams(10 /* max leaf */)));
 
-  libmesh_assert (_kd_tree.get() != libmesh_nullptr);
+  libmesh_assert (_kd_tree.get() != nullptr);
 
   _kd_tree->buildIndex();
-
-  STOP_LOG ("construct_kd_tree()", "InverseDistanceInterpolation<>");
 #endif
 }
 
@@ -181,7 +177,7 @@ void InverseDistanceInterpolation<KDDim>::clear()
 #ifdef LIBMESH_HAVE_NANOFLANN
   // Delete the KD Tree and start fresh
   if (_kd_tree.get())
-    _kd_tree.reset (libmesh_nullptr);
+    _kd_tree.reset (nullptr);
 #endif
 
   // Call  base class clear method
@@ -199,11 +195,11 @@ void InverseDistanceInterpolation<KDDim>::interpolate_field_data (const std::vec
 
   // forcibly initialize, if needed
 #ifdef LIBMESH_HAVE_NANOFLANN
-  if (_kd_tree.get() == libmesh_nullptr)
+  if (_kd_tree.get() == nullptr)
     const_cast<InverseDistanceInterpolation<KDDim> *>(this)->construct_kd_tree();
 #endif
 
-  START_LOG ("interpolate_field_data()", "InverseDistanceInterpolation<>");
+  LOG_SCOPE ("interpolate_field_data()", "InverseDistanceInterpolation<>");
 
   libmesh_assert_equal_to (field_names.size(), this->n_field_variables());
 
@@ -212,7 +208,7 @@ void InverseDistanceInterpolation<KDDim>::interpolate_field_data (const std::vec
   if (_names.size() != field_names.size())
     libmesh_error_msg("ERROR:  when adding field data to an existing list the \nvariable list must be the same!");
 
-  for (unsigned int v=0; v<_names.size(); v++)
+  for (std::size_t v=0; v<_names.size(); v++)
     if (_names[v] != field_names[v])
       libmesh_error_msg("ERROR:  when adding field data to an existing list the \nvariable list must be the same!");
 
@@ -227,10 +223,8 @@ void InverseDistanceInterpolation<KDDim>::interpolate_field_data (const std::vec
     std::vector<size_t> ret_index(num_results);
     std::vector<Real>   ret_dist_sqr(num_results);
 
-    for (std::vector<Point>::const_iterator tgt_it=tgt_pts.begin();
-         tgt_it != tgt_pts.end(); ++tgt_it)
+    for (const auto & tgt : tgt_pts)
       {
-        const Point & tgt(*tgt_it);
         const Real query_pt[] = { tgt(0), tgt(1), tgt(2) };
 
         _kd_tree->knnSearch(&query_pt[0], num_results, &ret_index[0], &ret_dist_sqr[0]);
@@ -251,12 +245,9 @@ void InverseDistanceInterpolation<KDDim>::interpolate_field_data (const std::vec
   }
 #else
 
-  libmesh_error_msg("ERROR:  This functionality requires the library to be configured\n" \
-                    << "with nanoflann KD-Tree approximate nearest neighbor support!");
+  libmesh_error_msg("ERROR: This functionality requires the library to be configured with nanoflann support!");
 
 #endif
-
-  STOP_LOG ("interpolate_field_data()", "InverseDistanceInterpolation<>");
 }
 
 template <unsigned int KDDim>
@@ -266,7 +257,7 @@ void InverseDistanceInterpolation<KDDim>::interpolate (const Point              
                                                        std::vector<Number>::iterator & out_it) const
 {
   // We explicitly assume that the input source points are sorted from closest to
-  // farthests.  assert that assumption in DEBUG mode.
+  // farthest.  assert that assumption in DEBUG mode.
 #ifdef DEBUG
   if (!src_dist_sqr.empty())
     {

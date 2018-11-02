@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -16,13 +16,13 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-// C++ includes
-
 // Local includes
 #include "libmesh/side.h"
 #include "libmesh/cell_hex20.h"
 #include "libmesh/edge_edge3.h"
 #include "libmesh/face_quad8.h"
+#include "libmesh/enum_io_package.h"
+#include "libmesh/enum_order.h"
 
 namespace libMesh
 {
@@ -31,8 +31,14 @@ namespace libMesh
 
 // ------------------------------------------------------------
 // Hex20 class static member initializations
+const int Hex20::num_nodes;
+const int Hex20::num_sides;
+const int Hex20::num_edges;
+const int Hex20::num_children;
+const int Hex20::nodes_per_side;
+const int Hex20::nodes_per_edge;
 
-const unsigned int Hex20::side_nodes_map[6][8] =
+const unsigned int Hex20::side_nodes_map[Hex20::num_sides][Hex20::nodes_per_side] =
   {
     {0, 3, 2, 1, 11, 10,  9,  8}, // Side 0
     {0, 1, 5, 4,  8, 13, 16, 12}, // Side 1
@@ -42,20 +48,20 @@ const unsigned int Hex20::side_nodes_map[6][8] =
     {4, 5, 6, 7, 16, 17, 18, 19}  // Side 5
   };
 
-const unsigned int Hex20::edge_nodes_map[12][3] =
+const unsigned int Hex20::edge_nodes_map[Hex20::num_edges][Hex20::nodes_per_edge] =
   {
-    {0, 1, 8},  // Side 0
-    {1, 2, 9},  // Side 1
-    {2, 3, 10}, // Side 2
-    {0, 3, 11}, // Side 3
-    {0, 4, 12}, // Side 4
-    {1, 5, 13}, // Side 5
-    {2, 6, 14}, // Side 6
-    {3, 7, 15}, // Side 7
-    {4, 5, 16}, // Side 8
-    {5, 6, 17}, // Side 9
-    {6, 7, 18}, // Side 10
-    {4, 7, 19}  // Side 11
+    {0, 1, 8},  // Edge 0
+    {1, 2, 9},  // Edge 1
+    {2, 3, 10}, // Edge 2
+    {0, 3, 11}, // Edge 3
+    {0, 4, 12}, // Edge 4
+    {1, 5, 13}, // Edge 5
+    {2, 6, 14}, // Edge 6
+    {3, 7, 15}, // Edge 7
+    {4, 5, 16}, // Edge 8
+    {5, 6, 17}, // Edge 9
+    {6, 7, 18}, // Edge 10
+    {4, 7, 19}  // Edge 11
   };
 
 
@@ -86,20 +92,25 @@ bool Hex20::is_node_on_side(const unsigned int n,
                             const unsigned int s) const
 {
   libmesh_assert_less (s, n_sides());
-  for (unsigned int i = 0; i != 8; ++i)
-    if (side_nodes_map[s][i] == n)
-      return true;
-  return false;
+  return std::find(std::begin(side_nodes_map[s]),
+                   std::end(side_nodes_map[s]),
+                   n) != std::end(side_nodes_map[s]);
+}
+
+std::vector<unsigned>
+Hex20::nodes_on_side(const unsigned int s) const
+{
+  libmesh_assert_less(s, n_sides());
+  return {std::begin(side_nodes_map[s]), std::end(side_nodes_map[s])};
 }
 
 bool Hex20::is_node_on_edge(const unsigned int n,
                             const unsigned int e) const
 {
   libmesh_assert_less (e, n_edges());
-  for (unsigned int i = 0; i != 3; ++i)
-    if (edge_nodes_map[e][i] == n)
-      return true;
-  return false;
+  return std::find(std::begin(edge_nodes_map[e]),
+                   std::end(edge_nodes_map[e]),
+                   n) != std::end(edge_nodes_map[e]);
 }
 
 
@@ -142,36 +153,51 @@ bool Hex20::has_affine_map() const
 
 
 
-UniquePtr<Elem> Hex20::build_side (const unsigned int i,
-                                   bool proxy ) const
+Order Hex20::default_order() const
 {
-  libmesh_assert_less (i, this->n_sides());
-
-  if (proxy)
-    return UniquePtr<Elem>(new Side<Quad8,Hex20>(this,i));
-
-  else
-    {
-      Elem * face = new Quad8;
-      face->subdomain_id() = this->subdomain_id();
-
-      for (unsigned n=0; n<face->n_nodes(); ++n)
-        face->set_node(n) = this->get_node(Hex20::side_nodes_map[i][n]);
-
-      return UniquePtr<Elem>(face);
-    }
-
-  libmesh_error_msg("We'll never get here!");
-  return UniquePtr<Elem>();
+  return SECOND;
 }
 
 
 
-UniquePtr<Elem> Hex20::build_edge (const unsigned int i) const
+std::unique_ptr<Elem> Hex20::build_side_ptr (const unsigned int i,
+                                             bool proxy )
+{
+  libmesh_assert_less (i, this->n_sides());
+
+  if (proxy)
+    return libmesh_make_unique<Side<Quad8,Hex20>>(this,i);
+
+  else
+    {
+      std::unique_ptr<Elem> face = libmesh_make_unique<Quad8>();
+      face->subdomain_id() = this->subdomain_id();
+
+      for (unsigned n=0; n<face->n_nodes(); ++n)
+        face->set_node(n) = this->node_ptr(Hex20::side_nodes_map[i][n]);
+
+      return face;
+    }
+}
+
+
+
+unsigned int Hex20::which_node_am_i(unsigned int side,
+                                    unsigned int side_node) const
+{
+  libmesh_assert_less (side, this->n_sides());
+  libmesh_assert_less (side_node, Hex20::nodes_per_side);
+
+  return Hex20::side_nodes_map[side][side_node];
+}
+
+
+
+std::unique_ptr<Elem> Hex20::build_edge_ptr (const unsigned int i)
 {
   libmesh_assert_less (i, this->n_edges());
 
-  return UniquePtr<Elem>(new SideEdge<Edge3,Hex20>(this,i));
+  return libmesh_make_unique<SideEdge<Edge3,Hex20>>(this,i);
 }
 
 
@@ -193,14 +219,14 @@ void Hex20::connectivity(const unsigned int sc,
           {
           case 0:
             conn.resize(8);
-            conn[0] = this->node(0)+1;
-            conn[1] = this->node(1)+1;
-            conn[2] = this->node(2)+1;
-            conn[3] = this->node(3)+1;
-            conn[4] = this->node(4)+1;
-            conn[5] = this->node(5)+1;
-            conn[6] = this->node(6)+1;
-            conn[7] = this->node(7)+1;
+            conn[0] = this->node_id(0)+1;
+            conn[1] = this->node_id(1)+1;
+            conn[2] = this->node_id(2)+1;
+            conn[3] = this->node_id(3)+1;
+            conn[4] = this->node_id(4)+1;
+            conn[5] = this->node_id(5)+1;
+            conn[6] = this->node_id(6)+1;
+            conn[7] = this->node_id(7)+1;
 
             return;
 
@@ -215,26 +241,26 @@ void Hex20::connectivity(const unsigned int sc,
           {
           case 0:
             conn.resize(20);
-            conn[0] = this->node(0);
-            conn[1] = this->node(1);
-            conn[2] = this->node(2);
-            conn[3] = this->node(3);
-            conn[4] = this->node(4);
-            conn[5] = this->node(5);
-            conn[6] = this->node(6);
-            conn[7] = this->node(7);
-            conn[8] = this->node(8);
-            conn[9] = this->node(9);
-            conn[10] = this->node(10);
-            conn[11] = this->node(11);
-            conn[12] = this->node(16);
-            conn[13] = this->node(17);
-            conn[14] = this->node(18);
-            conn[15] = this->node(19);
-            conn[16] = this->node(12);
-            conn[17] = this->node(13);
-            conn[18] = this->node(14);
-            conn[19] = this->node(15);
+            conn[0] = this->node_id(0);
+            conn[1] = this->node_id(1);
+            conn[2] = this->node_id(2);
+            conn[3] = this->node_id(3);
+            conn[4] = this->node_id(4);
+            conn[5] = this->node_id(5);
+            conn[6] = this->node_id(6);
+            conn[7] = this->node_id(7);
+            conn[8] = this->node_id(8);
+            conn[9] = this->node_id(9);
+            conn[10] = this->node_id(10);
+            conn[11] = this->node_id(11);
+            conn[12] = this->node_id(16);
+            conn[13] = this->node_id(17);
+            conn[14] = this->node_id(18);
+            conn[15] = this->node_id(19);
+            conn[16] = this->node_id(12);
+            conn[17] = this->node_id(13);
+            conn[18] = this->node_id(14);
+            conn[19] = this->node_id(15);
             return;
 
           default:
@@ -439,7 +465,7 @@ Real Hex20::volume () const
 
 #ifdef LIBMESH_ENABLE_AMR
 
-const float Hex20::_embedding_matrix[8][20][20] =
+const float Hex20::_embedding_matrix[Hex20::num_children][Hex20::num_nodes][Hex20::num_nodes] =
   {
     // embedding matrix for child 0
     {

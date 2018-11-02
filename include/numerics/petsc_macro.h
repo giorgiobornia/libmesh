@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -58,7 +58,10 @@
 #define EXTERN_C_FOR_PETSC_END
 
 // Petsc include files
+// Wrapped to avoid triggering our more paranoid warnings
+#include <libmesh/ignore_warnings.h>
 #include <petsc.h>
+#include <libmesh/restore_warnings.h>
 
 #if PETSC_RELEASE_LESS_THAN(3,1,1)
 typedef PetscTruth PetscBool;
@@ -84,6 +87,13 @@ typedef PetscTruth PetscBool;
 #  define LibMeshPCDestroy(x)          PCDestroy(x)
 #endif
 
+// Once PETSc-3.11.0 is released, "&& PETSC_VERSION_RELEASE" should be removed
+#if PETSC_VERSION_LESS_THAN(3,11,0) && PETSC_VERSION_RELEASE
+#  define LibMeshVecScatterCreate(xin,ix,yin,iy,newctx)  VecScatterCreate(xin,ix,yin,iy,newctx)
+#else
+#  define LibMeshVecScatterCreate(xin,ix,yin,iy,newctx)  VecScatterCreateWithData(xin,ix,yin,iy,newctx)
+#endif
+
 #if PETSC_RELEASE_LESS_THAN(3,1,1)
 typedef enum { PETSC_COPY_VALUES, PETSC_OWN_POINTER, PETSC_USE_POINTER} PetscCopyMode;
 #  define ISCreateLibMesh(comm,n,idx,mode,is)           \
@@ -94,6 +104,13 @@ typedef enum { PETSC_COPY_VALUES, PETSC_OWN_POINTER, PETSC_USE_POINTER} PetscCop
       : ISCreateGeneral((comm),(n),(idx),(is))))
 #else
 #  define ISCreateLibMesh(comm,n,idx,mode,is) ISCreateGeneral((comm),(n),(idx),(mode),(is))
+#endif
+
+// As of release 3.8.0, MatGetSubMatrix was renamed to MatCreateSubMatrix.
+#if PETSC_RELEASE_LESS_THAN(3,8,0)
+# define LibMeshCreateSubMatrix MatGetSubMatrix
+#else
+# define LibMeshCreateSubMatrix MatCreateSubMatrix
 #endif
 
 #else // LIBMESH_HAVE_PETSC

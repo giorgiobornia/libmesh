@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -37,7 +37,7 @@
 
 // libMesh includes
 #include "libmesh/libmesh.h"
-#include "libmesh/serial_mesh.h"
+#include "libmesh/replicated_mesh.h"
 #include "libmesh/mesh_generation.h"
 #include "libmesh/linear_implicit_system.h"
 #include "libmesh/equation_systems.h"
@@ -58,11 +58,12 @@
 #include "libmesh/error_vector.h"
 #include "libmesh/kelly_error_estimator.h"
 #include "libmesh/mesh_refinement.h"
+#include "libmesh/enum_solver_package.h"
 
 using namespace libMesh;
 
-bool compare_elements(const SerialMesh & mesh1,
-                      const SerialMesh & mesh2);
+bool compare_elements(const ReplicatedMesh & mesh1,
+                      const ReplicatedMesh & mesh2);
 void assemble_poisson(EquationSystems & es,
                       const std::string & system_name);
 void assemble_and_solve(MeshBase &,
@@ -72,6 +73,10 @@ int main (int argc, char ** argv)
 {
   START_LOG("Initialize and create cubes", "main");
   LibMeshInit init (argc, argv);
+
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
 
   // Create a GetPot object to parse the command line
   GetPot command_line (argc, argv);
@@ -104,14 +109,14 @@ int main (int argc, char ** argv)
     ps = command_line.next(ps);
 
   // Generate eight meshes that will be stitched
-  SerialMesh mesh (init.comm());
-  SerialMesh mesh1(init.comm());
-  SerialMesh mesh2(init.comm());
-  SerialMesh mesh3(init.comm());
-  SerialMesh mesh4(init.comm());
-  SerialMesh mesh5(init.comm());
-  SerialMesh mesh6(init.comm());
-  SerialMesh mesh7(init.comm());
+  ReplicatedMesh mesh (init.comm());
+  ReplicatedMesh mesh1(init.comm());
+  ReplicatedMesh mesh2(init.comm());
+  ReplicatedMesh mesh3(init.comm());
+  ReplicatedMesh mesh4(init.comm());
+  ReplicatedMesh mesh5(init.comm());
+  ReplicatedMesh mesh6(init.comm());
+  ReplicatedMesh mesh7(init.comm());
   MeshTools::Generation::build_cube (mesh, ps, ps, ps, -1,    0,    0,  1,  0, 1, HEX8);
   MeshTools::Generation::build_cube (mesh1, ps, ps, ps,    0,  1,    0,  1,  0, 1, HEX8);
   MeshTools::Generation::build_cube (mesh2, ps, ps, ps, -1,    0, -1,    0,  0, 1, HEX8);
@@ -122,7 +127,7 @@ int main (int argc, char ** argv)
   MeshTools::Generation::build_cube (mesh7, ps, ps, ps,    0,  1, -1,    0, -1, 0, HEX8);
 
   // Generate a single unstitched reference mesh
-  SerialMesh nostitch_mesh(init.comm());
+  ReplicatedMesh nostitch_mesh(init.comm());
   MeshTools::Generation::build_cube (nostitch_mesh, ps*2, ps*2, ps*2, -1, 1, -1, 1, -1, 1, HEX8);
   STOP_LOG("Initialize and create cubes", "main");
 
@@ -188,9 +193,11 @@ void assemble_and_solve(MeshBase & mesh,
   variables[0] = u_var;
 
   ZeroFunction<> zf;
-  DirichletBoundary dirichlet_bc(boundary_ids,
-                                 variables,
-                                 &zf);
+
+  // Most DirichletBoundary users will want to supply a "locally
+  // indexed" functor
+  DirichletBoundary dirichlet_bc(boundary_ids, variables, zf,
+                                 LOCAL_VARIABLE_ORDER);
   system.get_dof_map().add_dirichlet_boundary(dirichlet_bc);
 
   equation_systems.init();
@@ -234,7 +241,7 @@ void assemble_and_solve(MeshBase & mesh,
 }
 
 void assemble_poisson(EquationSystems & es,
-                      const std::string & system_name)
+                      const std::string & libmesh_dbg_var(system_name))
 {
   libmesh_assert_equal_to (system_name, "Poisson");
 
@@ -245,29 +252,24 @@ void assemble_poisson(EquationSystems & es,
   const DofMap & dof_map = system.get_dof_map();
 
   FEType fe_type = dof_map.variable_type(0);
-  UniquePtr<FEBase> fe (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe (FEBase::build(dim, fe_type));
   QGauss qrule (dim, FIFTH);
   fe->attach_quadrature_rule (&qrule);
-  UniquePtr<FEBase> fe_face (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe_face (FEBase::build(dim, fe_type));
   QGauss qface(dim-1, FIFTH);
   fe_face->attach_quadrature_rule (&qface);
 
   const std::vector<Real> & JxW = fe->get_JxW();
-  const std::vector<std::vector<Real> > & phi = fe->get_phi();
-  const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+  const std::vector<std::vector<Real>> & phi = fe->get_phi();
+  const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
   DenseMatrix<Number> Ke;
   DenseVector<Number> Fe;
 
   std::vector<dof_id_type> dof_indices;
 
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-  for ( ; el != end_el; ++el)
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      const Elem * elem = *el;
-
       dof_map.dof_indices (elem, dof_indices);
 
       fe->reinit (elem);
@@ -279,10 +281,10 @@ void assemble_poisson(EquationSystems & es,
 
       for (unsigned int qp=0; qp<qrule.n_points(); qp++)
         {
-          for (unsigned int i=0; i<phi.size(); i++)
+          for (std::size_t i=0; i<phi.size(); i++)
             {
               Fe(i) += JxW[qp]*phi[i][qp];
-              for (unsigned int j=0; j<phi.size(); j++)
+              for (std::size_t j=0; j<phi.size(); j++)
                 Ke(i,j) += JxW[qp]*(dphi[i][qp]*dphi[j][qp]);
             }
         }

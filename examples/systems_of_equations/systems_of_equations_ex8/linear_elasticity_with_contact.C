@@ -5,6 +5,7 @@
 #include <iostream>
 #include <algorithm>
 #include <cmath>
+#include <unordered_set>
 
 // Various include files needed for the mesh & solver functionality.
 #include "libmesh/libmesh.h"
@@ -21,7 +22,7 @@
 #include "libmesh/fe_interface.h"
 #include "libmesh/fe_compute_data.h"
 #include "libmesh/petsc_matrix.h"
-#include LIBMESH_INCLUDE_UNORDERED_SET
+#include "libmesh/edge_edge2.h"
 
 // The nonlinear solver and system we will be using
 #include "libmesh/nonlinear_solver.h"
@@ -32,14 +33,8 @@ using namespace libMesh;
 LinearElasticityWithContact::LinearElasticityWithContact (NonlinearImplicitSystem & sys_in,
                                                           Real contact_penalty_in) :
   _sys(sys_in),
-  _augment_sparsity(_sys),
   _contact_penalty(contact_penalty_in)
 {
-}
-
-AugmentSparsityOnContact & LinearElasticityWithContact::get_augment_sparsity()
-{
-  return _augment_sparsity;
 }
 
 void LinearElasticityWithContact::set_contact_penalty(Real contact_penalty_in)
@@ -77,32 +72,28 @@ void LinearElasticityWithContact::move_mesh (MeshBase & input_mesh,
                                              const NumericVector<Number> & input_solution)
 {
   // Maintain a set of node ids that we've encountered.
-  LIBMESH_BEST_UNORDERED_SET<dof_id_type> encountered_node_ids;
+  std::unordered_set<dof_id_type> encountered_node_ids;
 
   // Localize input_solution so that we have the data to move all
   // elements (not just elements local to this processor).
-  UniquePtr< NumericVector<Number> > localized_input_solution =
+  std::unique_ptr<NumericVector<Number>> localized_input_solution =
     NumericVector<Number>::build(input_solution.comm());
 
   localized_input_solution->init (input_solution.size(), false, SERIAL);
   input_solution.localize(*localized_input_solution);
 
-  MeshBase::const_element_iterator       el     = input_mesh.active_elements_begin();
-  const MeshBase::const_element_iterator end_el = input_mesh.active_elements_end();
-
-  for ( ; el != end_el; ++el)
+  for (const auto & elem : input_mesh.active_element_ptr_range())
     {
-      Elem * elem = *el;
-      Elem * orig_elem = _sys.get_mesh().elem(elem->id());
+      Elem * orig_elem = _sys.get_mesh().elem_ptr(elem->id());
 
-      for (unsigned int node_id=0; node_id<elem->n_nodes(); node_id++)
+      for (auto node_id : elem->node_index_range())
         {
-          Node * node = elem->get_node(node_id);
+          Node & node = elem->node_ref(node_id);
 
-          if (encountered_node_ids.find(node->id()) != encountered_node_ids.end())
+          if (encountered_node_ids.find(node.id()) != encountered_node_ids.end())
             continue;
 
-          encountered_node_ids.insert(node->id());
+          encountered_node_ids.insert(node.id());
 
           std::vector<std::string> uvw_names(3);
           uvw_names[0] = "u";
@@ -113,7 +104,7 @@ void LinearElasticityWithContact::move_mesh (MeshBase & input_mesh,
             const Point master_point = elem->master_point(node_id);
 
             Point uvw;
-            for (unsigned int index=0; index<uvw_names.size(); index++)
+            for (std::size_t index=0; index<uvw_names.size(); index++)
               {
                 const unsigned int var = _sys.variable_number(uvw_names[index]);
                 const FEType & fe_type = _sys.get_dof_map().variable_type(var);
@@ -128,7 +119,7 @@ void LinearElasticityWithContact::move_mesh (MeshBase & input_mesh,
                 std::vector<dof_id_type> dof_indices_var;
                 _sys.get_dof_map().dof_indices (orig_elem, dof_indices_var, var);
 
-                for (unsigned int i=0; i<dof_indices_var.size(); i++)
+                for (std::size_t i=0; i<dof_indices_var.size(); i++)
                   {
                     Number value = (*localized_input_solution)(dof_indices_var[i]) * data.shape[i];
 
@@ -142,7 +133,7 @@ void LinearElasticityWithContact::move_mesh (MeshBase & input_mesh,
               }
 
             // Update the node's location
-            *node += uvw;
+            node += uvw;
           }
         }
     }
@@ -155,73 +146,86 @@ void LinearElasticityWithContact::initialize_contact_load_paths()
   std::vector<dof_id_type> nodes_on_lower_surface;
   std::vector<dof_id_type> nodes_on_upper_surface;
 
-  MeshBase::const_element_iterator       el     = mesh.active_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_elements_end();
-
   _lambdas.clear();
-  for ( ; el != end_el; ++el)
-    {
-      const Elem * elem = *el;
-
-      for (unsigned int side=0; side<elem->n_sides(); side++)
+  for (const auto & elem : mesh.active_element_ptr_range())
+    for (auto side : elem->side_index_range())
+      if (elem->neighbor_ptr(side) == nullptr)
         {
-          if (elem->neighbor(side) == libmesh_nullptr)
+          bool on_lower_contact_surface =
+            mesh.get_boundary_info().has_boundary_id (elem, side, CONTACT_BOUNDARY_LOWER);
+
+          bool on_upper_contact_surface =
+            mesh.get_boundary_info().has_boundary_id (elem, side, CONTACT_BOUNDARY_UPPER);
+
+          if (on_lower_contact_surface && on_upper_contact_surface)
+            libmesh_error_msg("Should not be on both surfaces at the same time");
+
+          if (on_lower_contact_surface || on_upper_contact_surface)
             {
-              bool on_lower_contact_surface =
-                mesh.get_boundary_info().has_boundary_id (elem, side, CONTACT_BOUNDARY_LOWER);
-
-              bool on_upper_contact_surface =
-                mesh.get_boundary_info().has_boundary_id (elem, side, CONTACT_BOUNDARY_UPPER);
-
-              if (on_lower_contact_surface && on_upper_contact_surface)
-                libmesh_error_msg("Should not be on both surfaces at the same time");
-
-              if (on_lower_contact_surface || on_upper_contact_surface)
-                {
-                  for (unsigned int node_index=0; node_index<elem->n_nodes(); node_index++)
-                    if (elem->is_node_on_side(node_index, side))
+              for (auto node_index : elem->node_index_range())
+                if (elem->is_node_on_side(node_index, side))
+                  {
+                    if (on_lower_contact_surface)
+                      nodes_on_lower_surface.push_back(elem->node_id(node_index));
+                    else
                       {
-                        if (on_lower_contact_surface)
-                          nodes_on_lower_surface.push_back(elem->node(node_index));
-                        else
-                          {
-                            _lambdas[elem->node(node_index)] = 0.;
-                            nodes_on_upper_surface.push_back(elem->node(node_index));
-                          }
+                        _lambdas[elem->node_id(node_index)] = 0.;
+                        nodes_on_upper_surface.push_back(elem->node_id(node_index));
                       }
-                }
-
-            } // end if nieghbor(side_) != libmesh_nullptr
-        } // end for side
-    } // end for el
+                  }
+            }
+        } // end if neighbor(side_) != nullptr
 
   // In this example, we expect the number of upper and lower nodes to match
   libmesh_assert(nodes_on_lower_surface.size() == nodes_on_upper_surface.size());
 
   // Do an N^2 search to match the contact nodes
-  _augment_sparsity.clear_contact_node_map();
-  for (unsigned int i=0; i<nodes_on_lower_surface.size(); i++)
+  _contact_node_map.clear();
+  for (std::size_t i=0; i<nodes_on_lower_surface.size(); i++)
     {
       dof_id_type lower_node_id = nodes_on_lower_surface[i];
       Point p_lower = mesh.point(lower_node_id);
 
       Real min_distance = std::numeric_limits<Real>::max();
 
-      for (unsigned int j=0; j<nodes_on_upper_surface.size(); j++)
+      for (std::size_t j=0; j<nodes_on_upper_surface.size(); j++)
         {
           dof_id_type upper_node_id = nodes_on_upper_surface[j];
           Point p_upper = mesh.point(upper_node_id);
 
-          Real distance = (p_upper - p_lower).size();
+          Real distance = (p_upper - p_lower).norm();
 
           if (distance < min_distance)
             {
-              _augment_sparsity.add_contact_node(lower_node_id, upper_node_id);
+              _contact_node_map[lower_node_id] = upper_node_id;
               min_distance = distance;
             }
         }
     }
+}
 
+void LinearElasticityWithContact::add_contact_edge_elements()
+{
+  MeshBase & mesh = _sys.get_mesh();
+
+  std::map<dof_id_type, dof_id_type>::iterator it = _contact_node_map.begin();
+  std::map<dof_id_type, dof_id_type>::iterator it_end = _contact_node_map.end();
+  for( ; it != it_end ; ++it )
+    {
+      dof_id_type master_node_id = it->first;
+      dof_id_type slave_node_id = it->second;
+
+      Node & master_node = mesh.node_ref(master_node_id);
+      Node & slave_node = mesh.node_ref(slave_node_id);
+
+      Elem * connector_elem = mesh.add_elem (new Edge2);
+      connector_elem->set_node(0) = &master_node;
+      connector_elem->set_node(1) = &slave_node;
+
+      connector_elem->subdomain_id() = 10;
+    }
+
+  mesh.prepare_for_use();
 }
 
 void LinearElasticityWithContact::residual_and_jacobian (const NumericVector<Number> & soln,
@@ -241,19 +245,19 @@ void LinearElasticityWithContact::residual_and_jacobian (const NumericVector<Num
   DofMap & dof_map = _sys.get_dof_map();
 
   FEType fe_type = dof_map.variable_type(u_var);
-  UniquePtr<FEBase> fe (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe (FEBase::build(dim, fe_type));
   QGauss qrule (dim, fe_type.default_quadrature_order());
   fe->attach_quadrature_rule (&qrule);
 
-  UniquePtr<FEBase> fe_face (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe_face (FEBase::build(dim, fe_type));
   QGauss qface (dim-1, fe_type.default_quadrature_order());
   fe_face->attach_quadrature_rule (&qface);
 
-  UniquePtr<FEBase> fe_neighbor_face (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe_neighbor_face (FEBase::build(dim, fe_type));
   fe_neighbor_face->attach_quadrature_rule (&qface);
 
   const std::vector<Real> & JxW = fe->get_JxW();
-  const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+  const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
   if (jacobian)
     jacobian->zero();
@@ -278,14 +282,16 @@ void LinearElasticityWithContact::residual_and_jacobian (const NumericVector<Num
     };
 
   std::vector<dof_id_type> dof_indices;
-  std::vector< std::vector<dof_id_type> > dof_indices_var(3);
+  std::vector<std::vector<dof_id_type>> dof_indices_var(3);
 
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-  for ( ; el != end_el; ++el)
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      const Elem * elem = *el;
+      if( elem->type() == EDGE2 )
+        {
+          // We do not do any assembly on the contact connector elements.
+          // The contact force assembly is handled in a separate loop.
+          continue;
+        }
 
       dof_map.dof_indices (elem, dof_indices);
       for (unsigned int var=0; var<3; var++)
@@ -344,18 +350,20 @@ void LinearElasticityWithContact::residual_and_jacobian (const NumericVector<Num
     }
 
   // Move a copy of the mesh based on the solution. This is used to get
-  // the contact forces.
-  UniquePtr<MeshBase> mesh_clone = mesh.clone();
+  // the contact forces. We could compute the contact forces based on the
+  // current displacement solution, which would not require a clone of the
+  // mesh. Avoiding the mesh clone would be important for production-scale
+  // contact solves, but for the sake of this example, using the clone is
+  // simple and fast enough.
+  std::unique_ptr<MeshBase> mesh_clone = mesh.clone();
   move_mesh(*mesh_clone, soln);
 
   // Add contributions due to contact penalty forces. Only need to do this on
   // one processor.
   _lambda_plus_penalty_values.clear();
 
-  LIBMESH_BEST_UNORDERED_MAP<dof_id_type, dof_id_type>::iterator it =
-    _augment_sparsity._contact_node_map.begin();
-  LIBMESH_BEST_UNORDERED_MAP<dof_id_type, dof_id_type>::iterator it_end =
-    _augment_sparsity._contact_node_map.end();
+  std::map<dof_id_type, dof_id_type>::iterator it = _contact_node_map.begin();
+  std::map<dof_id_type, dof_id_type>::iterator it_end = _contact_node_map.end();
 
   for ( ; it != it_end; ++it)
     {
@@ -365,7 +373,7 @@ void LinearElasticityWithContact::residual_and_jacobian (const NumericVector<Num
       Point upper_to_lower;
       {
         Point lower_node_moved = mesh_clone->point(lower_point_id);
-        Point upper_node_moved = mesh_clone->node(upper_point_id);
+        Point upper_node_moved = mesh_clone->point(upper_point_id);
 
         upper_to_lower = (lower_node_moved - upper_node_moved);
       }
@@ -391,8 +399,8 @@ void LinearElasticityWithContact::residual_and_jacobian (const NumericVector<Num
       // Store lambda_plus_penalty, we'll need to use it later to update _lambdas
       _lambda_plus_penalty_values[upper_point_id] = lambda_plus_penalty;
 
-      const Node & lower_node = mesh.node(lower_point_id);
-      const Node & upper_node = mesh.node(upper_point_id);
+      const Node & lower_node = mesh.node_ref(lower_point_id);
+      const Node & upper_node = mesh.node_ref(upper_point_id);
 
       std::vector<dof_id_type> dof_indices_on_lower_node(3);
       std::vector<dof_id_type> dof_indices_on_upper_node(3);
@@ -487,12 +495,12 @@ void LinearElasticityWithContact::compute_stresses()
 
   const DofMap & dof_map = _sys.get_dof_map();
   FEType fe_type = dof_map.variable_type(u_var);
-  UniquePtr<FEBase> fe (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe (FEBase::build(dim, fe_type));
   QGauss qrule (dim, fe_type.default_quadrature_order());
   fe->attach_quadrature_rule (&qrule);
 
   const std::vector<Real> & JxW = fe->get_JxW();
-  const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+  const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
   // Also, get a reference to the ExplicitSystem
   ExplicitSystem & stress_system = es.get_system<ExplicitSystem>("StressSystem");
@@ -507,18 +515,19 @@ void LinearElasticityWithContact::compute_stresses()
   unsigned int vonMises_var = stress_system.variable_number ("vonMises");
 
   // Storage for the stress dof indices on each element
-  std::vector< std::vector<dof_id_type> > dof_indices_var(_sys.n_vars());
+  std::vector<std::vector<dof_id_type>> dof_indices_var(_sys.n_vars());
   std::vector<dof_id_type> stress_dof_indices_var;
 
   // To store the stress tensor on each element
   DenseMatrix<Number> elem_avg_stress_tensor(3, 3);
 
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-  for ( ; el != end_el; ++el)
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      const Elem * elem = *el;
+      if( elem->type() == EDGE2 )
+        {
+          // We do not compute stress on the contact connector elements.
+          continue;
+        }
 
       for (unsigned int var=0; var<3; var++)
         dof_map.dof_indices (elem, dof_indices_var[var], displacement_vars[var]);
@@ -628,16 +637,14 @@ std::pair<Real, Real> LinearElasticityWithContact::update_lambdas()
 
 std::pair<Real, Real> LinearElasticityWithContact::get_least_and_max_gap_function()
 {
-  UniquePtr<MeshBase> mesh_clone = _sys.get_mesh().clone();
+  std::unique_ptr<MeshBase> mesh_clone = _sys.get_mesh().clone();
   move_mesh(*mesh_clone, *_sys.solution);
 
   Real least_value = std::numeric_limits<Real>::max();
   Real max_value = std::numeric_limits<Real>::min();
 
-  LIBMESH_BEST_UNORDERED_MAP<dof_id_type, dof_id_type>::iterator it =
-    _augment_sparsity._contact_node_map.begin();
-  LIBMESH_BEST_UNORDERED_MAP<dof_id_type, dof_id_type>::iterator it_end =
-    _augment_sparsity._contact_node_map.end();
+  std::map<dof_id_type, dof_id_type>::iterator it = _contact_node_map.begin();
+  std::map<dof_id_type, dof_id_type>::iterator it_end = _contact_node_map.end();
   for ( ; it != it_end; ++it)
     {
       dof_id_type lower_point_id = it->first;
@@ -646,7 +653,7 @@ std::pair<Real, Real> LinearElasticityWithContact::get_least_and_max_gap_functio
       Point upper_to_lower;
       {
         Point lower_node_moved = mesh_clone->point(lower_point_id);
-        Point upper_node_moved = mesh_clone->node(upper_point_id);
+        Point upper_node_moved = mesh_clone->point(upper_point_id);
 
         upper_to_lower = (lower_node_moved - upper_node_moved);
       }

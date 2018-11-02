@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -27,7 +27,15 @@
 #include "libmesh/libmesh_common.h"
 #include "libmesh/mesh_input.h"
 #include "libmesh/mesh_output.h"
+
+#ifdef LIBMESH_FORWARD_DECLARE_ENUMS
+namespace libMesh
+{
+enum ElemType : int;
+}
+#else
 #include "libmesh/enum_elem_type.h"
+#endif
 
 namespace libMesh
 {
@@ -47,7 +55,7 @@ class UCDIO : public MeshInput<MeshBase>,
 public:
 
   /**
-   * Constructor.  Takes a writeable reference to a mesh object.
+   * Constructor.  Takes a writable reference to a mesh object.
    * This is the constructor required to read a mesh.
    */
   explicit
@@ -69,13 +77,19 @@ public:
    * This method implements reading a mesh from a specified file
    * in UCD format.
    */
-  virtual void read (const std::string &) libmesh_override;
+  virtual void read (const std::string &) override;
 
   /**
    * This method implements writing a mesh to a specified file
    * in UCD format.
    */
-  virtual void write (const std::string &) libmesh_override;
+  virtual void write (const std::string &) override;
+
+  /**
+   * Bring in base class functionality for name resolution and to
+   * avoid warnings about hidden overloaded virtual functions.
+   */
+  using MeshOutput<MeshBase>::write_nodal_data;
 
   /**
    * This method implements writing a mesh and solution to a specified file
@@ -83,7 +97,7 @@ public:
    */
   virtual void write_nodal_data(const std::string & fname,
                                 const std::vector<Number> & soln,
-                                const std::vector<std::string> & names) libmesh_override;
+                                const std::vector<std::string> & names) override;
 
 
 private:

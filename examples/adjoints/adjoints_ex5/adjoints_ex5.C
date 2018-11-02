@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -82,6 +82,8 @@
 #include "libmesh/dirichlet_boundaries.h"
 #include "libmesh/system_norm.h"
 #include "libmesh/numeric_vector.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
+#include "libmesh/enum_solver_package.h"
 
 #include "libmesh/mesh.h"
 #include "libmesh/mesh_generation.h"
@@ -97,6 +99,7 @@
 #include "libmesh/getpot.h"
 #include "libmesh/tecplot_io.h"
 #include "libmesh/gmv_io.h"
+#include "libmesh/exodusII_io.h"
 
 // SolutionHistory Includes
 #include "libmesh/solution_history.h"
@@ -108,22 +111,62 @@
 #include <iomanip>
 
 void write_output(EquationSystems & es,
-                  unsigned int a_step,       // The adaptive step count
-                  std::string solution_type) // primal or adjoint solve
+                  unsigned int t_step,       // The current time step count
+                  std::string solution_type, // primal or adjoint solve
+                  FEMParameters & param)
 {
+  // Ignore parameters when there are no output formats available.
+  libmesh_ignore(es);
+  libmesh_ignore(t_step);
+  libmesh_ignore(solution_type);
+  libmesh_ignore(param);
+
 #ifdef LIBMESH_HAVE_GMV
-  MeshBase & mesh = es.get_mesh();
+  if (param.output_gmv)
+    {
+      MeshBase & mesh = es.get_mesh();
 
-  std::ostringstream file_name_gmv;
-  file_name_gmv << solution_type
-                << ".out.gmv."
-                << std::setw(2)
-                << std::setfill('0')
-                << std::right
-                << a_step;
+      std::ostringstream file_name_gmv;
+      file_name_gmv << solution_type
+                    << ".out.gmv."
+                    << std::setw(2)
+                    << std::setfill('0')
+                    << std::right
+                    << t_step;
 
-  GMVIO(mesh).write_equation_systems
-    (file_name_gmv.str(), es);
+      GMVIO(mesh).write_equation_systems(file_name_gmv.str(), es);
+    }
+#endif
+
+#ifdef LIBMESH_HAVE_EXODUS_API
+  if (param.output_exodus)
+    {
+      MeshBase & mesh = es.get_mesh();
+
+      // We write out one file per timestep. The files are named in
+      // the following way:
+      // foo.e
+      // foo.e-s002
+      // foo.e-s003
+      // ...
+      // so that, if you open the first one with Paraview, it actually
+      // opens the entire sequence of adapted files.
+      std::ostringstream file_name_exodus;
+
+      file_name_exodus << solution_type << ".e";
+      if (t_step > 0)
+        file_name_exodus << "-s"
+                         << std::setw(3)
+                         << std::setfill('0')
+                         << std::right
+                         << t_step + 1;
+
+      // TODO: Get the current time from the System...
+      ExodusII_IO(mesh).write_timestep(file_name_exodus.str(),
+                                       es,
+                                       1,
+                                       /*time=*/t_step + 1);
+    }
 #endif
 }
 
@@ -167,11 +210,10 @@ void set_system_parameters(HeatSystem & system,
         libmesh_error_msg("This example (and unsteady adjoints in libMesh) only support Backward Euler and explicit methods.");
 
       system.time_solver =
-        UniquePtr<TimeSolver>(innersolver);
+        std::unique_ptr<TimeSolver>(innersolver);
     }
   else
-    system.time_solver =
-      UniquePtr<TimeSolver>(new SteadySolver(system));
+    system.time_solver = libmesh_make_unique<SteadySolver>(system);
 
   // The Memory Solution History object we will set the system SolutionHistory object to
   MemorySolutionHistory heatsystem_solution_history(system);
@@ -198,7 +240,7 @@ void set_system_parameters(HeatSystem & system,
                                                                     f));
 
       libMesh::out << "Added Dirichlet boundary " << b << " for variables ";
-      for (unsigned int vi=0; vi != param.dirichlet_condition_variables[b].size(); ++vi)
+      for (std::size_t vi=0; vi != param.dirichlet_condition_variables[b].size(); ++vi)
         libMesh::out << param.dirichlet_condition_variables[b][vi];
       libMesh::out << std::endl;
     }
@@ -214,7 +256,7 @@ void set_system_parameters(HeatSystem & system,
     {
 #ifdef LIBMESH_HAVE_PETSC
       PetscDiffSolver *solver = new PetscDiffSolver(system);
-      system.time_solver->diff_solver() = UniquePtr<DiffSolver>(solver);
+      system.time_solver->diff_solver() = std::unique_ptr<DiffSolver>(solver);
 #else
       libmesh_error_msg("This example requires libMesh to be compiled with PETSc support.");
 #endif
@@ -222,7 +264,7 @@ void set_system_parameters(HeatSystem & system,
   else
     {
       NewtonSolver *solver = new NewtonSolver(system);
-      system.time_solver->diff_solver() = UniquePtr<DiffSolver>(solver);
+      system.time_solver->diff_solver() = std::unique_ptr<DiffSolver>(solver);
 
       solver->quiet                       = param.solver_quiet;
       solver->verbose                     = param.solver_verbose;
@@ -246,10 +288,12 @@ void set_system_parameters(HeatSystem & system,
 }
 
 // The main program.
-int main (int argc, char** argv)
+int main (int argc, char ** argv)
 {
   // Skip adaptive examples on a non-adaptive libMesh build
 #ifndef LIBMESH_ENABLE_AMR
+  libmesh_ignore(argc);
+  libmesh_ignore(argv);
   libmesh_example_requires(false, "--enable-amr");
 #else
   // Skip this 2D example if libMesh was compiled as 1D-only.
@@ -257,6 +301,9 @@ int main (int argc, char** argv)
 
   // Initialize libMesh.
   LibMeshInit init (argc, argv);
+
+  // This doesn't converge with Trilinos for some reason...
+  libmesh_example_requires(libMesh::default_solver_package() == PETSC_SOLVERS, "--enable-petsc");
 
   libMesh::out << "Started " << argv[0] << std::endl;
 
@@ -274,10 +321,10 @@ int main (int argc, char** argv)
 
   // Create a mesh with the given dimension, distributed
   // across the default MPI communicator.
-  Mesh mesh(init.comm(), param.dimension);
+  Mesh mesh(init.comm(), cast_int<unsigned char>(param.dimension));
 
   // And an object to refine it
-  UniquePtr<MeshRefinement> mesh_refinement(new MeshRefinement(mesh));
+  auto mesh_refinement = libmesh_make_unique<MeshRefinement>(mesh);
 
   // And an EquationSystems to run on it
   EquationSystems equation_systems (mesh);
@@ -349,7 +396,7 @@ int main (int argc, char** argv)
   finish_initialization();
 
   // Plot the initial conditions
-  write_output(equation_systems, 0, "primal");
+  write_output(equation_systems, 0, "primal", param);
 
   // Print information about the mesh and system to the screen.
   mesh.print_info();
@@ -389,7 +436,7 @@ int main (int argc, char** argv)
           system.time_solver->advance_timestep();
 
           // Write out this timestep
-          write_output(equation_systems, t_step+1, "primal");
+          write_output(equation_systems, t_step+1, "primal", param);
         }
       // End timestep loop
 
@@ -437,7 +484,7 @@ int main (int argc, char** argv)
 
       // Since we have specified an adjoint solution for the current
       // time (T), set the adjoint_already_solved boolean to true, so
-      // we dont solve unneccesarily in the adjoint sensitivity method
+      // we dont solve unnecessarily in the adjoint sensitivity method
       system.set_adjoint_already_solved(true);
 
       libMesh::out << "|Z("
@@ -447,7 +494,7 @@ int main (int argc, char** argv)
                    << std::endl
                    << std::endl;
 
-      write_output(equation_systems, param.n_timesteps, "dual");
+      write_output(equation_systems, param.n_timesteps, "dual", param);
 
       // Now that the adjoint initial condition is set, we will start the
       // backwards in time adjoint integration
@@ -490,7 +537,7 @@ int main (int argc, char** argv)
 
           // Now that we have solved the adjoint, set the
           // adjoint_already_solved boolean to true, so we dont solve
-          // unneccesarily in the error estimator
+          // unnecessarily in the error estimator
           system.set_adjoint_already_solved(true);
 
           libMesh::out << "|Z("
@@ -509,14 +556,14 @@ int main (int argc, char** argv)
           // Swap the primal and dual solutions so we can write out the adjoint solution
           primal_solution.swap(dual_solution_0);
 
-          write_output(equation_systems, param.n_timesteps - (t_step + 1), "dual");
+          write_output(equation_systems, param.n_timesteps - (t_step + 1), "dual", param);
 
           // Swap back
           primal_solution.swap(dual_solution_0);
         }
       // End adjoint timestep loop
 
-      // Now that we have computed both the primal and adjoint solutions, we compute the sensitivties to the parameter p
+      // Now that we have computed both the primal and adjoint solutions, we compute the sensitivities to the parameter p
       // dQ/dp = partialQ/partialp - partialR/partialp
       // partialQ/partialp = (Q(p+dp) - Q(p-dp))/(2*dp), this is not supported by the library yet
       // partialR/partialp = (R(u,z;p+dp) - R(u,z;p-dp))/(2*dp), where
@@ -606,11 +653,12 @@ int main (int argc, char** argv)
                    << sensitivity_0_0
                    << std::endl;
 
-      // Hard coded assert to ensure that the actual numbers we are
+      // Hard coded test to ensure that the actual numbers we are
       // getting are what they should be
       // The 2e-4 tolerance is chosen to ensure success even with
       // 32-bit floats
-      libmesh_assert_less(std::abs(sensitivity_0_0 - (-5.37173)), 2.e-4);
+      if(std::abs(sensitivity_0_0 - (-5.37173)) >= 2.e-4)
+        libmesh_error_msg("Mismatch in sensitivity gold value!");
 
 #ifdef NDEBUG
     }

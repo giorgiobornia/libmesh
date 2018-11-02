@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -21,7 +21,7 @@
 #define LIBMESH_TIME_SOLVER_H
 
 // Local includes
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
 #include "libmesh/libmesh_common.h"
 #include "libmesh/linear_solver.h"
 #include "libmesh/numeric_vector.h"
@@ -29,6 +29,7 @@
 #include "libmesh/solution_history.h"
 
 // C++ includes
+#include <memory>
 
 namespace libMesh
 {
@@ -166,24 +167,24 @@ public:
   virtual void before_timestep () {}
 
   /**
-   * @returns a constant reference to the system we are solving.
+   * \returns A constant reference to the system we are solving.
    */
   const sys_type & system () const { return _system; }
 
   /**
-   * @returns a writeable reference to the system we are solving.
+   * \returns A writable reference to the system we are solving.
    */
   sys_type & system () { return _system; }
 
   /**
    * An implicit linear or nonlinear solver to use at each timestep.
    */
-  virtual UniquePtr<DiffSolver> & diff_solver() { return _diff_solver; }
+  virtual std::unique_ptr<DiffSolver> & diff_solver() { return _diff_solver; }
 
   /**
    * An implicit linear solver to use for adjoint and sensitivity problems.
    */
-  virtual UniquePtr<LinearSolver<Number> > & linear_solver() { return _linear_solver; }
+  virtual std::unique_ptr<LinearSolver<Number>> & linear_solver() { return _linear_solver; }
 
   /**
    * Print extra debugging information if quiet ==  false.
@@ -193,7 +194,7 @@ public:
   /**
    * Computes the size of ||u^{n+1} - u^{n}|| in some norm.
    *
-   * Note that, while you can always call this function, its
+   * \note While you can always call this function, its
    * result may or may not be very meaningful.  For example, if
    * you call this function right after calling advance_timestep()
    * then you'll get a result of zero since old_nonlinear_solution
@@ -209,9 +210,10 @@ public:
   /**
    * This value (which defaults to zero) is the number of times the
    * TimeSolver is allowed to halve deltat and let the DiffSolver
-   * repeat the latest failed solve with a reduced timestep.  Note
-   * that this has no effect for SteadySolvers.  Note that you must
-   * set at least one of the DiffSolver flags
+   * repeat the latest failed solve with a reduced timestep.
+   *
+   * \note This has no effect for SteadySolvers.
+   * \note You must set at least one of the DiffSolver flags
    * "continue_after_max_iterations" or
    * "continue_after_backtrack_failure" to allow the TimeSolver to
    * retry the solve.
@@ -243,12 +245,12 @@ protected:
   /**
    * An implicit linear or nonlinear solver to use at each timestep.
    */
-  UniquePtr<DiffSolver> _diff_solver;
+  std::unique_ptr<DiffSolver> _diff_solver;
 
   /**
    * An implicit linear solver to use for adjoint problems.
    */
-  UniquePtr<LinearSolver<Number> > _linear_solver;
+  std::unique_ptr<LinearSolver<Number>> _linear_solver;
 
   /**
    * A reference to the system we are solving.
@@ -256,11 +258,11 @@ protected:
   sys_type & _system;
 
   /**
-   * An UniquePtr to a SolutionHistory object. Default is
+   * A std::unique_ptr to a SolutionHistory object. Default is
    * NoSolutionHistory, which the user can override by declaring a
    * different kind of SolutionHistory in the application
    */
-  UniquePtr<SolutionHistory> solution_history;
+  std::unique_ptr<SolutionHistory> solution_history;
 
   /**
    * Definitions of argument types for use in refactoring subclasses.

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -34,6 +34,8 @@
 #include "libmesh/numeric_vector.h"
 #include "libmesh/exodusII_io_helper.h"
 #include "libmesh/string_to_enum.h"
+#include "libmesh/mesh_communication.h"
+#include "libmesh/parallel_mesh.h"
 
 namespace libMesh
 {
@@ -48,14 +50,16 @@ ExodusII_IO::ExodusII_IO (MeshBase & mesh,
 #endif
                           ) :
   MeshInput<MeshBase> (mesh),
-  MeshOutput<MeshBase> (mesh),
+  MeshOutput<MeshBase> (mesh,
+                        /* is_parallel_format = */ false,
+                        /* serial_only_needed_on_proc_0 = */ true),
   ParallelObject(mesh),
 #ifdef LIBMESH_HAVE_EXODUS_API
   exio_helper(new ExodusII_IO_Helper(*this, false, true, single_precision)),
-#endif
   _timestep(1),
   _verbose(false),
   _append(false),
+#endif
   _allow_empty_variables(false)
 {
 }
@@ -70,6 +74,7 @@ void ExodusII_IO::set_output_variables(const std::vector<std::string> & output_v
 
 
 
+#ifdef LIBMESH_ENABLE_DEPRECATED
 void ExodusII_IO::copy_nodal_solution(System & system,
                                       std::string var_name,
                                       unsigned int timestep)
@@ -77,6 +82,7 @@ void ExodusII_IO::copy_nodal_solution(System & system,
   libmesh_deprecated();
   copy_nodal_solution(system, var_name, var_name, timestep);
 }
+#endif
 
 
 
@@ -87,13 +93,37 @@ void ExodusII_IO::write_discontinuous_exodusII(const std::string & name,
   std::vector<std::string> solution_names;
   std::vector<Number>      v;
 
-  es.build_variable_names  (solution_names, libmesh_nullptr, system_names);
+  es.build_variable_names  (solution_names, nullptr, system_names);
   es.build_discontinuous_solution_vector (v, system_names);
 
   this->write_nodal_data_discontinuous(name, v, solution_names);
 }
 
 
+#ifdef LIBMESH_HAVE_EXODUS_API
+void ExodusII_IO::write_timestep_discontinuous (const std::string &fname,
+                                                const EquationSystems &es,
+                                                const int timestep,
+                                                const Real time,
+                                                const std::set<std::string> * system_names)
+{
+  _timestep = timestep;
+  write_discontinuous_equation_systems (fname,es,system_names);
+
+  if (MeshOutput<MeshBase>::mesh().processor_id())
+    return;
+
+  exio_helper->write_timestep(timestep, time);
+}
+
+#else
+void ExodusII_IO::write_timestep_discontinuous (const std::string & /* fname */,
+                                                const EquationSystems & /* es */,
+                                                const int /* timestep */,
+                                                const Real /* time */,
+                                                const std::set<std::string> * /*system_names*/)
+{ libmesh_error(); }
+#endif
 
 
 // ------------------------------------------------------------
@@ -103,7 +133,6 @@ void ExodusII_IO::write_discontinuous_exodusII(const std::string & name,
 ExodusII_IO::~ExodusII_IO ()
 {
   exio_helper->close();
-  delete exio_helper;
 }
 
 
@@ -120,12 +149,8 @@ void ExodusII_IO::read (const std::string & fname)
   elems_of_dimension.clear();
   elems_of_dimension.resize(4, false);
 
-#ifdef DEBUG
-  this->verbose(true);
-#endif
-
   // Instantiate the ElementMaps interface
-  ExodusII_IO_Helper::ElementMaps em(*exio_helper);
+  ExodusII_IO_Helper::ElementMaps em;
 
   // Open the exodus file in EX_READ mode
   exio_helper->open(fname.c_str(), /*read_only=*/true);
@@ -293,7 +318,7 @@ void ExodusII_IO::read (const std::string & fname)
             = sideset_name;
       }
 
-    for (unsigned int e=0; e<exio_helper->elem_list.size(); e++)
+    for (std::size_t e=0; e<exio_helper->elem_list.size(); e++)
       {
         // The numbers in the Exodus file sidesets should be thought
         // of as (1-based) indices into the elem_num_map array.  So,
@@ -306,24 +331,48 @@ void ExodusII_IO::read (const std::string & fname)
           cast_int<dof_id_type>(exio_helper->elem_num_map[exio_helper->elem_list[e] - 1] - 1);
 
         // Set any relevant node/edge maps for this element
-        Elem * elem = mesh.elem(libmesh_elem_id);
+        Elem & elem = mesh.elem_ref(libmesh_elem_id);
 
-        const ExodusII_IO_Helper::Conversion conv = em.assign_conversion(elem->type());
+        const ExodusII_IO_Helper::Conversion conv = em.assign_conversion(elem.type());
 
         // Map the zero-based Exodus side numbering to the libmesh side numbering
-        int mapped_side = conv.get_side_map(exio_helper->side_list[e]-1);
+        unsigned int raw_side_index = exio_helper->side_list[e]-1;
+        std::size_t side_index_offset = conv.get_shellface_index_offset();
 
-        // Check for errors
-        if (mapped_side == ExodusII_IO_Helper::Conversion::invalid_id)
-          libmesh_error_msg("Invalid 1-based side id: "                 \
-                            << exio_helper->side_list[e]                \
-                            << " detected for "                         \
-                            << Utility::enum_to_string(elem->type()));
+        if (raw_side_index < side_index_offset)
+          {
+            // We assume this is a "shell face"
+            int mapped_shellface = raw_side_index;
 
-        // Add this (elem,side,id) triplet to the BoundaryInfo object.
-        mesh.get_boundary_info().add_side (libmesh_elem_id,
-                                           cast_int<unsigned short>(mapped_side),
-                                           cast_int<boundary_id_type>(exio_helper->id_list[e]));
+            // Check for errors
+            if (mapped_shellface == ExodusII_IO_Helper::Conversion::invalid_id)
+              libmesh_error_msg("Invalid 1-based side id: "                 \
+                                << mapped_shellface                         \
+                                << " detected for "                         \
+                                << Utility::enum_to_string(elem.type()));
+
+            // Add this (elem,shellface,id) triplet to the BoundaryInfo object.
+            mesh.get_boundary_info().add_shellface (libmesh_elem_id,
+                                                    cast_int<unsigned short>(mapped_shellface),
+                                                    cast_int<boundary_id_type>(exio_helper->id_list[e]));
+          }
+        else
+          {
+            unsigned int side_index = static_cast<unsigned int>(raw_side_index - side_index_offset);
+            int mapped_side = conv.get_side_map(side_index);
+
+            // Check for errors
+            if (mapped_side == ExodusII_IO_Helper::Conversion::invalid_id)
+              libmesh_error_msg("Invalid 1-based side id: "                 \
+                                << side_index                               \
+                                << " detected for "                         \
+                                << Utility::enum_to_string(elem.type()));
+
+            // Add this (elem,side,id) triplet to the BoundaryInfo object.
+            mesh.get_boundary_info().add_side (libmesh_elem_id,
+                                               cast_int<unsigned short>(mapped_side),
+                                               cast_int<boundary_id_type>(exio_helper->id_list[e]));
+          }
       }
   }
 
@@ -342,10 +391,10 @@ void ExodusII_IO::read (const std::string & fname)
 
         exio_helper->read_nodeset(nodeset);
 
-        for (unsigned int node=0; node<exio_helper->node_list.size(); node++)
+        for (std::size_t node=0; node<exio_helper->node_list.size(); node++)
           {
             // As before, the entries in 'node_list' are 1-based
-            // indcies into the node_num_map array, so we have to map
+            // indices into the node_num_map array, so we have to map
             // them.  See comment above.
             int libmesh_node_id = exio_helper->node_num_map[exio_helper->node_list[node] - 1] - 1;
             mesh.get_boundary_info().add_node(cast_int<dof_id_type>(libmesh_node_id),
@@ -392,7 +441,7 @@ void ExodusII_IO::write_as_dimension(unsigned dim)
 
 void ExodusII_IO::set_coordinate_offset(Point p)
 {
-  libmesh_deprecated();
+  libmesh_warning("This method may be deprecated in the future");
   exio_helper->set_coordinate_offset(p);
 }
 
@@ -439,14 +488,13 @@ void ExodusII_IO::copy_nodal_solution(System & system,
 
   const unsigned int var_num = system.variable_number(system_var_name);
 
-  for (unsigned int i=0; i<exio_helper->nodal_var_values.size(); ++i)
+  for (dof_id_type i=0,
+       n_nodal = cast_int<dof_id_type>(exio_helper->nodal_var_values.size());
+       i != n_nodal; ++i)
     {
       const Node * node = MeshInput<MeshBase>::mesh().query_node_ptr(i);
 
-      if (!node)
-        libmesh_error_msg("Error! Mesh returned NULL pointer for node " << i);
-
-      if (node->n_comp(system.number(), var_num) > 0)
+      if (node && node->n_comp(system.number(), var_num) > 0)
         {
           dof_id_type dof_index = node->dof_number(system.number(), var_num, 0);
 
@@ -467,39 +515,36 @@ void ExodusII_IO::copy_elemental_solution(System & system,
                                           std::string exodus_var_name,
                                           unsigned int timestep)
 {
-  if (!exio_helper->opened_for_reading)
-    libmesh_error_msg("ERROR, ExodusII file must be opened for reading before copying an elemental solution!");
-
-  // Map from element ID to elemental variable value.  We need to use
-  // a map here rather than a vector (e.g. elem_var_values) since the
-  // libmesh element numbering can contain "holes".  This is the case
-  // if we are reading elemental var values from an adaptively refined
-  // mesh that has not been sequentially renumbered.
-  std::map<dof_id_type, Real> elem_var_value_map;
-  exio_helper->read_elemental_var_values(exodus_var_name, timestep, elem_var_value_map);
-
-  const unsigned int var_num = system.variable_number(system_var_name);
-  if (system.variable_type(var_num) != FEType(CONSTANT, MONOMIAL))
-    libmesh_error_msg("Error! Trying to copy elemental solution into a variable that is not of CONSTANT MONOMIAL type.");
-
-  std::map<dof_id_type, Real>::iterator
-    it = elem_var_value_map.begin(),
-    end = elem_var_value_map.end();
-
-  for (; it!=end; ++it)
+  if (system.comm().rank() == 0)
     {
-      const Elem * elem = MeshInput<MeshBase>::mesh().query_elem(it->first);
+      if (!exio_helper->opened_for_reading)
+        libmesh_error_msg("ERROR, ExodusII file must be opened for reading before copying an elemental solution!");
 
-      if (!elem)
-        libmesh_error_msg("Error! Mesh returned NULL pointer for elem " << it->first);
+      // Map from element ID to elemental variable value.  We need to use
+      // a map here rather than a vector (e.g. elem_var_values) since the
+      // libmesh element numbering can contain "holes".  This is the case
+      // if we are reading elemental var values from an adaptively refined
+      // mesh that has not been sequentially renumbered.
+      std::map<dof_id_type, Real> elem_var_value_map;
+      exio_helper->read_elemental_var_values(exodus_var_name, timestep, elem_var_value_map);
 
-      if (elem->n_comp(system.number(), var_num) > 0)
+      const unsigned int var_num = system.variable_number(system_var_name);
+      if (system.variable_type(var_num) != FEType(CONSTANT, MONOMIAL))
+        libmesh_error_msg("Error! Trying to copy elemental solution into a variable that is not of CONSTANT MONOMIAL type.");
+
+      std::map<dof_id_type, Real>::iterator
+        it = elem_var_value_map.begin(),
+        end = elem_var_value_map.end();
+
+      for (; it!=end; ++it)
         {
-          dof_id_type dof_index = elem->dof_number(system.number(), var_num, 0);
+          const Elem * elem = MeshInput<MeshBase>::mesh().query_elem_ptr(it->first);
 
-          // If the dof_index is local to this processor, set the value
-          if ((dof_index >= system.solution->first_local_index()) && (dof_index < system.solution->last_local_index()))
-            system.solution->set (dof_index, it->second);
+          if (elem && elem->n_comp(system.number(), var_num) > 0)
+            {
+              dof_id_type dof_index = elem->dof_number(system.number(), var_num, 0);
+              system.solution->set (dof_index, it->second);
+            }
         }
     }
 
@@ -507,7 +552,49 @@ void ExodusII_IO::copy_elemental_solution(System & system,
   system.update();
 }
 
+void ExodusII_IO::read_elemental_variable(std::string elemental_var_name,
+                                          unsigned int timestep,
+                                          std::map<unsigned int, Real> & unique_id_to_value_map)
+{
+  // Note that this function MUST be called before renumbering
+  std::map<dof_id_type, Real> elem_var_value_map;
 
+  exio_helper->read_elemental_var_values(elemental_var_name, timestep, elem_var_value_map);
+  for (auto & pr : elem_var_value_map)
+    {
+      const Elem * elem = MeshInput<MeshBase>::mesh().query_elem_ptr(pr.first);
+      unique_id_to_value_map.insert(std::make_pair(elem->top_parent()->unique_id(), pr.second));
+    }
+}
+
+void ExodusII_IO::read_global_variable(std::vector<std::string> global_var_names,
+                                       unsigned int timestep,
+                                       std::vector<Real> & global_values)
+{
+  std::size_t size = global_var_names.size();
+  if (size == 0)
+    libmesh_error_msg("ERROR, empty list of global variables to read from the Exodus file.");
+
+  // read the values for all global variables
+  std::vector<Real> values_from_exodus;
+  exio_helper->read_var_names(ExodusII_IO_Helper::GLOBAL);
+  exio_helper->read_global_values(values_from_exodus, timestep);
+  std::vector<std::string> global_var_names_exodus = exio_helper->global_var_names;
+
+  global_values.clear();
+  for (std::size_t i = 0; i != size; ++i)
+    {
+      // for each global variable in global_var_names, look the corresponding one in global_var_names_from_exodus
+      // and fill global_values accordingly
+      auto it = find(global_var_names_exodus.begin(), global_var_names_exodus.end(), global_var_names[i]);
+      if (it != global_var_names_exodus.end())
+        global_values.push_back(values_from_exodus[it - global_var_names_exodus.begin()]);
+      else
+        libmesh_error_msg("ERROR, Global variable " << global_var_names[i] << \
+                          " not found in Exodus file.");
+    }
+
+}
 
 void ExodusII_IO::write_element_data (const EquationSystems & es)
 {
@@ -515,15 +602,16 @@ void ExodusII_IO::write_element_data (const EquationSystems & es)
   if (MeshOutput<MeshBase>::mesh().processor_id() == 0 && !exio_helper->opened_for_writing)
     libmesh_error_msg("ERROR, ExodusII file must be initialized before outputting element variables.");
 
-  // This function currently only works on SerialMeshes. We rely on
-  // having a reference to a non-const MeshBase object from our
+  // This function currently only works on serialized meshes. We rely
+  // on having a reference to a non-const MeshBase object from our
   // MeshInput parent class to construct a MeshSerializer object,
   // similar to what is done in ExodusII_IO::write().  Note that
   // calling ExodusII_IO::write_timestep() followed by
   // ExodusII_IO::write_element_data() when the underlying Mesh is a
-  // ParallelMesh will result in an unnecessary additional
+  // DistributedMesh will result in an unnecessary additional
   // serialization/re-parallelization step.
-  MeshSerializer serialize(MeshInput<MeshBase>::mesh(), !MeshOutput<MeshBase>::_is_parallel_format);
+  // The "true" specifies that we only need the mesh serialized to processor 0
+  MeshSerializer serialize(MeshInput<MeshBase>::mesh(), !MeshOutput<MeshBase>::_is_parallel_format, true);
 
   // To be (possibly) filled with a filtered list of variable names to output.
   std::vector<std::string> names;
@@ -540,22 +628,25 @@ void ExodusII_IO::write_element_data (const EquationSystems & es)
 
       // Filter that list against the _output_variables list.  Note: if names is still empty after
       // all this filtering, all the monomial variables will be gathered
-      std::vector<std::string>::iterator it = monomials.begin();
-      for (; it!=monomials.end(); ++it)
-        if (std::find(_output_variables.begin(), _output_variables.end(), *it) != _output_variables.end())
-          names.push_back(*it);
+      for (const auto & var : monomials)
+        if (std::find(_output_variables.begin(), _output_variables.end(), var) != _output_variables.end())
+          names.push_back(var);
     }
 
   // If we pass in a list of names to "get_solution" it'll filter the variables coming back
   std::vector<Number> soln;
-  es.get_solution(soln, names);
+  es.build_elemental_solution_vector(soln, names);
 
-  if(soln.empty()) // If there is nothing to write just return
+  // Also, store the list of subdomains on which each variable is active
+  std::vector<std::set<subdomain_id_type>> vars_active_subdomains;
+  es.get_vars_active_subdomains(names, vars_active_subdomains);
+
+  if (soln.empty()) // If there is nothing to write just return
     return;
 
   // The data must ultimately be written block by block.  This means that this data
   // must be sorted appropriately.
-  if(MeshOutput<MeshBase>::mesh().processor_id())
+  if (MeshOutput<MeshBase>::mesh().processor_id())
     return;
 
   const MeshBase & mesh = MeshOutput<MeshBase>::mesh();
@@ -564,7 +655,9 @@ void ExodusII_IO::write_element_data (const EquationSystems & es)
 
   std::vector<std::string> complex_names = exio_helper->get_complex_names(names);
 
-  exio_helper->initialize_element_variables(complex_names);
+  std::vector<std::set<subdomain_id_type>> complex_vars_active_subdomains =
+    exio_helper->get_complex_vars_active_subdomains(vars_active_subdomains);
+  exio_helper->initialize_element_variables(complex_names, complex_vars_active_subdomains);
 
   unsigned int num_values = soln.size();
   unsigned int num_vars = names.size();
@@ -594,11 +687,11 @@ void ExodusII_IO::write_element_data (const EquationSystems & es)
         }
     }
 
-  exio_helper->write_element_values(mesh, complex_soln, _timestep);
+  exio_helper->write_element_values(mesh, complex_soln, _timestep, complex_vars_active_subdomains);
 
 #else
-  exio_helper->initialize_element_variables(names);
-  exio_helper->write_element_values(mesh, soln, _timestep);
+  exio_helper->initialize_element_variables(names, vars_active_subdomains);
+  exio_helper->write_element_values(mesh, soln, _timestep, vars_active_subdomains);
 #endif
 }
 
@@ -608,7 +701,7 @@ void ExodusII_IO::write_nodal_data (const std::string & fname,
                                     const std::vector<Number> & soln,
                                     const std::vector<std::string> & names)
 {
-  START_LOG("write_nodal_data()", "ExodusII_IO");
+  LOG_SCOPE("write_nodal_data()", "ExodusII_IO");
 
   const MeshBase & mesh = MeshOutput<MeshBase>::mesh();
 
@@ -618,7 +711,7 @@ void ExodusII_IO::write_nodal_data (const std::string & fname,
   // The names of the variables to be output
   std::vector<std::string> output_names;
 
-  if(_allow_empty_variables || !_output_variables.empty())
+  if (_allow_empty_variables || !_output_variables.empty())
     output_names = _output_variables;
   else
     output_names = names;
@@ -635,11 +728,8 @@ void ExodusII_IO::write_nodal_data (const std::string & fname,
   this->write_nodal_data_common(fname, output_names, /*continuous=*/true);
 #endif
 
-  if(mesh.processor_id())
-    {
-      STOP_LOG("write_nodal_data()", "ExodusII_IO");
-      return;
-    }
+  if (mesh.processor_id())
+    return;
 
   // This will count the number of variables actually output
   for (int c=0; c<num_vars; c++)
@@ -654,32 +744,50 @@ void ExodusII_IO::write_nodal_data (const std::string & fname,
       unsigned int variable_name_position =
         cast_int<unsigned int>(pos - output_names.begin());
 
-#ifdef LIBMESH_USE_COMPLEX_NUMBERS
-      std::vector<Real> real_parts(num_nodes);
-      std::vector<Real> imag_parts(num_nodes);
-      std::vector<Real> magnitudes(num_nodes);
+      // Set up temporary vectors to be passed to Exodus to write the
+      // nodal values for a single variable at a time.
+#ifdef LIBMESH_USE_REAL_NUMBERS
+      std::vector<Number> cur_soln;
 
-      for (unsigned int i=0; i<num_nodes; ++i)
-        {
-          real_parts[i] = soln[i*num_vars + c].real();
-          imag_parts[i] = soln[i*num_vars + c].imag();
-          magnitudes[i] = std::abs(soln[i*num_vars + c]);
-        }
-      exio_helper->write_nodal_values(3*variable_name_position+1,real_parts,_timestep);
-      exio_helper->write_nodal_values(3*variable_name_position+2,imag_parts,_timestep);
-      exio_helper->write_nodal_values(3*variable_name_position+3,magnitudes,_timestep);
+      // num_nodes is either exactly how much space we will need for
+      // each vector, or a safe upper bound for the amount of memory
+      // we will require when there are gaps in the numbering.
+      cur_soln.reserve(num_nodes);
 #else
-      std::vector<Number> cur_soln(num_nodes);
+      std::vector<Real> real_parts;
+      std::vector<Real> imag_parts;
+      std::vector<Real> magnitudes;
+      real_parts.reserve(num_nodes);
+      imag_parts.reserve(num_nodes);
+      magnitudes.reserve(num_nodes);
+#endif
 
-      // Copy out this variable's solution
-      for (dof_id_type i=0; i<num_nodes; i++)
-        cur_soln[i] = soln[i*num_vars + c];
-      exio_helper->write_nodal_values(variable_name_position+1,cur_soln,_timestep);
+      // There could be gaps in "soln", but it will always be in the
+      // order of [num_vars * node_id + var_id]. We now copy the
+      // proper solution values contiguously into "cur_soln",
+      // removing the gaps.
+      for (const auto & node : mesh.node_ptr_range())
+        {
+          dof_id_type idx = node->id()*num_vars + c;
+#ifdef LIBMESH_USE_REAL_NUMBERS
+          cur_soln.push_back(soln[idx]);
+#else
+          real_parts.push_back(soln[idx].real());
+          imag_parts.push_back(soln[idx].imag());
+          magnitudes.push_back(std::abs(soln[idx]));
+#endif
+        }
+
+      // Finally, actually call the Exodus API to write to file.
+#ifdef LIBMESH_USE_REAL_NUMBERS
+      exio_helper->write_nodal_values(variable_name_position+1, cur_soln, _timestep);
+#else
+      exio_helper->write_nodal_values(3*variable_name_position+1, real_parts, _timestep);
+      exio_helper->write_nodal_values(3*variable_name_position+2, imag_parts, _timestep);
+      exio_helper->write_nodal_values(3*variable_name_position+3, magnitudes, _timestep);
 #endif
 
     }
-
-  STOP_LOG("write_nodal_data()", "ExodusII_IO");
 }
 
 
@@ -687,7 +795,7 @@ void ExodusII_IO::write_nodal_data (const std::string & fname,
 
 void ExodusII_IO::write_information_records (const std::vector<std::string> & records)
 {
-  if(MeshOutput<MeshBase>::mesh().processor_id())
+  if (MeshOutput<MeshBase>::mesh().processor_id())
     return;
 
   if (!exio_helper->opened_for_writing)
@@ -701,7 +809,7 @@ void ExodusII_IO::write_information_records (const std::vector<std::string> & re
 void ExodusII_IO::write_global_data (const std::vector<Number> & soln,
                                      const std::vector<std::string> & names)
 {
-  if(MeshOutput<MeshBase>::mesh().processor_id())
+  if (MeshOutput<MeshBase>::mesh().processor_id())
     return;
 
   if (!exio_helper->opened_for_writing)
@@ -754,12 +862,13 @@ void ExodusII_IO::write_global_data (const std::vector<Number> & soln,
 void ExodusII_IO::write_timestep (const std::string & fname,
                                   const EquationSystems & es,
                                   const int timestep,
-                                  const Real time)
+                                  const Real time,
+                                  const std::set<std::string> * system_names)
 {
   _timestep = timestep;
-  write_equation_systems(fname,es);
+  write_equation_systems(fname,es,system_names);
 
-  if(MeshOutput<MeshBase>::mesh().processor_id())
+  if (MeshOutput<MeshBase>::mesh().processor_id())
     return;
 
   exio_helper->write_timestep(timestep, time);
@@ -771,9 +880,10 @@ void ExodusII_IO::write (const std::string & fname)
 {
   const MeshBase & mesh = MeshOutput<MeshBase>::mesh();
 
-  // We may need to gather a ParallelMesh to output it, making that
+  // We may need to gather a DistributedMesh to output it, making that
   // const qualifier in our constructor a dirty lie
-  MeshSerializer serialize(const_cast<MeshBase &>(mesh), !MeshOutput<MeshBase>::_is_parallel_format);
+  // The "true" specifies that we only need the mesh serialized to processor 0
+  MeshSerializer serialize(MeshInput<MeshBase>::mesh(), !MeshOutput<MeshBase>::_is_parallel_format, true);
 
   libmesh_assert( !exio_helper->opened_for_writing );
 
@@ -782,9 +892,8 @@ void ExodusII_IO::write (const std::string & fname)
   // data, while "appending" is really intended to add data to an
   // existing file.  If we're verbose, print a message to this effect.
   if (_append && _verbose)
-    libMesh::out << "Warning: Appending in ExodusII_IO::write() does not make sense.\n"
-                 << "Creating a new file instead!"
-                 << std::endl;
+    libmesh_warning("Warning: Appending in ExodusII_IO::write() does not make sense.\n"
+                    "Creating a new file instead!");
 
   exio_helper->create(fname);
   exio_helper->initialize(fname,mesh);
@@ -793,16 +902,9 @@ void ExodusII_IO::write (const std::string & fname)
   exio_helper->write_sidesets(mesh);
   exio_helper->write_nodesets(mesh);
 
-  if(MeshOutput<MeshBase>::mesh().processor_id())
-    return;
-
-  if( (mesh.get_boundary_info().n_edge_conds() > 0) &&
-      _verbose )
-    {
-      libMesh::out << "Warning: Mesh contains edge boundary IDs, but these "
-                   << "are not supported by the ExodusII format."
-                   << std::endl;
-    }
+  if ((mesh.get_boundary_info().n_edge_conds() > 0) && _verbose)
+    libmesh_warning("Warning: Mesh contains edge boundary IDs, but these "
+                    "are not supported by the ExodusII format.");
 }
 
 
@@ -811,17 +913,14 @@ void ExodusII_IO::write_nodal_data_discontinuous (const std::string & fname,
                                                   const std::vector<Number> & soln,
                                                   const std::vector<std::string> & names)
 {
-
-  START_LOG("write_nodal_data_discontinuous()", "ExodusII_IO");
+  LOG_SCOPE("write_nodal_data_discontinuous()", "ExodusII_IO");
 
   const MeshBase & mesh = MeshOutput<MeshBase>::mesh();
 
   int num_vars = cast_int<int>(names.size());
   int num_nodes = 0;
-  MeshBase::const_element_iterator       it  = mesh.active_elements_begin();
-  const MeshBase::const_element_iterator end = mesh.active_elements_end();
-  for ( ; it != end; ++it)
-    num_nodes += (*it)->n_nodes();
+  for (const auto & elem : mesh.active_element_ptr_range())
+    num_nodes += elem->n_nodes();
 
 #ifdef LIBMESH_USE_COMPLEX_NUMBERS
 
@@ -836,10 +935,7 @@ void ExodusII_IO::write_nodal_data_discontinuous (const std::string & fname,
 #endif
 
   if (mesh.processor_id())
-    {
-      STOP_LOG("write_nodal_data_discontinuous()", "ExodusII_IO");
-      return;
-    }
+    return;
 
   for (int c=0; c<num_vars; c++)
     {
@@ -867,8 +963,6 @@ void ExodusII_IO::write_nodal_data_discontinuous (const std::string & fname,
       exio_helper->write_nodal_values(c+1,cur_soln,_timestep);
 #endif
     }
-
-  STOP_LOG("write_nodal_data_discontinuous()", "ExodusII_IO");
 }
 
 
@@ -909,13 +1003,9 @@ void ExodusII_IO::write_nodal_data_common(std::string fname,
           exio_helper->write_sidesets(mesh);
           exio_helper->write_nodesets(mesh);
 
-          if( (mesh.get_boundary_info().n_edge_conds() > 0) &&
-              _verbose )
-            {
-              libMesh::out << "Warning: Mesh contains edge boundary IDs, but these "
-                           << "are not supported by the ExodusII format."
-                           << std::endl;
-            }
+          if ((mesh.get_boundary_info().n_edge_conds() > 0) && _verbose)
+            libmesh_warning("Warning: Mesh contains edge boundary IDs, but these "
+                            "are not supported by the ExodusII format.");
 
           exio_helper->initialize_nodal_variables(names);
         }
@@ -945,6 +1035,16 @@ const std::vector<std::string> & ExodusII_IO::get_elem_var_names()
   return exio_helper->elem_var_names;
 }
 
+ExodusII_IO_Helper & ExodusII_IO::get_exio_helper()
+{
+  // Provide a warning when accessing the helper object
+  // since it is a non-public API and is likely to see
+  // future API changes
+  libmesh_experimental();
+
+  return *exio_helper;
+}
+
 
 // LIBMESH_HAVE_EXODUS_API is not defined, declare error() versions of functions...
 #else
@@ -953,7 +1053,6 @@ const std::vector<std::string> & ExodusII_IO::get_elem_var_names()
 
 ExodusII_IO::~ExodusII_IO ()
 {
-  libmesh_error_msg("ERROR, ExodusII API is not defined.");
 }
 
 
@@ -1067,7 +1166,8 @@ void ExodusII_IO::write_global_data (const std::vector<Number> &,
 void ExodusII_IO::write_timestep (const std::string &,
                                   const EquationSystems &,
                                   const int,
-                                  const Real)
+                                  const Real,
+                                  const std::set<std::string> *)
 {
   libmesh_error_msg("ERROR, ExodusII API is not defined.");
 }

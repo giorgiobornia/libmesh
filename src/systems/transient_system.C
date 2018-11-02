@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -27,6 +27,7 @@
 #include "libmesh/dof_map.h"
 #include "libmesh/numeric_vector.h"
 #include "libmesh/rb_construction.h"
+#include "libmesh/eigen_system.h"
 
 namespace libMesh
 {
@@ -41,21 +42,7 @@ TransientSystem<Base>::TransientSystem (EquationSystems & es,
 
   Base                 (es, name_in, number_in)
 {
-#ifdef LIBMESH_ENABLE_GHOSTED
-  old_local_solution =
-    UniquePtr<NumericVector<Number> >
-    (&(this->add_vector("_transient_old_local_solution", true, GHOSTED)));
-  older_local_solution =
-    UniquePtr<NumericVector<Number> >
-    (&(this->add_vector("_transient_older_local_solution", true, GHOSTED)));
-#else
-  old_local_solution =
-    UniquePtr<NumericVector<Number> >
-    (&(this->add_vector("_transient_old_local_solution", true, SERIAL)));
-  older_local_solution =
-    UniquePtr<NumericVector<Number> >
-    (&(this->add_vector("_transient_older_local_solution", true, SERIAL)));
-#endif
+  this->add_old_vectors();
 }
 
 
@@ -65,7 +52,7 @@ TransientSystem<Base>::~TransientSystem ()
 {
   this->clear();
 
-  // We still have UniquePtrs for API compatibility, but
+  // We still have std::unique_ptrs for API compatibility, but
   // now that we're System::add_vector()ing these, we can trust
   // the base class to handle memory management
   old_local_solution.release();
@@ -90,50 +77,8 @@ void TransientSystem<Base>::clear ()
   old_local_solution.release();
   older_local_solution.release();
 
-  old_local_solution =
-    UniquePtr<NumericVector<Number> >
-    (&(this->add_vector("_transient_old_local_solution")));
-  older_local_solution =
-    UniquePtr<NumericVector<Number> >
-    (&(this->add_vector("_transient_older_local_solution")));
-}
-
-
-
-
-template <class Base>
-void TransientSystem<Base>::init_data ()
-{
-  // initialize parent data
-  Base::init_data();
-
-  // Initialize the old & older solutions
-  // Using new ghosted vectors if enabled
-#ifdef LIBMESH_ENABLE_GHOSTED
-  old_local_solution->init   (this->n_dofs(), this->n_local_dofs(),
-                              this->get_dof_map().get_send_list(), false,
-                              GHOSTED);
-  older_local_solution->init (this->n_dofs(), this->n_local_dofs(),
-                              this->get_dof_map().get_send_list(), false,
-                              GHOSTED);
-#else
-  old_local_solution->init   (this->n_dofs(), false, SERIAL);
-  older_local_solution->init (this->n_dofs(), false, SERIAL);
-#endif
-}
-
-
-
-template <class Base>
-void TransientSystem<Base>::reinit ()
-{
-  // initialize parent data
-  Base::reinit();
-
-  // Project the old & older vectors to the new mesh
-  // The System::reinit handles this now
-  // this->project_vector (*old_local_solution);
-  // this->project_vector (*older_local_solution);
+  // Restore us to a "basic" state
+  this->add_old_vectors();
 }
 
 
@@ -197,6 +142,25 @@ Number TransientSystem<Base>::older_solution (const dof_id_type global_dof_numbe
 
 
 
+template <class Base>
+void TransientSystem<Base>::add_old_vectors()
+{
+#ifdef LIBMESH_ENABLE_GHOSTED
+  old_local_solution =
+    std::unique_ptr<NumericVector<Number>>
+    (&(this->add_vector("_transient_old_local_solution", true, GHOSTED)));
+  older_local_solution =
+    std::unique_ptr<NumericVector<Number>>
+    (&(this->add_vector("_transient_older_local_solution", true, GHOSTED)));
+#else
+  old_local_solution =
+    std::unique_ptr<NumericVector<Number>>
+    (&(this->add_vector("_transient_old_local_solution", true, SERIAL)));
+  older_local_solution =
+    std::unique_ptr<NumericVector<Number>>
+    (&(this->add_vector("_transient_older_local_solution", true, SERIAL)));
+#endif
+}
 
 // ------------------------------------------------------------
 // TransientSystem instantiations
@@ -205,5 +169,8 @@ template class TransientSystem<NonlinearImplicitSystem>;
 template class TransientSystem<ExplicitSystem>;
 template class TransientSystem<System>;
 template class TransientSystem<RBConstruction>;
+#ifdef LIBMESH_HAVE_SLEPC
+template class TransientSystem<EigenSystem>;
+#endif
 
 } // namespace libMesh

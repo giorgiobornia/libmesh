@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -29,9 +29,7 @@
 #include "libmesh/equation_systems.h"
 #include "libmesh/mesh_base.h"
 #include "libmesh/mesh_tools.h"
-#include "libmesh/parallel_mesh.h"
 #include "libmesh/parallel.h"
-#include "libmesh/serial_mesh.h"
 #include "libmesh/xdr_cxx.h"
 #include "libmesh/mesh_refinement.h"
 
@@ -94,21 +92,19 @@ void EquationSystems::read (const std::string & name,
                             const unsigned int read_flags,
                             bool partition_agnostic)
 {
-#ifdef LIBMESH_ENABLE_EXCEPTIONS
-
   // If we have exceptions enabled we can be considerate and try
   // to read old restart files which contain infinite element
   // information but do not have the " with infinite elements"
   // string in the version information.
 
   // First try the read the user requested
-  try
+  libmesh_try
     {
       this->_read_impl<InValType> (name, mode, read_flags, partition_agnostic);
     }
 
   // If that fails, try it again but explicitly request we look for infinite element info
-  catch (...)
+  libmesh_catch (...)
     {
       libMesh::out << "\n*********************************************************************\n"
                    << "READING THE FILE \"" << name << "\" FAILED.\n"
@@ -118,29 +114,22 @@ void EquationSystems::read (const std::string & name,
                    << "*********************************************************************\n"
                    << std::endl;
 
-      try
+      libmesh_try
         {
           this->_read_impl<InValType> (name, mode, read_flags | EquationSystems::TRY_READ_IFEMS, partition_agnostic);
         }
 
       // If all that failed, we are out of ideas here...
-      catch (...)
+      libmesh_catch (...)
         {
           libMesh::out << "\n*********************************************************************\n"
                        << "Well, at least we tried!\n"
                        << "Good Luck!!\n"
                        << "*********************************************************************\n"
                        << std::endl;
-          throw;
+          LIBMESH_THROW();
         }
     }
-
-#else
-
-  // no exceptions - cross your fingers...
-  this->_read_impl<InValType> (name, mode, read_flags, partition_agnostic);
-
-#endif // #ifdef LIBMESH_ENABLE_EXCEPTIONS
 
 #ifdef LIBMESH_ENABLE_AMR
   MeshRefinement mesh_refine(_mesh);
@@ -228,7 +217,7 @@ void EquationSystems::_read_impl (const std::string & name,
   const bool read_basic_only      = read_flags & EquationSystems::READ_BASIC_ONLY;
   bool read_parallel_files  = false;
 
-  std::map<std::string, System *> xda_systems;
+  std::vector<std::pair<std::string, System *>> xda_systems;
 
   // This will unzip a file with .bz2 as the extension, otherwise it
   // simply returns the name if the file need not be unzipped.
@@ -245,9 +234,10 @@ void EquationSystems::_read_impl (const std::string & name,
         this->comm().broadcast(version);
 
         // All processors have the version header, if it does not contain
-        // "libMesh" something then it is a legacy file.
-        std::string::size_type lm_pos = version.find("libMesh");
-        if (!(lm_pos < version.size()))
+        // the libMesh_label string then it is a legacy file.
+        const std::string libMesh_label = "libMesh-";
+        std::string::size_type lm_pos = version.find(libMesh_label);
+        if (lm_pos==std::string::npos)
           {
             io.close();
 
@@ -258,7 +248,7 @@ void EquationSystems::_read_impl (const std::string & name,
           }
 
         // Figure out the libMesh version that created this file
-        std::istringstream iss(version.substr(lm_pos + 8));
+        std::istringstream iss(version.substr(lm_pos + libMesh_label.size()));
         int ver_major = 0, ver_minor = 0, ver_patch = 0;
         char dot;
         iss >> ver_major >> dot >> ver_minor >> dot >> ver_patch;
@@ -313,7 +303,7 @@ void EquationSystems::_read_impl (const std::string & name,
                                 read_additional_data,
                                 read_legacy_format);
 
-        xda_systems.insert(std::make_pair(sys_name, &new_system));
+        xda_systems.push_back(std::make_pair(sys_name, &new_system));
 
         // If we're only creating "basic" systems, we need to tell
         // each system that before we call init() later.
@@ -345,20 +335,19 @@ void EquationSystems::_read_impl (const std::string & name,
 
       Xdr local_io (read_parallel_files ? local_file_name(this->processor_id(),name) : "", mode);
 
-      std::map<std::string, System *>::iterator
-        pos = xda_systems.begin();
-
-      for (; pos != xda_systems.end(); ++pos)
+      for (auto & pr : xda_systems)
         if (read_legacy_format)
           {
             libmesh_deprecated();
-            pos->second->read_legacy_data (io, read_additional_data);
+#ifdef LIBMESH_ENABLE_DEPRECATED
+            pr.second->read_legacy_data (io, read_additional_data);
+#endif
           }
         else
           if (read_parallel_files)
-            pos->second->read_parallel_data<InValType>   (local_io, read_additional_data);
+            pr.second->read_parallel_data<InValType>   (local_io, read_additional_data);
           else
-            pos->second->read_serialized_data<InValType> (io, read_additional_data);
+            pr.second->read_serialized_data<InValType> (io, read_additional_data);
 
 
       // Undo the temporary numbering.
@@ -457,7 +446,7 @@ void EquationSystems::write(const std::string & name,
   // the EquationSystems::write() method should look constant,
   // but we need to assign a temporary numbering to the nodes
   // and elements in the mesh, which requires that we abuse const_cast
-  if(partition_agnostic)
+  if (partition_agnostic)
     {
       MeshBase & mesh = const_cast<MeshBase &>(this->get_mesh());
       MeshTools::Private::globally_renumber_nodes_and_elements(mesh);
@@ -470,27 +459,32 @@ void EquationSystems::write(const std::string & name,
   // always write parallel files if we're instructed to write in
   // parallel
   const bool write_parallel_files  =
-    (write_flags & EquationSystems::WRITE_PARALLEL_FILES) ||
-    // but also write parallel files if we haven't been instructed to
-    // write in serial and we're on a distributed mesh
-    (!(write_flags & EquationSystems::WRITE_SERIAL_FILES) &&
-     !this->get_mesh().is_serial());
+    (write_flags & EquationSystems::WRITE_PARALLEL_FILES)
+    // Even if we're on a distributed mesh, we may or may not have a
+    // consistent way of reconstructing the same mesh partitioning
+    // later, but we need the same mesh partitioning if we want to
+    // reread the parallel solution safely, so let's write a serial file
+    // unless specifically requested not to.
+    // ||
+    // // but also write parallel files if we haven't been instructed to
+    // // write in serial and we're on a distributed mesh
+    // (!(write_flags & EquationSystems::WRITE_SERIAL_FILES) &&
+    // !this->get_mesh().is_serial())
+    ;
 
   // New scope so that io will close before we try to zip the file
   {
     Xdr io((this->processor_id()==0) ? name : "", mode);
     libmesh_assert (io.writing());
 
-    START_LOG("write()","EquationSystems");
+    LOG_SCOPE("write()", "EquationSystems");
 
     const unsigned int proc_id = this->processor_id();
 
     unsigned int n_sys = 0;
-    for (std::map<std::string, System *>::const_iterator pos = _systems.begin();
-         pos != _systems.end(); ++pos)
-      {
-        if (! pos->second->hide_output()) n_sys++;
-      }
+    for (auto & pr : _systems)
+      if (!pr.second->hide_output())
+        n_sys++;
 
     // set the version number in the Xdr object
     io.set_version(LIBMESH_VERSION_ID(LIBMESH_MAJOR_VERSION,
@@ -518,17 +512,16 @@ void EquationSystems::write(const std::string & name,
         // Write the number of equation systems
         io.data (n_sys, "# No. of Equation Systems");
 
-        for (std::map<std::string, System *>::const_iterator pos = _systems.begin();
-             pos != _systems.end(); ++pos)
+        for (auto & pr : _systems)
           {
             // Ignore this system if it has been marked as hidden
-            if (pos->second->hide_output()) continue;
+            if (pr.second->hide_output()) continue;
 
             // 3.)
             // Write the name of the sys_num-th system
             {
-              const unsigned int sys_num = pos->second->number();
-              std::string sys_name       = pos->first;
+              const unsigned int sys_num = pr.second->number();
+              std::string sys_name       = pr.first;
 
               comment =  "# Name, System No. ";
               std::sprintf(buf, "%u", sys_num);
@@ -540,8 +533,8 @@ void EquationSystems::write(const std::string & name,
             // 4.)
             // Write the type of system handled
             {
-              const unsigned int sys_num = pos->second->number();
-              std::string sys_type       = pos->second->system_type();
+              const unsigned int sys_num = pr.second->number();
+              std::string sys_type       = pr.second->system_type();
 
               comment =  "# Type, System No. ";
               std::sprintf(buf, "%u", sys_num);
@@ -552,7 +545,7 @@ void EquationSystems::write(const std::string & name,
 
             // 5.) - 9.)
             // Let System::write_header() do the job
-            pos->second->write_header (io, version, write_additional_data);
+            pr.second->write_header (io, version, write_additional_data);
           }
       }
 
@@ -563,27 +556,24 @@ void EquationSystems::write(const std::string & name,
         // open a parallel buffer if warranted.
         Xdr local_io (write_parallel_files ? local_file_name(this->processor_id(),name) : "", mode);
 
-        for (std::map<std::string, System *>::const_iterator pos = _systems.begin();
-             pos != _systems.end(); ++pos)
+        for (auto & pr : _systems)
           {
             // Ignore this system if it has been marked as hidden
-            if (pos->second->hide_output()) continue;
+            if (pr.second->hide_output()) continue;
 
             // 10.) + 11.)
             if (write_parallel_files)
-              pos->second->write_parallel_data (local_io,write_additional_data);
+              pr.second->write_parallel_data (local_io,write_additional_data);
             else
-              pos->second->write_serialized_data (io,write_additional_data);
+              pr.second->write_serialized_data (io,write_additional_data);
           }
       }
-
-    STOP_LOG("write()","EquationSystems");
   }
 
   // the EquationSystems::write() method should look constant,
   // but we need to undo the temporary numbering of the nodes
   // and elements in the mesh, which requires that we abuse const_cast
-  if(partition_agnostic)
+  if (partition_agnostic)
     const_cast<MeshBase &>(_mesh).fix_broken_node_and_element_numbering();
 }
 

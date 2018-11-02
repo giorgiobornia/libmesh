@@ -27,22 +27,25 @@
 // Local includes
 #include "libmesh/libmesh_common.h"
 #include "libmesh/point.h"
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
 #include "libmesh/parallel.h"
 
 // C++ includes
 #include <vector>
-
-
+#include <memory>
 
 namespace libMesh
 {
 
 // Forward declarations
 class Elem;
-class SerialMesh;
+class ReplicatedMesh;
 class TriangleInterface;
 class TetGenMeshInterface;
+
+// This is for backwards compatibility, but if your code relies on
+// forward declarations in our headers then fix it.
+class SerialMesh;
 
 /**
  * This class implements cutting a single element into a collection
@@ -52,6 +55,7 @@ class TetGenMeshInterface;
  *
  * \author Benjamin S. Kirk
  * \date 2013
+ * \brief Subdivides a single element using a mesh generator.
  */
 class ElemCutter
 {
@@ -59,7 +63,7 @@ public:
 
   /**
    * Constructor.  Initializes pointer data
-   * without requiring a full \p SerialMesh in this header file.
+   * without requiring a full \p ReplicatedMesh in this header file.
    */
   ElemCutter();
 
@@ -69,7 +73,7 @@ public:
   ~ElemCutter();
 
   /**
-   * @returns \p true if the element is completely inside the
+   * \returns \p true if the element is completely inside the
    * interface defined implicitly by the vertex values of the signed
    * \p vertex_distance_func.
    */
@@ -77,7 +81,7 @@ public:
                   const std::vector<Real> & vertex_distance_func) const;
 
   /**
-   * @returns \p true if the element is completely outside the
+   * \returns \p true if the element is completely outside the
    * interface defined implicitly by the vertex values of the signed
    * \p vertex_distance_func.
    */
@@ -85,7 +89,7 @@ public:
                    const std::vector<Real> & vertex_distance_func) const;
 
   /**
-   * @returns \p true if the element is cut by the interface defined
+   * \returns \p true if the element is cut by the interface defined
    * implicitly by the vertex values of the signed
    * \p vertex_distance_func.
    */
@@ -105,7 +109,7 @@ public:
                   const std::vector<Real> & vertex_distance_func);
 
   /**
-   * Returns a list of in general element pieces considered inside the
+   * \returns A list of general element pieces considered inside the
    * cutting surface.  These are subelements whose geometric union
    * defines the spatial domain of the inside portion of the cut element.
    */
@@ -113,7 +117,7 @@ public:
   { return _inside_elem; }
 
   /**
-   * Returns a list of in general element pieces considered outside the
+   * \returns A list of general element pieces considered outside the
    * cutting surface.  These are subelements whose geometric union
    * defines the spatial domain of the outside portion of the cut element.
    */
@@ -130,19 +134,19 @@ protected:
                                 const std::vector<Real> & vertex_distance_func);
 
   /**
-   * cutting algoritm in 1D.
+   * cutting algorithm in 1D.
    */
   void cut_1D(const Elem & elem,
               const std::vector<Real> & vertex_distance_func);
 
   /**
-   * cutting algoritm in 2D.
+   * cutting algorithm in 2D.
    */
   void cut_2D(const Elem & elem,
               const std::vector<Real> & vertex_distance_func);
 
   /**
-   * cutting algoritm in 3D.
+   * cutting algorithm in 3D.
    */
   void cut_3D(const Elem & elem,
               const std::vector<Real> & vertex_distance_func);
@@ -150,17 +154,19 @@ protected:
   std::vector<Elem const *> _inside_elem;
   std::vector<Elem const *> _outside_elem;
 
-  UniquePtr<SerialMesh> _inside_mesh_2D;
-  UniquePtr<SerialMesh> _outside_mesh_2D;
-  UniquePtr<SerialMesh> _inside_mesh_3D;
-  UniquePtr<SerialMesh> _outside_mesh_3D;
-
   Parallel::Communicator _comm_self; // defaults to MPI_COMM_SELF
 
-  UniquePtr<TriangleInterface>   _triangle_inside;
-  UniquePtr<TriangleInterface>   _triangle_outside;
-  UniquePtr<TetGenMeshInterface> _tetgen_inside;
-  UniquePtr<TetGenMeshInterface> _tetgen_outside;
+  std::unique_ptr<ReplicatedMesh> _inside_mesh_2D;
+  std::unique_ptr<TriangleInterface> _triangle_inside;
+
+  std::unique_ptr<ReplicatedMesh> _outside_mesh_2D;
+  std::unique_ptr<TriangleInterface> _triangle_outside;
+
+  std::unique_ptr<ReplicatedMesh> _inside_mesh_3D;
+  std::unique_ptr<TetGenMeshInterface> _tetgen_inside;
+
+  std::unique_ptr<ReplicatedMesh> _outside_mesh_3D;
+  std::unique_ptr<TetGenMeshInterface> _tetgen_outside;
 
   std::vector<Point> _intersection_pts;
 };

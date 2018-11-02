@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -40,9 +40,10 @@ std::string demangle(const char * name);
 /**
  * Writes a stack trace to a uniquely named file if
  * --enable-tracefiles has been set by configure, otherwise does
- * nothing. Note that we append to the trace file rather than
- * overwriting it.  This allows multiple traces to be written to the
- * same file.
+ * nothing.
+ *
+ * \note We append to the trace file rather than overwriting it.  This
+ * allows multiple traces to be written to the same file.
  */
 void write_traceout();
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -74,7 +74,7 @@ void assemble_unconstrained_element_system(const FEMSystem & _sys,
 
   // We need jacobians to do heterogeneous residual constraints
   const bool need_jacobian =
-    _get_jacobian || _constrain_heterogeneously;
+    (_get_jacobian || _constrain_heterogeneously);
 
   bool jacobian_computed =
     _sys.time_solver->element_residual(need_jacobian, _femcontext);
@@ -132,13 +132,13 @@ void assemble_unconstrained_element_system(const FEMSystem & _sys,
         }
     }
 
-  for (_femcontext.side = 0;
-       _femcontext.side != _femcontext.get_elem().n_sides();
+  const unsigned char n_sides = _femcontext.get_elem().n_sides();
+  for (_femcontext.side = 0; _femcontext.side != n_sides;
        ++_femcontext.side)
     {
       // Don't compute on non-boundary sides unless requested
       if (!_sys.get_physics()->compute_internal_sides &&
-          _femcontext.get_elem().neighbor(_femcontext.side) != libmesh_nullptr)
+          _femcontext.get_elem().neighbor_ptr(_femcontext.side) != nullptr)
         continue;
 
       // Any mesh movement has already been done (and restored,
@@ -251,6 +251,7 @@ void add_element_system(const FEMSystem & _sys,
                         const bool _get_residual,
                         const bool _get_jacobian,
                         const bool _constrain_heterogeneously,
+                        const bool _no_constraints,
                         FEMContext & _femcontext)
 {
 #ifdef LIBMESH_ENABLE_CONSTRAINTS
@@ -275,11 +276,12 @@ void add_element_system(const FEMSystem & _sys,
           (_femcontext.get_elem_jacobian(),
            _femcontext.get_elem_residual(),
            _femcontext.get_dof_indices(), false);
-      else
+      else if (!_no_constraints)
         _sys.get_dof_map().constrain_element_matrix_and_vector
           (_femcontext.get_elem_jacobian(),
            _femcontext.get_elem_residual(),
            _femcontext.get_dof_indices(), false);
+      // Do nothing if (_no_constraints)
     }
   else if (_get_residual)
     {
@@ -288,16 +290,20 @@ void add_element_system(const FEMSystem & _sys,
           (_femcontext.get_elem_jacobian(),
            _femcontext.get_elem_residual(),
            _femcontext.get_dof_indices(), false);
-      else
+      else if (!_no_constraints)
         _sys.get_dof_map().constrain_element_vector
           (_femcontext.get_elem_residual(), _femcontext.get_dof_indices(), false);
+      // Do nothing if (_no_constraints)
     }
   else if (_get_jacobian)
     {
       // Heterogeneous and homogeneous constraints are the same on the
       // matrix
-      _sys.get_dof_map().constrain_element_matrix
-        (_femcontext.get_elem_jacobian(), _femcontext.get_dof_indices(), false);
+      // Only get these contribs if we are applying some constraints
+      if (!_no_constraints)
+        _sys.get_dof_map().constrain_element_matrix (_femcontext.get_elem_jacobian(),
+                                                     _femcontext.get_dof_indices(),
+                                                     false);
     }
 #endif // #ifdef LIBMESH_ENABLE_CONSTRAINTS
 
@@ -348,36 +354,36 @@ public:
   AssemblyContributions(FEMSystem & sys,
                         bool get_residual,
                         bool get_jacobian,
-                        bool constrain_heterogeneously) :
+                        bool constrain_heterogeneously,
+                        bool no_constraints) :
     _sys(sys),
     _get_residual(get_residual),
     _get_jacobian(get_jacobian),
-    _constrain_heterogeneously(constrain_heterogeneously) {}
+    _constrain_heterogeneously(constrain_heterogeneously),
+    _no_constraints(no_constraints) {}
 
   /**
    * operator() for use with Threads::parallel_for().
    */
   void operator()(const ConstElemRange & range) const
   {
-    UniquePtr<DiffContext> con = _sys.build_context();
+    std::unique_ptr<DiffContext> con = _sys.build_context();
     FEMContext & _femcontext = cast_ref<FEMContext &>(*con);
     _sys.init_context(_femcontext);
 
-    for (ConstElemRange::const_iterator elem_it = range.begin();
-         elem_it != range.end(); ++elem_it)
+    for (const auto & elem : range)
       {
-        Elem * el = const_cast<Elem *>(*elem_it);
+        Elem * el = const_cast<Elem *>(elem);
 
         _femcontext.pre_fe_reinit(_sys, el);
         _femcontext.elem_fe_reinit();
 
         assemble_unconstrained_element_system
-          (_sys, _get_jacobian, _constrain_heterogeneously,
-           _femcontext);
+          (_sys, _get_jacobian, _constrain_heterogeneously, _femcontext);
 
         add_element_system
           (_sys, _get_residual, _get_jacobian,
-           _constrain_heterogeneously, _femcontext);
+           _constrain_heterogeneously, _no_constraints, _femcontext);
       }
   }
 
@@ -385,7 +391,7 @@ private:
 
   FEMSystem & _sys;
 
-  const bool _get_residual, _get_jacobian, _constrain_heterogeneously;
+  const bool _get_residual, _get_jacobian, _constrain_heterogeneously, _no_constraints;
 };
 
 class PostprocessContributions
@@ -402,14 +408,13 @@ public:
    */
   void operator()(const ConstElemRange & range) const
   {
-    UniquePtr<DiffContext> con = _sys.build_context();
+    std::unique_ptr<DiffContext> con = _sys.build_context();
     FEMContext & _femcontext = cast_ref<FEMContext &>(*con);
     _sys.init_context(_femcontext);
 
-    for (ConstElemRange::const_iterator elem_it = range.begin();
-         elem_it != range.end(); ++elem_it)
+    for (const auto & elem : range)
       {
-        Elem * el = const_cast<Elem *>(*elem_it);
+        Elem * el = const_cast<Elem *>(elem);
         _femcontext.pre_fe_reinit(_sys, el);
 
         // Optionally initialize all the interior FE objects on elem.
@@ -418,14 +423,14 @@ public:
 
         _sys.element_postprocess(_femcontext);
 
-        for (_femcontext.side = 0;
-             _femcontext.side != _femcontext.get_elem().n_sides();
+        const unsigned char n_sides = _femcontext.get_elem().n_sides();
+        for (_femcontext.side = 0; _femcontext.side != n_sides;
              ++_femcontext.side)
           {
             // Don't compute on non-boundary sides unless requested
             if (!_sys.postprocess_sides ||
                 (!_sys.get_physics()->compute_internal_sides &&
-                 _femcontext.get_elem().neighbor(_femcontext.side) != libmesh_nullptr))
+                 _femcontext.get_elem().neighbor_ptr(_femcontext.side) != nullptr))
               continue;
 
             // Optionally initialize all the FE objects on this side.
@@ -452,28 +457,28 @@ public:
   QoIContributions(FEMSystem & sys,
                    DifferentiableQoI & diff_qoi,
                    const QoISet & qoi_indices) :
-    qoi(sys.qoi.size(), 0.), _sys(sys), _diff_qoi(diff_qoi),_qoi_indices(qoi_indices) {}
+    qoi(sys.n_qois(), 0.), _sys(sys), _diff_qoi(diff_qoi),_qoi_indices(qoi_indices) {}
 
   /**
    * splitting constructor
    */
   QoIContributions(const QoIContributions & other,
                    Threads::split) :
-    qoi(other._sys.qoi.size(), 0.), _sys(other._sys), _diff_qoi(other._diff_qoi) {}
+    qoi(other._sys.n_qois(), 0.), _sys(other._sys), _diff_qoi(other._diff_qoi) {}
 
   /**
    * operator() for use with Threads::parallel_reduce().
    */
   void operator()(const ConstElemRange & range)
   {
-    UniquePtr<DiffContext> con = _sys.build_context();
+    std::unique_ptr<DiffContext> con = _sys.build_context();
     FEMContext & _femcontext = cast_ref<FEMContext &>(*con);
     _diff_qoi.init_context(_femcontext);
 
     bool have_some_heterogenous_qoi_bc = false;
 #ifdef LIBMESH_ENABLE_CONSTRAINTS
-    std::vector<bool> have_heterogenous_qoi_bc(_sys.qoi.size(), false);
-    for (unsigned int q=0; q != _sys.qoi.size(); ++q)
+    std::vector<bool> have_heterogenous_qoi_bc(_sys.n_qois(), false);
+    for (unsigned int q=0; q != _sys.n_qois(); ++q)
       if (_qoi_indices.has_index(q) &&
           _sys.get_dof_map().has_heterogenous_adjoint_constraints(q))
         {
@@ -485,26 +490,27 @@ public:
     if (have_some_heterogenous_qoi_bc)
       _sys.init_context(_femcontext);
 
-    for (ConstElemRange::const_iterator elem_it = range.begin();
-         elem_it != range.end(); ++elem_it)
+    for (const auto & elem : range)
       {
-        Elem * el = const_cast<Elem *>(*elem_it);
+        Elem * el = const_cast<Elem *>(elem);
 
         _femcontext.pre_fe_reinit(_sys, el);
+
+        const unsigned int n_dofs =
+          cast_int<unsigned int>(_femcontext.get_dof_indices().size());
 
         // We might have some heterogenous dofs here; let's see for
         // certain
 #ifdef LIBMESH_ENABLE_CONSTRAINTS
         bool elem_has_some_heterogenous_qoi_bc = false;
-        std::vector<bool> elem_has_heterogenous_qoi_bc(_sys.qoi.size(), false);
+        std::vector<bool> elem_has_heterogenous_qoi_bc(_sys.n_qois(), false);
         if (have_some_heterogenous_qoi_bc)
           {
-            for (unsigned int q=0; q != _sys.qoi.size(); ++q)
+            for (unsigned int q=0; q != _sys.n_qois(); ++q)
               {
                 if (have_heterogenous_qoi_bc[q])
                   {
-                    for (unsigned int d=0;
-                         d != _femcontext.get_dof_indices().size(); ++d)
+                    for (auto d : IntRange<unsigned int>(0, n_dofs))
                       if (_sys.get_dof_map().has_heterogenous_adjoint_constraint
                           (q, _femcontext.get_dof_indices()[d]) != Number(0))
                         {
@@ -532,12 +538,11 @@ public:
           {
             _sys.time_solver->element_residual(false, _femcontext);
 
-            for (unsigned int q=0; q != _sys.qoi.size(); ++q)
+            for (unsigned int q=0; q != _sys.n_qois(); ++q)
               {
                 if (elem_has_heterogenous_qoi_bc[q])
                   {
-                    for (unsigned int d=0;
-                         d != _femcontext.get_dof_indices().size(); ++d)
+                    for (auto d : IntRange<unsigned int>(0, n_dofs))
                       this->qoi[q] -= _femcontext.get_elem_residual()(d) *
                         _sys.get_dof_map().has_heterogenous_adjoint_constraint(q, _femcontext.get_dof_indices()[d]);
 
@@ -546,14 +551,14 @@ public:
           }
 #endif
 
-        for (_femcontext.side = 0;
-             _femcontext.side != _femcontext.get_elem().n_sides();
+        const unsigned char n_sides = _femcontext.get_elem().n_sides();
+        for (_femcontext.side = 0; _femcontext.side != n_sides;
              ++_femcontext.side)
           {
             // Don't compute on non-boundary sides unless requested
             if (!_diff_qoi.assemble_qoi_sides ||
                 (!_diff_qoi.assemble_qoi_internal_sides &&
-                 _femcontext.get_elem().neighbor(_femcontext.side) != libmesh_nullptr))
+                 _femcontext.get_elem().neighbor_ptr(_femcontext.side) != nullptr))
               continue;
 
             _femcontext.side_fe_reinit();
@@ -603,15 +608,15 @@ public:
    */
   void operator()(const ConstElemRange & range) const
   {
-    UniquePtr<DiffContext> con = _sys.build_context();
+    std::unique_ptr<DiffContext> con = _sys.build_context();
     FEMContext & _femcontext = cast_ref<FEMContext &>(*con);
     _qoi.init_context(_femcontext);
 
     bool have_some_heterogenous_qoi_bc = false;
 #ifdef LIBMESH_ENABLE_CONSTRAINTS
-    std::vector<bool> have_heterogenous_qoi_bc(_sys.qoi.size(), false);
+    std::vector<bool> have_heterogenous_qoi_bc(_sys.n_qois(), false);
     if (_include_liftfunc || _apply_constraints)
-      for (unsigned int q=0; q != _sys.qoi.size(); ++q)
+      for (unsigned int q=0; q != _sys.n_qois(); ++q)
         if (_qoi_indices.has_index(q) &&
             _sys.get_dof_map().has_heterogenous_adjoint_constraints(q))
           {
@@ -623,26 +628,27 @@ public:
     if (have_some_heterogenous_qoi_bc)
       _sys.init_context(_femcontext);
 
-    for (ConstElemRange::const_iterator elem_it = range.begin();
-         elem_it != range.end(); ++elem_it)
+    for (const auto & elem : range)
       {
-        Elem * el = const_cast<Elem *>(*elem_it);
+        Elem * el = const_cast<Elem *>(elem);
 
         _femcontext.pre_fe_reinit(_sys, el);
+
+        const unsigned int n_dofs =
+          cast_int<unsigned int>(_femcontext.get_dof_indices().size());
 
         // We might have some heterogenous dofs here; let's see for
         // certain
 #ifdef LIBMESH_ENABLE_CONSTRAINTS
         bool elem_has_some_heterogenous_qoi_bc = false;
-        std::vector<bool> elem_has_heterogenous_qoi_bc(_sys.qoi.size(), false);
+        std::vector<bool> elem_has_heterogenous_qoi_bc(_sys.n_qois(), false);
         if (have_some_heterogenous_qoi_bc)
           {
-            for (unsigned int q=0; q != _sys.qoi.size(); ++q)
+            for (unsigned int q=0; q != _sys.n_qois(); ++q)
               {
                 if (have_heterogenous_qoi_bc[q])
                   {
-                    for (unsigned int d=0;
-                         d != _femcontext.get_dof_indices().size(); ++d)
+                    for (auto d : IntRange<unsigned int>(0, n_dofs))
                       if (_sys.get_dof_map().has_heterogenous_adjoint_constraint
                           (q, _femcontext.get_dof_indices()[d]) != Number(0))
                         {
@@ -692,20 +698,18 @@ public:
         // may handle integrating
         if (_include_liftfunc && elem_has_some_heterogenous_qoi_bc)
           {
-            for (unsigned int q=0; q != _sys.qoi.size(); ++q)
+            for (unsigned int q=0; q != _sys.n_qois(); ++q)
               {
                 if (elem_has_heterogenous_qoi_bc[q])
                   {
-                    for (unsigned int i=0;
-                         i != _femcontext.get_dof_indices().size(); ++i)
+                    for (auto i : IntRange<unsigned int>(0, n_dofs))
                       {
                         Number liftfunc_val =
                           _sys.get_dof_map().has_heterogenous_adjoint_constraint(q, _femcontext.get_dof_indices()[i]);
 
                         if (liftfunc_val != Number(0))
                           {
-                            for (unsigned int j=0;
-                                 j != _femcontext.get_dof_indices().size(); ++j)
+                            for (auto j : IntRange<unsigned int>(0, n_dofs))
                               _femcontext.get_qoi_derivatives()[q](j) -=
                                 _femcontext.get_elem_jacobian()(i,j) *
                                 liftfunc_val;
@@ -717,14 +721,14 @@ public:
 #endif
 
 
-        for (_femcontext.side = 0;
-             _femcontext.side != _femcontext.get_elem().n_sides();
+        const unsigned char n_sides = _femcontext.get_elem().n_sides();
+        for (_femcontext.side = 0; _femcontext.side != n_sides;
              ++_femcontext.side)
           {
             // Don't compute on non-boundary sides unless requested
             if (!_qoi.assemble_qoi_sides ||
                 (!_qoi.assemble_qoi_internal_sides &&
-                 _femcontext.get_elem().neighbor(_femcontext.side) != libmesh_nullptr))
+                 _femcontext.get_elem().neighbor_ptr(_femcontext.side) != nullptr))
               continue;
 
             _femcontext.side_fe_reinit();
@@ -751,7 +755,7 @@ public:
             _sys.get_dof_map().constrain_nothing(_femcontext.get_dof_indices());
 #endif
 
-          for (unsigned int i=0; i != _sys.qoi.size(); ++i)
+          for (unsigned int i=0; i != _sys.n_qois(); ++i)
             if (_qoi_indices.has_index(i))
               {
 #ifdef LIBMESH_ENABLE_CONSTRAINTS
@@ -759,8 +763,7 @@ public:
                   {
 #ifndef NDEBUG
                     bool has_heterogenous_constraint = false;
-                    for (unsigned int d=0;
-                         d != _femcontext.get_dof_indices().size(); ++d)
+                    for (auto d : IntRange<unsigned int>(0, n_dofs))
                       if (_sys.get_dof_map().has_heterogenous_adjoint_constraint
                           (i, _femcontext.get_dof_indices()[d]) != Number(0))
                         {
@@ -849,10 +852,14 @@ void FEMSystem::init_data ()
 
 
 void FEMSystem::assembly (bool get_residual, bool get_jacobian,
-                          bool apply_heterogeneous_constraints)
+                          bool apply_heterogeneous_constraints,
+                          bool apply_no_constraints)
 {
   libmesh_assert(get_residual || get_jacobian);
-  std::string log_name;
+
+  // Log residual and jacobian and combined performance separately
+#ifdef LIBMESH_ENABLE_PERFORMANCE_LOGGING
+  const char * log_name;
   if (get_residual && get_jacobian)
     log_name = "assembly()";
   else if (get_residual)
@@ -860,24 +867,18 @@ void FEMSystem::assembly (bool get_residual, bool get_jacobian,
   else
     log_name = "assembly(get_jacobian)";
 
-  START_LOG(log_name, "FEMSystem");
+  LOG_SCOPE(log_name, "FEMSystem");
+#endif
 
   const MeshBase & mesh = this->get_mesh();
 
-  //  this->get_vector("_nonlinear_solution").localize
-  //    (*current_local_nonlinear_solution,
-  //     dof_map.get_send_list());
-  this->update();
-
   if (print_solution_norms)
     {
-      //      this->get_vector("_nonlinear_solution").close();
       this->solution->close();
 
       std::streamsize old_precision = libMesh::out.precision();
       libMesh::out.precision(16);
       libMesh::out << "|U| = "
-        //                    << this->get_vector("_nonlinear_solution").l1_norm()
                    << this->solution->l1_norm()
                    << std::endl;
       libMesh::out.precision(old_precision);
@@ -886,7 +887,6 @@ void FEMSystem::assembly (bool get_residual, bool get_jacobian,
     {
       std::streamsize old_precision = libMesh::out.precision();
       libMesh::out.precision(16);
-      //      libMesh::out << "U = [" << this->get_vector("_nonlinear_solution")
       libMesh::out << "U = [" << *(this->solution)
                    << "];" << std::endl;
       libMesh::out.precision(old_precision);
@@ -920,13 +920,14 @@ void FEMSystem::assembly (bool get_residual, bool get_jacobian,
     (elem_range.reset(mesh.active_local_elements_begin(),
                       mesh.active_local_elements_end()),
      AssemblyContributions(*this, get_residual, get_jacobian,
-                           apply_heterogeneous_constraints));
+                           apply_heterogeneous_constraints,
+                           apply_no_constraints));
 
   // Check and see if we have SCALAR variables
   bool have_scalar = false;
-  for(unsigned int i=0; i != this->n_variable_groups(); ++i)
+  for (unsigned int i=0; i != this->n_variable_groups(); ++i)
     {
-      if( this->variable_group(i).type().family == SCALAR )
+      if (this->variable_group(i).type().family == SCALAR)
         {
           have_scalar = true;
           break;
@@ -935,12 +936,12 @@ void FEMSystem::assembly (bool get_residual, bool get_jacobian,
 
   // SCALAR dofs are stored on the last processor, so we'll evaluate
   // their equation terms there and only if we have a SCALAR variable
-  if ( this->processor_id() == (this->n_processors()-1) && have_scalar )
+  if (this->processor_id() == (this->n_processors()-1) && have_scalar)
     {
-      UniquePtr<DiffContext> con = this->build_context();
+      std::unique_ptr<DiffContext> con = this->build_context();
       FEMContext & _femcontext = cast_ref<FEMContext &>(*con);
       this->init_context(_femcontext);
-      _femcontext.pre_fe_reinit(*this, libmesh_nullptr);
+      _femcontext.pre_fe_reinit(*this, nullptr);
 
       bool jacobian_computed =
         this->time_solver->nonlocal_residual(get_jacobian, _femcontext);
@@ -1005,7 +1006,7 @@ void FEMSystem::assembly (bool get_residual, bool get_jacobian,
 
           add_element_system
             (*this, get_residual, get_jacobian,
-             apply_heterogeneous_constraints, _femcontext);
+             apply_heterogeneous_constraints, apply_no_constraints, _femcontext);
         }
     }
 
@@ -1042,7 +1043,6 @@ void FEMSystem::assembly (bool get_residual, bool get_jacobian,
       libMesh::out << "J = [" << *(this->matrix) << "];" << std::endl;
       libMesh::out.precision(old_precision);
     }
-  STOP_LOG(log_name, "FEMSystem");
 }
 
 
@@ -1066,20 +1066,15 @@ void FEMSystem::mesh_position_set()
 
   MeshBase & mesh = this->get_mesh();
 
-  UniquePtr<DiffContext> con = this->build_context();
+  std::unique_ptr<DiffContext> con = this->build_context();
   FEMContext & _femcontext = cast_ref<FEMContext &>(*con);
   this->init_context(_femcontext);
 
   // Move every mesh element we can
-  MeshBase::const_element_iterator el =
-    mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el =
-    mesh.active_local_elements_end();
-
-  for ( ; el != end_el; ++el)
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
       // We need the algebraic data
-      _femcontext.pre_fe_reinit(*this, *el);
+      _femcontext.pre_fe_reinit(*this, elem);
       // And when asserts are on, we also need the FE so
       // we can assert that the mesh data is of the right type.
 #ifndef NDEBUG
@@ -1105,7 +1100,7 @@ void FEMSystem::mesh_position_set()
 
 void FEMSystem::postprocess ()
 {
-  START_LOG("postprocess()", "FEMSystem");
+  LOG_SCOPE("postprocess()", "FEMSystem");
 
   const MeshBase & mesh = this->get_mesh();
 
@@ -1116,24 +1111,22 @@ void FEMSystem::postprocess ()
   this->get_time_solver().set_is_adjoint(false);
 
   // Loop over every active mesh element on this processor
-  Threads::parallel_for(elem_range.reset(mesh.active_local_elements_begin(),
-                                         mesh.active_local_elements_end()),
-                        PostprocessContributions(*this));
-
-  STOP_LOG("postprocess()", "FEMSystem");
+  Threads::parallel_for (elem_range.reset(mesh.active_local_elements_begin(),
+                                          mesh.active_local_elements_end()),
+                         PostprocessContributions(*this));
 }
 
 
 
 void FEMSystem::assemble_qoi (const QoISet & qoi_indices)
 {
-  START_LOG("assemble_qoi()", "FEMSystem");
+  LOG_SCOPE("assemble_qoi()", "FEMSystem");
 
   const MeshBase & mesh = this->get_mesh();
 
   this->update();
 
-  const unsigned int Nq = cast_int<unsigned int>(qoi.size());
+  const unsigned int Nq = this->n_qois();
 
   // the quantity of interest is assumed to be a sum of element and
   // side terms
@@ -1151,8 +1144,6 @@ void FEMSystem::assemble_qoi (const QoISet & qoi_indices)
                            qoi_contributions);
 
   this->diff_qoi->parallel_op( this->comm(), this->qoi, qoi_contributions.qoi, qoi_indices );
-
-  STOP_LOG("assemble_qoi()", "FEMSystem");
 }
 
 
@@ -1161,7 +1152,7 @@ void FEMSystem::assemble_qoi_derivative (const QoISet & qoi_indices,
                                          bool include_liftfunc,
                                          bool apply_constraints)
 {
-  START_LOG("assemble_qoi_derivative()", "FEMSystem");
+  LOG_SCOPE("assemble_qoi_derivative()", "FEMSystem");
 
   const MeshBase & mesh = this->get_mesh();
 
@@ -1169,19 +1160,21 @@ void FEMSystem::assemble_qoi_derivative (const QoISet & qoi_indices,
 
   // The quantity of interest derivative assembly accumulates on
   // initially zero vectors
-  for (unsigned int i=0; i != qoi.size(); ++i)
+  for (unsigned int i=0; i != this->n_qois(); ++i)
     if (qoi_indices.has_index(i))
       this->add_adjoint_rhs(i).zero();
 
   // Loop over every active mesh element on this processor
-  Threads::parallel_for(elem_range.reset(mesh.active_local_elements_begin(),
-                                         mesh.active_local_elements_end()),
-                        QoIDerivativeContributions(*this, qoi_indices,
-                                                   *(this->diff_qoi),
-                                                   include_liftfunc,
-                                                   apply_constraints));
+  Threads::parallel_for (elem_range.reset(mesh.active_local_elements_begin(),
+                                          mesh.active_local_elements_end()),
+                         QoIDerivativeContributions(*this, qoi_indices,
+                                                    *(this->diff_qoi),
+                                                    include_liftfunc,
+                                                    apply_constraints));
 
-  STOP_LOG("assemble_qoi_derivative()", "FEMSystem");
+  for (unsigned int i=0; i != this->n_qois(); ++i)
+    if (qoi_indices.has_index(i))
+      this->diff_qoi->finalize_derivative(this->get_adjoint_rhs(i),i);
 }
 
 
@@ -1203,6 +1196,9 @@ void FEMSystem::numerical_jacobian (TimeSolverResPtr res,
   if (_mesh_sys == this)
     numerical_point_h = numerical_jacobian_h * context.get_elem().hmin();
 
+  const unsigned int n_dofs =
+    cast_int<unsigned int>(context.get_dof_indices().size());
+
   for (unsigned int v = 0; v != context.n_vars(); ++v)
     {
       const Real my_h = this->numerical_jacobian_h_for_var(v);
@@ -1211,8 +1207,7 @@ void FEMSystem::numerical_jacobian (TimeSolverResPtr res,
 
       if (!context.get_dof_indices(v).empty())
         {
-          for (unsigned int i = 0;
-               i != context.get_dof_indices().size(); ++i)
+          for (auto i : IntRange<unsigned int>(0, n_dofs))
             if (context.get_dof_indices()[i] ==
                 context.get_dof_indices(v)[0])
               j_offset = i;
@@ -1220,7 +1215,7 @@ void FEMSystem::numerical_jacobian (TimeSolverResPtr res,
           libmesh_assert_not_equal_to(j_offset, libMesh::invalid_uint);
         }
 
-      for (unsigned int j = 0; j != context.get_dof_indices(v).size(); ++j)
+      for (auto j : IntRange<unsigned int>(0, context.get_dof_indices(v).size()))
         {
           const unsigned int total_j = j + j_offset;
 
@@ -1229,7 +1224,7 @@ void FEMSystem::numerical_jacobian (TimeSolverResPtr res,
           context.get_elem_solution(v)(j) -= my_h;
 
           // Make sure to catch any moving mesh terms
-          Real * coord = libmesh_nullptr;
+          Real * coord = nullptr;
           if (_mesh_sys == this)
             {
               if (_mesh_x_var == v)
@@ -1271,7 +1266,7 @@ void FEMSystem::numerical_jacobian (TimeSolverResPtr res,
           if (coord)
             {
               *coord = libmesh_real(context.get_elem_solution(v)(j));
-              for (unsigned int i = 0; i != context.get_dof_indices().size(); ++i)
+              for (auto i : IntRange<unsigned int>(0, n_dofs))
                 {
                   numeric_jacobian(i,total_j) =
                     (context.get_elem_residual()(i) - backwards_residual(i)) /
@@ -1280,7 +1275,7 @@ void FEMSystem::numerical_jacobian (TimeSolverResPtr res,
             }
           else
             {
-              for (unsigned int i = 0; i != context.get_dof_indices().size(); ++i)
+              for (auto i : IntRange<unsigned int>(0, n_dofs))
                 {
                   numeric_jacobian(i,total_j) =
                     (context.get_elem_residual()(i) - backwards_residual(i)) /
@@ -1298,32 +1293,29 @@ void FEMSystem::numerical_jacobian (TimeSolverResPtr res,
 
 void FEMSystem::numerical_elem_jacobian (FEMContext & context) const
 {
-  START_LOG("numerical_elem_jacobian()", "FEMSystem");
+  LOG_SCOPE("numerical_elem_jacobian()", "FEMSystem");
   this->numerical_jacobian(&TimeSolver::element_residual, context);
-  STOP_LOG("numerical_elem_jacobian()", "FEMSystem");
 }
 
 
 
 void FEMSystem::numerical_side_jacobian (FEMContext & context) const
 {
-  START_LOG("numerical_side_jacobian()", "FEMSystem");
+  LOG_SCOPE("numerical_side_jacobian()", "FEMSystem");
   this->numerical_jacobian(&TimeSolver::side_residual, context);
-  STOP_LOG("numerical_side_jacobian()", "FEMSystem");
 }
 
 
 
 void FEMSystem::numerical_nonlocal_jacobian (FEMContext & context) const
 {
-  START_LOG("numerical_nonlocal_jacobian()", "FEMSystem");
+  LOG_SCOPE("numerical_nonlocal_jacobian()", "FEMSystem");
   this->numerical_jacobian(&TimeSolver::nonlocal_residual, context);
-  STOP_LOG("numerical_nonlocal_jacobian()", "FEMSystem");
 }
 
 
 
-UniquePtr<DiffContext> FEMSystem::build_context ()
+std::unique_ptr<DiffContext> FEMSystem::build_context ()
 {
   FEMContext * fc = new FEMContext(*this);
 
@@ -1342,7 +1334,7 @@ UniquePtr<DiffContext> FEMSystem::build_context ()
   // If we are solving the adjoint problem, tell that to the Context
   fc->is_adjoint() = this->get_time_solver().is_adjoint();
 
-  return UniquePtr<DiffContext>(fc);
+  return std::unique_ptr<DiffContext>(fc);
 }
 
 
@@ -1372,7 +1364,7 @@ void FEMSystem::init_context(DiffContext & c)
           {
           case( TYPE_SCALAR ):
             {
-              FEBase * elem_fe = libmesh_nullptr;
+              FEBase * elem_fe = nullptr;
               context.get_element_fe(var, elem_fe);
               elem_fe->get_JxW();
               elem_fe->get_phi();
@@ -1380,7 +1372,7 @@ void FEMSystem::init_context(DiffContext & c)
             break;
           case( TYPE_VECTOR ):
             {
-              FEGenericBase<RealGradient> * elem_fe = libmesh_nullptr;
+              FEGenericBase<RealGradient> * elem_fe = nullptr;
               context.get_element_fe(var, elem_fe);
               elem_fe->get_JxW();
               elem_fe->get_phi();
@@ -1399,7 +1391,7 @@ void FEMSystem::mesh_position_get()
   // This function makes no sense unless we've already picked out some
   // variable(s) to reflect mesh position coordinates
   if (!_mesh_sys)
-    libmesh_error_msg("_mesh_sys was NULL!");
+    libmesh_error_msg("_mesh_sys was nullptr!");
 
   // We currently assume mesh variables are in our own system
   if (_mesh_sys != this)
@@ -1408,19 +1400,14 @@ void FEMSystem::mesh_position_get()
   // Loop over every active mesh element on this processor
   const MeshBase & mesh = this->get_mesh();
 
-  MeshBase::const_element_iterator el =
-    mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el =
-    mesh.active_local_elements_end();
-
-  UniquePtr<DiffContext> con = this->build_context();
+  std::unique_ptr<DiffContext> con = this->build_context();
   FEMContext & _femcontext = cast_ref<FEMContext &>(*con);
   this->init_context(_femcontext);
 
   // Get the solution's mesh variables from every element
-  for ( ; el != end_el; ++el)
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      _femcontext.pre_fe_reinit(*this, *el);
+      _femcontext.pre_fe_reinit(*this, elem);
 
       _femcontext.elem_position_get();
 

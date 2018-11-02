@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -107,7 +107,7 @@ void init_sys(EquationSystems & es,
   System & system =
     es.get_system<System>(system_name);
 
-  system.project_solution(exact_value, libmesh_nullptr, es.parameters);
+  system.project_solution(exact_value, nullptr, es.parameters);
 }
 
 
@@ -249,23 +249,17 @@ int main(int argc, char ** argv)
 
       // We now will loop over every node in the source mesh
       // and add it to a source point list, along with the solution
-      {
-        MeshBase::const_node_iterator nd  = mesh_a.local_nodes_begin();
-        MeshBase::const_node_iterator end = mesh_a.local_nodes_end();
+      for (const auto & node : mesh_a.local_node_ptr_range())
+        {
+          src_pts.push_back(*node);
+          src_vals.push_back(sys_a.current_solution(node->dof_number(0, 0, 0)));
+        }
 
-        for (; nd!=end; ++nd)
-          {
-            const Node * node = *nd;
-            src_pts.push_back(*node);
-            src_vals.push_back(sys_a.current_solution(node->dof_number(0, 0, 0)));
-          }
+      rbi.set_field_variables(field_vars);
+      rbi.get_source_points() = idi.get_source_points();
+      rbi.get_source_vals()   = idi.get_source_vals();
 
-        rbi.set_field_variables(field_vars);
-        rbi.get_source_points() = idi.get_source_points();
-        rbi.get_source_vals()   = idi.get_source_vals();
-      }
-
-      // We have only set local values - prepare for use by gathering remote gata
+      // We have only set local values - prepare for use by gathering remote data
       idi.prepare_for_use();
       rbi.prepare_for_use();
 

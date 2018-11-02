@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -38,21 +38,20 @@ template <typename T> class NumericVector;
 /**
  * Generic shell matrix, i.e. a matrix that does not define anything
  * but its action on a vector.  This class contains pure virtual
- * members that must be overloaded in derived classes.
+ * members that must be overridden in derived classes.
  *
  * \author Tim Kroeger
  * \date 2008
  */
 template <typename T>
-class ShellMatrix : public ReferenceCountedObject<ShellMatrix<T> >,
+class ShellMatrix : public ReferenceCountedObject<ShellMatrix<T>>,
                     public ParallelObject
 {
 public:
   /**
    * Constructor; does nothing.
    */
-  ShellMatrix (const Parallel::Communicator & comm_in
-               LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
+  ShellMatrix (const Parallel::Communicator & comm_in);
 
   /**
    * Destructor.
@@ -60,13 +59,13 @@ public:
   virtual ~ShellMatrix ();
 
   /**
-   * @returns \p m, the row-dimension of the matrix where the marix is
+   * \returns \p m, the row-dimension of the matrix where the matrix is
    * \f$ M \times N \f$.
    */
   virtual numeric_index_type m () const = 0;
 
   /**
-   * @returns \p n, the column-dimension of the matrix where the marix
+   * \returns \p n, the column-dimension of the matrix where the matrix
    * is \f$ M \times N \f$.
    */
   virtual numeric_index_type n () const = 0;

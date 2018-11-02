@@ -20,13 +20,14 @@
 // Local includes
 #include "libmesh/libmesh_singleton.h"
 #include "libmesh/threads.h"
+#include "libmesh/simple_range.h"
 
 // C/C++ includes
 #include <vector>
 
 
 // --------------------------------------------------------
-// Local anonymous namespace to hold miscelaneous bits
+// Local anonymous namespace to hold miscellaneous bits
 namespace
 {
 using namespace libMesh;
@@ -57,7 +58,7 @@ SetupList & get_setup_cache()
 
 
 // --------------------------------------------------------
-// Local anonymous namespace to hold miscelaneous bits
+// Local anonymous namespace to hold miscellaneous bits
 namespace libMesh
 {
 
@@ -83,11 +84,10 @@ void Singleton::setup ()
 
   SetupList & setup_cache = get_setup_cache();
 
-  for (SetupList::iterator it = setup_cache.begin();
-       it!=setup_cache.end(); ++it)
+  for (auto & item : setup_cache)
     {
-      libmesh_assert (*it != libmesh_nullptr);
-      (*it)->setup();
+      libmesh_assert (item);
+      item->setup();
     }
 }
 
@@ -99,12 +99,12 @@ void Singleton::cleanup ()
 
   SingletonList & singleton_cache = get_singleton_cache();
 
-  for (SingletonList::reverse_iterator it = singleton_cache.rbegin();
-       it!=singleton_cache.rend(); ++it)
+  for (auto & item : as_range(singleton_cache.rbegin(),
+                              singleton_cache.rend()))
     {
-      libmesh_assert (*it != libmesh_nullptr);
-      delete *it;
-      *it = libmesh_nullptr;
+      libmesh_assert (item);
+      delete item;
+      item = nullptr;
     }
 
   singleton_cache.clear();

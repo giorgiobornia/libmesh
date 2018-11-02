@@ -5,7 +5,6 @@
 #include <libmesh/restore_warnings.h>
 
 // libmesh includes
-#include "libmesh/auto_ptr.h"
 #include "libmesh/elem.h"
 #include "libmesh/equation_systems.h"
 #include "libmesh/mesh.h"
@@ -17,12 +16,26 @@
 // test includes
 #include "test_comm.h"
 
+// C++ includes
+#include <memory>
+
+// THE CPPUNIT_TEST_SUITE_END macro expands to code that involves
+// std::auto_ptr, which in turn produces -Wdeprecated-declarations
+// warnings.  These can be ignored in GCC as long as we wrap the
+// offending code in appropriate pragmas.  We can't get away with a
+// single ignore_warnings.h inclusion at the beginning of this file,
+// since the libmesh headers pull in a restore_warnings.h at some
+// point.  We also don't bother restoring warnings at the end of this
+// file since it's not a header.
+#include <libmesh/ignore_warnings.h>
+
 using namespace libMesh;
 
 class ParsedFEMFunctionTest : public CppUnit::TestCase
 {
 public:
   void setUp() {
+#if LIBMESH_DIM > 2
     mesh.reset(new Mesh(*TestCommWorld));
     MeshTools::Generation::build_cube(*mesh, 1, 1, 1);
     es.reset(new EquationSystems(*mesh));
@@ -38,48 +51,48 @@ public:
     es->init();
 
     NumericVector<Number> & sol = *sys->solution;
-    Elem *elem = mesh->query_elem(0);
+    Elem *elem = mesh->query_elem_ptr(0);
 
     if (elem && elem->processor_id() == TestCommWorld->rank())
       {
         // Set x2 = 2*x
-        sol.set(elem->get_node(1)->dof_number(0,0,0), 2);
-        sol.set(elem->get_node(2)->dof_number(0,0,0), 2);
-        sol.set(elem->get_node(5)->dof_number(0,0,0), 2);
-        sol.set(elem->get_node(6)->dof_number(0,0,0), 2);
+        sol.set(elem->node_ref(1).dof_number(0,0,0), 2);
+        sol.set(elem->node_ref(2).dof_number(0,0,0), 2);
+        sol.set(elem->node_ref(5).dof_number(0,0,0), 2);
+        sol.set(elem->node_ref(6).dof_number(0,0,0), 2);
 
         // Set x3 = 3*x
-        sol.set(elem->get_node(1)->dof_number(0,1,0), 3);
-        sol.set(elem->get_node(2)->dof_number(0,1,0), 3);
-        sol.set(elem->get_node(5)->dof_number(0,1,0), 3);
-        sol.set(elem->get_node(6)->dof_number(0,1,0), 3);
+        sol.set(elem->node_ref(1).dof_number(0,1,0), 3);
+        sol.set(elem->node_ref(2).dof_number(0,1,0), 3);
+        sol.set(elem->node_ref(5).dof_number(0,1,0), 3);
+        sol.set(elem->node_ref(6).dof_number(0,1,0), 3);
 
         // Set c05 = 0.5
-        sol.set(elem->get_node(0)->dof_number(0,2,0), 0.5);
-        sol.set(elem->get_node(1)->dof_number(0,2,0), 0.5);
-        sol.set(elem->get_node(2)->dof_number(0,2,0), 0.5);
-        sol.set(elem->get_node(3)->dof_number(0,2,0), 0.5);
-        sol.set(elem->get_node(4)->dof_number(0,2,0), 0.5);
-        sol.set(elem->get_node(5)->dof_number(0,2,0), 0.5);
-        sol.set(elem->get_node(6)->dof_number(0,2,0), 0.5);
-        sol.set(elem->get_node(7)->dof_number(0,2,0), 0.5);
+        sol.set(elem->node_ref(0).dof_number(0,2,0), 0.5);
+        sol.set(elem->node_ref(1).dof_number(0,2,0), 0.5);
+        sol.set(elem->node_ref(2).dof_number(0,2,0), 0.5);
+        sol.set(elem->node_ref(3).dof_number(0,2,0), 0.5);
+        sol.set(elem->node_ref(4).dof_number(0,2,0), 0.5);
+        sol.set(elem->node_ref(5).dof_number(0,2,0), 0.5);
+        sol.set(elem->node_ref(6).dof_number(0,2,0), 0.5);
+        sol.set(elem->node_ref(7).dof_number(0,2,0), 0.5);
 
         // Set y4 = 4*y
-        sol.set(elem->get_node(2)->dof_number(0,3,0), 4);
-        sol.set(elem->get_node(3)->dof_number(0,3,0), 4);
-        sol.set(elem->get_node(6)->dof_number(0,3,0), 4);
-        sol.set(elem->get_node(7)->dof_number(0,3,0), 4);
+        sol.set(elem->node_ref(2).dof_number(0,3,0), 4);
+        sol.set(elem->node_ref(3).dof_number(0,3,0), 4);
+        sol.set(elem->node_ref(6).dof_number(0,3,0), 4);
+        sol.set(elem->node_ref(7).dof_number(0,3,0), 4);
 
         // Set xy = x*y
-        sol.set(elem->get_node(2)->dof_number(0,4,0), 1);
-        sol.set(elem->get_node(6)->dof_number(0,4,0), 1);
+        sol.set(elem->node_ref(2).dof_number(0,4,0), 1);
+        sol.set(elem->node_ref(6).dof_number(0,4,0), 1);
 
         // Set yz = y*z
-        sol.set(elem->get_node(6)->dof_number(0,5,0), 1);
-        sol.set(elem->get_node(7)->dof_number(0,5,0), 1);
+        sol.set(elem->node_ref(6).dof_number(0,5,0), 1);
+        sol.set(elem->node_ref(7).dof_number(0,5,0), 1);
 
         // Set xyz = x*y*z
-        sol.set(elem->get_node(6)->dof_number(0,6,0), 1);
+        sol.set(elem->node_ref(6).dof_number(0,6,0), 1);
       }
 
     sol.close();
@@ -95,6 +108,7 @@ public:
         s->side = 3;
         s->side_fe_reinit();
       }
+#endif
   }
 
   void tearDown() {
@@ -106,21 +120,23 @@ public:
 
   CPPUNIT_TEST_SUITE(ParsedFEMFunctionTest);
 
+#if LIBMESH_DIM > 2
   CPPUNIT_TEST(testValues);
   CPPUNIT_TEST(testGradients);
   CPPUNIT_TEST(testHessians);
   CPPUNIT_TEST(testInlineGetter);
   CPPUNIT_TEST(testInlineSetter);
   CPPUNIT_TEST(testNormals);
+#endif
 
   CPPUNIT_TEST_SUITE_END();
 
 
 private:
-  UniquePtr<UnstructuredMesh> mesh;
-  UniquePtr<EquationSystems> es;
+  std::unique_ptr<UnstructuredMesh> mesh;
+  std::unique_ptr<EquationSystems> es;
   System * sys;
-  UniquePtr<FEMContext> c, s;
+  std::unique_ptr<FEMContext> c, s;
 
   void testValues()
   {
@@ -129,13 +145,19 @@ private:
       {
         ParsedFEMFunction<Number> x2(*sys, "x2");
 
+        // Test that copy constructor works
+        ParsedFEMFunction<Number> x2_copy(x2);
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL
-          (libmesh_real(x2(*c,Point(0.5,0.5,0.5))), 1.0, TOLERANCE*TOLERANCE);
+          (libmesh_real(x2_copy(*c,Point(0.5,0.5,0.5))), 1.0, TOLERANCE*TOLERANCE);
 
         ParsedFEMFunction<Number> xy8(*sys, "x2*y4");
 
+        // Test that move constructor works
+        ParsedFEMFunction<Number> xy8_stolen(std::move(xy8));
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL
-          (libmesh_real(xy8(*c,Point(0.5,0.5,0.5))), 2.0, TOLERANCE*TOLERANCE);
+          (libmesh_real(xy8_stolen(*c,Point(0.5,0.5,0.5))), 2.0, TOLERANCE*TOLERANCE);
       }
   }
 
@@ -146,6 +168,12 @@ private:
         c->get_elem().processor_id() == TestCommWorld->rank())
       {
         ParsedFEMFunction<Number> c2(*sys, "grad_x_x2");
+
+        // Test that copy/move assignment fails to compile. Note:
+        // ParsedFEMFunction is neither move-assignable nor
+        // copy-assignable because it contains a const reference.
+        // ParsedFEMFunction<Number> c2_assigned(*sys, "grad_y_xyz");
+        // c2_assigned = c2;
 
         CPPUNIT_ASSERT_DOUBLES_EQUAL
           (libmesh_real(c2(*c,Point(0.35,0.45,0.55))), 2.0, TOLERANCE*TOLERANCE);
@@ -257,7 +285,7 @@ private:
         const std::vector<Point> & xyz = s->get_side_fe(0)->get_xyz();
 
         // On side 3 of a hex the normal direction is +y
-        for (unsigned int qp=0; qp != xyz.size(); ++qp)
+        for (std::size_t qp=0; qp != xyz.size(); ++qp)
           {
             CPPUNIT_ASSERT_DOUBLES_EQUAL
               (libmesh_real(nx(*s,xyz[qp])), 0.0, TOLERANCE*TOLERANCE);

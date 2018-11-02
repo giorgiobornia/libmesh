@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -26,6 +26,7 @@
 
 #include "libmesh/dtk_evaluator.h"
 
+#include "libmesh/ignore_warnings.h"
 #include <DTK_MeshManager.hpp>
 #include <DTK_MeshContainer.hpp>
 #include <DTK_MeshTraits.hpp>
@@ -36,12 +37,13 @@
 
 #include <Teuchos_RCP.hpp>
 #include <Teuchos_ArrayRCP.hpp>
+#include "libmesh/restore_warnings.h"
 
 namespace libMesh
 {
 
 /**
- * The DTKAdapter is used with the DTKSolutionTranfer object to adapt
+ * The DTKAdapter is used with the DTKSolutionTransfer object to adapt
  * libmesh data to the DTK interface.
  *
  * \author Derek Gaston
@@ -50,7 +52,7 @@ namespace libMesh
 class DTKAdapter
 {
 public:
-  DTKAdapter(Teuchos::RCP<const Teuchos::Comm<int> > in_comm, EquationSystems & in_es);
+  DTKAdapter(Teuchos::RCP<const Teuchos::Comm<int>> in_comm, EquationSystems & in_es);
 
   typedef DataTransferKit::MeshContainer<int>                                  MeshContainerType;
   typedef DataTransferKit::FieldContainer<double>                              FieldContainerType;
@@ -59,10 +61,10 @@ public:
   typedef Teuchos::RCP<EvaluatorType>                                          RCP_Evaluator;
 
 
-  Teuchos::RCP<DataTransferKit::MeshManager<MeshContainerType> > get_mesh_manager() { return mesh_manager; }
+  Teuchos::RCP<DataTransferKit::MeshManager<MeshContainerType>> get_mesh_manager() { return mesh_manager; }
   RCP_Evaluator get_variable_evaluator(std::string var_name);
-  Teuchos::RCP<DataTransferKit::FieldManager<MeshContainerType> > get_target_coords() { return target_coords; }
-  Teuchos::RCP<DataTransferKit::FieldManager<FieldContainerType> > get_values_to_fill(std::string var_name);
+  Teuchos::RCP<DataTransferKit::FieldManager<MeshContainerType>> get_target_coords() { return target_coords; }
+  Teuchos::RCP<DataTransferKit::FieldManager<FieldContainerType>> get_values_to_fill(std::string var_name);
 
   /**
    * After computing values for a variable in this EquationSystems
@@ -74,12 +76,12 @@ protected:
   /**
    * Small helper function for finding the system containing the variable.
    *
-   * Note that this implies that variable names are unique across all systems!
+   * \note This implies that variable names are unique across all systems!
    */
   System * find_sys(std::string var_name);
 
   /**
-   * Helper that returns the DTK ElementTopology for a given Elem
+   * \returns The DTK ElementTopology for a given Elem.
    */
   DataTransferKit::DTK_ElementTopology get_element_topology(const Elem * elem);
 
@@ -89,7 +91,7 @@ protected:
    */
   void get_semi_local_nodes(std::set<unsigned int> & semi_local_nodes);
 
-  Teuchos::RCP<const Teuchos::Comm<int> > comm;
+  Teuchos::RCP<const Teuchos::Comm<int>> comm;
   EquationSystems & es;
   const MeshBase & mesh;
   unsigned int dim;
@@ -97,12 +99,12 @@ protected:
   unsigned int num_local_nodes;
   Teuchos::ArrayRCP<int> vertices;
 
-  Teuchos::RCP<DataTransferKit::MeshManager<MeshContainerType> > mesh_manager;
+  Teuchos::RCP<DataTransferKit::MeshManager<MeshContainerType>> mesh_manager;
   RCP_Evaluator field_evaluator;
-  Teuchos::RCP<DataTransferKit::FieldManager<MeshContainerType> > target_coords;
+  Teuchos::RCP<DataTransferKit::FieldManager<MeshContainerType>> target_coords;
 
   /// Map of variable names to arrays to be filled by a transfer
-  std::map<std::string, Teuchos::RCP<DataTransferKit::FieldManager<FieldContainerType> > > values_to_fill;
+  std::map<std::string, Teuchos::RCP<DataTransferKit::FieldManager<FieldContainerType>>> values_to_fill;
 
   /// Map of variable names to RCP_Evaluator objects
   std::map<std::string, RCP_Evaluator> evaluators;

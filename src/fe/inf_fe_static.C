@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -178,6 +178,8 @@ Real InfFE<Dim,T_radial,T_map>::shape(const FEType & fet,
   compute_shape_indices(fet, inf_elem_type, i, i_base, i_radial);
 
   //TODO:[SP/DD]  exp(ikr) is still missing here!
+  // but is it intended?  It would be probably somehow nice, but than it would be Number, not Real !
+  // --> thus it would destroy the interface...
   if (Dim > 1)
     return FEInterface::shape(Dim-1, fet, base_et, i_base, p)
       * InfFE<Dim,T_radial,T_map>::eval(v, o_radial, i_radial)
@@ -213,9 +215,9 @@ Real InfFE<Dim,T_radial,T_map>::shape(const FEType & fet,
     }
 #endif
 
-  const Order        o_radial (fet.radial_order);
-  const Real         v        (p(Dim-1));
-  UniquePtr<Elem>      base_el  (inf_elem->build_side(0));
+  const Order o_radial (fet.radial_order);
+  const Real v (p(Dim-1));
+  std::unique_ptr<const Elem> base_el (inf_elem->build_side_ptr(0));
 
   unsigned int i_base, i_radial;
   compute_shape_indices(fet, inf_elem->type(), i, i_base, i_radial);
@@ -245,9 +247,9 @@ void InfFE<Dim,T_radial,T_map>::compute_data(const FEType & fet,
 
   const Order        o_radial             (fet.radial_order);
   const Order        radial_mapping_order (Radial::mapping_order());
-  const Point &       p                    (data.p);
+  const Point &      p                    (data.p);
   const Real         v                    (p(Dim-1));
-  UniquePtr<Elem>      base_el              (inf_elem->build_side(0));
+  std::unique_ptr<const Elem> base_el (inf_elem->build_side_ptr(0));
 
   /*
    * compute \p interpolated_dist containing the mapping-interpolated
@@ -261,7 +263,7 @@ void InfFE<Dim,T_radial,T_map>::compute_data(const FEType & fet,
     case 1:
       {
         libmesh_assert_equal_to (inf_elem->type(), INFEDGE2);
-        interpolated_dist =  Point(inf_elem->point(0) - inf_elem->point(1)).size();
+        interpolated_dist =  Point(inf_elem->point(0) - inf_elem->point(1)).norm();
         break;
       }
 
@@ -275,7 +277,7 @@ void InfFE<Dim,T_radial,T_map>::compute_data(const FEType & fet,
 
         // interpolate the base nodes' distances
         for (unsigned int n=0; n<n_base_nodes; n++)
-          interpolated_dist += Point(base_el->point(n) - origin).size()
+          interpolated_dist += Point(base_el->point(n) - origin).norm()
             * FE<1,LAGRANGE>::shape (base_mapping_elem_type, base_mapping_order, n, p);
         break;
       }
@@ -290,7 +292,7 @@ void InfFE<Dim,T_radial,T_map>::compute_data(const FEType & fet,
 
         // interpolate the base nodes' distances
         for (unsigned int n=0; n<n_base_nodes; n++)
-          interpolated_dist += Point(base_el->point(n) - origin).size()
+          interpolated_dist += Point(base_el->point(n) - origin).norm()
             * FE<2,LAGRANGE>::shape (base_mapping_elem_type, base_mapping_order, n, p);
         break;
       }
@@ -304,18 +306,18 @@ void InfFE<Dim,T_radial,T_map>::compute_data(const FEType & fet,
 #ifdef LIBMESH_USE_COMPLEX_NUMBERS
 
   // assumption on time-harmonic behavior
-  const short int sign (-1);
+  Number sign_i (0,1.);
 
   // the wave number
-  const Real wavenumber = 2. * libMesh::pi * data.frequency / data.speed;
+  const Number wavenumber = 2. * libMesh::pi * data.frequency / data.speed;
 
   // the exponent for time-harmonic behavior
-  const Real exponent = sign                                                            /* +1. or -1.                */
-    * wavenumber                                                                      /* k                         */
+  const Number exponent = sign_i                                                      /* imaginary unit             */
+    * wavenumber                                                                      /* k  (can be complex)       */
     * interpolated_dist                                                               /* together with next line:  */
     * InfFE<Dim,INFINITE_MAP,T_map>::eval(v, radial_mapping_order, 1);                /* phase(s,t,v)              */
 
-  const Number time_harmonic = Number(cos(exponent), sin(exponent));                    /* e^(sign*i*k*phase(s,t,v)) */
+  const Number time_harmonic = exp(exponent);                                         /* e^(sign*i*k*phase(s,t,v)) */
 
   /*
    * compute \p shape for all dof in the element
@@ -346,7 +348,7 @@ void InfFE<Dim,T_radial,T_map>::compute_data(const FEType & fet,
 
   /*
    * This is quite weird: the phase is actually
-   * a measure how @e advanced the pressure is that
+   * a measure how advanced the pressure is that
    * we compute.  In other words: the further away
    * the node \p data.p is, the further we look into
    * the future...
@@ -730,7 +732,7 @@ void InfFE<Dim,T_radial,T_map>::compute_shape_indices (const FEType & fet,
    * 8. element-associated dof further out
    */
 
-  const unsigned int radial_order       = static_cast<unsigned int>(fet.radial_order);             // 4
+  const unsigned int radial_order       = static_cast<unsigned int>(fet.radial_order.get_order()); // 4
   const unsigned int radial_order_p_one = radial_order+1;                                          // 5
 
   const ElemType base_elem_type           (Base::get_elem_type(inf_elem_type));                    // QUAD9

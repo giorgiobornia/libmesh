@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -28,8 +28,6 @@
 #include "libmesh/equation_systems.h"
 #include "libmesh/system.h"
 
-#include <string>
-
 namespace libMesh
 {
 
@@ -54,13 +52,13 @@ DTKEvaluator::evaluate(const Teuchos::ArrayRCP<int> & elements,
   Teuchos::ArrayRCP<Number> values(num_values);
   DataTransferKit::FieldContainer<Number> evaluations(values, 1);
 
-  for(unsigned int i=0; i<num_values; i++)
+  for (unsigned int i=0; i<num_values; i++)
     {
-      Elem * elem = mesh.elem(elements[i]);
+      Elem * elem = mesh.elem_ptr(elements[i]);
 
       Point p;
 
-      for(unsigned int j=0; j<dim; j++)
+      for (unsigned int j=0; j<dim; j++)
         p(j) = coords[(j*num_values)+i];
 
       const Point mapped_point(FEInterface::inverse_map(dim, dof_map.variable_type(0), elem, p));
@@ -73,7 +71,7 @@ DTKEvaluator::evaluate(const Teuchos::ArrayRCP<int> & elements,
 
       Number value = 0;
 
-      for (unsigned int j=0; j<dof_indices.size(); j++)
+      for (std::size_t j=0; j<dof_indices.size(); j++)
         value += current_local_solution(dof_indices[j]) * data.shape[j];
 
       values[i] = value;

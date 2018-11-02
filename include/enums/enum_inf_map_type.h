@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,19 +20,24 @@
 #ifndef LIBMESH_ENUM_INF_MAP_TYPE_H
 #define LIBMESH_ENUM_INF_MAP_TYPE_H
 
-// ------------------------------------------------------------
-// enum Order definition
 namespace libMesh {
 
 /**
  * \enum libMesh::InfMapType defines an \p enum for the
  * types of coordinate mappings available in infinite elements.
+ *
+ * The fixed type, i.e. ": int", enumeration syntax used here allows
+ * this enum to be forward declared as
+ * enum InfMapType : int;
+ * reducing header file dependencies.
  */
-enum InfMapType {CARTESIAN=0,
+enum InfMapType : int {
+                 CARTESIAN=0,
                  SPHERICAL,
                  ELLIPSOIDAL,
+                 // Invalid
                  INVALID_INF_MAP};
 
 }
 
-#endif // LIBMESH_ENUM_INF_MAP_TYPE_H
+#endif

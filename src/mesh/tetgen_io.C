@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -24,7 +24,6 @@
 #include "libmesh/mesh_base.h"
 #include "libmesh/cell_tet4.h"
 #include "libmesh/cell_tet10.h"
-#include "libmesh/mesh_data.h"
 
 namespace libMesh
 {
@@ -73,7 +72,7 @@ void TetGenIO::read (const std::string & name)
   std::ifstream node_stream (name_node.c_str());
   std::ifstream ele_stream  (name_ele.c_str());
 
-  if ( !node_stream.good() || !ele_stream.good() )
+  if (!node_stream.good() || !ele_stream.good())
     libmesh_error_msg("Error while opening either "     \
                       << name_node                      \
                       << " or "                         \
@@ -101,11 +100,6 @@ void TetGenIO::read_nodes_and_elem (std::istream & node_stream,
   // Read all the datasets.
   this->node_in    (node_stream);
   this->element_in (ele_stream);
-
-  // Tell the MeshData object that we are finished
-  // reading data.
-  if (this->_mesh_data != libmesh_nullptr)
-    this->_mesh_data->close_foreign_id_maps ();
 
   // some more clean-up
   _assign_nodes.clear();
@@ -164,13 +158,8 @@ void TetGenIO::node_in (std::istream & node_stream)
       //_assign_nodes.insert (std::make_pair(node_lab,i));
       _assign_nodes[node_lab] = i;
 
-      // do this irrespective whether MeshData exists
-      Node * newnode = mesh.add_point(xyz, i);
-
-      // Add node to the nodes vector &
-      // tell the MeshData object the foreign node id.
-      if (this->_mesh_data != libmesh_nullptr)
-        this->_mesh_data->add_foreign_node_id (newnode, node_lab);
+      // Add this point to the Mesh.
+      mesh.add_point(xyz, i);
     }
 }
 
@@ -187,22 +176,27 @@ void TetGenIO::element_in (std::istream & ele_stream)
   MeshBase & mesh = MeshInput<MeshBase>::mesh();
 
   // Read the elements from the ele_stream (*.ele file).
-  unsigned int element_lab=0, n_nodes=0, nAttri=0;
+  unsigned int element_lab=0, n_nodes=0, region_attribute=0;
 
   ele_stream >> _num_elements // Read the number of tetrahedrons from the stream.
              >> n_nodes       // Read the number of nodes per tetrahedron from the stream (defaults to 4).
-             >> nAttri;       // Read the number of attributes from stream.
+             >> region_attribute; // Read the number of attributes from stream.
+
+  // According to the Tetgen docs for .ele files:
+  // http://wias-berlin.de/software/tetgen/1.5/doc/manual/manual006.html#ff_ele
+  // region_attribute can either 0 or 1, and specifies whether, for
+  // each tetrahedron, there is an extra integer specifying which
+  // region it belongs to. Normally, this id matches a value in a
+  // corresponding .poly or .smesh file, but here we simply use it to
+  // set the subdomain_id of the element in question.
+  if (region_attribute > 1)
+    libmesh_error_msg("Invalid region_attribute " << region_attribute << " specified in .ele file.");
 
   // Vector that assigns element nodes to their correct position.
-  // TetGen is normaly 0-based
+  // TetGen is normally 0-based
   // (right now this is strictly not necessary since it is the identity map,
   //  but in the future TetGen could change their numbering scheme.)
   static const unsigned int assign_elm_nodes[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-
-  // If present, make room for element attributes to be stored.
-  this->element_attributes.resize(nAttri);
-  for (unsigned i=0; i<nAttri; ++i)
-    this->element_attributes[i].resize(_num_elements);
 
   for (dof_id_type i=0; i<_num_elements; i++)
     {
@@ -227,13 +221,11 @@ void TetGenIO::element_in (std::istream & ele_stream)
       libmesh_assert(elem);
       libmesh_assert_equal_to (elem->n_nodes(), n_nodes);
 
-      // Read the element label
+      // The first number on the line is the tetrahedron number. We
+      // have previously ignored this, preferring to set our own ids,
+      // but this could be changed to respect the Tetgen numbering if
+      // desired.
       ele_stream >> element_lab;
-
-      // Add the element to the mesh &
-      // tell the MeshData object the foreign element id
-      if (this->_mesh_data != libmesh_nullptr)
-        this->_mesh_data->add_foreign_elem_id (elem, element_lab);
 
       // Read node labels
       for (dof_id_type j=0; j<n_nodes; j++)
@@ -246,9 +238,16 @@ void TetGenIO::element_in (std::istream & ele_stream)
             mesh.node_ptr(_assign_nodes[node_label]);
         }
 
-      // Read and store attributes from the stream.
-      for (unsigned int j=0; j<nAttri; j++)
-        ele_stream >> this->element_attributes[j][i];
+      // Read the region attribute (if present) and use it to set the subdomain id.
+      if (region_attribute)
+        {
+          unsigned int region;
+          ele_stream >> region;
+
+          // Make sure that the id we read can be successfully cast to
+          // an integral value of type subdomain_id_type.
+          elem->subdomain_id() = cast_int<subdomain_id_type>(region);
+        }
     }
 }
 
@@ -294,18 +293,12 @@ void TetGenIO::write (const std::string & fname)
     out_stream << "# Facets:\n"
                << mesh.n_elem() << " 0\n";
 
-    //     const_active_elem_iterator       it (mesh.elements_begin());
-    //     const const_active_elem_iterator end(mesh.elements_end());
-
-    MeshBase::const_element_iterator       it  = mesh.active_elements_begin();
-    const MeshBase::const_element_iterator end = mesh.active_elements_end();
-
-    for ( ; it != end; ++it)
+    for (const auto & elem : mesh.active_element_ptr_range())
       out_stream << "1\n3 " // no. of facet polygons
-        //  << (*it)->n_nodes() << " "
-                 << (*it)->node(0)   << " "
-                 << (*it)->node(1)   << " "
-                 << (*it)->node(2)   << "\n";
+        //  << elem->n_nodes() << " "
+                 << elem->node_id(0)   << " "
+                 << elem->node_id(1)   << " "
+                 << elem->node_id(2)   << "\n";
   }
 
   // end of the file

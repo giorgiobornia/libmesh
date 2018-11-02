@@ -80,9 +80,9 @@ RBEvaluationSerialization::~RBEvaluationSerialization()
 
 void RBEvaluationSerialization::write_to_file(const std::string & path)
 {
-  START_LOG("write_to_file()", "RBEvaluationSerialization");
+  LOG_SCOPE("write_to_file()", "RBEvaluationSerialization");
 
-  if(_rb_eval.comm().rank() == 0)
+  if (_rb_eval.comm().rank() == 0)
     {
       capnp::MallocMessageBuilder message;
 
@@ -106,8 +106,6 @@ void RBEvaluationSerialization::write_to_file(const std::string & path)
       if (error)
         libmesh_error_msg("Error closing a write-only file descriptor to " + path);
     }
-
-  STOP_LOG("write_to_file()", "RBEvaluationSerialization");
 }
 
 // ---- RBEvaluationSerialization (END) ----
@@ -127,9 +125,9 @@ TransientRBEvaluationSerialization::~TransientRBEvaluationSerialization()
 
 void TransientRBEvaluationSerialization::write_to_file(const std::string & path)
 {
-  START_LOG("write_to_file()", "TransientRBEvaluationSerialization");
+  LOG_SCOPE("write_to_file()", "TransientRBEvaluationSerialization");
 
-  if(_trans_rb_eval.comm().rank() == 0)
+  if (_trans_rb_eval.comm().rank() == 0)
     {
       capnp::MallocMessageBuilder message;
 
@@ -159,8 +157,6 @@ void TransientRBEvaluationSerialization::write_to_file(const std::string & path)
       if (error)
         libmesh_error_msg("Error closing a write-only file descriptor to " + path);
     }
-
-  STOP_LOG("write_to_file()", "TransientRBEvaluationSerialization");
 }
 
 // ---- TransientRBEvaluationSerialization (END) ----
@@ -180,9 +176,9 @@ RBEIMEvaluationSerialization::~RBEIMEvaluationSerialization()
 
 void RBEIMEvaluationSerialization::write_to_file(const std::string & path)
 {
-  START_LOG("write_to_file()", "RBEIMEvaluationSerialization");
+  LOG_SCOPE("write_to_file()", "RBEIMEvaluationSerialization");
 
-  if(_rb_eim_eval.comm().rank() == 0)
+  if (_rb_eim_eval.comm().rank() == 0)
     {
       capnp::MallocMessageBuilder message;
 
@@ -212,8 +208,6 @@ void RBEIMEvaluationSerialization::write_to_file(const std::string & path)
       if (error)
         libmesh_error_msg("Error closing a write-only file descriptor to " + path);
     }
-
-  STOP_LOG("write_to_file()", "RBEIMEvaluationSerialization");
 }
 
 // ---- RBEIMEvaluationSerialization (END) ----
@@ -235,9 +229,9 @@ RBSCMEvaluationSerialization::~RBSCMEvaluationSerialization()
 
 void RBSCMEvaluationSerialization::write_to_file(const std::string & path)
 {
-  START_LOG("write_to_file()", "RBSCMEvaluationSerialization");
+  LOG_SCOPE("write_to_file()", "RBSCMEvaluationSerialization");
 
-  if(_rb_scm_eval.comm().rank() == 0)
+  if (_rb_scm_eval.comm().rank() == 0)
     {
       capnp::MallocMessageBuilder message;
 
@@ -256,8 +250,6 @@ void RBSCMEvaluationSerialization::write_to_file(const std::string & path)
       if (error)
         libmesh_error_msg("Error closing a write-only file descriptor to " + path);
     }
-
-  STOP_LOG("write_to_file()", "RBSCMEvaluationSerialization");
 }
 
 #endif // LIBMESH_HAVE_SLEPC && LIBMESH_HAVE_GLPK
@@ -283,9 +275,9 @@ void add_parameter_ranges_to_builder(const RBParametrized & rb_evaluation,
     const RBParameters & parameters_max = rb_evaluation.get_parameters_max();
 
     unsigned int count = 0;
-    for(const auto & parameter_name : parameter_names)
+    for (const auto & parameter_name : parameter_names)
       {
-        if(!rb_evaluation.is_discrete_parameter(parameter_name))
+        if (!rb_evaluation.is_discrete_parameter(parameter_name))
           {
             names.set(count, parameter_name);
             mins.set(count, parameters_min.get_value(parameter_name));
@@ -305,11 +297,11 @@ void add_parameter_ranges_to_builder(const RBParametrized & rb_evaluation,
     auto names = discrete_parameters_list.initNames(n_discrete_parameters);
     auto values_outer = discrete_parameters_list.initValues(n_discrete_parameters);
 
-    const std::map< std::string, std::vector<Real> > & discrete_parameters =
+    const std::map<std::string, std::vector<Real>> & discrete_parameters =
       rb_evaluation.get_discrete_parameter_values();
 
     unsigned int count = 0;
-    for(const auto & discrete_parameter : discrete_parameters)
+    for (const auto & discrete_parameter : discrete_parameters)
       {
         names.set(count, discrete_parameter.first);
 
@@ -318,7 +310,7 @@ void add_parameter_ranges_to_builder(const RBParametrized & rb_evaluation,
 
         values_outer.init(count, n_values);
         auto values_inner = values_outer[count];
-        for(unsigned int i=0; i<n_values; ++i)
+        for (unsigned int i=0; i<n_values; ++i)
           {
             values_inner.set(i, values[i]);
           }
@@ -350,7 +342,7 @@ void add_rb_evaluation_data_to_builder(RBEvaluation & rb_eval,
 
     auto fq_innerprods_list = rb_evaluation_builder.initFqInnerprods(Q_f_hat);
 
-    for(unsigned int i=0; i<Q_f_hat; i++)
+    for (unsigned int i=0; i<Q_f_hat; i++)
       set_scalar_in_list(fq_innerprods_list,
                          i,
                          rb_eval.Fq_representor_innerprods[i]);
@@ -361,9 +353,9 @@ void add_rb_evaluation_data_to_builder(RBEvaluation & rb_eval,
     auto fq_aq_innerprods_list =
       rb_evaluation_builder.initFqAqInnerprods(n_F_terms*n_A_terms*n_bfs);
 
-    for(unsigned int q_f=0; q_f < n_F_terms; ++q_f)
-      for(unsigned int q_a=0; q_a < n_A_terms; ++q_a)
-        for(unsigned int i=0; i < n_bfs; ++i)
+    for (unsigned int q_f=0; q_f < n_F_terms; ++q_f)
+      for (unsigned int q_a=0; q_a < n_A_terms; ++q_a)
+        for (unsigned int i=0; i < n_bfs; ++i)
           {
             unsigned int offset = q_f*n_A_terms*n_bfs + q_a*n_bfs + i;
             set_scalar_in_list(
@@ -378,9 +370,9 @@ void add_rb_evaluation_data_to_builder(RBEvaluation & rb_eval,
     auto aq_aq_innerprods_list =
       rb_evaluation_builder.initAqAqInnerprods(Q_a_hat*n_bfs*n_bfs);
 
-    for(unsigned int i=0; i < Q_a_hat; ++i)
-      for(unsigned int j=0; j < n_bfs; ++j)
-        for(unsigned int l=0; l < n_bfs; ++l)
+    for (unsigned int i=0; i < Q_a_hat; ++i)
+      for (unsigned int j=0; j < n_bfs; ++j)
+        for (unsigned int l=0; l < n_bfs; ++l)
           {
             unsigned int offset = i*n_bfs*n_bfs + j*n_bfs + l;
             set_scalar_in_list(
@@ -396,14 +388,14 @@ void add_rb_evaluation_data_to_builder(RBEvaluation & rb_eval,
     auto output_innerprod_outer = rb_evaluation_builder.initOutputDualInnerprods(n_outputs);
     auto output_vector_outer = rb_evaluation_builder.initOutputVectors(n_outputs);
 
-    for(unsigned int output_id=0; output_id < n_outputs; ++output_id)
+    for (unsigned int output_id=0; output_id < n_outputs; ++output_id)
       {
         unsigned int n_output_terms = rb_theta_expansion.get_n_output_terms(output_id);
 
         {
           unsigned int Q_l_hat = n_output_terms*(n_output_terms+1)/2;
           auto output_innerprod_inner = output_innerprod_outer.init(output_id, Q_l_hat);
-          for(unsigned int q=0; q < Q_l_hat; ++q)
+          for (unsigned int q=0; q < Q_l_hat; ++q)
             {
               set_scalar_in_list(
                                  output_innerprod_inner, q, rb_eval.output_dual_innerprods[output_id][q]);
@@ -412,10 +404,10 @@ void add_rb_evaluation_data_to_builder(RBEvaluation & rb_eval,
 
         {
           auto output_vector_middle = output_vector_outer.init(output_id, n_output_terms);
-          for(unsigned int q_l=0; q_l<n_output_terms; ++q_l)
+          for (unsigned int q_l=0; q_l<n_output_terms; ++q_l)
             {
               auto output_vector_inner = output_vector_middle.init(q_l, n_bfs);
-              for(unsigned int j=0; j<n_bfs; ++j)
+              for (unsigned int j=0; j<n_bfs; ++j)
                 {
                   set_scalar_in_list(
                                      output_vector_inner, j, rb_eval.RB_output_vectors[output_id][q_l](j));
@@ -431,19 +423,19 @@ void add_rb_evaluation_data_to_builder(RBEvaluation & rb_eval,
     unsigned int n_A_terms = rb_theta_expansion.get_n_A_terms();
 
     auto rb_fq_vectors_outer_list = rb_evaluation_builder.initRbFqVectors(n_F_terms);
-    for(unsigned int q_f=0; q_f < n_F_terms; ++q_f)
+    for (unsigned int q_f=0; q_f < n_F_terms; ++q_f)
       {
         auto rb_fq_vectors_inner_list = rb_fq_vectors_outer_list.init(q_f, n_bfs);
-        for(unsigned int i=0; i<n_bfs; i++)
+        for (unsigned int i=0; i<n_bfs; i++)
           set_scalar_in_list(rb_fq_vectors_inner_list, i, rb_eval.RB_Fq_vector[q_f](i));
       }
 
     auto rb_Aq_matrices_outer_list = rb_evaluation_builder.initRbAqMatrices(n_A_terms);
-    for(unsigned int q_a=0; q_a < n_A_terms; ++q_a)
+    for (unsigned int q_a=0; q_a < n_A_terms; ++q_a)
       {
         auto rb_Aq_matrices_inner_list = rb_Aq_matrices_outer_list.init(q_a, n_bfs*n_bfs);
-        for(unsigned int i=0; i < n_bfs; ++i)
-          for(unsigned int j=0; j < n_bfs; ++j)
+        for (unsigned int i=0; i < n_bfs; ++i)
+          for (unsigned int j=0; j < n_bfs; ++j)
             {
               unsigned int offset = i*n_bfs+j;
               set_scalar_in_list(rb_Aq_matrices_inner_list, offset, rb_eval.RB_Aq_vector[q_a](i,j));
@@ -452,13 +444,13 @@ void add_rb_evaluation_data_to_builder(RBEvaluation & rb_eval,
   }
 
   // Inner-product matrix
-  if(rb_eval.compute_RB_inner_product)
+  if (rb_eval.compute_RB_inner_product)
     {
       auto rb_inner_product_matrix_list =
         rb_evaluation_builder.initRbInnerProductMatrix(n_bfs*n_bfs);
 
-      for(unsigned int i=0; i < n_bfs; ++i)
-        for(unsigned int j=0; j < n_bfs; ++j)
+      for (unsigned int i=0; i < n_bfs; ++i)
+        for (unsigned int j=0; j < n_bfs; ++j)
           {
             unsigned int offset = i*n_bfs + j;
             set_scalar_in_list(
@@ -496,8 +488,8 @@ void add_transient_rb_evaluation_data_to_builder(TransientRBEvaluation & trans_r
     auto rb_L2_matrix_list =
       trans_rb_eval_builder.initRbL2Matrix(n_bfs*n_bfs);
 
-    for(unsigned int i=0; i<n_bfs; ++i)
-      for(unsigned int j=0; j<n_bfs; ++j)
+    for (unsigned int i=0; i<n_bfs; ++i)
+      for (unsigned int j=0; j<n_bfs; ++j)
         {
           unsigned int offset = i*n_bfs + j;
           set_scalar_in_list(rb_L2_matrix_list,
@@ -512,11 +504,11 @@ void add_transient_rb_evaluation_data_to_builder(TransientRBEvaluation & trans_r
   // Mq matrices
   {
     auto rb_Mq_matrices_outer_list = trans_rb_eval_builder.initRbMqMatrices(n_M_terms);
-    for(unsigned int q_m=0; q_m < n_M_terms; ++q_m)
+    for (unsigned int q_m=0; q_m < n_M_terms; ++q_m)
       {
         auto rb_Mq_matrices_inner_list = rb_Mq_matrices_outer_list.init(q_m, n_bfs*n_bfs);
-        for(unsigned int i=0; i < n_bfs; ++i)
-          for(unsigned int j=0; j < n_bfs; ++j)
+        for (unsigned int i=0; i < n_bfs; ++i)
+          for (unsigned int j=0; j < n_bfs; ++j)
             {
               unsigned int offset = i*n_bfs+j;
               set_scalar_in_list(rb_Mq_matrices_inner_list,
@@ -534,13 +526,13 @@ void add_transient_rb_evaluation_data_to_builder(TransientRBEvaluation & trans_r
     auto initial_conditions_outer_list =
       trans_rb_eval_builder.initInitialConditions(n_bfs);
 
-    for(unsigned int i=0; i<n_bfs; i++)
+    for (unsigned int i=0; i<n_bfs; i++)
       {
         initial_l2_errors_builder.set(i, trans_rb_eval.initial_L2_error_all_N[i]);
 
         auto initial_conditions_inner_list =
           initial_conditions_outer_list.init(i, i+1);
-        for(unsigned int j=0; j<=i; j++)
+        for (unsigned int j=0; j<=i; j++)
           {
             set_scalar_in_list(initial_conditions_inner_list,
                                j,
@@ -555,9 +547,9 @@ void add_transient_rb_evaluation_data_to_builder(TransientRBEvaluation & trans_r
     auto fq_mq_innerprods_list =
       trans_rb_eval_builder.initFqMqInnerprods(n_F_terms*n_M_terms*n_bfs);
 
-    for(unsigned int q_f=0; q_f<n_F_terms; ++q_f)
-      for(unsigned int q_m=0; q_m<n_M_terms; ++q_m)
-        for(unsigned int i=0; i<n_bfs; ++i)
+    for (unsigned int q_f=0; q_f<n_F_terms; ++q_f)
+      for (unsigned int q_m=0; q_m<n_M_terms; ++q_m)
+        for (unsigned int i=0; i<n_bfs; ++i)
           {
             unsigned int offset = q_f*n_M_terms*n_bfs + q_m*n_bfs + i;
             set_scalar_in_list(fq_mq_innerprods_list,
@@ -572,9 +564,9 @@ void add_transient_rb_evaluation_data_to_builder(TransientRBEvaluation & trans_r
     auto mq_mq_innerprods_list =
       trans_rb_eval_builder.initMqMqInnerprods(Q_m_hat*n_bfs*n_bfs);
 
-    for(unsigned int i=0; i < Q_m_hat; ++i)
-      for(unsigned int j=0; j < n_bfs; ++j)
-        for(unsigned int l=0; l < n_bfs; ++l)
+    for (unsigned int i=0; i < Q_m_hat; ++i)
+      for (unsigned int j=0; j < n_bfs; ++j)
+        for (unsigned int l=0; l < n_bfs; ++l)
           {
             unsigned int offset = i*n_bfs*n_bfs + j*n_bfs + l;
             set_scalar_in_list(mq_mq_innerprods_list,
@@ -590,10 +582,10 @@ void add_transient_rb_evaluation_data_to_builder(TransientRBEvaluation & trans_r
     auto aq_mq_innerprods_list =
       trans_rb_eval_builder.initAqMqInnerprods(n_A_terms*n_M_terms*n_bfs*n_bfs);
 
-    for(unsigned int q_a=0; q_a<n_A_terms; q_a++)
-      for(unsigned int q_m=0; q_m<n_M_terms; q_m++)
-        for(unsigned int i=0; i<n_bfs; i++)
-          for(unsigned int j=0; j<n_bfs; j++)
+    for (unsigned int q_a=0; q_a<n_A_terms; q_a++)
+      for (unsigned int q_m=0; q_m<n_M_terms; q_m++)
+        for (unsigned int i=0; i<n_bfs; i++)
+          for (unsigned int j=0; j<n_bfs; j++)
             {
               unsigned int offset =
                 q_a*(n_M_terms*n_bfs*n_bfs) + q_m*(n_bfs*n_bfs) + i*n_bfs + j;
@@ -614,7 +606,7 @@ void add_rb_eim_evaluation_data_to_builder(RBEIMEvaluation & rb_eim_evaluation,
 
   unsigned int n_bfs = rb_eim_evaluation.get_n_basis_functions();
 
-  // EIM interpolation matrix (with extra row for EIM error bound)
+  // EIM interpolation matrix
   {
     // We store the lower triangular part of an NxN matrix, the size of which is given by
     // (N(N + 1))/2
@@ -622,49 +614,35 @@ void add_rb_eim_evaluation_data_to_builder(RBEIMEvaluation & rb_eim_evaluation,
 
     auto interpolation_matrix_list =
       rb_eim_evaluation_builder.initInterpolationMatrix(half_matrix_size);
-    for(unsigned int i=0; i < n_bfs; ++i)
-      for(unsigned int j=0; j <= i; ++j)
+    for (unsigned int i=0; i < n_bfs; ++i)
+      for (unsigned int j=0; j <= i; ++j)
         {
           unsigned int offset = i*(i+1)/2 + j;
           set_scalar_in_list(interpolation_matrix_list,
                              offset,
                              rb_eim_evaluation.interpolation_matrix(i,j));
         }
-
-    auto extra_interpolation_matrix_row_list =
-      rb_eim_evaluation_builder.initExtraInterpolationMatrixRow(n_bfs);
-    for(unsigned int j=0; j < n_bfs; ++j)
-      set_scalar_in_list(extra_interpolation_matrix_row_list,
-                         j,
-                         rb_eim_evaluation.extra_interpolation_matrix_row(j));
   }
 
-  // Interpolation points (including the extra point)
+  // Interpolation points
   {
     auto interpolation_points_list =
       rb_eim_evaluation_builder.initInterpolationPoints(n_bfs);
-    for(unsigned int i=0; i < n_bfs; ++i)
+    for (unsigned int i=0; i < n_bfs; ++i)
       add_point_to_builder(rb_eim_evaluation.interpolation_points[i],
                            interpolation_points_list[i]);
-
-    auto extra_interpolation_point_builder =
-      rb_eim_evaluation_builder.initExtraInterpolationPoint();
-    add_point_to_builder(rb_eim_evaluation.extra_interpolation_point,
-                         extra_interpolation_point_builder);
   }
 
-  // Interpolation points variables (including the "extra one")
+  // Interpolation points variables
   {
     auto interpolation_points_var_list =
       rb_eim_evaluation_builder.initInterpolationPointsVar(n_bfs);
-    for(unsigned int i=0; i<n_bfs; ++i)
+    for (unsigned int i=0; i<n_bfs; ++i)
       interpolation_points_var_list.set(i,
                                         rb_eim_evaluation.interpolation_points_var[i]);
-
-    rb_eim_evaluation_builder.setExtraInterpolationPointVar(rb_eim_evaluation.extra_interpolation_point_var);
   }
 
-  // Interpolation elements (including the "extra one")
+  // Interpolation elements
   {
     unsigned int n_interpolation_elems =
       rb_eim_evaluation.interpolation_points_elem.size();
@@ -674,17 +652,12 @@ void add_rb_eim_evaluation_data_to_builder(RBEIMEvaluation & rb_eim_evaluation,
     if (n_interpolation_elems != n_bfs)
       libmesh_error_msg("The number of elements should match the number of basis functions");
 
-    for(unsigned int i=0; i<n_interpolation_elems; ++i)
+    for (unsigned int i=0; i<n_interpolation_elems; ++i)
       {
         const libMesh::Elem & elem = *rb_eim_evaluation.interpolation_points_elem[i];
         auto mesh_elem_builder = interpolation_points_elem_list[i];
         add_elem_to_builder(elem, mesh_elem_builder);
       }
-
-    auto extra_interpolation_point_elem_builder =
-      rb_eim_evaluation_builder.initExtraInterpolationPointElem();
-    add_elem_to_builder(*rb_eim_evaluation.extra_interpolation_point_elem,
-                        extra_interpolation_point_elem_builder);
   }
 }
 
@@ -704,10 +677,8 @@ void add_rb_scm_evaluation_data_to_builder(RBSCMEvaluation & rb_scm_eval,
     if (rb_scm_eval.B_min.size() != rb_scm_eval.get_rb_theta_expansion().get_n_A_terms())
       libmesh_error_msg("Size error while writing B_min");
     auto b_min_list = rb_scm_eval_builder.initBMin( rb_scm_eval.B_min.size() );
-    for(unsigned int i=0; i<rb_scm_eval.B_min.size(); i++)
-      {
-        b_min_list.set(i, rb_scm_eval.get_B_min(i));
-      }
+    for (std::size_t i=0; i<rb_scm_eval.B_min.size(); i++)
+      b_min_list.set(i, rb_scm_eval.get_B_min(i));
   }
 
   {
@@ -715,26 +686,22 @@ void add_rb_scm_evaluation_data_to_builder(RBSCMEvaluation & rb_scm_eval,
       libmesh_error_msg("Size error while writing B_max");
 
     auto b_max_list = rb_scm_eval_builder.initBMax( rb_scm_eval.B_max.size() );
-    for(unsigned int i=0; i<rb_scm_eval.B_max.size(); i++)
-      {
-        b_max_list.set(i, rb_scm_eval.get_B_max(i));
-      }
+    for (std::size_t i=0; i<rb_scm_eval.B_max.size(); i++)
+      b_max_list.set(i, rb_scm_eval.get_B_max(i));
   }
 
   {
     auto cj_stability_vector =
       rb_scm_eval_builder.initCJStabilityVector( rb_scm_eval.C_J_stability_vector.size() );
-    for(unsigned int i=0; i<rb_scm_eval.C_J_stability_vector.size(); i++)
-      {
-        cj_stability_vector.set(i, rb_scm_eval.get_C_J_stability_constraint(i));
-      }
+    for (std::size_t i=0; i<rb_scm_eval.C_J_stability_vector.size(); i++)
+      cj_stability_vector.set(i, rb_scm_eval.get_C_J_stability_constraint(i));
   }
 
   {
     auto cj_parameters_outer =
       rb_scm_eval_builder.initCJ( rb_scm_eval.C_J.size() );
 
-    for(unsigned int i=0; i<rb_scm_eval.C_J.size(); i++)
+    for (std::size_t i=0; i<rb_scm_eval.C_J.size(); i++)
       {
         auto cj_parameters_inner =
           cj_parameters_outer.init(i, rb_scm_eval.C_J[i].n_parameters());
@@ -743,7 +710,7 @@ void add_rb_scm_evaluation_data_to_builder(RBSCMEvaluation & rb_scm_eval,
         RBParameters::const_iterator it_end = rb_scm_eval.C_J[i].end();
 
         unsigned int count = 0;
-        for( ; it != it_end; ++it)
+        for ( ; it != it_end; ++it)
           {
             cj_parameters_inner[count].setName( it->first );
             cj_parameters_inner[count].setValue( it->second );
@@ -760,8 +727,8 @@ void add_rb_scm_evaluation_data_to_builder(RBSCMEvaluation & rb_scm_eval,
     auto scm_ub_vectors =
       rb_scm_eval_builder.initScmUbVectors( n_values );
 
-    for(unsigned int i=0; i<n_C_J_values; i++)
-      for(unsigned int j=0; j<n_A_terms; j++)
+    for (unsigned int i=0; i<n_C_J_values; i++)
+      for (unsigned int j=0; j<n_A_terms; j++)
         {
           unsigned int offset = i*n_A_terms + j;
           scm_ub_vectors.set(offset, rb_scm_eval.get_SCM_UB_vector(i,j));
@@ -791,9 +758,9 @@ void add_elem_to_builder(const libMesh::Elem & elem, RBData::MeshElem::Builder m
   unsigned int n_points = elem.n_nodes();
   auto mesh_elem_point_list = mesh_elem_builder.initPoints(n_points);
 
-  for(unsigned int j=0; j < n_points; ++j)
+  for (unsigned int j=0; j < n_points; ++j)
     {
-      add_point_to_builder(*elem.get_node(j), mesh_elem_point_list[j]);
+      add_point_to_builder(elem.node_ref(j), mesh_elem_point_list[j]);
     }
 }
 

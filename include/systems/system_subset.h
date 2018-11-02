@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -55,14 +55,15 @@ public:
   virtual ~SystemSubset ();
 
   /**
-   * Method that returns the actual set of dofs that the subset
-   * consists of.  The result must contain local dofs on each
-   * processor only and must not contain duplictates.
+   * \returns The actual set of dofs that the subset consists of.
+   *
+   * The result must contain local dofs on each processor only and
+   * must not contain duplicates.
    */
   virtual const std::vector<unsigned int> & dof_ids () const = 0;
 
   /**
-   * Returns the \p System to which we belong.
+   * \returns The \p System to which we belong.
    */
   const System & get_system () const;
 

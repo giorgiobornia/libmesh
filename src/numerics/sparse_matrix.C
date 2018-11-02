@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -29,6 +29,8 @@
 #include "libmesh/sparse_matrix.h"
 #include "libmesh/trilinos_epetra_matrix.h"
 #include "libmesh/numeric_vector.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
+#include "libmesh/enum_solver_package.h"
 
 namespace libMesh
 {
@@ -42,15 +44,8 @@ namespace libMesh
 template <typename T>
 SparseMatrix<T>::SparseMatrix (const Parallel::Communicator & comm_in) :
   ParallelObject(comm_in),
-  _dof_map(libmesh_nullptr),
+  _dof_map(nullptr),
   _is_initialized(false)
-{}
-
-
-
-// Destructor
-template <typename T>
-SparseMatrix<T>::~SparseMatrix ()
 {}
 
 
@@ -75,7 +70,7 @@ void SparseMatrix<T>::add_block_matrix (const DenseMatrix<T> & dm,
   rows.reserve(blocksize*brows.size());
   cols.reserve(blocksize*bcols.size());
 
-  for (unsigned int ib=0; ib<brows.size(); ib++)
+  for (std::size_t ib=0; ib<brows.size(); ib++)
     {
       numeric_index_type i=brows[ib]*blocksize;
 
@@ -83,7 +78,7 @@ void SparseMatrix<T>::add_block_matrix (const DenseMatrix<T> & dm,
         rows.push_back(i++);
     }
 
-  for (unsigned int jb=0; jb<bcols.size(); jb++)
+  for (std::size_t jb=0; jb<bcols.size(); jb++)
     {
       numeric_index_type j=bcols[jb]*blocksize;
 
@@ -102,7 +97,7 @@ void SparseMatrix<Complex>::print(std::ostream & os, const bool sparse) const
 {
   // std::complex<>::operator<<() is defined, but use this form
 
-  if(sparse)
+  if (sparse)
     {
       libmesh_not_implemented();
     }
@@ -131,43 +126,43 @@ void SparseMatrix<Complex>::print(std::ostream & os, const bool sparse) const
 
 // Full specialization for Real datatypes
 template <typename T>
-UniquePtr<SparseMatrix<T> >
+std::unique_ptr<SparseMatrix<T>>
 SparseMatrix<T>::build(const Parallel::Communicator & comm,
                        const SolverPackage solver_package)
 {
+  // Avoid unused parameter warnings when no solver packages are enabled.
+  libmesh_ignore(comm);
+
   // Build the appropriate vector
   switch (solver_package)
     {
 
 #ifdef LIBMESH_HAVE_LASPACK
     case LASPACK_SOLVERS:
-      return UniquePtr<SparseMatrix<T> >(new LaspackMatrix<T>(comm));
+      return libmesh_make_unique<LaspackMatrix<T>>(comm);
 #endif
 
 
 #ifdef LIBMESH_HAVE_PETSC
     case PETSC_SOLVERS:
-      return UniquePtr<SparseMatrix<T> >(new PetscMatrix<T>(comm));
+      return libmesh_make_unique<PetscMatrix<T>>(comm);
 #endif
 
 
-#ifdef LIBMESH_HAVE_TRILINOS
+#ifdef LIBMESH_TRILINOS_HAVE_EPETRA
     case TRILINOS_SOLVERS:
-      return UniquePtr<SparseMatrix<T> >(new EpetraMatrix<T>(comm));
+      return libmesh_make_unique<EpetraMatrix<T>>(comm);
 #endif
 
 
 #ifdef LIBMESH_HAVE_EIGEN
     case EIGEN_SOLVERS:
-      return UniquePtr<SparseMatrix<T> >(new EigenSparseMatrix<T>(comm));
+      return libmesh_make_unique<EigenSparseMatrix<T>>(comm);
 #endif
 
     default:
       libmesh_error_msg("ERROR:  Unrecognized solver package: " << solver_package);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return UniquePtr<SparseMatrix<T> >();
 }
 
 
@@ -208,7 +203,7 @@ void SparseMatrix<T>::print(std::ostream & os, const bool sparse) const
 
   libmesh_assert (this->initialized());
 
-  if(!this->_dof_map)
+  if (!this->_dof_map)
     libmesh_error_msg("Error!  Trying to print a matrix with no dof_map set!");
 
   // We'll print the matrix from processor 0 to make sure
@@ -219,7 +214,7 @@ void SparseMatrix<T>::print(std::ostream & os, const bool sparse) const
       for (numeric_index_type i=this->_dof_map->first_dof();
            i!=this->_dof_map->end_dof(); ++i)
         {
-          if(sparse)
+          if (sparse)
             {
               for (numeric_index_type j=0; j<this->n(); j++)
                 {
@@ -257,7 +252,7 @@ void SparseMatrix<T>::print(std::ostream & os, const bool sparse) const
           std::size_t currentb = 0;
           for (;currenti <= ibuf.back(); ++currenti)
             {
-              if(sparse)
+              if (sparse)
                 {
                   for (numeric_index_type j=0; j<this->n(); j++)
                     {
@@ -288,7 +283,7 @@ void SparseMatrix<T>::print(std::ostream & os, const bool sparse) const
                 }
             }
         }
-      if(!sparse)
+      if (!sparse)
         {
           for (; currenti != this->m(); ++currenti)
             {

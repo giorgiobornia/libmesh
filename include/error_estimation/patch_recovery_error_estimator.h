@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,10 +22,18 @@
 
 // Local Includes
 #include "libmesh/error_estimator.h"
-#include "libmesh/enum_order.h"
 #include "libmesh/patch.h"
 #include "libmesh/point.h"
 #include "libmesh/elem_range.h"
+
+#ifdef LIBMESH_FORWARD_DECLARE_ENUMS
+namespace libMesh
+{
+enum Order : int;
+}
+#else
+#include "libmesh/enum_order.h"
+#endif
 
 // C++ includes
 #include <cstddef>
@@ -36,7 +44,6 @@ namespace libMesh
 
 // Forward Declarations
 class Elem;
-
 
 /**
  * This class implements the Patch Recovery error indicator.
@@ -54,18 +61,17 @@ public:
    * seminorms should be supported now.  W1,p and W2,p norms would
    * be natural to support if any contributors make the effort.
    */
-  PatchRecoveryErrorEstimator() :
-    ErrorEstimator(),
-    target_patch_size(20),
-    patch_growth_strategy(&Patch::add_local_face_neighbors),
-    patch_reuse(true)
-  { error_norm = H1_SEMINORM; }
+  PatchRecoveryErrorEstimator();
 
   /**
-   * Destructor.
+   * Copy/move ctor, copy/move assignment operator, and destructor are
+   * all explicitly defaulted for this class.
    */
-  ~PatchRecoveryErrorEstimator() {}
-
+  PatchRecoveryErrorEstimator (const PatchRecoveryErrorEstimator &) = default;
+  PatchRecoveryErrorEstimator (PatchRecoveryErrorEstimator &&) = default;
+  PatchRecoveryErrorEstimator & operator= (const PatchRecoveryErrorEstimator &) = default;
+  PatchRecoveryErrorEstimator & operator= (PatchRecoveryErrorEstimator &&) = default;
+  virtual ~PatchRecoveryErrorEstimator() = default;
 
   /**
    * This function uses the Patch Recovery error
@@ -75,8 +81,8 @@ public:
    */
   virtual void estimate_error (const System & system,
                                ErrorVector & error_per_cell,
-                               const NumericVector<Number> * solution_vector = libmesh_nullptr,
-                               bool estimate_parent_error = false) libmesh_override;
+                               const NumericVector<Number> * solution_vector = nullptr,
+                               bool estimate_parent_error = false) override;
 
   /**
    * The PatchErrorEstimator will build patches of at least this many
@@ -94,15 +100,13 @@ public:
 
   void set_patch_reuse (bool);
 
-  virtual ErrorEstimatorType type() const libmesh_override
-  { return PATCH_RECOVERY;}
+  virtual ErrorEstimatorType type() const override;
 
 protected:
 
   /**
-   * Returns the spectral polynomial basis function values at a point x,y,z
+   * \returns The spectral polynomial basis function values at a point (x,y,z).
    */
-
   static std::vector<Real> specpoly(const unsigned int dim,
                                     const Order order,
                                     const Point p,
@@ -129,13 +133,7 @@ private:
 
     void operator()(const ConstElemRange & range) const;
 
-    /**
-     * Function to set the boolean patch_reuse in case the user
-     * wants to change the default behaviour of patch_recovery_error_estimator
-     */
-
   private:
-
     const System & system;
     const PatchRecoveryErrorEstimator & error_estimator;
     ErrorVector & error_per_cell;

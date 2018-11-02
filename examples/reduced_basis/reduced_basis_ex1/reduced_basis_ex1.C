@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -33,7 +33,7 @@
 // dependent functions and a^q, f^q are parameter independent
 // operators (\mu denotes a parameter).
 //
-// We first attach the parameter dependent functions and paramater
+// We first attach the parameter dependent functions and parameter
 // independent operators to the RBSystem. Then in Offline mode, a
 // reduced basis space is generated and written out to the directory
 // "offline_data". In Online mode, the reduced basis data in
@@ -64,6 +64,7 @@
 #include "libmesh/elem.h"
 #include "libmesh/rb_data_serialization.h"
 #include "libmesh/rb_data_deserialization.h"
+#include "libmesh/enum_solver_package.h"
 
 // local includes
 #include "rb_classes.h"
@@ -77,6 +78,10 @@ int main (int argc, char ** argv)
 {
   // Initialize libMesh.
   LibMeshInit init (argc, argv);
+
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
 
 #if !defined(LIBMESH_HAVE_XDR)
   // We need XDR support to write out reduced bases

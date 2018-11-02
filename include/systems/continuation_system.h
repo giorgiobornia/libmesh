@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -82,12 +82,12 @@ public:
    * Clear all the data structures associated with
    * the system.
    */
-  virtual void clear () libmesh_override;
+  virtual void clear () override;
 
   /**
    * Perform a standard "solve" of the system, without doing continuation.
    */
-  virtual void solve () libmesh_override;
+  virtual void solve () override;
 
   /**
    * Perform a continuation solve of the system.  In general, you can only
@@ -148,7 +148,7 @@ public:
 
   /**
    * Stores the current solution and continuation parameter
-   * (as "previous_u" and "old_continuation_paramter") for later referral.
+   * (as "previous_u" and "old_continuation_parameter") for later referral.
    * You may need to call this e.g. after the first regular solve, in order
    * to store the first solution, before computing a second solution and
    * beginning arclength continuation.
@@ -175,7 +175,7 @@ public:
 
   /**
    * Arclength normalization parameter.  Defaults to 1.0 (no normalization).  Used to
-   * ensure that one term in the arclength contstraint equation does not wash out all
+   * ensure that one term in the arclength constraint equation does not wash out all
    * the others.
    */
   Real Theta;
@@ -260,7 +260,7 @@ protected:
    * Initializes the member data fields associated with
    * the system, so that, e.g., \p assemble() may be used.
    */
-  virtual void init_data () libmesh_override;
+  virtual void init_data () override;
 
   /**
    * There are (so far) two different vectors which may be assembled using the assembly routine:
@@ -374,7 +374,7 @@ private:
    * custom systems of equations and/or things which do not require
    * a full-blown NewtonSolver.
    */
-  UniquePtr<LinearSolver<Number> > linear_solver;
+  std::unique_ptr<LinearSolver<Number>> linear_solver;
 
   /**
    * False until initialize_tangent() is called
@@ -404,7 +404,7 @@ private:
 
   /**
    * Value of stepsize currently in use.  Will not exceed user-provided maximum
-   * arclength stepize ds.
+   * arclength stepsize ds.
    */
   Real ds_current;
 

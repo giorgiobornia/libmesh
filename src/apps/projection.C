@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,11 +20,12 @@
 // arguments, open the output mesh, project that solution onto the
 // output mesh, and write a corresponding output solution file.
 
+// C++ includes
 #include <map>
 #include <string>
 
+// libMesh includes
 #include "libmesh/libmesh.h"
-
 #include "libmesh/dof_map.h"
 #include "libmesh/equation_systems.h"
 #include "libmesh/getpot.h"
@@ -32,7 +33,8 @@
 #include "libmesh/mesh_function.h"
 #include "libmesh/numeric_vector.h"
 #include "libmesh/point.h"
-#include "libmesh/serial_mesh.h"
+#include "libmesh/replicated_mesh.h"
+#include "libmesh/enum_xdr_mode.h"
 
 
 using namespace libMesh;
@@ -59,7 +61,7 @@ T assert_argument (GetPot & cl,
                    const char * progname,
                    const T & defaultarg)
 {
-  if(!cl.search(argname))
+  if (!cl.search(argname))
     {
       libMesh::err << ("No " + argname + " argument found!") << std::endl;
       usage_error(progname);
@@ -119,7 +121,7 @@ int main(int argc, char ** argv)
   // Load the old mesh from --inmesh filename.
   // Keep it serialized; we don't want elements on the new mesh to be
   // looking for data on old mesh elements that live off-processor.
-  SerialMesh old_mesh(init.comm(), requested_dim);
+  ReplicatedMesh old_mesh(init.comm(), requested_dim);
 
   const std::string meshname =
     assert_argument(cl, "--inmesh", argv[0], std::string("mesh.xda"));
@@ -186,7 +188,7 @@ int main(int argc, char ** argv)
       unsigned int n_vars = old_sys.n_vars();
       libmesh_assert_equal_to (new_sys.n_vars(), n_vars);
 
-      UniquePtr<NumericVector<Number> > comparison_soln =
+      std::unique_ptr<NumericVector<Number>> comparison_soln =
         NumericVector<Number>::build(old_sys.comm());
       std::vector<Number> global_soln;
       old_sys.update_global_solution(global_soln);

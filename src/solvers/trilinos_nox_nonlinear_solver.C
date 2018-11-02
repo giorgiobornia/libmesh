@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -19,10 +19,7 @@
 
 #include "libmesh/libmesh_common.h"
 
-#ifdef LIBMESH_TRILINOS_HAVE_NOX
-
-
-// C++ includes
+#if defined(LIBMESH_TRILINOS_HAVE_NOX) && defined(LIBMESH_TRILINOS_HAVE_EPETRA)
 
 // Local Includes
 #include "libmesh/libmesh_logging.h"
@@ -34,18 +31,13 @@
 #include "libmesh/trilinos_epetra_matrix.h"
 #include "libmesh/trilinos_preconditioner.h"
 
-// ---------- Standard Includes ----------
-#include <iostream>
-#include "Epetra_Vector.h"
-#include "Epetra_Operator.h"
-#include "Epetra_RowMatrix.h"
-#include "NOX_Epetra_Interface_Required.H" // base class
-#include "NOX_Epetra_Interface_Jacobian.H" // base class
-#include "NOX_Epetra_Interface_Preconditioner.H" // base class
+// Trilinos includes
+#include "libmesh/ignore_warnings.h"
 #include "NOX_Epetra_MatrixFree.H"
 #include "NOX_Epetra_LinearSystem_AztecOO.H"
-#include "NOX_Epetra_Group.H"// class definition
+#include "NOX_Epetra_Group.H"
 #include "NOX_Epetra_Vector.H"
+#include "libmesh/restore_warnings.h"
 
 namespace libMesh
 {
@@ -104,7 +96,7 @@ bool Problem_Interface::computeF(const Epetra_Vector & x,
                                  Epetra_Vector & r,
                                  NOX::Epetra::Interface::Required::FillType /*fillType*/)
 {
-  START_LOG("residual()", "TrilinosNoxNonlinearSolver");
+  LOG_SCOPE("residual()", "TrilinosNoxNonlinearSolver");
 
   NonlinearImplicitSystem & sys = _solver->system();
 
@@ -130,30 +122,28 @@ bool Problem_Interface::computeF(const Epetra_Vector & x,
   // will be used, so catch that as an error
 
   if (_solver->residual && _solver->residual_object)
-    libmesh_error_msg("ERROR: cannot specifiy both a function and object to compute the Residual!");
+    libmesh_error_msg("ERROR: cannot specify both a function and object to compute the Residual!");
 
   if (_solver->matvec && _solver->residual_and_jacobian_object)
-    libmesh_error_msg("ERROR: cannot specifiy both a function and object to compute the combined Residual & Jacobian!");
+    libmesh_error_msg("ERROR: cannot specify both a function and object to compute the combined Residual & Jacobian!");
 
-  if (_solver->residual != libmesh_nullptr)
+  if (_solver->residual != nullptr)
     _solver->residual(*sys.current_local_solution.get(), R, sys);
 
-  else if (_solver->residual_object != libmesh_nullptr)
+  else if (_solver->residual_object != nullptr)
     _solver->residual_object->residual(*sys.current_local_solution.get(), R, sys);
 
-  else if (_solver->matvec != libmesh_nullptr)
-    _solver->matvec(*sys.current_local_solution.get(), &R, libmesh_nullptr, sys);
+  else if (_solver->matvec != nullptr)
+    _solver->matvec(*sys.current_local_solution.get(), &R, nullptr, sys);
 
-  else if (_solver->residual_and_jacobian_object != libmesh_nullptr)
-    _solver->residual_and_jacobian_object->residual_and_jacobian (*sys.current_local_solution.get(), &R, libmesh_nullptr, sys);
+  else if (_solver->residual_and_jacobian_object != nullptr)
+    _solver->residual_and_jacobian_object->residual_and_jacobian (*sys.current_local_solution.get(), &R, nullptr, sys);
 
   else
     return false;
 
   R.close();
   X_global.close();
-
-  STOP_LOG("residual()", "TrilinosNoxNonlinearSolver");
 
   return true;
 }
@@ -163,16 +153,16 @@ bool Problem_Interface::computeF(const Epetra_Vector & x,
 bool Problem_Interface::computeJacobian(const Epetra_Vector & x,
                                         Epetra_Operator & jac)
 {
-  START_LOG("jacobian()", "TrilinosNoxNonlinearSolver");
+  LOG_SCOPE("jacobian()", "TrilinosNoxNonlinearSolver");
 
   NonlinearImplicitSystem & sys = _solver->system();
 
-  EpetraMatrix<Number> Jac(&dynamic_cast<Epetra_FECrsMatrix &>(jac), sys.comm());
+  EpetraMatrix<Number> J(&dynamic_cast<Epetra_FECrsMatrix &>(jac), sys.comm());
   EpetraVector<Number> & X_sys = *cast_ptr<EpetraVector<Number> *>(sys.solution.get());
   EpetraVector<Number> X_global(*const_cast<Epetra_Vector *>(&x), sys.comm());
 
   // Set the dof maps
-  Jac.attach_dof_map(sys.get_dof_map());
+  J.attach_dof_map(sys.get_dof_map());
 
   // Use the systems update() to get a good local version of the parallel solution
   X_global.swap(X_sys);
@@ -191,25 +181,23 @@ bool Problem_Interface::computeJacobian(const Epetra_Vector & x,
   if (_solver->matvec && _solver->residual_and_jacobian_object)
     libmesh_error_msg("ERROR: cannot specify both a function and object to compute the combined Residual & Jacobian!");
 
-  if (_solver->jacobian != libmesh_nullptr)
-    _solver->jacobian(*sys.current_local_solution.get(), Jac, sys);
+  if (_solver->jacobian != nullptr)
+    _solver->jacobian(*sys.current_local_solution.get(), J, sys);
 
-  else if (_solver->jacobian_object != libmesh_nullptr)
-    _solver->jacobian_object->jacobian(*sys.current_local_solution.get(), Jac, sys);
+  else if (_solver->jacobian_object != nullptr)
+    _solver->jacobian_object->jacobian(*sys.current_local_solution.get(), J, sys);
 
-  else if (_solver->matvec != libmesh_nullptr)
-    _solver->matvec(*sys.current_local_solution.get(), libmesh_nullptr, &Jac, sys);
+  else if (_solver->matvec != nullptr)
+    _solver->matvec(*sys.current_local_solution.get(), nullptr, &J, sys);
 
-  else if (_solver->residual_and_jacobian_object != libmesh_nullptr)
-    _solver->residual_and_jacobian_object->residual_and_jacobian (*sys.current_local_solution.get(), libmesh_nullptr, &Jac, sys);
+  else if (_solver->residual_and_jacobian_object != nullptr)
+    _solver->residual_and_jacobian_object->residual_and_jacobian (*sys.current_local_solution.get(), nullptr, &J, sys);
 
   else
     libmesh_error_msg("Error! Unable to compute residual and/or Jacobian!");
 
-  Jac.close();
+  J.close();
   X_global.close();
-
-  STOP_LOG("jacobian()", "TrilinosNoxNonlinearSolver");
 
   return true;
 }
@@ -228,17 +216,17 @@ bool Problem_Interface::computePreconditioner(const Epetra_Vector & x,
                                               Epetra_Operator & prec,
                                               Teuchos::ParameterList * /*p*/)
 {
-  START_LOG("preconditioner()", "TrilinosNoxNonlinearSolver");
+  LOG_SCOPE("preconditioner()", "TrilinosNoxNonlinearSolver");
 
   NonlinearImplicitSystem & sys = _solver->system();
   TrilinosPreconditioner<Number> & tpc = dynamic_cast<TrilinosPreconditioner<Number> &>(prec);
 
-  EpetraMatrix<Number> Jac(dynamic_cast<Epetra_FECrsMatrix *>(tpc.mat()),sys.comm());
+  EpetraMatrix<Number> J(dynamic_cast<Epetra_FECrsMatrix *>(tpc.mat()),sys.comm());
   EpetraVector<Number> & X_sys = *cast_ptr<EpetraVector<Number> *>(sys.solution.get());
   EpetraVector<Number> X_global(*const_cast<Epetra_Vector *>(&x), sys.comm());
 
   // Set the dof maps
-  Jac.attach_dof_map(sys.get_dof_map());
+  J.attach_dof_map(sys.get_dof_map());
 
   // Use the systems update() to get a good local version of the parallel solution
   X_global.swap(X_sys);
@@ -257,27 +245,25 @@ bool Problem_Interface::computePreconditioner(const Epetra_Vector & x,
   if (_solver->matvec && _solver->residual_and_jacobian_object)
     libmesh_error_msg("ERROR: cannot specify both a function and object to compute the combined Residual & Jacobian!");
 
-  if (_solver->jacobian != libmesh_nullptr)
-    _solver->jacobian(*sys.current_local_solution.get(), Jac, sys);
+  if (_solver->jacobian != nullptr)
+    _solver->jacobian(*sys.current_local_solution.get(), J, sys);
 
-  else if (_solver->jacobian_object != libmesh_nullptr)
-    _solver->jacobian_object->jacobian(*sys.current_local_solution.get(), Jac, sys);
+  else if (_solver->jacobian_object != nullptr)
+    _solver->jacobian_object->jacobian(*sys.current_local_solution.get(), J, sys);
 
-  else if (_solver->matvec != libmesh_nullptr)
-    _solver->matvec(*sys.current_local_solution.get(), libmesh_nullptr, &Jac, sys);
+  else if (_solver->matvec != nullptr)
+    _solver->matvec(*sys.current_local_solution.get(), nullptr, &J, sys);
 
-  else if (_solver->residual_and_jacobian_object != libmesh_nullptr)
-    _solver->residual_and_jacobian_object->residual_and_jacobian (*sys.current_local_solution.get(), libmesh_nullptr, &Jac, sys);
+  else if (_solver->residual_and_jacobian_object != nullptr)
+    _solver->residual_and_jacobian_object->residual_and_jacobian (*sys.current_local_solution.get(), nullptr, &J, sys);
 
   else
     libmesh_error_msg("Error! Unable to compute residual and/or Jacobian!");
 
-  Jac.close();
+  J.close();
   X_global.close();
 
   tpc.compute();
-
-  STOP_LOG("preconditioner()", "TrilinosNoxNonlinearSolver");
 
   return true;
 }
@@ -356,7 +342,7 @@ NoxNonlinearSolver<T>::solve (SparseMatrix<T> &  /* jac_in */,  // System Jacobi
 
   if (this->jacobian || this->jacobian_object || this->residual_and_jacobian_object)
     {
-      if(this->_preconditioner)
+      if (this->_preconditioner)
         {
           // PJNFK
           lsParams.set("Preconditioner", "User Defined");
@@ -456,4 +442,4 @@ template class NoxNonlinearSolver<Number>;
 
 
 
-#endif // #ifdef LIBMESH_TRILINOS_HAVE_NOX
+#endif // LIBMESH_TRILINOS_HAVE_NOX && LIBMESH_TRILINOS_HAVE_EPETRA

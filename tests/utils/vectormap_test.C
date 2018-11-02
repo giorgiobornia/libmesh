@@ -6,6 +6,16 @@
 #include <cppunit/TestCase.h>
 #include <libmesh/restore_warnings.h>
 
+// THE CPPUNIT_TEST_SUITE_END macro expands to code that involves
+// std::auto_ptr, which in turn produces -Wdeprecated-declarations
+// warnings.  These can be ignored in GCC as long as we wrap the
+// offending code in appropriate pragmas.  We can't get away with a
+// single ignore_warnings.h inclusion at the beginning of this file,
+// since the libmesh headers pull in a restore_warnings.h at some
+// point.  We also don't bother restoring warnings at the end of this
+// file since it's not a header.
+#include <libmesh/ignore_warnings.h>
+
 #define VECTORMAPOBJECTTEST                     \
   CPPUNIT_TEST( testCreate );                   \
 
@@ -19,6 +29,7 @@ public:
   CPPUNIT_TEST( testCreate );
   CPPUNIT_TEST( testInsert );
   CPPUNIT_TEST( testIterate );
+  CPPUNIT_TEST( testFind );
 
   CPPUNIT_TEST_SUITE_END();
 
@@ -81,7 +92,7 @@ public:
     create<int, int> ();
     create<int*,int> ();
     create<int*,int*>();
-    create<int, std::vector<int> >();
+    create<int, std::vector<int>>();
   }
 
   void testInsert()
@@ -89,7 +100,7 @@ public:
     insert<int, int> ();
     insert<char,int> ();
     insert<long,int*>();
-    insert<int, std::vector<int> >();
+    insert<int, std::vector<int>>();
   }
 
   void testIterate()
@@ -98,6 +109,22 @@ public:
     iterate<char,int> ();
     iterate<long,int*>();
     iterate<int, std::string>("test_string");
+  }
+
+  void testFind()
+  {
+    vectormap<int, int> vm;
+    for (int i=16; i<32; ++i)
+      vm.insert(std::make_pair(i,i));
+
+    vectormap<int, int>::iterator
+      it1 = vm.find(24),
+      it2 = vm.find(4);
+
+    CPPUNIT_ASSERT(it1 != vm.end());
+    CPPUNIT_ASSERT(it2 == vm.end());
+    CPPUNIT_ASSERT(vm.count(24) == 1);
+    CPPUNIT_ASSERT(vm.count(4) == 0);
   }
 };
 

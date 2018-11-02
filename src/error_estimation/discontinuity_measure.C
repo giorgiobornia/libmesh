@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -30,13 +30,30 @@
 #include "libmesh/libmesh_logging.h"
 #include "libmesh/elem.h"
 #include "libmesh/system.h"
-
 #include "libmesh/dense_vector.h"
 #include "libmesh/tensor_tools.h"
-
+#include "libmesh/enum_error_estimator_type.h"
+#include "libmesh/enum_norm_type.h"
 
 namespace libMesh
 {
+
+DiscontinuityMeasure::DiscontinuityMeasure() :
+  JumpErrorEstimator(),
+  _bc_function(nullptr)
+{
+  error_norm = L2;
+}
+
+
+
+ErrorEstimatorType
+DiscontinuityMeasure::type() const
+{
+  return DISCONTINUITY_MEASURE;
+}
+
+
 
 void
 DiscontinuityMeasure::init_context(FEMContext & c)
@@ -48,16 +65,13 @@ DiscontinuityMeasure::init_context(FEMContext & c)
       if (error_norm.weight(v) == 0.0) continue;
 
       // FIXME: Need to generalize this to vector-valued elements. [PB]
-      FEBase * side_fe = libmesh_nullptr;
+      FEBase * side_fe = nullptr;
 
       const std::set<unsigned char> & elem_dims =
         c.elem_dimensions();
 
-      for (std::set<unsigned char>::const_iterator dim_it =
-             elem_dims.begin(); dim_it != elem_dims.end(); ++dim_it)
+      for (const auto & dim : elem_dims)
         {
-          const unsigned char dim = *dim_it;
-
           fine_context->get_side_fe( v, side_fe, dim );
 
           // We'll need values on both sides for discontinuity computation
@@ -74,17 +88,17 @@ DiscontinuityMeasure::internal_side_integration ()
   const Elem & coarse_elem = coarse_context->get_elem();
   const Elem & fine_elem = fine_context->get_elem();
 
-  FEBase * fe_fine = libmesh_nullptr;
+  FEBase * fe_fine = nullptr;
   fine_context->get_side_fe( var, fe_fine, fine_elem.dim() );
 
-  FEBase * fe_coarse = libmesh_nullptr;
+  FEBase * fe_coarse = nullptr;
   coarse_context->get_side_fe( var, fe_coarse, fine_elem.dim() );
 
   Real error = 1.e-30;
   unsigned int n_qp = fe_fine->n_quadrature_points();
 
-  std::vector<std::vector<Real> > phi_coarse = fe_coarse->get_phi();
-  std::vector<std::vector<Real> > phi_fine = fe_fine->get_phi();
+  std::vector<std::vector<Real>> phi_coarse = fe_coarse->get_phi();
+  std::vector<std::vector<Real>> phi_fine = fe_fine->get_phi();
   std::vector<Real> JxW_face = fe_fine->get_JxW();
 
   for (unsigned int qp=0; qp != n_qp; ++qp)
@@ -116,13 +130,13 @@ DiscontinuityMeasure::boundary_side_integration ()
 {
   const Elem & fine_elem = fine_context->get_elem();
 
-  FEBase * fe_fine = libmesh_nullptr;
+  FEBase * fe_fine = nullptr;
   fine_context->get_side_fe( var, fe_fine, fine_elem.dim() );
 
   const std::string & var_name =
     fine_context->get_system().variable_name(var);
 
-  std::vector<std::vector<Real> > phi_fine = fe_fine->get_phi();
+  std::vector<std::vector<Real>> phi_fine = fe_fine->get_phi();
   std::vector<Real> JxW_face = fe_fine->get_JxW();
   std::vector<Point> qface_point = fe_fine->get_xyz();
 

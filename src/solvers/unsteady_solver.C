@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -179,7 +179,7 @@ void UnsteadySolver::adjoint_advance_timestep ()
 {
   // On the first call of this function, we dont save the adjoint solution or
   // decrement the time, we just call the retrieve function below
-  if(!first_adjoint_step)
+  if (!first_adjoint_step)
     {
       // Call the store function to store the last adjoint before decrementing the time
       solution_history->store();
@@ -227,7 +227,7 @@ Number UnsteadySolver::old_nonlinear_solution(const dof_id_type global_dof_numbe
 Real UnsteadySolver::du(const SystemNorm & norm) const
 {
 
-  UniquePtr<NumericVector<Number> > solution_copy =
+  std::unique_ptr<NumericVector<Number>> solution_copy =
     _system.solution->clone();
 
   solution_copy->add(-1., _system.get_vector("_old_nonlinear_solution"));
@@ -236,7 +236,5 @@ Real UnsteadySolver::du(const SystemNorm & norm) const
 
   return _system.calculate_norm(*solution_copy, norm);
 }
-
-
 
 } // namespace libMesh

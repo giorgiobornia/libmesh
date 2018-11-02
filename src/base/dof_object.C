@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -42,7 +42,7 @@ const processor_id_type DofObject::invalid_processor_id;
 DofObject::DofObject (const DofObject & dof_obj) :
   ReferenceCountedObject<DofObject>(),
 #ifdef LIBMESH_ENABLE_AMR
-  old_dof_object (libmesh_nullptr),
+  old_dof_object (nullptr),
 #endif
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
   _unique_id     (dof_obj._unique_id),
@@ -51,6 +51,14 @@ DofObject::DofObject (const DofObject & dof_obj) :
   _processor_id  (dof_obj._processor_id),
   _idx_buf       (dof_obj._idx_buf)
 {
+  // DO NOT copy old_dof_object, because this isn't a *real* copy
+  // constructor, it's a "copy almost everything" constructor that
+  // is intended to be used solely for internal construction of
+  // old_dof_object, never for a true deep copy where the newly
+  // created object really matches the source object.
+  //
+  // if (dof_obj.old_dof_object)
+  //  this->old_dof_object = new DofObject(*(dof_obj.old_dof_object));
 
   // Check that everything worked
 #ifdef DEBUG
@@ -134,7 +142,7 @@ DofObject & DofObject::operator= (const DofObject & dof_obj)
 void  DofObject::clear_old_dof_object ()
 {
   delete this->old_dof_object;
-  this->old_dof_object = libmesh_nullptr;
+  this->old_dof_object = nullptr;
 }
 
 
@@ -204,7 +212,7 @@ void DofObject::add_system()
   // cache this value before we screw it up!
   const unsigned int ns_orig = this->n_systems();
 
-  // incriment the number of systems and the offsets for each of
+  // increment the number of systems and the offsets for each of
   // the systems including the new one we just added.
   for (unsigned int i=0; i<ns_orig+1; i++)
     _idx_buf[i]++;
@@ -222,13 +230,13 @@ void DofObject::set_n_vars_per_group(const unsigned int s,
 
   libmesh_assert_less (s, this->n_systems());
 
-  // number of varaible groups for this system - inferred
+  // number of variable groups for this system - inferred
   const unsigned int nvg = cast_int<unsigned int>(nvpg.size());
 
   // BSK - note that for compatibility with the previous implementation
   // calling this method when (nvars == this->n_vars()) requires that
   // we invalidate the DOF indices and set the number of components to 0.
-  // Note this was a bit of a suprise to me - there was no quick return in
+  // Note this was a bit of a surprise to me - there was no quick return in
   // the old method, which caused removal and readdition of the DOF indices
   // even in the case of (nvars == this->n_vars()), resulting in n_comp(s,v)
   // implicitly becoming 0 regardless of any previous value.
@@ -273,7 +281,7 @@ void DofObject::set_n_vars_per_group(const unsigned int s,
   // better not have any now!
   libmesh_assert_equal_to (this->n_var_groups(s), 0);
 
-  // had better not screwed up any of our sizes!
+  // Make sure we didn't screw up any of our sizes!
 #ifdef DEBUG
   for (unsigned int s_ctr=0; s_ctr<this->n_systems(); s_ctr++)
     if (s_ctr != s)
@@ -304,13 +312,12 @@ void DofObject::set_n_vars_per_group(const unsigned int s,
     DofObject::index_buffer_t(_idx_buf).swap(_idx_buf);
   }
 
-  // that better had worked.  Assert stuff.
   libmesh_assert_equal_to (nvg, this->n_var_groups(s));
 
 #ifdef DEBUG
 
   // libMesh::out << " [ ";
-  // for (unsigned int i=0; i<_idx_buf.size(); i++)
+  // for (std::size_t i=0; i<_idx_buf.size(); i++)
   //   libMesh::out << _idx_buf[i] << " ";
   // libMesh::out << "]\n";
 
@@ -325,7 +332,7 @@ void DofObject::set_n_vars_per_group(const unsigned int s,
   for (unsigned int v=0; v<this->n_vars(s); v++)
     libmesh_assert_equal_to (this->n_comp(s,v), 0);
 
-  // again, all other system sizes shoudl be unchanged!
+  // again, all other system sizes should be unchanged!
   for (unsigned int s_ctr=0; s_ctr<this->n_systems(); s_ctr++)
     if (s_ctr != s)
       libmesh_assert_equal_to (this->n_var_groups(s_ctr), old_system_sizes[s_ctr]);
@@ -436,7 +443,7 @@ void DofObject::set_dof_number(const unsigned int s,
 
   // #ifdef DEBUG
   //   libMesh::out << " [ ";
-  //   for (unsigned int i=0; i<_idx_buf.size(); i++)
+  //   for (std::size_t i=0; i<_idx_buf.size(); i++)
   //     libMesh::out << _idx_buf[i] << " ";
   //   libMesh::out << "]\n";
   // #endif
@@ -452,7 +459,7 @@ unsigned int DofObject::packed_indexing_size() const
   return
     cast_int<unsigned int> (
 #ifdef LIBMESH_ENABLE_AMR
-                            ((old_dof_object == libmesh_nullptr) ? 0 : old_dof_object->packed_indexing_size()) + 2 +
+                            ((old_dof_object == nullptr) ? 0 : old_dof_object->packed_indexing_size()) + 2 +
 #else
                             1 +
 #endif
@@ -522,11 +529,11 @@ void DofObject::unpack_indexing(std::vector<largest_id_type>::const_iterator beg
 
 // FIXME: it'll be tricky getting this to work with 64-bit dof_id_type
 void
-DofObject::pack_indexing(std::back_insert_iterator<std::vector<largest_id_type> > target) const
+DofObject::pack_indexing(std::back_insert_iterator<std::vector<largest_id_type>> target) const
 {
 #ifdef LIBMESH_ENABLE_AMR
   // We might need to pack old_dof_object too
-  *target++ = (old_dof_object == libmesh_nullptr) ? 0 : 1;
+  *target++ = (old_dof_object == nullptr) ? 0 : 1;
 #endif
 
   *target++ = _idx_buf.size();
@@ -543,8 +550,30 @@ DofObject::pack_indexing(std::back_insert_iterator<std::vector<largest_id_type> 
 void DofObject::debug_buffer () const
 {
   libMesh::out << " [ ";
-  for (unsigned int i=0; i<_idx_buf.size(); i++)
+  for (std::size_t i=0; i<_idx_buf.size(); i++)
     libMesh::out << _idx_buf[i] << " ";
+  libMesh::out << "]\n";
+}
+
+
+
+void DofObject::print_dof_info() const
+{
+  libMesh::out << this->id() << " [ ";
+
+  for (unsigned int s=0; s<this->n_systems(); s++)
+    {
+      libMesh::out << "s:" << s << " ";
+      for (unsigned int var=0; var<this->n_vars(s); var++)
+        {
+          libMesh::out << "v:" << var << " ";
+          for (unsigned int comp=0; comp<this->n_comp(s,var); comp++)
+            {
+              libMesh::out << "c:" << comp << " dof:" << this->dof_number(s,var,comp) << " ";
+            }
+        }
+    }
+
   libMesh::out << "]\n";
 }
 

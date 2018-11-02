@@ -96,7 +96,11 @@ ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ac_cxx_rtti.m4 \
 	$(top_srcdir)/m4/all_static.m4 \
 	$(top_srcdir)/m4/ax_boost_base.m4 \
+	$(top_srcdir)/m4/ax_check_compile_flag.m4 \
+	$(top_srcdir)/m4/ax_compiler_vendor.m4 \
 	$(top_srcdir)/m4/ax_cxx_compile_stdcxx_11.m4 \
+	$(top_srcdir)/m4/ax_gcc_archflag.m4 \
+	$(top_srcdir)/m4/ax_gcc_x86_cpuid.m4 \
 	$(top_srcdir)/m4/ax_openmp.m4 $(top_srcdir)/m4/ax_pthread.m4 \
 	$(top_srcdir)/m4/ax_split_version.m4 \
 	$(top_srcdir)/m4/ax_tls.m4 $(top_srcdir)/m4/backtrace.m4 \
@@ -106,16 +110,16 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ac_cxx_rtti.m4 \
 	$(top_srcdir)/m4/config_summary.m4 \
 	$(top_srcdir)/m4/coverage.m4 $(top_srcdir)/m4/cppunit.m4 \
 	$(top_srcdir)/m4/curl.m4 $(top_srcdir)/m4/cxx11.m4 \
-	$(top_srcdir)/m4/demangle.m4 $(top_srcdir)/m4/dlopen.m4 \
-	$(top_srcdir)/m4/eigen.m4 $(top_srcdir)/m4/errno_test.m4 \
-	$(top_srcdir)/m4/exodus.m4 $(top_srcdir)/m4/feexcept.m4 \
-	$(top_srcdir)/m4/fparser.m4 $(top_srcdir)/m4/glpk.m4 \
-	$(top_srcdir)/m4/gmv.m4 $(top_srcdir)/m4/gz.m4 \
-	$(top_srcdir)/m4/hdf5.m4 \
-	$(top_srcdir)/m4/hinnant_unique_ptr.m4 \
+	$(top_srcdir)/m4/cxx17.m4 $(top_srcdir)/m4/demangle.m4 \
+	$(top_srcdir)/m4/dlopen.m4 $(top_srcdir)/m4/eigen.m4 \
+	$(top_srcdir)/m4/errno_test.m4 $(top_srcdir)/m4/exodus.m4 \
+	$(top_srcdir)/m4/feexcept.m4 $(top_srcdir)/m4/fparser.m4 \
+	$(top_srcdir)/m4/glpk.m4 $(top_srcdir)/m4/gmv.m4 \
+	$(top_srcdir)/m4/gz.m4 $(top_srcdir)/m4/hdf5.m4 \
 	$(top_srcdir)/m4/laspack.m4 $(top_srcdir)/m4/libhilbert.m4 \
 	$(top_srcdir)/m4/libmesh_compiler_features.m4 \
 	$(top_srcdir)/m4/libmesh_core_features.m4 \
+	$(top_srcdir)/m4/libmesh_metaphysicl.m4 \
 	$(top_srcdir)/m4/libmesh_method.m4 \
 	$(top_srcdir)/m4/libmesh_optional_packages.m4 \
 	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/locale.m4 \
@@ -127,14 +131,14 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ac_cxx_rtti.m4 \
 	$(top_srcdir)/m4/nlopt.m4 $(top_srcdir)/m4/parmetis.m4 \
 	$(top_srcdir)/m4/petsc.m4 $(top_srcdir)/m4/precision.m4 \
 	$(top_srcdir)/m4/prefix_config.m4 $(top_srcdir)/m4/qhull.m4 \
-	$(top_srcdir)/m4/safe_bool.m4 $(top_srcdir)/m4/sanitize.m4 \
-	$(top_srcdir)/m4/sfc.m4 $(top_srcdir)/m4/slepc.m4 \
-	$(top_srcdir)/m4/sstream.m4 $(top_srcdir)/m4/strstream.m4 \
-	$(top_srcdir)/m4/tbb.m4 $(top_srcdir)/m4/tecio.m4 \
-	$(top_srcdir)/m4/tecplot.m4 $(top_srcdir)/m4/tetgen.m4 \
-	$(top_srcdir)/m4/threads.m4 $(top_srcdir)/m4/triangle.m4 \
-	$(top_srcdir)/m4/trilinos.m4 $(top_srcdir)/m4/unordered.m4 \
-	$(top_srcdir)/m4/vtk.m4 $(top_srcdir)/configure.ac
+	$(top_srcdir)/m4/sanitize.m4 $(top_srcdir)/m4/sfc.m4 \
+	$(top_srcdir)/m4/slepc.m4 $(top_srcdir)/m4/sstream.m4 \
+	$(top_srcdir)/m4/strstream.m4 $(top_srcdir)/m4/tbb.m4 \
+	$(top_srcdir)/m4/tecio.m4 $(top_srcdir)/m4/tecplot.m4 \
+	$(top_srcdir)/m4/tetgen.m4 $(top_srcdir)/m4/threads.m4 \
+	$(top_srcdir)/m4/triangle.m4 $(top_srcdir)/m4/trilinos.m4 \
+	$(top_srcdir)/m4/unordered.m4 $(top_srcdir)/m4/vtk.m4 \
+	$(top_srcdir)/m4/xdr.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(include_HEADERS) \
@@ -259,6 +263,8 @@ am__relativize = \
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
+ANY_PARANOID_FLAGS = @ANY_PARANOID_FLAGS@
+ANY_WERROR_FLAG = @ANY_WERROR_FLAG@
 AR = @AR@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
@@ -379,6 +385,7 @@ LT_SYS_LIBRARY_PATH = @LT_SYS_LIBRARY_PATH@
 MAINT = @MAINT@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
+METAPHYSICL_INCLUDE = @METAPHYSICL_INCLUDE@
 METHOD = @METHOD@
 METHODS = @METHODS@
 METIS_INCLUDE = @METIS_INCLUDE@
@@ -434,6 +441,7 @@ PETSC_DIR = @PETSC_DIR@
 PETSC_FC_INCLUDES = @PETSC_FC_INCLUDES@
 PKG_CONFIG = @PKG_CONFIG@
 PROFILING_FLAGS = @PROFILING_FLAGS@
+PRTDIAG = @PRTDIAG@
 PTHREAD_CC = @PTHREAD_CC@
 PTHREAD_CFLAGS = @PTHREAD_CFLAGS@
 PTHREAD_LIBS = @PTHREAD_LIBS@
@@ -499,7 +507,8 @@ datadir = @datadir@
 datarootdir = @datarootdir@
 docdir = @docdir@
 dvidir = @dvidir@
-enabledefaultcommworld = @enabledefaultcommworld@
+enabledeprecated = @enabledeprecated@
+enablefwdenums = @enablefwdenums@
 enablelegacyincludepaths = @enablelegacyincludepaths@
 enablepetsc = @enablepetsc@
 enableuniqueptr = @enableuniqueptr@
@@ -571,7 +580,6 @@ DISTCLEANFILES = libmesh_config.h
 # details which are not required for the public interface
 noinst_HEADERS = \
         base/libmesh_augment_std_namespace.h \
-        mesh/exodusII_io_helper.h \
         mesh/nemesis_io_helper.h \
         numerics/laspack_matrix.h \
         numerics/laspack_vector.h \
@@ -587,11 +595,14 @@ noinst_HEADERS = \
 include_HEADERS = \
         libmesh_config.h \
         base/auto_ptr.h \
+        base/default_coupling.h \
         base/dirichlet_boundaries.h \
         base/dof_map.h \
         base/dof_object.h \
         base/factory.h \
         base/getpot.h \
+        base/ghost_point_neighbors.h \
+        base/ghosting_functor.h \
         base/id_types.h \
         base/libmesh.h \
         base/libmesh_C_isnan.h \
@@ -606,9 +617,11 @@ include_HEADERS = \
         base/periodic_boundaries.h \
         base/periodic_boundary.h \
         base/periodic_boundary_base.h \
+        base/point_neighbor_coupling.h \
         base/print_trace.h \
         base/reference_counted_object.h \
         base/reference_counter.h \
+        base/sibling_coupling.h \
         base/single_predicates.h \
         base/sparsity_pattern.h \
         base/variable.h \
@@ -663,6 +676,7 @@ include_HEADERS = \
         fe/inf_fe_instantiate_2D.h \
         fe/inf_fe_instantiate_3D.h \
         fe/inf_fe_macro.h \
+        geom/bounding_box.h \
         geom/cell.h \
         geom/cell_hex.h \
         geom/cell_hex20.h \
@@ -687,6 +701,7 @@ include_HEADERS = \
         geom/cell_tet.h \
         geom/cell_tet10.h \
         geom/cell_tet4.h \
+        geom/compare_elems_by_level.h \
         geom/edge.h \
         geom/edge_edge2.h \
         geom/edge_edge3.h \
@@ -703,10 +718,13 @@ include_HEADERS = \
         geom/face_inf_quad6.h \
         geom/face_quad.h \
         geom/face_quad4.h \
+        geom/face_quad4_shell.h \
         geom/face_quad8.h \
+        geom/face_quad8_shell.h \
         geom/face_quad9.h \
         geom/face_tri.h \
         geom/face_tri3.h \
+        geom/face_tri3_shell.h \
         geom/face_tri3_subdivision.h \
         geom/face_tri6.h \
         geom/node.h \
@@ -724,21 +742,20 @@ include_HEADERS = \
         mesh/boundary_info.h \
         mesh/boundary_mesh.h \
         mesh/checkpoint_io.h \
-        mesh/diva_io.h \
+        mesh/distributed_mesh.h \
         mesh/ensight_io.h \
         mesh/exodusII_io.h \
+        mesh/exodusII_io_helper.h \
         mesh/fro_io.h \
         mesh/gmsh_io.h \
         mesh/gmv_io.h \
         mesh/gnuplot_io.h \
         mesh/inf_elem_builder.h \
-        mesh/legacy_xdr_io.h \
         mesh/matlab_io.h \
         mesh/medit_io.h \
         mesh/mesh.h \
         mesh/mesh_base.h \
         mesh/mesh_communication.h \
-        mesh/mesh_data.h \
         mesh/mesh_function.h \
         mesh/mesh_generation.h \
         mesh/mesh_input.h \
@@ -763,20 +780,16 @@ include_HEADERS = \
         mesh/parallel_mesh.h \
         mesh/patch.h \
         mesh/postscript_io.h \
+        mesh/replicated_mesh.h \
         mesh/serial_mesh.h \
+        mesh/sync_refinement_flags.h \
         mesh/tecplot_io.h \
         mesh/tetgen_io.h \
         mesh/ucd_io.h \
         mesh/unstructured_mesh.h \
         mesh/unv_io.h \
         mesh/vtk_io.h \
-        mesh/xdr_head.h \
         mesh/xdr_io.h \
-        mesh/xdr_mesh.h \
-        mesh/xdr_mgf.h \
-        mesh/xdr_mhead.h \
-        mesh/xdr_shead.h \
-        mesh/xdr_soln.h \
         numerics/analytic_function.h \
         numerics/composite_fem_function.h \
         numerics/composite_function.h \
@@ -785,6 +798,7 @@ include_HEADERS = \
         numerics/coupling_matrix.h \
         numerics/dense_matrix.h \
         numerics/dense_matrix_base.h \
+        numerics/dense_matrix_impl.h \
         numerics/dense_submatrix.h \
         numerics/dense_subvector.h \
         numerics/dense_vector.h \
@@ -819,6 +833,7 @@ include_HEADERS = \
         numerics/trilinos_epetra_matrix.h \
         numerics/trilinos_epetra_vector.h \
         numerics/trilinos_preconditioner.h \
+        numerics/tuple_of.h \
         numerics/type_n_tensor.h \
         numerics/type_tensor.h \
         numerics/type_vector.h \
@@ -826,6 +841,13 @@ include_HEADERS = \
         numerics/wrapped_function.h \
         numerics/wrapped_functor.h \
         numerics/zero_function.h \
+        parallel/attributes.h \
+        parallel/communicator.h \
+        parallel/data_type.h \
+        parallel/libmesh_call_mpi.h \
+        parallel/message_tag.h \
+        parallel/op_function.h \
+        parallel/packing.h \
         parallel/parallel.h \
         parallel/parallel_algebra.h \
         parallel/parallel_bin_sorter.h \
@@ -836,18 +858,35 @@ include_HEADERS = \
         parallel/parallel_implementation.h \
         parallel/parallel_node.h \
         parallel/parallel_object.h \
+        parallel/parallel_only.h \
         parallel/parallel_sort.h \
+        parallel/parallel_sync.h \
+        parallel/post_wait_copy_buffer.h \
+        parallel/post_wait_delete_buffer.h \
+        parallel/post_wait_dereference_shared_ptr.h \
+        parallel/post_wait_dereference_tag.h \
+        parallel/post_wait_free_buffer.h \
+        parallel/post_wait_unpack_buffer.h \
+        parallel/post_wait_work.h \
+        parallel/request.h \
+        parallel/standard_type.h \
+        parallel/status.h \
         parallel/threads.h \
         parallel/threads_allocators.h \
+        parallel/threads_none.h \
+        parallel/threads_pthread.h \
+        parallel/threads_tbb.h \
         partitioning/centroid_partitioner.h \
         partitioning/hilbert_sfc_partitioner.h \
         partitioning/linear_partitioner.h \
+        partitioning/mapped_subdomain_partitioner.h \
         partitioning/metis_csr_graph.h \
         partitioning/metis_partitioner.h \
         partitioning/morton_sfc_partitioner.h \
         partitioning/parmetis_partitioner.h \
         partitioning/partitioner.h \
         partitioning/sfc_partitioner.h \
+        partitioning/subdomain_partitioner.h \
         physics/diff_physics.h \
         physics/diff_qoi.h \
         physics/fem_physics.h \
@@ -885,6 +924,7 @@ include_HEADERS = \
         reduced_basis/transient_rb_construction.h \
         reduced_basis/transient_rb_evaluation.h \
         reduced_basis/transient_rb_theta_expansion.h \
+        solution_transfer/boundary_volume_solution_transfer.h \
         solution_transfer/direct_solution_transfer.h \
         solution_transfer/dtk_adapter.h \
         solution_transfer/dtk_evaluator.h \
@@ -913,6 +953,7 @@ include_HEADERS = \
         solvers/optimization_solver.h \
         solvers/petsc_auto_fieldsplit.h \
         solvers/petsc_diff_solver.h \
+        solvers/petsc_dm_wrapper.h \
         solvers/petsc_linear_solver.h \
         solvers/petsc_nonlinear_solver.h \
         solvers/petscdmlibmesh.h \
@@ -940,6 +981,7 @@ include_HEADERS = \
         systems/fem_context.h \
         systems/fem_system.h \
         systems/frequency_system.h \
+        systems/generic_projector.h \
         systems/implicit_system.h \
         systems/linear_implicit_system.h \
         systems/newmark_system.h \
@@ -962,6 +1004,7 @@ include_HEADERS = \
         utils/error_vector.h \
         utils/hashword.h \
         utils/ignore_warnings.h \
+        utils/int_range.h \
         utils/libmesh_nullptr.h \
         utils/location_maps.h \
         utils/mapvector.h \
@@ -973,11 +1016,11 @@ include_HEADERS = \
         utils/perfmon.h \
         utils/plt_loader.h \
         utils/point_locator_base.h \
-        utils/point_locator_list.h \
         utils/point_locator_tree.h \
+        utils/pointer_to_pointer_iter.h \
         utils/pool_allocator.h \
         utils/restore_warnings.h \
-        utils/safe_bool.h \
+        utils/simple_range.h \
         utils/statistics.h \
         utils/string_to_enum.h \
         utils/timestamp.h \

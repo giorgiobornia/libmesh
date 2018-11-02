@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -43,6 +43,11 @@ namespace Parallel
  * ensuring that the data is properly sorted between
  * all the processors.  We assume that a Sort
  * is instantiated on all processors.
+ *
+ * \author Benjamin S. Kirk
+ * \author John W. Peterson
+ * \date 2007
+ * \brief Object for performing parallel sorts using MPI.
  */
 template <typename KeyType, typename IdxType=unsigned int>
 class Sort : public ParallelObject
@@ -53,7 +58,7 @@ public:
    * the processor id, and a reference to a vector of data
    * to be sorted.  This vector is sorted by
    * the constructor, therefore, construction of
-   * a Sort object takes O(nlogn) time,
+   * a Sort object takes O(n log n) time,
    * where n is the length of the vector.
    */
   Sort (const Parallel::Communicator & comm,

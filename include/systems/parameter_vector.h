@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -21,13 +21,14 @@
 #define LIBMESH_PARAMETER_VECTOR_H
 
 
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/libmesh_common.h"
 #include "libmesh/parameter_accessor.h"
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
 
-// C++ Includes   -----------------------------------
+// C++ Includes
 #include <vector>
+#include <memory>
 
 namespace libMesh
 {
@@ -36,6 +37,10 @@ namespace libMesh
 /**
  * Data structure for specifying which Parameters should be
  * independent variables in a parameter sensitivity calculation.
+ *
+ * \author Roy Stogner
+ * \date 2009
+ * \brief Specifies parameters for parameter sensitivity calculations.
  */
 class ParameterVector
 {
@@ -81,7 +86,7 @@ public:
   void clear();
 
   /**
-   * Returns the number of parameters to be used
+   * \returns The number of parameters to be used
    */
   std::size_t size() const { return _params.size(); }
 
@@ -90,35 +95,35 @@ public:
    * larger than the old, empty ParameterPointer accessors fill the
    * new entries.
    */
-  void resize(unsigned int s);
+  void resize(std::size_t s);
 
   /**
    * Adds an additional parameter accessor to the end of the vector.
    *
    * We will free this accessor when we are finished with it; we
-   * request that it be passed to us as a UniquePtr to reflect that
+   * request that it be passed to us as a std::unique_ptr to reflect that
    * fact in the API.
    */
-  void push_back(UniquePtr<ParameterAccessor<Number> > new_accessor);
+  void push_back(std::unique_ptr<ParameterAccessor<Number>> new_accessor);
 
   /**
    * Sets the number of parameters to be used.  This method is for
    * resizing a ParameterVector that owns its own parameter values
    */
-  void deep_resize(unsigned int s);
+  void deep_resize(std::size_t s);
 
   /**
-   * Returns a smart-pointer to a parameter value
+   * \returns A smart-pointer to a parameter value
    */
-  const ParameterAccessor<Number> & operator[](unsigned int i) const;
+  const ParameterAccessor<Number> & operator[](std::size_t i) const;
 
   /**
-   * Returns a reference to a smart-pointer to a parameter value,
+   * \returns A reference to a smart-pointer to a parameter value,
    * suitable for repointing it to a different address.
    * This method is deprecated and may not work with more
    * sophisticated ParameterAccessor subclasses.
    */
-  ParameterAccessor<Number> & operator[](unsigned int i);
+  ParameterAccessor<Number> & operator[](std::size_t i);
 
   /**
    * Multiplication operator; acts individually on each parameter.
@@ -165,9 +170,9 @@ inline
 void
 ParameterVector::clear()
 {
-  if (_is_shallow_copy)
-    for (unsigned int i=0; i != _params.size(); ++i)
-      delete _params[i];
+  if (!_is_shallow_copy)
+    for (auto & param : _params)
+      delete param;
 
   _params.clear();
   _my_data.clear();
@@ -176,8 +181,10 @@ ParameterVector::clear()
 
 
 inline
-void ParameterVector::push_back(UniquePtr<ParameterAccessor<Number> > new_accessor)
+void ParameterVector::push_back(std::unique_ptr<ParameterAccessor<Number>> new_accessor)
 {
+  // Can't append stuff we are responsible for if we're already a shallow copy.
+  libmesh_assert(!_is_shallow_copy);
   libmesh_assert(new_accessor.get());
   _params.push_back(new_accessor.release());
 }
@@ -185,7 +192,7 @@ void ParameterVector::push_back(UniquePtr<ParameterAccessor<Number> > new_access
 
 
 inline
-const ParameterAccessor<Number> & ParameterVector::operator[] (unsigned int i) const
+const ParameterAccessor<Number> & ParameterVector::operator[] (std::size_t i) const
 {
   libmesh_assert_greater (_params.size(), i);
 
@@ -195,7 +202,7 @@ const ParameterAccessor<Number> & ParameterVector::operator[] (unsigned int i) c
 
 
 inline
-ParameterAccessor<Number> & ParameterVector::operator[] (unsigned int i)
+ParameterAccessor<Number> & ParameterVector::operator[] (std::size_t i)
 {
   libmesh_assert_greater (_params.size(), i);
 

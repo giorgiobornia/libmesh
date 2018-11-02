@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -29,12 +29,23 @@ namespace libMesh
 // Forward declarations
 class Elem;
 
+/**
+ * An implementation of FEMap for "XYZ" elements.
+ *
+ * \author Paul Bauman
+ * \date 2012
+ * \brief An implementation of FEMap for "XYZ" elements.
+ */
 class FEXYZMap : public FEMap
 {
 public:
 
   FEXYZMap()
-    : FEMap(){}
+    : FEMap()
+  {
+    // All FEXYZ objects are going to be querying xyz coordinates
+    calculate_xyz = true;
+  }
 
   virtual ~FEXYZMap(){}
 
@@ -43,7 +54,7 @@ public:
    */
   virtual void compute_face_map(int dim,
                                 const std::vector<Real> & qw,
-                                const Elem * side) libmesh_override;
+                                const Elem * side) override;
 
 }; // class FEXYZMap
 } // namespace libMesh

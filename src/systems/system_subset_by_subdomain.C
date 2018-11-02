@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -100,7 +100,7 @@ set_var_nums (const std::set<unsigned int> * const var_nums)
 {
   _var_nums.clear();
 
-  if (var_nums != libmesh_nullptr)
+  if (var_nums != nullptr)
     _var_nums = *var_nums;
 
   else
@@ -116,52 +116,43 @@ init (const SubdomainSelection & subdomain_selection)
 {
   _dof_ids.clear();
 
-  std::vector<std::vector<dof_id_type> > dof_ids_per_processor(this->n_processors());
+  std::vector<std::vector<dof_id_type>> dof_ids_per_processor(this->n_processors());
 
   const DofMap & dof_map = _system.get_dof_map();
   std::vector<dof_id_type> dof_indices;
 
   const MeshBase & mesh = _system.get_mesh();
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-  for ( ; el != end_el; ++el)
-    {
-      const Elem * elem = *el;
-      if(subdomain_selection(elem->subdomain_id()))
-        {
-          std::set<unsigned int>::const_iterator it = _var_nums.begin();
-          const std::set<unsigned int>::const_iterator itEnd = _var_nums.end();
-          for (; it!=itEnd; ++it)
-            {
-              dof_map.dof_indices (elem, dof_indices, *it);
-              for(size_t i=0; i<dof_indices.size(); i++)
-                {
-                  const dof_id_type dof = dof_indices[i];
-                  for(processor_id_type proc=0; proc<this->n_processors(); proc++)
-                    {
-                      if((dof>=dof_map.first_dof(proc)) && (dof<dof_map.end_dof(proc)))
-                        {
-                          dof_ids_per_processor[proc].push_back(dof);
-                        }
-                    }
-                }
-            }
-        }
-    }
+  for (const auto & elem : mesh.active_local_element_ptr_range())
+    if (subdomain_selection(elem->subdomain_id()))
+      {
+        std::set<unsigned int>::const_iterator it = _var_nums.begin();
+        const std::set<unsigned int>::const_iterator itEnd = _var_nums.end();
+        for (; it!=itEnd; ++it)
+          {
+            dof_map.dof_indices (elem, dof_indices, *it);
+            for (std::size_t i=0; i<dof_indices.size(); i++)
+              {
+                const dof_id_type dof = dof_indices[i];
+                for (processor_id_type proc=0; proc<this->n_processors(); proc++)
+                  if ((dof>=dof_map.first_dof(proc)) && (dof<dof_map.end_dof(proc)))
+                    dof_ids_per_processor[proc].push_back(dof);
+              }
+          }
+      }
 
   /* Distribute information among processors.  */
   std::vector<Parallel::Request> request_per_processor(this->n_processors());
-  for(unsigned int proc=0; proc<this->n_processors(); proc++)
+  for (unsigned int proc=0; proc<this->n_processors(); proc++)
     {
-      if(proc!=this->processor_id())
+      if (proc!=this->processor_id())
         {
           this->comm().send(proc,dof_ids_per_processor[proc],request_per_processor[proc]);
         }
     }
-  for(unsigned int proc=0; proc<this->n_processors(); proc++)
+  for (unsigned int proc=0; proc<this->n_processors(); proc++)
     {
       std::vector<dof_id_type> received_dofs;
-      if(proc==this->processor_id())
+      if (proc==this->processor_id())
         {
           received_dofs = dof_ids_per_processor[proc];
         }
@@ -169,10 +160,8 @@ init (const SubdomainSelection & subdomain_selection)
         {
           this->comm().receive(proc,received_dofs);
         }
-      for(unsigned int i=0; i<received_dofs.size(); i++)
-        {
-          _dof_ids.push_back(received_dofs[i]);
-        }
+      for (std::size_t i=0; i<received_dofs.size(); i++)
+        _dof_ids.push_back(received_dofs[i]);
     }
 
   /* Sort and unique the vector (using the same mechanism as in \p
@@ -182,9 +171,9 @@ init (const SubdomainSelection & subdomain_selection)
   std::vector<unsigned int> (_dof_ids.begin(), new_end).swap (_dof_ids);
 
   /* Wait for sends to be complete.  */
-  for(unsigned int proc=0; proc<this->n_processors(); proc++)
+  for (unsigned int proc=0; proc<this->n_processors(); proc++)
     {
-      if(proc!=this->processor_id())
+      if (proc!=this->processor_id())
         {
           request_per_processor[proc].wait();
         }

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -47,11 +47,9 @@ Real StatisticsVector<T>::l2_norm() const
 template <typename T>
 T StatisticsVector<T>::minimum() const
 {
-  START_LOG ("minimum()", "StatisticsVector");
+  LOG_SCOPE ("minimum()", "StatisticsVector");
 
   const T min = *(std::min_element(this->begin(), this->end()));
-
-  STOP_LOG ("minimum()", "StatisticsVector");
 
   return min;
 }
@@ -62,11 +60,9 @@ T StatisticsVector<T>::minimum() const
 template <typename T>
 T StatisticsVector<T>::maximum() const
 {
-  START_LOG ("maximum()", "StatisticsVector");
+  LOG_SCOPE ("maximum()", "StatisticsVector");
 
   const T max = *(std::max_element(this->begin(), this->end()));
-
-  STOP_LOG ("maximum()", "StatisticsVector");
 
   return max;
 }
@@ -77,7 +73,7 @@ T StatisticsVector<T>::maximum() const
 template <typename T>
 Real StatisticsVector<T>::mean() const
 {
-  START_LOG ("mean()", "StatisticsVector");
+  LOG_SCOPE ("mean()", "StatisticsVector");
 
   const dof_id_type n = cast_int<dof_id_type>(this->size());
 
@@ -88,8 +84,6 @@ Real StatisticsVector<T>::mean() const
       the_mean += ( static_cast<Real>((*this)[i]) - the_mean ) /
         static_cast<Real>(i + 1);
     }
-
-  STOP_LOG ("mean()", "StatisticsVector");
 
   return the_mean;
 }
@@ -105,7 +99,7 @@ Real StatisticsVector<T>::median()
   if (n == 0)
     return 0.;
 
-  START_LOG ("median()", "StatisticsVector");
+  LOG_SCOPE ("median()", "StatisticsVector");
 
   std::sort(this->begin(), this->end());
 
@@ -125,8 +119,6 @@ Real StatisticsVector<T>::median()
       the_median = ( static_cast<Real>((*this)[lhs]) +
                      static_cast<Real>((*this)[rhs]) ) / 2.0;
     }
-
-  STOP_LOG ("median()", "StatisticsVector");
 
   return the_median;
 }
@@ -150,7 +142,7 @@ Real StatisticsVector<T>::variance(const Real mean_in) const
 {
   const dof_id_type n = cast_int<dof_id_type>(this->size());
 
-  START_LOG ("variance()", "StatisticsVector");
+  LOG_SCOPE ("variance()", "StatisticsVector");
 
   Real the_variance = 0;
 
@@ -164,8 +156,6 @@ Real StatisticsVector<T>::variance(const Real mean_in) const
   if (n > 1)
     the_variance *= static_cast<Real>(n) / static_cast<Real>(n - 1);
 
-  STOP_LOG ("variance()", "StatisticsVector");
-
   return the_variance;
 }
 
@@ -177,9 +167,7 @@ void StatisticsVector<T>::normalize()
   const Real max = this->maximum();
 
   for (dof_id_type i=0; i<n; i++)
-    {
-      (*this)[i] = static_cast<T>((*this)[i] / max);
-    }
+    (*this)[i] = static_cast<T>((*this)[i] / max);
 }
 
 
@@ -203,11 +191,11 @@ void StatisticsVector<T>::histogram(std::vector<dof_id_type> & bin_members,
   Real max      = static_cast<Real>(this->maximum());
   Real bin_size = (max - min) / static_cast<Real>(n_bins);
 
-  START_LOG ("histogram()", "StatisticsVector");
+  LOG_SCOPE ("histogram()", "StatisticsVector");
 
   std::vector<Real> bin_bounds(n_bins+1);
-  for (unsigned int i=0; i<bin_bounds.size(); i++)
-    bin_bounds[i] = min + i * bin_size;
+  for (std::size_t i=0; i<bin_bounds.size(); i++)
+    bin_bounds[i] = min + Real(i) * bin_size;
 
   // Give the last bin boundary a little wiggle room: we don't want
   // it to be just barely less than the max, otherwise our bin test below
@@ -218,7 +206,7 @@ void StatisticsVector<T>::histogram(std::vector<dof_id_type> & bin_members,
   bin_members.resize(n_bins);
 
   dof_id_type data_index = 0;
-  for (unsigned int j=0; j<bin_members.size(); j++) // bin vector indexing
+  for (std::size_t j=0; j<bin_members.size(); j++) // bin vector indexing
     {
       // libMesh::out << "(debug) Filling bin " << j << std::endl;
 
@@ -230,7 +218,7 @@ void StatisticsVector<T>::histogram(std::vector<dof_id_type> & bin_members,
           // There may be entries in the vector smaller than the value
           // reported by this->minimum().  (e.g. inactive elements in an
           // ErrorVector.)  We just skip entries like that.
-          if ( current_val < min )
+          if (current_val < min)
             {
               //     libMesh::out << "(debug) Skipping entry v[" << i << "]="
               //       << (*this)[i]
@@ -239,7 +227,7 @@ void StatisticsVector<T>::histogram(std::vector<dof_id_type> & bin_members,
               continue;
             }
 
-          if ( current_val > bin_bounds[j+1] ) // if outside the current bin (bin[j] is bounded
+          if (current_val > bin_bounds[j+1]) // if outside the current bin (bin[j] is bounded
             // by bin_bounds[j] and bin_bounds[j+1])
             {
               // libMesh::out.precision(16);
@@ -272,9 +260,6 @@ void StatisticsVector<T>::histogram(std::vector<dof_id_type> & bin_members,
                    << n << "." << std::endl;
     }
 #endif
-
-
-  STOP_LOG ("histogram()", "StatisticsVector");
 }
 
 
@@ -306,14 +291,14 @@ void StatisticsVector<T>::plot_histogram(const processor_id_type my_procid,
 
       // abscissa values are located at the center of each bin.
       out_stream << "x=[";
-      for (unsigned int i=0; i<bin_members.size(); ++i)
+      for (std::size_t i=0; i<bin_members.size(); ++i)
         {
-          out_stream << min + (i+0.5)*bin_size << " ";
+          out_stream << min + (Real(i)+0.5)*bin_size << " ";
         }
       out_stream << "];\n";
 
       out_stream << "y=[";
-      for (unsigned int i=0; i<bin_members.size(); ++i)
+      for (std::size_t i=0; i<bin_members.size(); ++i)
         {
           out_stream << bin_members[i] << " ";
         }
@@ -339,7 +324,7 @@ void StatisticsVector<T>::histogram(std::vector<dof_id_type> & bin_members,
 template <typename T>
 std::vector<dof_id_type> StatisticsVector<T>::cut_below(Real cut) const
 {
-  START_LOG ("cut_below()", "StatisticsVector");
+  LOG_SCOPE ("cut_below()", "StatisticsVector");
 
   const dof_id_type n = cast_int<dof_id_type>(this->size());
 
@@ -354,8 +339,6 @@ std::vector<dof_id_type> StatisticsVector<T>::cut_below(Real cut) const
         }
     }
 
-  STOP_LOG ("cut_below()", "StatisticsVector");
-
   return cut_indices;
 }
 
@@ -365,7 +348,7 @@ std::vector<dof_id_type> StatisticsVector<T>::cut_below(Real cut) const
 template <typename T>
 std::vector<dof_id_type> StatisticsVector<T>::cut_above(Real cut) const
 {
-  START_LOG ("cut_above()", "StatisticsVector");
+  LOG_SCOPE ("cut_above()", "StatisticsVector");
 
   const dof_id_type n = cast_int<dof_id_type>(this->size());
 
@@ -373,14 +356,8 @@ std::vector<dof_id_type> StatisticsVector<T>::cut_above(Real cut) const
   cut_indices.reserve(n/2);  // Arbitrary
 
   for (dof_id_type i=0; i<n; i++)
-    {
-      if ((*this)[i] > cut)
-        {
-          cut_indices.push_back(i);
-        }
-    }
-
-  STOP_LOG ("cut_above()", "StatisticsVector");
+    if ((*this)[i] > cut)
+      cut_indices.push_back(i);
 
   return cut_indices;
 }
@@ -389,7 +366,7 @@ std::vector<dof_id_type> StatisticsVector<T>::cut_above(Real cut) const
 
 
 //------------------------------------------------------------
-// Explicit Instantions
+// Explicit Instantiations
 template class StatisticsVector<float>;
 template class StatisticsVector<double>;
 #ifdef LIBMESH_DEFAULT_TRIPLE_PRECISION

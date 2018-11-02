@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -25,8 +25,12 @@ namespace libMesh
 {
 
 /**
- * A SolutionHistory class that enables the storage and retrieval of timesteps
- * and (in the future) adaptive steps
+ * A SolutionHistory class that enables the storage and retrieval of
+ * timesteps and (in the future) adaptive steps.
+ *
+ * \author Vikram Garg
+ * \date 2012
+ * \brief For storing and retrieving timestep data.
  */
 class SolutionHistory
 {
@@ -54,10 +58,10 @@ public:
   virtual void retrieve() = 0;
 
   /**
-   * Cloning function for an UniquePtr, pure virtual, used in the
+   * Cloning function for a std::unique_ptr, pure virtual, used in the
    * setter function in time_solver.C
    */
-  virtual UniquePtr<SolutionHistory > clone() const = 0;
+  virtual std::unique_ptr<SolutionHistory > clone() const = 0;
 
   /**
    * Turn on overwrite_previously_stored to overwrite any

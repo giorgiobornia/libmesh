@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -37,19 +37,19 @@ class Point;
  * children of \p FEBase through the \p FEInterface::compute_data()
  * method.  This enables the efficient computation of data on
  * the finite element level, while maintaining library integrity.
- * -- With special finite elements @e disabled (like infinite elements),
- * this class wraps the return values of @e all shape functions
- * from \p FEInterface::shape() in a \p std::vector<Number>.
- * -- With enabled infinite elements, this class returns a vector of physically
- * correct shape functions, both for finite and infinite elements.
+ * - With special finite elements disabled (like infinite elements),
+ *   this class wraps the return values of all shape functions
+ *   from \p FEInterface::shape() in a \p std::vector<Number>.
+ * - With infinite elements enabled, this class returns a vector of physically
+ *   correct shape functions, both for finite and infinite elements.
+ *
+ * \author Daniel Dreyer
+ * \date 2003
+ * \brief Helper class used with FEInterface::compute_data().
  */
 class FEComputeData
 {
 public:
-
-
-  //------------------------------------------------------
-  // Conventional FEComputeData
   /**
    * Constructor.  Takes the required input data and clears
    * the output data using \p clear().
@@ -62,23 +62,17 @@ public:
     this->clear();
   }
 
-
-  //----------------------------------------------------
-  // Input data
   /**
    * Const reference to the \p EquationSystems object
    * that contains simulation-specific data.
    */
   const EquationSystems & equation_systems;
+
   /**
    * Holds the point where the data are to be computed
    */
   const Point & p;
 
-
-
-  //----------------------------------------------------
-  // Output data
   /**
    * Storage for the computed shape function values.
    */
@@ -90,7 +84,6 @@ public:
    * Storage for the computed phase lag
    */
   Real phase;
-
 #endif
 
 #ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
@@ -98,29 +91,27 @@ public:
    * The wave speed.
    */
   Real speed;
-
 #endif
 
 #if defined LIBMESH_ENABLE_INFINITE_ELEMENTS && defined(LIBMESH_USE_COMPLEX_NUMBERS)
   /**
    * The frequency to evaluate shape functions
-   * including the wave number depending terms
+   * including the wave number depending terms.
+   * Use imaginary contributions for exponential damping
    */
-  Real frequency;
-
+  Number frequency;
 #endif
 
   /**
-   * Clears the @e output data completely.
+   * Clears the output data completely.
    */
-  void clear () ;
-
+  void clear ();
 
   /**
-   * Inits the @e output data to default values, provided
+   * Inits the output data to default values, provided
    * the fields are correctly resized.
    */
-  void init () ;
+  void init ();
 };
 
 

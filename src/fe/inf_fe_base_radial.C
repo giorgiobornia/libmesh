@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -35,8 +35,13 @@ namespace libMesh
 template <unsigned int Dim, FEFamily T_radial, InfMapType T_base>
 Elem * InfFE<Dim,T_radial,T_base>::Base::build_elem (const Elem * inf_elem)
 {
-  UniquePtr<Elem> ape(inf_elem->build_side(0));
-  return ape.release();
+  std::unique_ptr<const Elem> ape(inf_elem->build_side_ptr(0));
+
+  // The incoming inf_elem is const, but this function is required to
+  // return a non-const Elem * so that it can be used by
+  // update_base_elem().  Therefore a const_cast seems to be
+  // unavoidable here.
+  return const_cast<Elem *>(ape.release());
 }
 
 
@@ -83,9 +88,6 @@ ElemType InfFE<Dim,T_radial,T_base>::Base::get_elem_type (const ElemType type)
     default:
       libmesh_error_msg("ERROR: Unsupported element type!: " << type);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return INVALID_ELEM;
 }
 
 

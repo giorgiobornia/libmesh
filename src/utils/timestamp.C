@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -39,10 +39,10 @@ std::string get_timestamp()
 #ifdef LIBMESH_HAVE_LOCALE
   // Create time_put "facet"
   std::locale loc;
-  const std::time_put<char> & tp = std::use_facet <std::time_put<char> > (loc);
+  const std::time_put<char> & tp = std::use_facet <std::time_put<char>> (loc);
 
   // Call C-style time getting functions
-  time_t now = time(NULL);
+  time_t now = time(nullptr);
   tm * tm_struct = localtime(&now);
 
   // Date will eventually be stored in this ostringstream's string
@@ -67,13 +67,13 @@ std::string get_timestamp()
 
   return date_stream.str();
 #else
-  // C-stye code originally found here:
+  // C-style code originally found here:
   // http://people.sc.fsu.edu/~burkardt/cpp_src/timestamp/timestamp.C
   // Author: John Burkardt, 24 September 2003
   const unsigned int time_size = 40;
   char time_buffer[time_size];
 
-  time_t now = time (NULL);
+  time_t now = time (nullptr);
   tm * tm_struct = localtime (&now);
 
   // No more than time_size characters will be placed into the array.  If the

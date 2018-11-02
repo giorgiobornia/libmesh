@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -122,9 +122,9 @@ int main (int argc, char ** argv)
   // function defined below.
   eigen_system.attach_assemble_function (assemble_mass);
 
-  // Set necessary parametrs used in EigenSystem::solve(),
-  // i.e. the number of requested eigenpairs \p nev and the number
-  // of basis vectors \p ncv used in the solution algorithm. Note that
+  // Set necessary parameters used in EigenSystem::solve(),
+  // i.e. the number of requested eigenpairs nev and the number
+  // of basis vectors ncv used in the solution algorithm. Note that
   // ncv >= nev must hold and ncv >= 2*nev is recommended.
   equation_systems.parameters.set<unsigned int>("eigenpairs")    = nev;
   equation_systems.parameters.set<unsigned int>("basis vectors") = nev*3;
@@ -181,7 +181,7 @@ int main (int argc, char ** argv)
 
 
 void assemble_mass(EquationSystems & es,
-                   const std::string & system_name)
+                   const std::string & libmesh_dbg_var(system_name))
 {
   // It is a good idea to make sure we are assembling
   // the proper system.
@@ -196,7 +196,7 @@ void assemble_mass(EquationSystems & es,
   const unsigned int dim = mesh.mesh_dimension();
 
   // Get a reference to our system.
-  EigenSystem & eigen_system = es.get_system<EigenSystem> (system_name);
+  EigenSystem & eigen_system = es.get_system<EigenSystem> ("Eigensystem");
 
   // Get a constant reference to the Finite Element type
   // for the first (and only) variable in the system.
@@ -206,10 +206,10 @@ void assemble_mass(EquationSystems & es,
   SparseMatrix<Number> & matrix_A = *eigen_system.matrix_A;
 
   // Build a Finite Element object of the specified type.  Since the
-  // \p FEBase::build() member dynamically creates memory we will
-  // store the object as an \p UniquePtr<FEBase>.  This can be thought
+  // FEBase::build() member dynamically creates memory we will
+  // store the object as a std::unique_ptr<FEBase>.  This can be thought
   // of as a pointer that will clean up after itself.
-  UniquePtr<FEBase> fe (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe (FEBase::build(dim, fe_type));
 
   // A  Gauss quadrature rule for numerical integration.
   // Use the default quadrature order.
@@ -222,9 +222,9 @@ void assemble_mass(EquationSystems & es,
   const std::vector<Real> & JxW = fe->get_JxW();
 
   // The element shape functions evaluated at the quadrature points.
-  const std::vector<std::vector<Real> > & phi = fe->get_phi();
+  const std::vector<std::vector<Real>> & phi = fe->get_phi();
 
-  // A reference to the \p DofMap object for this system.  The \p DofMap
+  // A reference to the DofMap object for this system.  The DofMap
   // object handles the index translation from node and element numbers
   // to degree of freedom numbers.
   const DofMap & dof_map = eigen_system.get_dof_map();
@@ -242,16 +242,9 @@ void assemble_mass(EquationSystems & es,
   // matrix and right-hand-side contribution.  In case users
   // later modify this program to include refinement, we will
   // be safe and will only consider the active elements;
-  // hence we use a variant of the \p active_elem_iterator.
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-  for ( ; el != end_el; ++el)
+  // hence we use a variant of the active_elem_iterator.
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      // Store a pointer to the element we are currently
-      // working on.  This allows for nicer syntax later.
-      const Elem * elem = *el;
-
       // Get the degree of freedom indices for the
       // current element.  These define where in the global
       // matrix and right-hand-side this element will
@@ -270,17 +263,19 @@ void assemble_mass(EquationSystems & es,
       // the last element.  Note that this will be the case if the
       // element type is different (i.e. the last element was a
       // triangle, now we are on a quadrilateral).
-      Me.resize (dof_indices.size(), dof_indices.size());
+      const unsigned int n_dofs =
+        cast_int<unsigned int>(dof_indices.size());
+      Me.resize (n_dofs, n_dofs);
 
       // Now loop over the quadrature points.  This handles
       // the numeric integration.
       //
       // We will build the element matrix.  This involves
-      // a double loop to integrate the test funcions (i) against
+      // a double loop to integrate the test functions (i) against
       // the trial functions (j).
       for (unsigned int qp=0; qp<qrule.n_points(); qp++)
-        for (unsigned int i=0; i<phi.size(); i++)
-          for (unsigned int j=0; j<phi.size(); j++)
+        for (unsigned int i=0; i != n_dofs; i++)
+          for (unsigned int j=0; j != n_dofs; j++)
             Me(i,j) += JxW[qp]*phi[i][qp]*phi[j][qp];
 
       // On an unrefined mesh, constrain_element_matrix does

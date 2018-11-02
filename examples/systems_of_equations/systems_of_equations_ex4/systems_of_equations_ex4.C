@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -56,6 +56,7 @@
 #include "libmesh/dirichlet_boundaries.h"
 #include "libmesh/string_to_enum.h"
 #include "libmesh/getpot.h"
+#include "libmesh/enum_solver_package.h"
 
 // Bring in everything from the libMesh namespace
 using namespace libMesh;
@@ -74,8 +75,12 @@ Real eval_elasticity_tensor(unsigned int i,
 // Begin the main program.
 int main (int argc, char ** argv)
 {
-  // Initialize libMesh and any dependent libaries
+  // Initialize libMesh and any dependent libraries
   LibMeshInit init (argc, argv);
+
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
 
   // Initialize the cantilever mesh
   const unsigned int dim = 2;
@@ -122,9 +127,10 @@ int main (int argc, char ** argv)
   // Create a ZeroFunction to initialize dirichlet_bc
   ZeroFunction<> zf;
 
-  DirichletBoundary dirichlet_bc(boundary_ids,
-                                 variables,
-                                 &zf);
+  // Most DirichletBoundary users will want to supply a "locally
+  // indexed" functor
+  DirichletBoundary dirichlet_bc(boundary_ids, variables, zf,
+                                 LOCAL_VARIABLE_ORDER);
 
   // We must add the Dirichlet boundary condition _before_
   // we call equation_systems.init()
@@ -150,7 +156,7 @@ int main (int argc, char ** argv)
 
 
 void assemble_elasticity(EquationSystems & es,
-                         const std::string & system_name)
+                         const std::string & libmesh_dbg_var(system_name))
 {
   libmesh_assert_equal_to (system_name, "Elasticity");
 
@@ -165,16 +171,16 @@ void assemble_elasticity(EquationSystems & es,
 
   const DofMap & dof_map = system.get_dof_map();
   FEType fe_type = dof_map.variable_type(0);
-  UniquePtr<FEBase> fe (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe (FEBase::build(dim, fe_type));
   QGauss qrule (dim, fe_type.default_quadrature_order());
   fe->attach_quadrature_rule (&qrule);
 
-  UniquePtr<FEBase> fe_face (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe_face (FEBase::build(dim, fe_type));
   QGauss qface(dim-1, fe_type.default_quadrature_order());
   fe_face->attach_quadrature_rule (&qface);
 
   const std::vector<Real> & JxW = fe->get_JxW();
-  const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+  const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
   DenseMatrix<Number> Ke;
   DenseVector<Number> Fe;
@@ -191,13 +197,8 @@ void assemble_elasticity(EquationSystems & es,
   std::vector<dof_id_type> dof_indices_u;
   std::vector<dof_id_type> dof_indices_v;
 
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-  for ( ; el != end_el; ++el)
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      const Elem * elem = *el;
-
       dof_map.dof_indices (elem, dof_indices);
       dof_map.dof_indices (elem, dof_indices_u, u_var);
       dof_map.dof_indices (elem, dof_indices_v, v_var);
@@ -304,10 +305,10 @@ void assemble_elasticity(EquationSystems & es,
         }
 
       {
-        for (unsigned int side=0; side<elem->n_sides(); side++)
-          if (elem->neighbor(side) == libmesh_nullptr)
+        for (auto side : elem->side_index_range())
+          if (elem->neighbor_ptr(side) == nullptr)
             {
-              const std::vector<std::vector<Real> > & phi_face = fe_face->get_phi();
+              const std::vector<std::vector<Real>> & phi_face = fe_face->get_phi();
               const std::vector<Real> & JxW_face = fe_face->get_JxW();
 
               fe_face->reinit(elem, side);

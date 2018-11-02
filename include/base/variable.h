@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -28,7 +28,8 @@
 #include <string>
 #include <vector>
 
-namespace libMesh {
+namespace libMesh
+{
 
 // Forward Declaration
 class System;
@@ -40,6 +41,10 @@ class System;
  * name, a finite element approximation family, and
  * (optionally) a list of subdomains to which the
  * variable is restricted.
+ *
+ * \author Roy Stogner
+ * \date 2010
+ * \brief A variable which is solved for in a System of equations.
  */
 class Variable
 {
@@ -82,7 +87,7 @@ public:
   {}
 
   /**
-   * The System this Variable is part of.
+   * \returns A pointer to the System this Variable is part of.
    */
   System * system() const
   {
@@ -90,47 +95,49 @@ public:
   }
 
   /**
-   * Arbitrary, user-specified name of the variable.
+   * \returns The user-specified name of the variable.
    */
   const std::string & name() const
   { return _name; }
 
   /**
-   * The rank of this variable in the system.
+   * \returns The rank of this variable in the system.
    */
   unsigned int number() const
   { return _number; }
 
   /**
-   * The index of the first scalar component of this variable in the
+   * \returns The index of the first scalar component of this variable in the
    * system.
    */
   unsigned int first_scalar_number() const
   { return _first_scalar_number; }
 
   /**
-   * The \p FEType for this variable.
+   * \returns The \p FEType for this variable.
    */
   const FEType & type() const
   { return _type; }
 
   /**
-   * The number of components of this variable.
+   * \returns The number of components of this variable.
    */
   unsigned int n_components() const
-  { return type().family == SCALAR ? _type.order : 1; }
+  { return type().family == SCALAR ? _type.order.get_order() : 1; }
 
   /**
-   * \p returns \p true if this variable is active on subdomain \p sid,
-   * \p false otherwise.  Note that we interperet the special case of an
-   * empty \p _active_subdomains container as active everywhere, i.e.
-   * for all subdomains.
+   * \returns \p true if this variable is active on subdomain \p sid,
+   * \p false otherwise.
+   *
+   * \note We interpret the special case of an empty \p
+   * _active_subdomains container as active everywhere, i.e. for all
+   * subdomains.
    */
   bool active_on_subdomain (subdomain_id_type sid) const
   { return (_active_subdomains.empty() || _active_subdomains.count(sid));  }
 
   /**
-   * \p returns \p true if this variable is active on all subdomains
+   * \returns \p true if this variable is active on all subdomains
    * because it has no specified activity map.  This can be used
    * to perform more efficient computations in some places.
    */
@@ -138,7 +145,7 @@ public:
   { return _active_subdomains.empty(); }
 
   /**
-   * Returns set of subdomain ids this variable lives on
+   * \returns The set of subdomain ids this variable lives on.
    */
   const std::set<subdomain_id_type> & active_subdomains() const
   { return _active_subdomains; }
@@ -205,13 +212,13 @@ public:
   {}
 
   /**
-   * The number of variables in this \p VariableGroup
+   * \returns The number of variables in this \p VariableGroup
    */
   unsigned int n_variables () const
   { return cast_int<unsigned int>(_names.size()); }
 
   /**
-   * Construct a \p Variable object for an individual member
+   * \returns A \p Variable object constructed for an individual member
    * of our group.
    */
   Variable variable (unsigned int v) const
@@ -226,13 +233,15 @@ public:
   }
 
   /**
-   * Support vg(v) - returns a \p Variable for v.
+   * Support vg(v).
+   *
+   * \returns A \p Variable for v.
    */
   Variable operator() (unsigned int v) const
   { return this->variable(v); }
 
   /**
-   * Arbitrary, user-specified name of the variable.
+   * \returns The user-specified name of the variable.
    */
   const std::string & name(unsigned int v) const
   {
@@ -241,7 +250,7 @@ public:
   }
 
   /**
-   * The rank of this variable in the system.
+   * \returns The rank of this variable in the system.
    */
   unsigned int number(unsigned int v) const
   {
@@ -249,8 +258,11 @@ public:
     return _number + v;
   }
 
+  // Don't let number(uint) hide number()
+  using Variable::number;
+
   /**
-   * The index of the first scalar component of this variable in the
+   * \returns The index of the first scalar component of this variable in the
    * system.
    */
   unsigned int first_scalar_number(unsigned int v) const

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -17,16 +17,19 @@
 
 
 
-// C++ includes
-
 // Local includes
 #include "libmesh/node_elem.h"
+#include "libmesh/enum_order.h"
 
 namespace libMesh
 {
 
 
-// Forward declarations
+Order NodeElem::default_order() const
+{
+  return FIRST;
+}
+
 
 
 void NodeElem::connectivity(const unsigned int,

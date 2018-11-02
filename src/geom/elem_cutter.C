@@ -22,11 +22,10 @@
 // Local includes
 #include "libmesh/elem_cutter.h"
 #include "libmesh/elem.h"
-#include "libmesh/serial_mesh.h"
+#include "libmesh/replicated_mesh.h"
 #include "libmesh/mesh_triangle_interface.h"
 #include "libmesh/mesh_tetgen_interface.h"
-
-// C++ includes
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
 
 namespace
 {
@@ -36,16 +35,16 @@ unsigned int cut_cntr;
 namespace libMesh
 {
 
-// ------------------------------------------------------------
-// ElemCutter implementation
-ElemCutter::ElemCutter()
+ElemCutter::ElemCutter() :
+  _inside_mesh_2D(libmesh_make_unique<ReplicatedMesh>(_comm_self,2)),
+  _triangle_inside(libmesh_make_unique<TriangleInterface>(*_inside_mesh_2D)),
+  _outside_mesh_2D(libmesh_make_unique<ReplicatedMesh>(_comm_self,2)),
+  _triangle_outside(libmesh_make_unique<TriangleInterface>(*_outside_mesh_2D)),
+  _inside_mesh_3D(libmesh_make_unique<ReplicatedMesh>(_comm_self,3)),
+  _tetgen_inside(libmesh_make_unique<TetGenMeshInterface>(*_inside_mesh_3D)),
+  _outside_mesh_3D(libmesh_make_unique<ReplicatedMesh>(_comm_self,3)),
+  _tetgen_outside(libmesh_make_unique<TetGenMeshInterface>(*_outside_mesh_3D))
 {
-  _inside_mesh_2D.reset  (new SerialMesh(_comm_self,2)); /**/ _triangle_inside.reset  (new TriangleInterface (*_inside_mesh_2D));
-  _outside_mesh_2D.reset (new SerialMesh(_comm_self,2)); /**/ _triangle_outside.reset (new TriangleInterface (*_outside_mesh_2D));
-
-  _inside_mesh_3D.reset  (new SerialMesh(_comm_self,3)); /**/ _tetgen_inside.reset  (new TetGenMeshInterface (*_inside_mesh_3D));
-  _outside_mesh_3D.reset (new SerialMesh(_comm_self,3)); /**/ _tetgen_outside.reset (new TetGenMeshInterface (*_outside_mesh_3D));
-
   cut_cntr = 0;
 }
 
@@ -56,14 +55,14 @@ ElemCutter::~ElemCutter()
 
 
 
-bool ElemCutter::is_inside (const Elem & elem,
+bool ElemCutter::is_inside (const Elem & libmesh_dbg_var(elem),
                             const std::vector<Real> & vertex_distance_func) const
 {
   libmesh_assert_equal_to (elem.n_vertices(), vertex_distance_func.size());
 
-  for (std::vector<Real>::const_iterator it=vertex_distance_func.begin();
-       it!=vertex_distance_func.end(); ++it)
-    if (*it > 0.) return false;
+  for (const auto & val : vertex_distance_func)
+    if (val > 0.)
+      return false;
 
   // if the distance function is nonpositive, we are outside
   return true;
@@ -71,14 +70,14 @@ bool ElemCutter::is_inside (const Elem & elem,
 
 
 
-bool ElemCutter::is_outside (const Elem & elem,
+bool ElemCutter::is_outside (const Elem & libmesh_dbg_var(elem),
                              const std::vector<Real> & vertex_distance_func) const
 {
   libmesh_assert_equal_to (elem.n_vertices(), vertex_distance_func.size());
 
-  for (std::vector<Real>::const_iterator it=vertex_distance_func.begin();
-       it!=vertex_distance_func.end(); ++it)
-    if (*it < 0.) return false;
+  for (const auto & val : vertex_distance_func)
+    if (val < 0.)
+      return false;
 
   // if the distance function is nonnegative, we are outside
   return true;
@@ -86,7 +85,7 @@ bool ElemCutter::is_outside (const Elem & elem,
 
 
 
-bool ElemCutter::is_cut (const Elem & elem,
+bool ElemCutter::is_cut (const Elem & libmesh_dbg_var(elem),
                          const std::vector<Real> & vertex_distance_func) const
 {
   libmesh_assert_equal_to (elem.n_vertices(), vertex_distance_func.size());
@@ -95,11 +94,10 @@ bool ElemCutter::is_cut (const Elem & elem,
     vmin = vertex_distance_func.front(),
     vmax = vmin;
 
-  for (std::vector<Real>::const_iterator it=vertex_distance_func.begin();
-       it!=vertex_distance_func.end(); ++it)
+  for (const auto & val : vertex_distance_func)
     {
-      vmin = std::min (vmin, *it);
-      vmax = std::max (vmax, *it);
+      vmin = std::min (vmin, val);
+      vmax = std::max (vmax, val);
     }
 
   // if the distance function changes sign, we're cut.
@@ -160,12 +158,12 @@ void ElemCutter::find_intersection_points(const Elem & elem,
 
   for (unsigned int e=0; e<elem.n_edges(); e++)
     {
-      UniquePtr<Elem> edge (elem.build_edge(e));
+      std::unique_ptr<const Elem> edge (elem.build_edge_ptr(e));
 
       // find the element nodes el0, el1 that map
       unsigned int
-        el0 = elem.get_node_index(edge->get_node(0)),
-        el1 = elem.get_node_index(edge->get_node(1));
+        el0 = elem.get_node_index(edge->node_ptr(0)),
+        el1 = elem.get_node_index(edge->node_ptr(1));
 
       libmesh_assert (elem.is_vertex(el0));
       libmesh_assert (elem.is_vertex(el1));
@@ -231,8 +229,8 @@ void ElemCutter::cut_2D (const Elem & elem,
 
   std::cout << "Inside cut face element!\n";
 
-  libmesh_assert (_inside_mesh_2D.get()  != libmesh_nullptr);
-  libmesh_assert (_outside_mesh_2D.get() != libmesh_nullptr);
+  libmesh_assert (_inside_mesh_2D.get()  != nullptr);
+  libmesh_assert (_outside_mesh_2D.get() != nullptr);
 
   _inside_mesh_2D->clear();
   _outside_mesh_2D->clear();
@@ -246,11 +244,10 @@ void ElemCutter::cut_2D (const Elem & elem,
         _inside_mesh_2D->add_point (elem.point(v));
     }
 
-  for (std::vector<Point>::const_iterator it=_intersection_pts.begin();
-       it != _intersection_pts.end(); ++it)
+  for (const auto & pt : _intersection_pts)
     {
-      _inside_mesh_2D->add_point(*it);
-      _outside_mesh_2D->add_point(*it);
+      _inside_mesh_2D->add_point(pt);
+      _outside_mesh_2D->add_point(pt);
     }
 
 
@@ -283,22 +280,14 @@ void ElemCutter::cut_2D (const Elem & elem,
   // _outside_mesh_2D->write ("out_" + name.str());
 
   // finally, add the elements to our lists.
-  {
-    _inside_elem.clear(); /**/ _outside_elem.clear();
+  _inside_elem.clear();
+  _outside_elem.clear();
 
-    MeshBase::const_element_iterator
-      it  = _inside_mesh_2D->elements_begin(),
-      end = _inside_mesh_2D->elements_end();
+  for (const auto & elem : _inside_mesh_2D->element_ptr_range())
+    _inside_elem.push_back (elem);
 
-    for (; it!=end; ++it)
-      _inside_elem.push_back (*it);
-
-    it  = _outside_mesh_2D->elements_begin();
-    end = _outside_mesh_2D->elements_end();
-
-    for (; it!=end; ++it)
-      _outside_elem.push_back (*it);
-  }
+  for (const auto & elem : _outside_mesh_2D->element_ptr_range())
+    _outside_elem.push_back (elem);
 
 #endif
 }
@@ -320,8 +309,8 @@ void ElemCutter::cut_3D (const Elem & elem,
 
   std::cout << "Inside cut cell element!\n";
 
-  libmesh_assert (_inside_mesh_3D.get()  != libmesh_nullptr);
-  libmesh_assert (_outside_mesh_3D.get() != libmesh_nullptr);
+  libmesh_assert (_inside_mesh_3D.get()  != nullptr);
+  libmesh_assert (_outside_mesh_3D.get() != nullptr);
 
   _inside_mesh_3D->clear();
   _outside_mesh_3D->clear();
@@ -335,11 +324,10 @@ void ElemCutter::cut_3D (const Elem & elem,
         _inside_mesh_3D->add_point (elem.point(v));
     }
 
-  for (std::vector<Point>::const_iterator it=_intersection_pts.begin();
-       it != _intersection_pts.end(); ++it)
+  for (const auto & pt : _intersection_pts)
     {
-      _inside_mesh_3D->add_point(*it);
-      _outside_mesh_3D->add_point(*it);
+      _inside_mesh_3D->add_point(pt);
+      _outside_mesh_3D->add_point(pt);
     }
 
 
@@ -373,24 +361,16 @@ void ElemCutter::cut_3D (const Elem & elem,
   _outside_mesh_3D->write ("out_" + name.str());
 
   // finally, add the elements to our lists.
-  {
-    _inside_elem.clear(); /**/ _outside_elem.clear();
+  _inside_elem.clear();
+  _outside_elem.clear();
 
-    MeshBase::const_element_iterator
-      it  = _inside_mesh_3D->elements_begin(),
-      end = _inside_mesh_3D->elements_end();
+  for (const auto & elem : _inside_mesh_3D->element_ptr_range())
+    if (elem->volume() > std::numeric_limits<Real>::epsilon())
+      _inside_elem.push_back (elem);
 
-    for (; it!=end; ++it)
-      if ((*it)->volume() > std::numeric_limits<Real>::epsilon())
-        _inside_elem.push_back (*it);
-
-    it  = _outside_mesh_3D->elements_begin();
-    end = _outside_mesh_3D->elements_end();
-
-    for (; it!=end; ++it)
-      if ((*it)->volume() > std::numeric_limits<Real>::epsilon())
-        _outside_elem.push_back (*it);
-  }
+  for (const auto & elem : _outside_mesh_3D->element_ptr_range())
+    if (elem->volume() > std::numeric_limits<Real>::epsilon())
+      _outside_elem.push_back (elem);
 
 #endif
 }

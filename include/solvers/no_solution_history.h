@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,12 +20,17 @@
 
 // Local includes
 #include "libmesh/solution_history.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
 
 namespace libMesh
 {
 
 /**
- * 'Save nothing' subclass of Solution History, this is the default
+ * 'Save nothing' subclass of Solution History, this is the default.
+ *
+ * \author Vikram Garg
+ * \date 2012
+ * \brief For storing and retrieving timestep data.
  */
 class NoSolutionHistory : public SolutionHistory
 {
@@ -44,19 +49,19 @@ public:
   /**
    * Virtual function store which we will be overriding
    */
-  virtual void store() libmesh_override;
+  virtual void store() override;
 
   /**
    * Virtual function retrieve which we will be overriding
    */
-  virtual void retrieve() libmesh_override;
+  virtual void retrieve() override;
 
   /**
    * Definition of the clone function needed for the setter function
    */
-  virtual UniquePtr<SolutionHistory > clone() const libmesh_override
+  virtual std::unique_ptr<SolutionHistory > clone() const override
   {
-    return UniquePtr<SolutionHistory >(new NoSolutionHistory());
+    return libmesh_make_unique<NoSolutionHistory>();
   }
 };
 

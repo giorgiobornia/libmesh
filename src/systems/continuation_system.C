@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -30,7 +30,7 @@ ContinuationSystem::ContinuationSystem (EquationSystems & es,
                                         const std::string & name_in,
                                         const unsigned int number_in) :
   Parent(es, name_in, number_in),
-  continuation_parameter(libmesh_nullptr),
+  continuation_parameter(nullptr),
   quiet(true),
   continuation_parameter_tolerance(1.e-6),
   solution_tolerance(1.e-6),
@@ -49,7 +49,7 @@ ContinuationSystem::ContinuationSystem (EquationSystems & es,
   rhs_mode(Residual),
   linear_solver(LinearSolver<Number>::build(es.comm())),
   tangent_initialized(false),
-  newton_solver(libmesh_nullptr),
+  newton_solver(nullptr),
   dlambda_ds(0.707),
   ds(0.1),
   ds_current(0.1),
@@ -60,7 +60,7 @@ ContinuationSystem::ContinuationSystem (EquationSystems & es,
   // Warn about using untested code
   libmesh_experimental();
 
-  if (libMesh::on_command_line("--solver_system_names"))
+  if (libMesh::on_command_line("--solver-system-names"))
     linear_solver->init((this->name()+"_").c_str());
   else
     linear_solver->init();
@@ -133,7 +133,7 @@ void ContinuationSystem::initialize_tangent()
   // Be sure the tangent was not already initialized.
   libmesh_assert (!tangent_initialized);
 
-  // Compute delta_s_zero, the initial arclength travelled during the
+  // Compute delta_s_zero, the initial arclength traveled during the
   // first step.  Here we assume that previous_u and lambda_old store
   // the previous solution and control parameter.  You may need to
   // read in an old solution (or solve the non-continuation system)
@@ -779,7 +779,7 @@ void ContinuationSystem::continuation_solve()
                     }
 
                   // Save a copy of the solution from before the Newton step.
-                  //UniquePtr<NumericVector<Number> > prior_iterate = solution->clone();
+                  //std::unique_ptr<NumericVector<Number>> prior_iterate = solution->clone();
                 }
             } // end if (attempte_backtracking)
 
@@ -1224,7 +1224,7 @@ void ContinuationSystem::update_solution()
   previous_ds = ds_current;
 
   // // 1.) Cosine method (for some reason this always predicts the angle is ~0)
-  // // Don't try divinding by zero
+  // // Don't try dividing by zero
   // if ((yoldnorm > 1.e-12) && (ynorm > 1.e-12))
   //   tau = std::abs(yoldy) / yoldnorm  / ynorm;
   // else

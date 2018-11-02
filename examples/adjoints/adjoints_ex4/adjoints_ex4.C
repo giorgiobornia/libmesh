@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -66,6 +66,8 @@
 #include "libmesh/numeric_vector.h"
 #include "libmesh/steady_solver.h"
 #include "libmesh/system_norm.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
+#include "libmesh/enum_solver_package.h"
 
 // Adjoint Related includes
 #include "libmesh/qoi_set.h"
@@ -74,6 +76,7 @@
 // libMesh I/O includes
 #include "libmesh/getpot.h"
 #include "libmesh/gmv_io.h"
+#include "libmesh/exodusII_io.h"
 
 // Local includes
 #include "femparameters.h"
@@ -87,25 +90,66 @@ using namespace libMesh;
 // Number output files, the files are give a prefix of primal or adjoint_i depending on
 // whether the output is the primal solution or the dual solution for the ith QoI
 
-// Write gmv output
-
+// Optionally write different types of output files.
 void write_output(EquationSystems & es,
                   unsigned int a_step,       // The adaptive step count
-                  std::string solution_type) // primal or adjoint solve
+                  std::string solution_type, // primal or adjoint solve
+                  FEMParameters & param)
 {
+  // Ignore parameters when there are no output formats available.
+  libmesh_ignore(es);
+  libmesh_ignore(a_step);
+  libmesh_ignore(solution_type);
+  libmesh_ignore(param);
+
 #ifdef LIBMESH_HAVE_GMV
-  MeshBase & mesh = es.get_mesh();
+  if (param.output_gmv)
+    {
+      MeshBase & mesh = es.get_mesh();
 
-  std::ostringstream file_name_gmv;
-  file_name_gmv << solution_type
-                << ".out.gmv."
-                << std::setw(2)
-                << std::setfill('0')
-                << std::right
-                << a_step;
+      std::ostringstream file_name_gmv;
+      file_name_gmv << solution_type
+                    << ".out.gmv."
+                    << std::setw(2)
+                    << std::setfill('0')
+                    << std::right
+                    << a_step;
 
-  GMVIO(mesh).write_equation_systems
-    (file_name_gmv.str(), es);
+      GMVIO(mesh).write_equation_systems
+        (file_name_gmv.str(), es);
+    }
+#endif
+
+#ifdef LIBMESH_HAVE_EXODUS_API
+  if (param.output_exodus)
+    {
+      MeshBase & mesh = es.get_mesh();
+
+      // We write out one file per adaptive step. The files are named in
+      // the following way:
+      // foo.e
+      // foo.e-s002
+      // foo.e-s003
+      // ...
+      // so that, if you open the first one with Paraview, it actually
+      // opens the entire sequence of adapted files.
+      std::ostringstream file_name_exodus;
+
+      file_name_exodus << solution_type << ".e";
+      if (a_step > 0)
+        file_name_exodus << "-s"
+                         << std::setw(3)
+                         << std::setfill('0')
+                         << std::right
+                         << a_step + 1;
+
+      // We write each adaptive step as a pseudo "time" step, where the
+      // time simply matches the (1-based) adaptive step we are on.
+      ExodusII_IO(mesh).write_timestep(file_name_exodus.str(),
+                                       es,
+                                       1,
+                                       /*time=*/a_step + 1);
+    }
 #endif
 }
 
@@ -133,13 +177,12 @@ void set_system_parameters(LaplaceSystem & system,
   system.print_jacobians      = param.print_jacobians;
 
   // No transient time solver
-  system.time_solver =
-    UniquePtr<TimeSolver>(new SteadySolver(system));
+  system.time_solver = libmesh_make_unique<SteadySolver>(system);
 
   // Nonlinear solver options
   {
     NewtonSolver * solver = new NewtonSolver(system);
-    system.time_solver->diff_solver() = UniquePtr<DiffSolver>(solver);
+    system.time_solver->diff_solver() = std::unique_ptr<DiffSolver>(solver);
 
     solver->quiet                       = param.solver_quiet;
     solver->max_nonlinear_iterations    = param.max_nonlinear_iterations;
@@ -165,8 +208,8 @@ void set_system_parameters(LaplaceSystem & system,
 
 #ifdef LIBMESH_ENABLE_AMR
 
-UniquePtr<MeshRefinement> build_mesh_refinement(MeshBase & mesh,
-                                                FEMParameters & param)
+std::unique_ptr<MeshRefinement> build_mesh_refinement(MeshBase & mesh,
+                                                      FEMParameters & param)
 {
   MeshRefinement * mesh_refinement = new MeshRefinement(mesh);
   mesh_refinement->coarsen_by_parents() = true;
@@ -176,13 +219,13 @@ UniquePtr<MeshRefinement> build_mesh_refinement(MeshBase & mesh,
   mesh_refinement->coarsen_fraction()  = param.coarsen_fraction;
   mesh_refinement->coarsen_threshold() = param.coarsen_threshold;
 
-  return UniquePtr<MeshRefinement>(mesh_refinement);
+  return std::unique_ptr<MeshRefinement>(mesh_refinement);
 }
 
 // This is where declare the adjoint refined error estimator. This estimator builds an error bound
 // for Q(u) - Q(u_h), by solving the adjoint problem on a finer Finite Element space. For more details
 // see the description of the Adjoint Refinement Error Estimator in adjoint_refinement_error_estimator.C
-UniquePtr<AdjointRefinementEstimator> build_adjoint_refinement_error_estimator(QoISet & qois)
+std::unique_ptr<AdjointRefinementEstimator> build_adjoint_refinement_error_estimator(QoISet & qois)
 {
   libMesh::out << "Computing the error estimate using the Adjoint Refinement Error Estimator" << std::endl << std::endl;
 
@@ -193,7 +236,7 @@ UniquePtr<AdjointRefinementEstimator> build_adjoint_refinement_error_estimator(Q
   // We enrich the FE space for the dual problem by doing 2 uniform h refinements
   adjoint_refinement_estimator->number_h_refinements = 2;
 
-  return UniquePtr<AdjointRefinementEstimator>(adjoint_refinement_estimator);
+  return std::unique_ptr<AdjointRefinementEstimator>(adjoint_refinement_estimator);
 }
 
 #endif // LIBMESH_ENABLE_AMR
@@ -204,6 +247,10 @@ int main (int argc, char** argv)
 {
   // Initialize libMesh.
   LibMeshInit init (argc, argv);
+
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
 
   // Skip adaptive examples on a non-adaptive libMesh build
 #ifndef LIBMESH_ENABLE_AMR
@@ -235,7 +282,7 @@ int main (int argc, char** argv)
   Mesh mesh(init.comm());
 
   // And an object to refine it
-  UniquePtr<MeshRefinement> mesh_refinement =
+  std::unique_ptr<MeshRefinement> mesh_refinement =
     build_mesh_refinement(mesh, param);
 
   // And an EquationSystems to run on it
@@ -291,7 +338,7 @@ int main (int argc, char** argv)
         system.solve();
 
         // Write out the computed primal solution
-        write_output(equation_systems, a_step, "primal");
+        write_output(equation_systems, a_step, "primal", param);
 
         // Get a pointer to the primal solution vector
         NumericVector<Number> & primal_solution = *system.solution;
@@ -321,7 +368,7 @@ int main (int argc, char** argv)
         // solves the resulting system
         system.adjoint_solve();
 
-        // Now that we have solved the adjoint, set the adjoint_already_solved boolean to true, so we dont solve unneccesarily in the error estimator
+        // Now that we have solved the adjoint, set the adjoint_already_solved boolean to true, so we dont solve unnecessarily in the error estimator
         system.set_adjoint_already_solved(true);
 
         // Get a pointer to the solution vector of the adjoint problem for QoI 0
@@ -329,7 +376,7 @@ int main (int argc, char** argv)
 
         // Swap the primal and dual solutions so we can write out the adjoint solution
         primal_solution.swap(dual_solution_0);
-        write_output(equation_systems, a_step, "adjoint_0");
+        write_output(equation_systems, a_step, "adjoint_0", param);
 
         // Swap back
         primal_solution.swap(dual_solution_0);
@@ -339,7 +386,7 @@ int main (int argc, char** argv)
 
         // Swap again
         primal_solution.swap(dual_solution_1);
-        write_output(equation_systems, a_step, "adjoint_1");
+        write_output(equation_systems, a_step, "adjoint_1", param);
 
         // Swap back again
         primal_solution.swap(dual_solution_1);
@@ -377,7 +424,7 @@ int main (int argc, char** argv)
         ErrorVector QoI_elementwise_error;
 
         // Build an adjoint refinement error estimator object
-        UniquePtr<AdjointRefinementEstimator> adjoint_refinement_error_estimator =
+        std::unique_ptr<AdjointRefinementEstimator> adjoint_refinement_error_estimator =
           build_adjoint_refinement_error_estimator(qois);
 
         // Estimate the error in each element using the Adjoint Refinement estimator
@@ -396,7 +443,7 @@ int main (int argc, char** argv)
                      << std::endl
                      << std::endl;
 
-        // Also print out effecitivity indices (estimated error/true error)
+        // Also print out effectivity indices (estimated error/true error)
         libMesh::out << "The effectivity index for the computed error in QoI 0 is "
                      << std::setprecision(17)
                      << std::abs(adjoint_refinement_error_estimator->get_global_QoI_error_estimate(0)) / std::abs(QoI_0_computed - QoI_0_exact)
@@ -462,7 +509,7 @@ int main (int argc, char** argv)
         linear_solver->reuse_preconditioner(false);
         system.solve();
 
-        write_output(equation_systems, a_step, "primal");
+        write_output(equation_systems, a_step, "primal", param);
 
         NumericVector<Number> & primal_solution = *system.solution;
 
@@ -480,20 +527,20 @@ int main (int argc, char** argv)
         linear_solver->reuse_preconditioner(param.reuse_preconditioner);
         system.adjoint_solve();
 
-        // Now that we have solved the adjoint, set the adjoint_already_solved boolean to true, so we dont solve unneccesarily in the error estimator
+        // Now that we have solved the adjoint, set the adjoint_already_solved boolean to true, so we dont solve unnecessarily in the error estimator
         system.set_adjoint_already_solved(true);
 
         NumericVector<Number> & dual_solution_0 = system.get_adjoint_solution(0);
 
         primal_solution.swap(dual_solution_0);
-        write_output(equation_systems, a_step, "adjoint_0");
+        write_output(equation_systems, a_step, "adjoint_0", param);
 
         primal_solution.swap(dual_solution_0);
 
         NumericVector<Number> & dual_solution_1 = system.get_adjoint_solution(1);
 
         primal_solution.swap(dual_solution_1);
-        write_output(equation_systems, a_step, "adjoint_1");
+        write_output(equation_systems, a_step, "adjoint_1", param);
 
         primal_solution.swap(dual_solution_1);
 
@@ -532,7 +579,7 @@ int main (int argc, char** argv)
         ErrorVector QoI_elementwise_error;
 
         // Build an adjoint refinement error estimator object
-        UniquePtr<AdjointRefinementEstimator> adjoint_refinement_error_estimator =
+        std::unique_ptr<AdjointRefinementEstimator> adjoint_refinement_error_estimator =
           build_adjoint_refinement_error_estimator(qois);
 
         // Estimate the error in each element using the Adjoint Refinement estimator
@@ -551,7 +598,7 @@ int main (int argc, char** argv)
                      << std::endl
                      << std::endl;
 
-        // Also print out effecitivity indices (estimated error/true error)
+        // Also print out effectivity indices (estimated error/true error)
         libMesh::out << "The effectivity index for the computed error in QoI 0 is "
                      << std::setprecision(17)
                      << std::abs(adjoint_refinement_error_estimator->get_global_QoI_error_estimate(0)) / std::abs(QoI_0_computed - QoI_0_exact)
@@ -565,7 +612,7 @@ int main (int argc, char** argv)
 
         // Hard coded assert to ensure that the actual numbers we are getting are what they should be
 
-	// The effectivity index isn't exactly reproduceable at single precision
+        // The effectivity index isn't exactly reproducible at single precision
         // libmesh_assert_less(std::abs(std::abs(adjoint_refinement_error_estimator->get_global_QoI_error_estimate(0)) / std::abs(QoI_0_computed - QoI_0_exact) - 0.84010976704434637), 1.e-5);
         // libmesh_assert_less(std::abs(std::abs(adjoint_refinement_error_estimator->get_global_QoI_error_estimate(1)) / std::abs(QoI_1_computed - QoI_1_exact) - 0.48294428289950514), 1.e-5);
 

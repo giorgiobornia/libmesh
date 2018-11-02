@@ -64,17 +64,30 @@ AC_C_RESTRICT
 # difficult.  If you know that you are on such a system, configure with
 # --disable-getpwuid.
 # --------------------------------------------------------------
+enablegetpwuid_default=yes
+
+# We can't use getpwuid if pwd.h is not found.
+AC_CHECK_HEADERS(pwd.h, [have_pwd_h=yes], [have_pwd_h=no])
+AS_IF([test "$have_pwd_h" = no], [enablegetpwuid_default=no])
+
+# If the user configured with --enable-all-static, certain functions
+# like getpwuid cannot be used. You may see warnings like the
+# following from the linker:
+# warning: Using 'getpwuid' in statically linked applications requires at runtime the shared libraries from the glibc version used for linking
+AS_IF([test "$enableallstatic" = yes], [enablegetpwuid_default=no])
+
+# Let the user override the default (at their own risk).
 AC_ARG_ENABLE(getpwuid,
               AS_HELP_STRING([--disable-getpwuid],
                              [do not make calls to getpwuid]),
               enablegetpwuid=$enableval,
-              enablegetpwuid=yes)
+              enablegetpwuid=$enablegetpwuid_default)
 
-if test "$enablegetpwuid" != no ; then
-  AC_DEFINE(HAVE_GETPWUID, 1,
-           [Flag indicating if the library should be built with calls to getpwuid()])
-  AC_MSG_RESULT(<<< Configuring library with getpwuid >>>)
-fi
+AS_IF([test "$enablegetpwuid" != no],
+      [
+        AC_DEFINE(HAVE_GETPWUID, 1, [Flag indicating if the library should be built with calls to getpwuid()])
+        AC_MSG_RESULT(<<< Configuring library with getpwuid >>>)
+      ])
 # --------------------------------------------------------------
 
 
@@ -88,11 +101,11 @@ AC_ARG_ENABLE(exceptions,
               enableexceptions=$enableval,
               enableexceptions=yes)
 
-if test "$enableexceptions" != no ; then
-  AC_DEFINE(ENABLE_EXCEPTIONS, 1,
-           [Flag indicating if the library should be built to throw C++ exceptions on unexpected errors])
-  AC_MSG_RESULT(<<< Configuring library with exception throwing support >>>)
-fi
+AS_IF([test "$enableexceptions" != no],
+      [
+        AC_DEFINE(ENABLE_EXCEPTIONS, 1, [Flag indicating if the library should be built to throw C++ exceptions on unexpected errors])
+        AC_MSG_RESULT(<<< Configuring library with exception throwing support >>>)
+      ])
 # --------------------------------------------------------------
 
 
@@ -108,11 +121,11 @@ AC_ARG_ENABLE(timestamps,
               enabletimestamps=$enableval,
               enabletimestamps=yes)
 
-if test "$enabletimestamps" != no ; then
-  AC_DEFINE(ENABLE_TIMESTAMPS, 1,
-           [Flag indicating if the library should be built with compile time and date timestamps])
-  AC_MSG_RESULT(<<< Configuring library with compile timestamps >>>)
-fi
+AS_IF([test "$enabletimestamps" != no],
+      [
+        AC_DEFINE(ENABLE_TIMESTAMPS, 1, [Flag indicating if the library should be built with compile time and date timestamps])
+        AC_MSG_RESULT(<<< Configuring library with compile timestamps >>>)
+      ])
 # --------------------------------------------------------------
 
 
@@ -123,6 +136,7 @@ fi
 AC_CHECK_SIZEOF(short int)
 AC_CHECK_SIZEOF(int)
 AC_CHECK_SIZEOF(unsigned int)
+AC_CHECK_SIZEOF(size_t)
 AC_CHECK_SIZEOF(long int)
 AC_CHECK_SIZEOF(float)
 AC_CHECK_SIZEOF(double)
@@ -158,73 +172,66 @@ AC_CHECK_HEADERS(xmmintrin.h)
 # See if we can actually compile code using the fe{enable,disable}except functions
 AC_HAVE_FEEXCEPT
 
+# Check if we have new-style signal handlers
+AC_CHECK_DECLS([sigaction], [], [], [#include <signal.h>])
+
+# Check for mkdir
+AC_MSG_CHECKING([for mkdir with two arguments])
+AC_COMPILE_IFELSE(
+    [AC_LANG_PROGRAM([
+        #include <sys/stat.h>
+        #include <sys/types.h> ],[
+        mkdir("test-dir", 0); ])],
+    [AC_DEFINE(HAVE_MKDIR, [], "The make directory command")
+     AC_MSG_RESULT(yes)],
+    [AC_MSG_RESULT(no)])
+AC_CHECK_HEADERS(direct.h)
+AC_CHECK_DECLS([_mkdir], [], [], [
+    #include <direct.h>
+])
+
+# Check for uname header.
+AC_CHECK_HEADERS(sys/utsname.h)
+
 AC_ARG_ENABLE(unordered-containers,
               AS_HELP_STRING([--disable-unordered-containers],
-                             [Use map/set instead of unordered_map/unordered_set]),
-              enableunorderedcontainers=$enableval,
-              enableunorderedcontainers=yes)
+                             [Use map/set instead of unordered_map/unordered_set (no longer supported)]),
+              [AS_CASE("${enableval}",
+                       [yes], [enableunorderedcontainers=yes],
+                       [no],  [AC_MSG_ERROR(libMesh now requires unordered containers)],
+                       [AC_MSG_ERROR(bad value ${enableval} for --disable-unordered-containers)])],
+              [enableunorderedcontainers=irrelevant])
 
-  if test "$enableunorderedcontainers" != no ; then
-    # The following routines, defined in unordered.m4, check to see if the compiler can compile programs using
-    # various quasi-standard hash containers.
-    ACX_BEST_UNORDERED_MULTIMAP
-    ACX_BEST_UNORDERED_MAP
-    ACX_BEST_UNORDERED_MULTISET
-    ACX_BEST_UNORDERED_SET
-  else
-    ACX_STD_MAP
-    ACX_STD_MULTIMAP
-    ACX_STD_SET
-    ACX_STD_MULTISET
-  fi
+AS_IF([test $enableunorderedcontainers != irrelevant],
+      [AC_MSG_WARN([--enable/disable-unordered-containers are now deprecated])])
+enableunorderedcontainers=yes
 
-# Determine which of std::hash, std::tr1::hash, or __gnu_cxx::hash is available
+# The following routines, defined in unordered.m4, check to see if
+# the compiler can compile programs using the std::unordered
+# containers.
+ACX_BEST_UNORDERED_MULTIMAP
+ACX_BEST_UNORDERED_MAP
+ACX_BEST_UNORDERED_MULTISET
+ACX_BEST_UNORDERED_SET
+
+# libMesh also requires C++11 std::hash.
 ACX_BEST_HASH
+
+# C++11 provides std::hash<T*> and std::hash<std::string>
+# implementations, but we keep these defines around for backward
+# compatibility.
+AC_DEFINE(DEFINE_HASH_STRING,,[workaround for potentially missing hash<string>])
+AC_DEFINE(DEFINE_HASH_POINTERS,,[workaround for potentially missing hash<T*>])
 
 AX_CXX_DLOPEN
 
 dnl Set preprocessor macro if the test code succeeded
-if (test "$ac_cv_cxx_dlopen" = yes); then
-  AC_DEFINE(HAVE_DLOPEN, 1, [define if the compiler supports dlopen/dlsym/dlclose])
-fi
+AS_IF([test "$ac_cv_cxx_dlopen" = yes],
+      [AC_DEFINE(HAVE_DLOPEN, 1, [define if the compiler supports dlopen/dlsym/dlclose])])
 
 AX_CXX_GCC_ABI_DEMANGLE
 AX_CXX_GLIBC_BACKTRACE
 
-
-
-# -------------------------------------------------------------
-# OpenMP Support  -- enabled by default
-# -------------------------------------------------------------
-AC_ARG_ENABLE(openmp,
-             AS_HELP_STRING([--disable-openmp],
-                            [Build without OpenMP Support]),
-             enableopenmp=$enableval,
-             enableopenmp=yes)
-if (test "$enableopenmp" != no) ; then
-   AX_OPENMP([],[enableopenmp=no])
-   #The above call only sets the flag for C++
-   if (test "x$OPENMP_CXXFLAGS" != x) ; then
-     AC_MSG_RESULT(<<< Configuring library with OpenMP support >>>)
-     OPENMP_CFLAGS=$OPENMP_CXXFLAGS
-     OPENMP_FFLAGS=$OPENMP_CXXFLAGS
-     CXXFLAGS_OPT="$CXXFLAGS_OPT $OPENMP_CXXFLAGS"
-     CXXFLAGS_DBG="$CXXFLAGS_DBG $OPENMP_CXXFLAGS"
-     CXXFLAGS_DEVEL="$CXXFLAGS_DEVEL $OPENMP_CXXFLAGS"
-     CXXFLAGS_PROF="$CXXFLAGS_PROF $OPENMP_CXXFLAGS"
-     CXXFLAGS_OPROF="$CXXFLAGS_OPROF $OPENMP_CXXFLAGS"
-     CFLAGS_OPT="$CFLAGS_OPT $OPENMP_CFLAGS"
-     CFLAGS_DBG="$CFLAGS_DBG $OPENMP_CFLAGS"
-     CFLAGS_DEVEL="$CFLAGS_DEVEL $OPENMP_CFLAGS"
-     CFLAGS_PROF="$CFLAGS_PROF $OPENMP_CFLAGS"
-     CFLAGS_OPROF="$CFLAGS_OPROF $OPENMP_CFLAGS"
-     FFLAGS="$FFLAGS $OPENMP_FFLAGS"
-   fi
-   AC_SUBST(OPENMP_CXXFLAGS)
-   AC_SUBST(OPENMP_CFLAGS)
-   AC_SUBST(OPENMP_FFLAGS)
-fi
-# -------------------------------------------------------------
 
 
 # See if this compiler has a broken errno_t in a very specific

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -23,7 +23,7 @@
 #include "libmesh/cell_hex.h"
 #include "libmesh/cell_hex8.h"
 #include "libmesh/face_quad4.h"
-
+#include "libmesh/enum_elem_quality.h"
 
 
 namespace libMesh
@@ -75,24 +75,35 @@ dof_id_type Hex::key (const unsigned int s) const
 {
   libmesh_assert_less (s, this->n_sides());
 
-  return this->compute_key(this->node(Hex8::side_nodes_map[s][0]),
-                           this->node(Hex8::side_nodes_map[s][1]),
-                           this->node(Hex8::side_nodes_map[s][2]),
-                           this->node(Hex8::side_nodes_map[s][3]));
+  return this->compute_key(this->node_id(Hex8::side_nodes_map[s][0]),
+                           this->node_id(Hex8::side_nodes_map[s][1]),
+                           this->node_id(Hex8::side_nodes_map[s][2]),
+                           this->node_id(Hex8::side_nodes_map[s][3]));
 }
 
 
 
-UniquePtr<Elem> Hex::side (const unsigned int i) const
+unsigned int Hex::which_node_am_i(unsigned int side,
+                                  unsigned int side_node) const
+{
+  libmesh_assert_less (side, this->n_sides());
+  libmesh_assert_less (side_node, 4);
+
+  return Hex8::side_nodes_map[side][side_node];
+}
+
+
+
+std::unique_ptr<Elem> Hex::side_ptr (const unsigned int i)
 {
   libmesh_assert_less (i, this->n_sides());
 
-  Elem * face = new Quad4;
+  std::unique_ptr<Elem> face = libmesh_make_unique<Quad4>();
 
   for (unsigned n=0; n<face->n_nodes(); ++n)
-    face->set_node(n) = this->get_node(Hex8::side_nodes_map[i][n]);
+    face->set_node(n) = this->node_ptr(Hex8::side_nodes_map[i][n]);
 
-  return UniquePtr<Elem>(face);
+  return face;
 }
 
 
@@ -168,9 +179,6 @@ unsigned int Hex::opposite_node(const unsigned int node_in,
     default:
       libmesh_error_msg("Unsupported side_in = " << side_in);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 255;
 }
 
 
@@ -181,7 +189,7 @@ Real Hex::quality (const ElemQuality q) const
     {
 
       /**
-       * Compue the min/max diagonal ratio.
+       * Compute the min/max diagonal ratio.
        * Source: CUBIT User's Manual.
        */
     case DIAGONAL:
@@ -311,9 +319,6 @@ Real Hex::quality (const ElemQuality q) const
     default:
       return Elem::quality(q);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 

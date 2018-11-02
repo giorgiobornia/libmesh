@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -28,7 +28,10 @@
 #if defined(LIBMESH_HAVE_LIBHILBERT)
 
 // Local includes
+// So many implicit-fallthrough warnings in crazy libHilbert macros...
+#include "libmesh/ignore_warnings.h"
 #include "hilbert.h"
+#include "libmesh/restore_warnings.h"
 #include "libmesh/parallel.h"
 
 // C++ includes
@@ -47,28 +50,25 @@ class StandardType<Hilbert::HilbertIndices> : public DataType
 {
 public:
   explicit
-  StandardType(const Hilbert::HilbertIndices * =libmesh_nullptr) {
-    // _static_type never gets freed, but it only gets committed once
-    // so it's not a *huge* memory leak...
-    static DataType _static_type;
-    static bool _is_initialized = false;
-    if (!_is_initialized)
-      {
-        _static_type = DataType(Parallel::StandardType<Hilbert::inttype>(), 3);
-        _is_initialized = true;
-      }
-    _datatype = _static_type;
+  StandardType(const Hilbert::HilbertIndices * =nullptr) {
+    _datatype = DataType(Parallel::StandardType<Hilbert::inttype>(), 3);
   }
+
+  StandardType(const StandardType<Hilbert::HilbertIndices> & t)
+    : DataType()
+  {
+    libmesh_call_mpi (MPI_Type_dup (t._datatype, &_datatype));
+  }
+
+  ~StandardType() { this->free(); }
 };
 
 #endif // LIBMESH_HAVE_MPI
 
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
-  typedef
-  std::pair<Hilbert::HilbertIndices, unique_id_type> DofObjectKey;
+typedef std::pair<Hilbert::HilbertIndices, unique_id_type> DofObjectKey;
 #else
-  typedef
-  Hilbert::HilbertIndices DofObjectKey;
+typedef Hilbert::HilbertIndices DofObjectKey;
 #endif
 
 
@@ -85,10 +85,8 @@ namespace Hilbert {
 // XCode didn't find it in the libMesh namespace.
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
 inline
-std::ostream&
-operator <<
-  (std::ostream& os,
-   const libMesh::Parallel::DofObjectKey & hilbert_pair)
+std::ostream & operator << (std::ostream & os,
+                            const libMesh::Parallel::DofObjectKey & hilbert_pair)
 {
   os << '(' << hilbert_pair.first << ',' << hilbert_pair.second << ')' << std::endl;
   return os;
@@ -102,9 +100,9 @@ operator <<
 // both DofObjectKey types
 
 inline
-void dofobjectkey_max_op (libMesh::Parallel::DofObjectKey *in,
-                          libMesh::Parallel::DofObjectKey *inout,
-                          int *len, void *)
+void dofobjectkey_max_op (libMesh::Parallel::DofObjectKey * in,
+                          libMesh::Parallel::DofObjectKey * inout,
+                          int * len, void *)
 {
   // When (*in <= *inout), then inout already contains max(*in,*inout)
   // Otherwise we need to copy from in.
@@ -114,9 +112,9 @@ void dofobjectkey_max_op (libMesh::Parallel::DofObjectKey *in,
 }
 
 inline
-void dofobjectkey_min_op (libMesh::Parallel::DofObjectKey *in,
-                          libMesh::Parallel::DofObjectKey *inout,
-                          int *len, void *)
+void dofobjectkey_min_op (libMesh::Parallel::DofObjectKey * in,
+                          libMesh::Parallel::DofObjectKey * inout,
+                          int * len, void *)
 {
   // When (*in >= *inout), then inout already contains min(*in,*inout)
   // Otherwise we need to copy from in.
@@ -125,6 +123,6 @@ void dofobjectkey_min_op (libMesh::Parallel::DofObjectKey *in,
       *inout = *in;
 }
 
-#endif // LIBMESH_HAVE_LIBHILBERT && LIBMESH_HAVE_MPI
+#endif // LIBMESH_HAVE_LIBHILBERT
 
 #endif // LIBMESH_PARALLEL_HILBERT_H

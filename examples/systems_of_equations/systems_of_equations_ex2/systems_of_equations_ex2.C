@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -59,9 +59,14 @@
 #include "libmesh/perf_log.h"
 #include "libmesh/boundary_info.h"
 #include "libmesh/utility.h"
+#include "libmesh/dirichlet_boundaries.h"
+#include "libmesh/zero_function.h"
+#include "libmesh/const_function.h"
+#include "libmesh/parsed_function.h"
+#include "libmesh/enum_solver_package.h"
 
-// For systems of equations the \p DenseSubMatrix
-// and \p DenseSubVector provide convenient ways for
+// For systems of equations the DenseSubMatrix
+// and DenseSubVector provide convenient ways for
 // assembling the element matrix and vector on a
 // component-by-component basis.
 #include "libmesh/dense_submatrix.h"
@@ -78,11 +83,20 @@ using namespace libMesh;
 void assemble_stokes (EquationSystems & es,
                       const std::string & system_name);
 
+// Functions which set Dirichlet BCs corresponding to different problems.
+void set_lid_driven_bcs(TransientLinearImplicitSystem & system);
+void set_stagnation_bcs(TransientLinearImplicitSystem & system);
+void set_poiseuille_bcs(TransientLinearImplicitSystem & system);
+
 // The main program.
 int main (int argc, char** argv)
 {
   // Initialize libMesh.
   LibMeshInit init (argc, argv);
+
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
 
   // Skip this 2D example if libMesh was compiled as 1D-only.
   libmesh_example_requires(2 <= LIBMESH_DIM, "2D support");
@@ -99,16 +113,14 @@ int main (int argc, char** argv)
 
   // Use the MeshTools::Generation mesh generator to create a uniform
   // 2D grid on the square [-1,1]^2.  We instruct the mesh generator
-  // to build a mesh of 8x8 \p Quad9 elements in 2D.  Building these
-  // higher-order elements allows us to use higher-order
-  // approximation, as in example 3.
+  // to build a mesh of 8x8 Quad9 elements in 2D.  Building these
+  // higher-order elements allows us to use higher-order polynomial
+  // approximations for the velocity.
   MeshTools::Generation::build_square (mesh,
                                        20, 20,
                                        0., 1.,
                                        0., 1.,
-                                       QUAD4);
-
-  mesh.all_second_order();
+                                       QUAD9);
 
   // Print information about the mesh to the screen.
   mesh.print_info();
@@ -121,10 +133,10 @@ int main (int argc, char** argv)
   TransientLinearImplicitSystem & system =
     equation_systems.add_system<TransientLinearImplicitSystem> ("Navier-Stokes");
 
-  // Add the variables "u" & "v" to "Navier-Stokes".  They
+  // Add the variables "vel_x" & "vel_y" to "Navier-Stokes".  They
   // will be approximated using second-order approximation.
-  system.add_variable ("u", SECOND);
-  system.add_variable ("v", SECOND);
+  system.add_variable ("vel_x", SECOND);
+  system.add_variable ("vel_y", SECOND);
 
   // Add the variable "p" to "Navier-Stokes". This will
   // be approximated with a first-order basis,
@@ -134,6 +146,11 @@ int main (int argc, char** argv)
   // Give the system a pointer to the matrix assembly
   // function.
   system.attach_assemble_function (assemble_stokes);
+
+  // Note: only pick one set of BCs!
+  set_lid_driven_bcs(system);
+  // set_stagnation_bcs(system);
+  // set_poiseuille_bcs(system);
 
   // Initialize the data structures for the equation system.
   equation_systems.init ();
@@ -150,17 +167,17 @@ int main (int argc, char** argv)
 
   // Now we begin the timestep loop to compute the time-accurate
   // solution of the equations.
-  const Real dt = 0.01;
+  const Real dt = 0.1;
   navier_stokes_system.time     = 0.0;
   const unsigned int n_timesteps = 15;
 
   // The number of steps and the stopping criterion are also required
   // for the nonlinear iterations.
   const unsigned int n_nonlinear_steps = 15;
-  const Real nonlinear_tolerance       = 1.e-3;
+  const Real nonlinear_tolerance       = 1.e-5;
 
   // We also set a standard linear solver flag in the EquationSystems object
-  // which controls the maxiumum number of linear solver iterations allowed.
+  // which controls the maximum number of linear solver iterations allowed.
   equation_systems.parameters.set<unsigned int>("linear solver maximum iterations") = 250;
 
   // Tell the system of equations what the timestep is by using
@@ -168,15 +185,21 @@ int main (int argc, char** argv)
   // then reference this parameter.
   equation_systems.parameters.set<Real> ("dt")   = dt;
 
+  // The kinematic viscosity, nu = mu/rho, units of length**2/time.
+  equation_systems.parameters.set<Real> ("nu") = .007;
+
   // The first thing to do is to get a copy of the solution at
   // the current nonlinear iteration.  This value will be used to
   // determine if we can exit the nonlinear loop.
-  UniquePtr<NumericVector<Number> >
+  std::unique_ptr<NumericVector<Number>>
     last_nonlinear_soln (navier_stokes_system.solution->clone());
 
-  for (unsigned int t_step=0; t_step<n_timesteps; ++t_step)
+  // Since we are not doing adaptivity, write all solutions to a single Exodus file.
+  ExodusII_IO exo_io(mesh);
+
+  for (unsigned int t_step=1; t_step<=n_timesteps; ++t_step)
     {
-      // Incremenet the time counter, set the time step size as
+      // Increment the time counter, set the time step size as
       // a parameter in the EquationSystem.
       navier_stokes_system.time += dt;
 
@@ -197,6 +220,9 @@ int main (int argc, char** argv)
       // to a "reasonable" starting value.
       const Real initial_linear_solver_tol = 1.e-6;
       equation_systems.parameters.set<Real> ("linear solver tolerance") = initial_linear_solver_tol;
+
+      // We'll set this flag when convergence is (hopefully) achieved.
+      bool converged = false;
 
       // Now we begin the nonlinear loop
       for (unsigned int l=0; l<n_nonlinear_steps; ++l)
@@ -226,6 +252,27 @@ int main (int argc, char** argv)
           // What was the final residual of the linear system?
           const Real final_linear_residual = navier_stokes_system.final_linear_residual();
 
+          // If the solver did no work (sometimes -ksp_converged_reason
+          // says "Linear solve converged due to CONVERGED_RTOL
+          // iterations 0") but the nonlinear residual norm is above
+          // the tolerance, we need to pick an even lower linear
+          // solver tolerance and try again.  Note that the tolerance
+          // is relative to the norm of the RHS, which for this
+          // particular problem does not go to zero, since we are
+          // solving for the full solution rather than the update.
+          //
+          // Similarly, if the solver did no work and this is the 0th
+          // nonlinear step, it means that the delta between solutions
+          // is being inaccurately measured as "0" since the solution
+          // did not change.  Decrease the tolerance and try again.
+          if (n_linear_iterations == 0 &&
+              (navier_stokes_system.final_linear_residual() >= nonlinear_tolerance || l==0))
+            {
+              Real old_linear_solver_tolerance = equation_systems.parameters.get<Real> ("linear solver tolerance");
+              equation_systems.parameters.set<Real> ("linear solver tolerance") = 1.e-3 * old_linear_solver_tolerance;
+              continue;
+            }
+
           // Print out convergence information for the linear and
           // nonlinear iterations.
           libMesh::out << "Linear solver converged at step: "
@@ -245,6 +292,7 @@ int main (int argc, char** argv)
               libMesh::out << " Nonlinear solver converged at step "
                            << l
                            << std::endl;
+              converged = true;
               break;
             }
 
@@ -253,9 +301,13 @@ int main (int argc, char** argv)
           // the solution to ensure quadratic convergence.  The new linear solver tolerance
           // is chosen (heuristically) as the square of the previous linear system residual norm.
           //Real flr2 = final_linear_residual*final_linear_residual;
-          equation_systems.parameters.set<Real> ("linear solver tolerance") =
-            std::min(Utility::pow<2>(final_linear_residual), initial_linear_solver_tol);
+          Real new_linear_solver_tolerance = std::min(Utility::pow<2>(final_linear_residual), initial_linear_solver_tol);
+          equation_systems.parameters.set<Real> ("linear solver tolerance") = new_linear_solver_tolerance;
         } // end nonlinear loop
+
+      // Don't keep going if we failed to converge.
+      if (!converged)
+        libmesh_error_msg("Error: Newton iterations failed to converge!");
 
 #ifdef LIBMESH_HAVE_EXODUS_API
       // Write out every nth timestep to file.
@@ -263,18 +315,10 @@ int main (int argc, char** argv)
 
       if ((t_step+1)%write_interval == 0)
         {
-          std::ostringstream file_name;
-
-          // We write the file in the ExodusII format.
-          file_name << "out_"
-                    << std::setw(3)
-                    << std::setfill('0')
-                    << std::right
-                    << t_step + 1
-                    << ".e";
-
-          ExodusII_IO(mesh).write_equation_systems (file_name.str(),
-                                                    equation_systems);
+          exo_io.write_timestep("out.e",
+                                equation_systems,
+                                t_step+1, // we're off by one since we wrote the IC and the Exodus numbering is 1-based.
+                                navier_stokes_system.time);
         }
 #endif // #ifdef LIBMESH_HAVE_EXODUS_API
     } // end timestep loop.
@@ -291,7 +335,7 @@ int main (int argc, char** argv)
 // The matrix assembly function to be called at each time step to
 // prepare for the linear solve.
 void assemble_stokes (EquationSystems & es,
-                      const std::string & system_name)
+                      const std::string & libmesh_dbg_var(system_name))
 {
   // It is a good idea to make sure we are assembling
   // the proper system.
@@ -308,8 +352,8 @@ void assemble_stokes (EquationSystems & es,
     es.get_system<TransientLinearImplicitSystem> ("Navier-Stokes");
 
   // Numeric ids corresponding to each variable in the system
-  const unsigned int u_var = navier_stokes_system.variable_number ("u");
-  const unsigned int v_var = navier_stokes_system.variable_number ("v");
+  const unsigned int u_var = navier_stokes_system.variable_number ("vel_x");
+  const unsigned int v_var = navier_stokes_system.variable_number ("vel_y");
   const unsigned int p_var = navier_stokes_system.variable_number ("p");
 
   // Get the Finite Element type for "u".  Note this will be
@@ -321,14 +365,14 @@ void assemble_stokes (EquationSystems & es,
 
   // Build a Finite Element object of the specified type for
   // the velocity variables.
-  UniquePtr<FEBase> fe_vel  (FEBase::build(dim, fe_vel_type));
+  std::unique_ptr<FEBase> fe_vel  (FEBase::build(dim, fe_vel_type));
 
   // Build a Finite Element object of the specified type for
   // the pressure variables.
-  UniquePtr<FEBase> fe_pres (FEBase::build(dim, fe_pres_type));
+  std::unique_ptr<FEBase> fe_pres (FEBase::build(dim, fe_pres_type));
 
   // A Gauss quadrature rule for numerical integration.
-  // Let the \p FEType object decide what order rule is appropriate.
+  // Let the FEType object decide what order rule is appropriate.
   QGauss qrule (dim, fe_vel_type.default_quadrature_order());
 
   // Tell the finite element objects to use our quadrature rule.
@@ -342,22 +386,22 @@ void assemble_stokes (EquationSystems & es,
   const std::vector<Real> & JxW = fe_vel->get_JxW();
 
   // The element shape functions evaluated at the quadrature points.
-  const std::vector<std::vector<Real> > & phi = fe_vel->get_phi();
+  const std::vector<std::vector<Real>> & phi = fe_vel->get_phi();
 
   // The element shape function gradients for the velocity
   // variables evaluated at the quadrature points.
-  const std::vector<std::vector<RealGradient> > & dphi = fe_vel->get_dphi();
+  const std::vector<std::vector<RealGradient>> & dphi = fe_vel->get_dphi();
 
   // The element shape functions for the pressure variable
   // evaluated at the quadrature points.
-  const std::vector<std::vector<Real> > & psi = fe_pres->get_phi();
+  const std::vector<std::vector<Real>> & psi = fe_pres->get_phi();
 
   // The value of the linear shape function gradients at the quadrature points
-  // const std::vector<std::vector<RealGradient> > & dpsi = fe_pres->get_dphi();
+  // const std::vector<std::vector<RealGradient>> & dpsi = fe_pres->get_dphi();
 
-  // A reference to the \p DofMap object for this system.  The \p DofMap
+  // A reference to the DofMap object for this system.  The DofMap
   // object handles the index translation from node and element numbers
-  // to degree of freedom numbers.  We will talk more about the \p DofMap
+  // to degree of freedom numbers.  We will talk more about the DofMap
   // in future examples.
   const DofMap & dof_map = navier_stokes_system.get_dof_map();
 
@@ -399,20 +443,21 @@ void assemble_stokes (EquationSystems & es,
   const Real dt    = es.parameters.get<Real>("dt");
   const Real theta = 1.;
 
+  // The kinematic viscosity, multiplies the "viscous" terms.
+  const Real nu = es.parameters.get<Real>("nu");
+
+  // The system knows whether or not we need to do a pressure pin.
+  // This is only required for problems with all-Dirichlet boundary
+  // conditions on the velocity.
+  const bool pin_pressure = es.parameters.get<bool>("pin_pressure");
+
   // Now we will loop over all the elements in the mesh that
   // live on the local processor. We will compute the element
   // matrix and right-hand-side contribution.  Since the mesh
   // will be refined we want to only consider the ACTIVE elements,
-  // hence we use a variant of the \p active_elem_iterator.
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-  for ( ; el != end_el; ++el)
+  // hence we use a variant of the active_elem_iterator.
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      // Store a pointer to the element we are currently
-      // working on.  This allows for nicer syntax later.
-      const Elem * elem = *el;
-
       // Get the degree of freedom indices for the
       // current element.  These define where in the global
       // matrix and right-hand-side this element will
@@ -451,10 +496,10 @@ void assemble_stokes (EquationSystems & es,
       //        | Kpu Kpv Kpp |        | Fp |
       //         -           -          -  -
       //
-      // The \p DenseSubMatrix.repostition () member takes the
+      // The DenseSubMatrix.reposition () member takes the
       // (row_offset, column_offset, row_size, column_size).
       //
-      // Similarly, the \p DenseSubVector.reposition () member
+      // Similarly, the DenseSubVector.reposition () member
       // takes the (row_offset, row_size)
       Kuu.reposition (u_var*n_u_dofs, u_var*n_u_dofs, n_u_dofs, n_u_dofs);
       Kuv.reposition (u_var*n_u_dofs, v_var*n_u_dofs, n_u_dofs, n_v_dofs);
@@ -525,14 +570,14 @@ void assemble_stokes (EquationSystems & es,
               Fu(i) += JxW[qp]*(u_old*phi[i][qp] -                            // mass-matrix term
                                 (1.-theta)*dt*(U_old*grad_u_old)*phi[i][qp] + // convection term
                                 (1.-theta)*dt*p_old*dphi[i][qp](0)  -         // pressure term on rhs
-                                (1.-theta)*dt*(grad_u_old*dphi[i][qp]) +      // diffusion term on rhs
+                                (1.-theta)*dt*nu*(grad_u_old*dphi[i][qp]) +   // diffusion term on rhs
                                 theta*dt*(U*grad_u)*phi[i][qp]);              // Newton term
 
 
               Fv(i) += JxW[qp]*(v_old*phi[i][qp] -                             // mass-matrix term
                                 (1.-theta)*dt*(U_old*grad_v_old)*phi[i][qp] +  // convection term
                                 (1.-theta)*dt*p_old*dphi[i][qp](1) -           // pressure term on rhs
-                                (1.-theta)*dt*(grad_v_old*dphi[i][qp]) +       // diffusion term on rhs
+                                (1.-theta)*dt*nu*(grad_v_old*dphi[i][qp]) +    // diffusion term on rhs
                                 theta*dt*(U*grad_v)*phi[i][qp]);               // Newton term
 
 
@@ -542,19 +587,19 @@ void assemble_stokes (EquationSystems & es,
               // Matrix contributions for the uu and vv couplings.
               for (unsigned int j=0; j<n_u_dofs; j++)
                 {
-                  Kuu(i,j) += JxW[qp]*(phi[i][qp]*phi[j][qp] +                // mass matrix term
-                                       theta*dt*(dphi[i][qp]*dphi[j][qp]) +   // diffusion term
-                                       theta*dt*(U*dphi[j][qp])*phi[i][qp] +  // convection term
-                                       theta*dt*u_x*phi[i][qp]*phi[j][qp]);   // Newton term
+                  Kuu(i,j) += JxW[qp]*(phi[i][qp]*phi[j][qp] +                  // mass matrix term
+                                       theta*dt*nu*(dphi[i][qp]*dphi[j][qp]) +  // diffusion term
+                                       theta*dt*(U*dphi[j][qp])*phi[i][qp] +    // convection term
+                                       theta*dt*u_x*phi[i][qp]*phi[j][qp]);     // Newton term
 
-                  Kuv(i,j) += JxW[qp]*theta*dt*u_y*phi[i][qp]*phi[j][qp];     // Newton term
+                  Kuv(i,j) += JxW[qp]*theta*dt*u_y*phi[i][qp]*phi[j][qp];       // Newton term
 
-                  Kvv(i,j) += JxW[qp]*(phi[i][qp]*phi[j][qp] +                // mass matrix term
-                                       theta*dt*(dphi[i][qp]*dphi[j][qp]) +   // diffusion term
-                                       theta*dt*(U*dphi[j][qp])*phi[i][qp] +  // convection term
-                                       theta*dt*v_y*phi[i][qp]*phi[j][qp]);   // Newton term
+                  Kvv(i,j) += JxW[qp]*(phi[i][qp]*phi[j][qp] +                  // mass matrix term
+                                       theta*dt*nu*(dphi[i][qp]*dphi[j][qp]) +  // diffusion term
+                                       theta*dt*(U*dphi[j][qp])*phi[i][qp] +    // convection term
+                                       theta*dt*v_y*phi[i][qp]*phi[j][qp]);     // Newton term
 
-                  Kvu(i,j) += JxW[qp]*theta*dt*v_x*phi[i][qp]*phi[j][qp];     // Newton term
+                  Kvu(i,j) += JxW[qp]*theta*dt*v_x*phi[i][qp]*phi[j][qp];       // Newton term
                 }
 
               // Matrix contributions for the up and vp couplings.
@@ -578,87 +623,234 @@ void assemble_stokes (EquationSystems & es,
         } // end of the quadrature point qp-loop
 
 
-      // At this point the interior element integration has
-      // been completed.  However, we have not yet addressed
-      // boundary conditions.  For this example we will only
-      // consider simple Dirichlet boundary conditions imposed
-      // via the penalty method. The penalty method used here
-      // is equivalent (for Lagrange basis functions) to lumping
-      // the matrix resulting from the L2 projection penalty
-      // approach introduced in example 3.
-      {
-        // The penalty value.  \f$ \frac{1}{\epsilon} \f$
-        const Real penalty = 1.e10;
+      // At this point the interior element integration has been
+      // completed. We now need to pin the pressure to zero at global
+      // node number "pressure_node".  This effectively removes the
+      // non-trivial null space of constant pressure solutions.  The
+      // pressure pin is not necessary in problems that have "outflow"
+      // BCs, like Poiseuille flow with natural BCs.  In fact it is
+      // actually wrong to do so, since the pressure is not
+      // under-specified in that situation.
+      if (pin_pressure)
+        {
+          const Real penalty = 1.e10;
+          const unsigned int pressure_node = 0;
+          const Real p_value               = 0.0;
+          for (auto c : elem->node_index_range())
+            if (elem->node_id(c) == pressure_node)
+              {
+                Kpp(c,c) += penalty;
+                Fp(c)    += penalty*p_value;
+              }
+        }
 
-        // The following loops over the sides of the element.
-        // If the element has no neighbor on a side then that
-        // side MUST live on a boundary of the domain.
-        for (unsigned int s=0; s<elem->n_sides(); s++)
-          if (elem->neighbor(s) == libmesh_nullptr)
-            {
-              UniquePtr<Elem> side (elem->build_side(s));
-
-              // Loop over the nodes on the side.
-              for (unsigned int ns=0; ns<side->n_nodes(); ns++)
-                {
-                  // Boundary ids are set internally by
-                  // build_square().
-                  // 0=bottom
-                  // 1=right
-                  // 2=top
-                  // 3=left
-
-                  // Set u = 1 on the top boundary, 0 everywhere else
-                  const Real u_value =
-                    (mesh.get_boundary_info().has_boundary_id(elem, s, 2))
-                    ? 1. : 0.;
-
-                  // Set v = 0 everywhere
-                  const Real v_value = 0.;
-
-                  // Find the node on the element matching this node on
-                  // the side.  That defined where in the element matrix
-                  // the boundary condition will be applied.
-                  for (unsigned int n=0; n<elem->n_nodes(); n++)
-                    if (elem->node(n) == side->node(ns))
-                      {
-                        // Matrix contribution.
-                        Kuu(n,n) += penalty;
-                        Kvv(n,n) += penalty;
-
-                        // Right-hand-side contribution.
-                        Fu(n) += penalty*u_value;
-                        Fv(n) += penalty*v_value;
-                      }
-                } // end face node loop
-            } // end if (elem->neighbor(side) == libmesh_nullptr)
-
-        // Pin the pressure to zero at global node number "pressure_node".
-        // This effectively removes the non-trivial null space of constant
-        // pressure solutions.
-        const bool pin_pressure = true;
-        if (pin_pressure)
-          {
-            const unsigned int pressure_node = 0;
-            const Real p_value               = 0.0;
-            for (unsigned int c=0; c<elem->n_nodes(); c++)
-              if (elem->node(c) == pressure_node)
-                {
-                  Kpp(c,c) += penalty;
-                  Fp(c)    += penalty*p_value;
-                }
-          }
-      } // end boundary condition section
-
-      // If this assembly program were to be used on an adaptive mesh,
-      // we would have to apply any hanging node constraint equations
-      dof_map.constrain_element_matrix_and_vector (Ke, Fe, dof_indices);
+      // Since we're using heterogeneous DirichletBoundary objects for
+      // the boundary conditions, we need to call a specific function
+      // to constrain the element stiffness matrix.
+      dof_map.heterogenously_constrain_element_matrix_and_vector (Ke, Fe, dof_indices);
 
       // The element matrix and right-hand-side are now built
       // for this element.  Add them to the global matrix and
-      // right-hand-side vector.  The \p SparseMatrix::add_matrix()
-      // and \p NumericVector::add_vector() members do this for us.
+      // right-hand-side vector.  The SparseMatrix::add_matrix()
+      // and NumericVector::add_vector() members do this for us.
       navier_stokes_system.matrix->add_matrix (Ke, dof_indices);
       navier_stokes_system.rhs->add_vector    (Fe, dof_indices);
     } // end of element loop
+}
+
+
+
+void set_lid_driven_bcs(TransientLinearImplicitSystem & system)
+{
+  unsigned short int
+    u_var = system.variable_number("vel_x"),
+    v_var = system.variable_number("vel_y");
+
+  // This problem *does* require a pressure pin, there are Dirichlet
+  // boundary conditions for u and v on the entire boundary.
+  system.get_equation_systems().parameters.set<bool>("pin_pressure") = true;
+
+  // Get a convenient reference to the System's DofMap
+  DofMap & dof_map = system.get_dof_map();
+
+  {
+    // u=v=0 on bottom, left, right
+    std::set<boundary_id_type> boundary_ids;
+    boundary_ids.insert(0);
+    boundary_ids.insert(1);
+    boundary_ids.insert(3);
+
+    std::vector<unsigned int> variables;
+    variables.push_back(u_var);
+    variables.push_back(v_var);
+
+    dof_map.add_dirichlet_boundary(DirichletBoundary(boundary_ids,
+                                                     variables,
+                                                     ZeroFunction<Number>()));
+  }
+  {
+    // u=1 on top
+    std::set<boundary_id_type> boundary_ids;
+    boundary_ids.insert(2);
+
+    std::vector<unsigned int> variables;
+    variables.push_back(u_var);
+
+    dof_map.add_dirichlet_boundary(DirichletBoundary(boundary_ids,
+                                                     variables,
+                                                     ConstFunction<Number>(1.)));
+  }
+  {
+    // v=0 on top
+    std::set<boundary_id_type> boundary_ids;
+    boundary_ids.insert(2);
+
+    std::vector<unsigned int> variables;
+    variables.push_back(v_var);
+
+    dof_map.add_dirichlet_boundary(DirichletBoundary(boundary_ids,
+                                                     variables,
+                                                     ZeroFunction<Number>()));
+  }
+}
+
+
+
+void set_stagnation_bcs(TransientLinearImplicitSystem & system)
+{
+  unsigned short int
+    u_var = system.variable_number("vel_x"),
+    v_var = system.variable_number("vel_y");
+
+  // This problem does not require a pressure pin, the Neumann outlet
+  // BCs are sufficient to set the value of the pressure.
+  system.get_equation_systems().parameters.set<bool>("pin_pressure") = false;
+
+  // Get a convenient reference to the System's DofMap
+  DofMap & dof_map = system.get_dof_map();
+
+  {
+    // u=v=0 on bottom
+    std::set<boundary_id_type> boundary_ids;
+    boundary_ids.insert(0);
+
+    std::vector<unsigned int> variables;
+    variables.push_back(u_var);
+    variables.push_back(v_var);
+
+    dof_map.add_dirichlet_boundary(DirichletBoundary(boundary_ids,
+                                                     variables,
+                                                     ZeroFunction<Number>()));
+  }
+  {
+    // u=0 on left (symmetry)
+    std::set<boundary_id_type> boundary_ids;
+    boundary_ids.insert(3);
+
+    std::vector<unsigned int> variables;
+    variables.push_back(u_var);
+
+    dof_map.add_dirichlet_boundary(DirichletBoundary(boundary_ids,
+                                                     variables,
+                                                     ZeroFunction<Number>()));
+  }
+  {
+    // u = k*x on top
+    std::set<boundary_id_type> boundary_ids;
+    boundary_ids.insert(2);
+
+    std::vector<unsigned int> variables;
+    variables.push_back(u_var);
+
+    // Set up ParsedFunction parameters
+    std::vector<std::string> additional_vars;
+    additional_vars.push_back("k");
+    std::vector<Number> initial_vals;
+    initial_vals.push_back(1.);
+
+    dof_map.add_dirichlet_boundary(DirichletBoundary(boundary_ids,
+                                                     variables,
+                                                     ParsedFunction<Number>("k*x",
+                                                                            &additional_vars,
+                                                                            &initial_vals)));
+  }
+  {
+    // v = -k*y on top
+    std::set<boundary_id_type> boundary_ids;
+    boundary_ids.insert(2);
+
+    std::vector<unsigned int> variables;
+    variables.push_back(v_var);
+
+    // Set up ParsedFunction parameters
+    std::vector<std::string> additional_vars;
+    additional_vars.push_back("k");
+    std::vector<Number> initial_vals;
+    initial_vals.push_back(1.);
+
+    // Note: we have to specify LOCAL_VARIABLE_ORDER here, since we're
+    // using a ParsedFunction to set the value of v_var, which is
+    // actually the second variable in the system.
+    dof_map.add_dirichlet_boundary(DirichletBoundary(boundary_ids,
+                                                     variables,
+                                                     ParsedFunction<Number>("-k*y",
+                                                                            &additional_vars,
+                                                                            &initial_vals),
+                                                     LOCAL_VARIABLE_ORDER));
+  }
+}
+
+
+
+void set_poiseuille_bcs(TransientLinearImplicitSystem & system)
+{
+  unsigned short int
+    u_var = system.variable_number("vel_x"),
+    v_var = system.variable_number("vel_y");
+
+  // This problem does not require a pressure pin, the Neumann outlet
+  // BCs are sufficient to set the value of the pressure.
+  system.get_equation_systems().parameters.set<bool>("pin_pressure") = false;
+
+  // Get a convenient reference to the System's DofMap
+  DofMap & dof_map = system.get_dof_map();
+
+  {
+    // u=v=0 on top, bottom
+    std::set<boundary_id_type> boundary_ids;
+    boundary_ids.insert(0);
+    boundary_ids.insert(2);
+
+    std::vector<unsigned int> variables;
+    variables.push_back(u_var);
+    variables.push_back(v_var);
+
+    dof_map.add_dirichlet_boundary(DirichletBoundary(boundary_ids,
+                                                     variables,
+                                                     ZeroFunction<Number>()));
+  }
+  {
+    // u=quadratic on left
+    std::set<boundary_id_type> boundary_ids;
+    boundary_ids.insert(3);
+
+    std::vector<unsigned int> variables;
+    variables.push_back(u_var);
+
+    dof_map.add_dirichlet_boundary(DirichletBoundary(boundary_ids,
+                                                     variables,
+                                                     ParsedFunction<Number>("4*y*(1-y)")));
+  }
+  {
+    // v=0 on left
+    std::set<boundary_id_type> boundary_ids;
+    boundary_ids.insert(3);
+
+    std::vector<unsigned int> variables;
+    variables.push_back(v_var);
+
+    dof_map.add_dirichlet_boundary(DirichletBoundary(boundary_ids,
+                                                     variables,
+                                                     ZeroFunction<Number>()));
+  }
 }

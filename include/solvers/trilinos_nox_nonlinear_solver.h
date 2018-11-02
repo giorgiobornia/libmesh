@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,12 +20,16 @@
 #ifndef LIBMESH_TRILINOS_NOX_NONLINEAR_SOLVER_H
 #define LIBMESH_TRILINOS_NOX_NONLINEAR_SOLVER_H
 
-#ifdef LIBMESH_TRILINOS_HAVE_NOX
+// It is possible to build Trilinos with NOX, but without Epetra.  The
+// way that libmesh uses NOX requires Epetra, however, so we have to
+// check for both.
+#if defined(LIBMESH_TRILINOS_HAVE_NOX) && defined(LIBMESH_TRILINOS_HAVE_EPETRA)
 
 // Local includes
 #include "libmesh/nonlinear_solver.h"
 
-//trilinos includes
+// Trilinos includes
+#include "libmesh/ignore_warnings.h"
 #include "Epetra_Vector.h"
 #include "Epetra_Operator.h"
 #include "Epetra_RowMatrix.h"
@@ -33,6 +37,7 @@
 #include "NOX_Epetra_Interface_Jacobian.H" // base class
 #include "NOX_Epetra_Interface_Preconditioner.H" // base class
 #include "NOX.H"
+#include "libmesh/restore_warnings.h"
 
 // C++ includes
 #include <cstddef>
@@ -75,12 +80,12 @@ public:
   /**
    * Release all memory and clear data structures.
    */
-  virtual void clear () libmesh_override;
+  virtual void clear () override;
 
   /**
    * Initialize data structures if not done so already.
    */
-  virtual void init (const char * name = libmesh_nullptr) libmesh_override;
+  virtual void init (const char * name = nullptr) override;
 
   /**
    * Call the Nox solver.  It calls the method below, using the
@@ -91,18 +96,20 @@ public:
          NumericVector<T> &,                    // Solution vector
          NumericVector<T> &,                    // Residual vector
          const double,                          // Stopping tolerance
-         const unsigned int) libmesh_override;  // N. Iterations
+         const unsigned int) override;  // N. Iterations
   /**
    * Get the total number of linear iterations done in the last solve
    */
-  virtual int get_total_linear_iterations() libmesh_override;
+  virtual int get_total_linear_iterations() override;
 
   /**
-   * If called *during* the solve(), for example by the user-specified
-   * residual or Jacobian function, returns the current nonlinear iteration
-   * number.  Not currently implemented.
+   * \returns The current nonlinear iteration number if called
+   * *during* the solve(), for example by the user-specified residual
+   * or Jacobian function.
+   *
+   * \note Not currently implemented for the NoxNonlinearSolver.
    */
-  virtual unsigned get_current_nonlinear_iteration_number() const libmesh_override
+  virtual unsigned get_current_nonlinear_iteration_number() const override
   { libmesh_not_implemented(); return 0; }
 
 private:
@@ -129,8 +136,8 @@ template <typename T>
 inline
 NoxNonlinearSolver<T>::NoxNonlinearSolver (sys_type & system) :
   NonlinearSolver<T>(system),
-  _solver(libmesh_nullptr),
-  _interface(libmesh_nullptr),
+  _solver(nullptr),
+  _interface(nullptr),
   _n_linear_iterations(0)
 {
 }
@@ -148,5 +155,5 @@ NoxNonlinearSolver<T>::~NoxNonlinearSolver ()
 } // namespace libMesh
 
 
-#endif // #ifdef LIBMESH_TRILINOS_HAVE_NOX
+#endif // LIBMESH_TRILINOS_HAVE_NOX && LIBMESH_TRILINOS_HAVE_EPETRA
 #endif // LIBMESH_TRILINOS_NOX_NONLINEAR_SOLVER_H

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -24,18 +24,20 @@
 // Local includes
 #include "libmesh/face_tri3.h"
 
-// C++ includes
-
 namespace libMesh
 {
 
 /**
- * The \p Tri3 is an element in 2D composed of 3 nodes.
+ * The \p Tri3Subdivision element is a three-noded subdivision surface
+ * shell element used in mechanics calculations.  See also,
+ * miscellaneous_ex11.
  *
- * \author Roman Vetter and Norbert Stoop
+ * \author Roman Vetter
+ * \author Norbert Stoop
  * \date 2014
+ * \brief A surface shell element used in mechanics calculations.
  */
-class Tri3Subdivision libmesh_final : public Tri3
+class Tri3Subdivision final : public Tri3
 {
 public:
 
@@ -50,27 +52,33 @@ public:
    */
   Tri3Subdivision(Elem * p);
 
-  /**
-   * @returns \p TRI3SUBDIVISION
-   */
-  virtual ElemType type () const libmesh_override { return TRI3SUBDIVISION; }
+  Tri3Subdivision (Tri3Subdivision &&) = delete;
+  Tri3Subdivision (const Tri3Subdivision &) = delete;
+  Tri3Subdivision & operator= (const Tri3Subdivision &) = delete;
+  Tri3Subdivision & operator= (Tri3Subdivision &&) = delete;
+  virtual ~Tri3Subdivision() = default;
 
   /**
-   * @returns true iff the element map is definitely affine within
-   * numerical tolerances
+   * \returns \p TRI3SUBDIVISION.
    */
-  virtual bool has_affine_map () const libmesh_override { return false; }
+  virtual ElemType type () const override { return TRI3SUBDIVISION; }
 
   /**
-   * @returns true iff the Lagrange shape functions on this element
-   * are linear
+   * \returns \p true if the element map is definitely affine within
+   * numerical tolerances.
    */
-  virtual bool is_linear () const libmesh_override { return false; }
+  virtual bool has_affine_map () const override { return false; }
 
   /**
-   * @returns FOURTH
+   * \returns \p true if the Lagrange shape functions on this element
+   * are linear.
    */
-  virtual Order default_order() const libmesh_override { return FOURTH; }
+  virtual bool is_linear () const override { return false; }
+
+  /**
+   * \returns FOURTH.
+   */
+  virtual Order default_order() const override;
 
   /**
    * Prepares the element for use by reordering the nodes such that
@@ -80,30 +88,30 @@ public:
   void prepare_subdivision_properties();
 
   /**
-   * @returns \p true iff the subdivision element is ready for use,
+   * \returns \p true if the subdivision element is ready for use,
    * i.e. the nodes have been reordered.
    */
   bool is_subdivision_updated() const { return _subdivision_updated; }
 
   /**
-   * @returns a pointer to the node whose ordered id is \p node_id.
+   * \returns A pointer to the node whose ordered id is \p node_id.
    */
   Node * get_ordered_node(unsigned int node_id) const;
 
   /**
-   * @returns the number of nodes connected to the ordered node
+   * \returns The number of nodes connected to the ordered node
    * whose id is \p node_id.
    */
   unsigned int get_ordered_valence(unsigned int node_id) const;
 
   /**
-   * @returns the order number of the node whose unordered id is
+   * \returns The order number of the node whose unordered id is
    * \p node_id. This is the inverse of an \p _ordered_nodes lookup.
    */
   unsigned int local_node_number(unsigned int node_id) const;
 
   /**
-   * @returns \p true iff the element is a ghost element.
+   * \returns \p true if the element is a ghost element.
    */
   bool is_ghost() const { return _is_ghost; }
 
@@ -121,13 +129,13 @@ private:
   Node * _ordered_nodes[3];
 
   /**
-   * \p true iff the subdivision element is ready for use,
+   * \p true if the subdivision element is ready for use,
    * i.e. the nodes have been reordered.
    */
   bool _subdivision_updated;
 
   /**
-   * \p true iff the element is a ghost element
+   * \p true if the element is a ghost element
    * (e.g. for boundary conditions).
    */
   bool _is_ghost;

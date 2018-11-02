@@ -5,12 +5,22 @@
 #include <libmesh/restore_warnings.h>
 
 #include <libmesh/libmesh.h>
-#include <libmesh/serial_mesh.h>
 #include <libmesh/node.h>
 #include <libmesh/mesh_generation.h>
 #include <libmesh/mesh_tools.h>
+#include <libmesh/replicated_mesh.h>
 
 #include "test_comm.h"
+
+// THE CPPUNIT_TEST_SUITE_END macro expands to code that involves
+// std::auto_ptr, which in turn produces -Wdeprecated-declarations
+// warnings.  These can be ignored in GCC as long as we wrap the
+// offending code in appropriate pragmas.  We can't get away with a
+// single ignore_warnings.h inclusion at the beginning of this file,
+// since the libmesh headers pull in a restore_warnings.h at some
+// point.  We also don't bother restoring warnings at the end of this
+// file since it's not a header.
+#include <libmesh/ignore_warnings.h>
 
 using namespace libMesh;
 
@@ -21,8 +31,8 @@ class NodalNeighborsTest : public CppUnit::TestCase
    * works in 1D.  If the numbering of MeshGeneration::build_line()
    * ever changes, this test will break, as it compares hand-checked
    * hard-coded "validation" data with the results of
-   * MeshTools::find_nodal_neighbors().  We also use a SerialMesh here
-   * to match the hard-coded numbering.
+   * MeshTools::find_nodal_neighbors().  We also use a ReplicatedMesh
+   * here to match the hard-coded numbering.
    */
 public:
   CPPUNIT_TEST_SUITE( NodalNeighborsTest );
@@ -40,7 +50,7 @@ protected:
                ElemType elem_type,
                dof_id_type * validation_data)
   {
-    SerialMesh mesh(*TestCommWorld, /*dim=*/1);
+    ReplicatedMesh mesh(*TestCommWorld, /*dim=*/1);
 
     MeshTools::Generation::build_line(mesh,
                                       n_elem,
@@ -49,36 +59,33 @@ protected:
                                       elem_type);
 
     // find_nodal_neighbors() needs a data structure which is prepared by another function
-    std::vector<std::vector<const Elem*> > nodes_to_elem_map;
+    std::vector<std::vector<const Elem *>> nodes_to_elem_map;
     MeshTools::build_nodes_to_elem_map(mesh, nodes_to_elem_map);
 
     // Loop over the nodes and call find_nodal_neighbors()
     {
-      MeshBase::const_node_iterator       nd     = mesh.nodes_begin();
-      const MeshBase::const_node_iterator end_nd = mesh.nodes_end();
-
       std::vector<const Node*> neighbor_nodes;
 
       unsigned ctr = 0;
-      for (; nd != end_nd; ++nd, ++ctr)
+      for (const auto & node : mesh.node_ptr_range())
         {
-          Node* node = *nd;
-
           MeshTools::find_nodal_neighbors(mesh, *node, nodes_to_elem_map, neighbor_nodes);
 
           // The entries in neighbor_nodes are just sorted according
           // to memory address, which is somewhat arbitrary, so create
           // a vector sorted by IDs for test purposes.
           std::vector<dof_id_type> neighbor_node_ids(neighbor_nodes.size());
-          for (unsigned i=0; i<neighbor_nodes.size(); ++i)
+          for (std::size_t i=0; i<neighbor_nodes.size(); ++i)
             neighbor_node_ids[i] = neighbor_nodes[i]->id();
           std::sort(neighbor_node_ids.begin(), neighbor_node_ids.end());
 
           // Compare to validation_data
-          for (unsigned j=0; j<neighbor_node_ids.size(); ++j)
+          for (std::size_t j=0; j<neighbor_node_ids.size(); ++j)
             {
               CPPUNIT_ASSERT_EQUAL( validation_data[2*ctr + j], neighbor_node_ids[j] );
             }
+
+          ++ctr;
         }
     }
   }

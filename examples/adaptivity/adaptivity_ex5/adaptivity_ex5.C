@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -34,9 +34,9 @@
 #include <cstdlib> // *must* precede <cmath> for proper std:abs() on PGI, Sun Studio CC
 #include <cmath>
 
-// Basic include file needed for the mesh functionality.
+// libMesh includes
 #include "libmesh/libmesh.h"
-#include "libmesh/serial_mesh.h"
+#include "libmesh/replicated_mesh.h"
 #include "libmesh/mesh_refinement.h"
 #include "libmesh/gmv_io.h"
 #include "libmesh/exodusII_io.h"
@@ -48,21 +48,23 @@
 #include "libmesh/numeric_vector.h"
 #include "libmesh/dense_matrix.h"
 #include "libmesh/dense_vector.h"
-
 #include "libmesh/periodic_boundaries.h"
 #include "libmesh/periodic_boundary.h"
 #include "libmesh/mesh_generation.h"
 #include "libmesh/parsed_function.h"
-
 #include "libmesh/getpot.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
+#include "libmesh/enum_solver_package.h"
+#include "libmesh/enum_xdr_mode.h"
+#include "libmesh/enum_norm_type.h"
 
 // This example will solve a linear transient system,
-// so we need to include the \p TransientLinearImplicitSystem definition.
+// so we need to include the TransientLinearImplicitSystem definition.
 #include "libmesh/transient_system.h"
 #include "libmesh/linear_implicit_system.h"
 #include "libmesh/vector_value.h"
 
-// To refine the mesh we need an \p ErrorEstimator
+// To refine the mesh we need an ErrorEstimator
 // object to figure out which elements to refine.
 #include "libmesh/error_vector.h"
 #include "libmesh/kelly_error_estimator.h"
@@ -76,12 +78,14 @@ using namespace libMesh;
 // Function prototype.  This function will assemble the system
 // matrix and right-hand-side at each time step.  Note that
 // since the system is linear we technically do not need to
-// assmeble the matrix at each time step, but we will anyway.
+// assemble the matrix at each time step, but we will anyway.
 // In subsequent examples we will employ adaptive mesh refinement,
 // and with a changing mesh it will be necessary to rebuild the
 // system matrix.
+#ifdef LIBMESH_ENABLE_AMR
 void assemble_cd (EquationSystems & es,
                   const std::string & system_name);
+#endif
 
 // Function prototype.  This function will initialize the system.
 // Initialization functions are optional for systems.  They allow
@@ -109,7 +113,7 @@ Number exact_value (const Point & p,
 
 // With --enable-fparser, the user can also optionally set their own
 // exact solution equations.
-FunctionBase<Number> * parsed_solution = libmesh_nullptr;
+std::unique_ptr<FunctionBase<Number>> parsed_solution;
 
 
 // Returns a string with 'number' formatted and placed directly
@@ -126,6 +130,10 @@ int main (int argc, char ** argv)
 {
   // Initialize libMesh.
   LibMeshInit init (argc, argv);
+
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
 
   // Skip this 2D example if libMesh was compiled as 1D-only.
   libmesh_example_requires(2 <= LIBMESH_DIM, "2D support");
@@ -211,19 +219,58 @@ int main (int argc, char ** argv)
   const bool have_expression = false;
 #endif
   if (have_expression)
-    parsed_solution = new ParsedFunction<Number>(command_line.next(std::string()));
+    parsed_solution = libmesh_make_unique<ParsedFunction<Number>>(command_line.next(std::string()));
 
   // Skip this 2D example if libMesh was compiled as 1D-only.
   libmesh_example_requires(2 <= LIBMESH_DIM, "2D support");
 
   // Create a new mesh on the default MPI communicator.
-  // ParallelMesh doesn't yet understand periodic BCs, plus
-  // we still need some work on automatic parallel restarts
-  SerialMesh mesh(init.comm());
+  // DistributedMesh currently has a bug which is triggered by this
+  // example.
+  ReplicatedMesh mesh(init.comm());
 
   // Create an equation systems object.
   EquationSystems equation_systems (mesh);
   MeshRefinement mesh_refinement (mesh);
+
+  // Declare the system and its variables.
+  // Begin by creating a transient system
+  // named "Convection-Diffusion".
+  TransientLinearImplicitSystem & system =
+    equation_systems.add_system<TransientLinearImplicitSystem>
+    ("Convection-Diffusion");
+
+  // Give the system a pointer to the assembly function.
+  system.attach_assemble_function (assemble_cd);
+
+  // Creating and attaching Periodic Boundaries
+  DofMap & dof_map = system.get_dof_map();
+
+  // Create a boundary periodic with one displaced 2.0 in the x
+  // direction
+  PeriodicBoundary horz(RealVectorValue(2.0, 0., 0.));
+
+  // Connect boundary ids 3 and 1 with it
+  horz.myboundary = 3;
+  horz.pairedboundary = 1;
+
+  // Add it to the PeriodicBoundaries
+  dof_map.add_periodic_boundary(horz);
+
+  // Create a boundary periodic with one displaced 2.0 in the y
+  // direction
+  PeriodicBoundary vert(RealVectorValue(0., 2.0, 0.));
+
+  // Connect boundary ids 0 and 2 with it
+  vert.myboundary = 0;
+  vert.pairedboundary = 2;
+
+  // Add it to the PeriodicBoundaries
+  dof_map.add_periodic_boundary(vert);
+
+  // Next build or read the mesh.  We do this only *after* generating
+  // periodic boundaries; otherwise a DistributedMesh won't know to
+  // retain periodic neighbor elements.
 
   // First we process the case where we do not read in the solution
   if (!read_solution)
@@ -241,14 +288,6 @@ int main (int argc, char ** argv)
 
       // Print information about the mesh to the screen.
       mesh.print_info();
-
-
-      // Declare the system and its variables.
-      // Begin by creating a transient system
-      // named "Convection-Diffusion".
-      TransientLinearImplicitSystem & system =
-        equation_systems.add_system<TransientLinearImplicitSystem>
-        ("Convection-Diffusion");
 
       // Adds the variable "u" to "Convection-Diffusion".  "u"
       // will be approximated using first-order approximation.
@@ -269,40 +308,6 @@ int main (int argc, char ** argv)
       // Read in the solution stored in "saved_solution.xda"
       equation_systems.read("saved_solution.xdr", DECODE);
     }
-
-  // Get a reference to the system so that we can attach things to it
-  TransientLinearImplicitSystem & system =
-    equation_systems.get_system<TransientLinearImplicitSystem>
-    ("Convection-Diffusion");
-
-  // Give the system a pointer to the assembly function.
-  system.attach_assemble_function (assemble_cd);
-
-  // Creating and attaching Periodic Boundaries
-  DofMap & dof_map = system.get_dof_map();
-
-  // Create a boundary periodic with one displaced 2.0 in the x
-  // direction
-  PeriodicBoundary horz(RealVectorValue(2.0, 0., 0.));
-
-  // Connect boundary ids 3 and 1 with it
-  horz.myboundary = 3;
-  horz.pairedboundary = 1;
-
-  // Add it to the PeriodicBoundaries
-  dof_map.add_periodic_boundary(horz);
-
-
-  // Create a boundary periodic with one displaced 2.0 in the y
-  // direction
-  PeriodicBoundary vert(RealVectorValue(0., 2.0, 0.));
-
-  // Connect boundary ids 0 and 2 with it
-  vert.myboundary = 0;
-  vert.pairedboundary = 2;
-
-  // Add it to the PeriodicBoundaries
-  dof_map.add_periodic_boundary(vert);
 
   // Initialize the data structures for the equation system.
   if (!read_solution)
@@ -363,7 +368,7 @@ int main (int argc, char ** argv)
 
   // Solve the system "Convection-Diffusion".  This will be done by
   // looping over the specified time interval and calling the
-  // \p solve() member at each time step.  This will assemble the
+  // solve() member at each time step.  This will assemble the
   // system and call the linear solver.
   const Real dt = 0.025;
   system.time = init_timestep*dt;
@@ -409,8 +414,8 @@ int main (int argc, char ** argv)
       // solution vector.  The old solution vector
       // will be the current solution vector from the
       // previous time step.  We will do this by extracting the
-      // system from the \p EquationSystems object and using
-      // vector assignment.  Since only \p TransientLinearImplicitSystems
+      // system from the EquationSystems object and using
+      // vector assignment.  Since only TransientLinearImplicitSystems
       // (and systems derived from them) contain old solutions
       // we need to specify the system type when we ask for it.
       *system.old_local_solution = *system.current_local_solution;
@@ -435,25 +440,24 @@ int main (int argc, char ** argv)
             {
               libMesh::out << "  Refining the mesh..." << std::endl;
 
-              // The \p ErrorVector is a particular \p StatisticsVector
+              // The ErrorVector is a particular StatisticsVector
               // for computing error information on a finite element mesh.
               ErrorVector error;
 
-              // The \p ErrorEstimator class interrogates a finite element
+              // The ErrorEstimator class interrogates a finite element
               // solution and assigns to each element a positive error value.
               // This value is used for deciding which elements to refine
               // and which to coarsen.
-              //ErrorEstimator* error_estimator = new KellyErrorEstimator;
               KellyErrorEstimator error_estimator;
 
               // Compute the error for each active element using the provided
-              // \p flux_jump indicator.  Note in general you will need to
+              // flux_jump indicator.  Note in general you will need to
               // provide an error estimator specifically designed for your
               // application.
               error_estimator.estimate_error (system,
                                               error);
 
-              // This takes the error in \p error and decides which elements
+              // This takes the error in error and decides which elements
               // will be coarsened or refined.  Any element within 20% of the
               // maximum error on any element will be refined, and any
               // element within 7% of the minimum error on any element might
@@ -469,10 +473,10 @@ int main (int argc, char ** argv)
               // elements.
               mesh_refinement.refine_and_coarsen_elements();
 
-              // This call reinitializes the \p EquationSystems object for
+              // This call reinitializes the EquationSystems object for
               // the newly refined mesh.  One of the steps in the
-              // reinitialization is projecting the \p solution,
-              // \p old_solution, etc... vectors from the old mesh to
+              // reinitialization is projecting the solution,
+              // old_solution, etc... vectors from the old mesh to
               // the current one.
               equation_systems.reinit ();
             }
@@ -527,9 +531,6 @@ int main (int argc, char ** argv)
     }
 #endif // #ifndef LIBMESH_ENABLE_AMR
 
-  // We might have a parser to clean up
-  delete parsed_solution;
-
   return 0;
 }
 
@@ -538,7 +539,7 @@ int main (int argc, char ** argv)
 // responsible for applying the initial conditions to
 // the system.
 void init_cd (EquationSystems & es,
-              const std::string & system_name)
+              const std::string & libmesh_dbg_var(system_name))
 {
   // It is a good idea to make sure we are initializing
   // the proper system.
@@ -551,10 +552,10 @@ void init_cd (EquationSystems & es,
   // Project initial conditions at time 0
   es.parameters.set<Real> ("time") = system.time = 0;
 
-  if (parsed_solution)
-    system.project_solution(parsed_solution, libmesh_nullptr);
+  if (parsed_solution.get())
+    system.project_solution(parsed_solution.get(), nullptr);
   else
-    system.project_solution(exact_value, libmesh_nullptr, es.parameters);
+    system.project_solution(exact_value, nullptr, es.parameters);
 }
 
 
@@ -563,10 +564,10 @@ void init_cd (EquationSystems & es,
 // will be called at each time step.  It is responsible
 // for computing the proper matrix entries for the
 // element stiffness matrices and right-hand sides.
-void assemble_cd (EquationSystems & es,
-                  const std::string & system_name)
-{
 #ifdef LIBMESH_ENABLE_AMR
+void assemble_cd (EquationSystems & es,
+                  const std::string & libmesh_dbg_var(system_name))
+{
   // It is a good idea to make sure we are assembling
   // the proper system.
   libmesh_assert_equal_to (system_name, "Convection-Diffusion");
@@ -586,14 +587,14 @@ void assemble_cd (EquationSystems & es,
   FEType fe_type = system.variable_type(0);
 
   // Build a Finite Element object of the specified type.  Since the
-  // \p FEBase::build() member dynamically creates memory we will
-  // store the object as an \p UniquePtr<FEBase>.  This can be thought
+  // FEBase::build() member dynamically creates memory we will
+  // store the object as a std::unique_ptr<FEBase>.  This can be thought
   // of as a pointer that will clean up after itself.
-  UniquePtr<FEBase> fe      (FEBase::build(dim, fe_type));
-  UniquePtr<FEBase> fe_face (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe      (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe_face (FEBase::build(dim, fe_type));
 
   // A Gauss quadrature rule for numerical integration.
-  // Let the \p FEType object decide what order rule is appropriate.
+  // Let the FEType object decide what order rule is appropriate.
   QGauss qrule (dim,   fe_type.default_quadrature_order());
   QGauss qface (dim-1, fe_type.default_quadrature_order());
 
@@ -607,15 +608,15 @@ void assemble_cd (EquationSystems & es,
   const std::vector<Real> & JxW = fe->get_JxW();
 
   // The element shape functions evaluated at the quadrature points.
-  const std::vector<std::vector<Real> > & phi = fe->get_phi();
+  const std::vector<std::vector<Real>> & phi = fe->get_phi();
 
   // The element shape function gradients evaluated at the quadrature
   // points.
-  const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+  const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
-  // A reference to the \p DofMap object for this system.  The \p DofMap
+  // A reference to the DofMap object for this system.  The DofMap
   // object handles the index translation from node and element numbers
-  // to degree of freedom numbers.  We will talk more about the \p DofMap
+  // to degree of freedom numbers.  We will talk more about the DofMap
   // in future examples.
   const DofMap & dof_map = system.get_dof_map();
 
@@ -645,16 +646,9 @@ void assemble_cd (EquationSystems & es,
   // live on the local processor. We will compute the element
   // matrix and right-hand-side contribution.  Since the mesh
   // will be refined we want to only consider the ACTIVE elements,
-  // hence we use a variant of the \p active_elem_iterator.
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-  for ( ; el != end_el; ++el)
+  // hence we use a variant of the active_elem_iterator.
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      // Store a pointer to the element we are currently
-      // working on.  This allows for nicer syntax later.
-      const Elem * elem = *el;
-
       // Get the degree of freedom indices for the
       // current element.  These define where in the global
       // matrix and right-hand-side this element will
@@ -667,16 +661,19 @@ void assemble_cd (EquationSystems & es,
       // (phi, dphi) for the current element.
       fe->reinit (elem);
 
+      const unsigned int n_dofs =
+        cast_int<unsigned int>(dof_indices.size());
+      libmesh_assert_equal_to (n_dofs, phi.size());
+
       // Zero the element matrix and right-hand side before
       // summing them.  We use the resize member here because
       // the number of degrees of freedom might have changed from
       // the last element.  Note that this will be the case if the
       // element type is different (i.e. the last element was a
       // triangle, now we are on a quadrilateral).
-      Ke.resize (dof_indices.size(),
-                 dof_indices.size());
+      Ke.resize (n_dofs, n_dofs);
 
-      Fe.resize (dof_indices.size());
+      Fe.resize (n_dofs);
 
       // Now we will build the element matrix and right-hand-side.
       // Constructing the RHS requires the solution and its
@@ -691,7 +688,7 @@ void assemble_cd (EquationSystems & es,
           Gradient grad_u_old;
 
           // Compute the old solution & its gradient.
-          for (unsigned int l=0; l<phi.size(); l++)
+          for (unsigned int l=0; l != n_dofs; l++)
             {
               u_old += phi[l][qp]*system.old_solution  (dof_indices[l]);
 
@@ -702,7 +699,7 @@ void assemble_cd (EquationSystems & es,
             }
 
           // Now compute the element matrix and RHS contributions.
-          for (unsigned int i=0; i<phi.size(); i++)
+          for (unsigned int i=0; i != n_dofs; i++)
             {
               // The RHS contribution
               Fe(i) += JxW[qp]*(
@@ -718,7 +715,7 @@ void assemble_cd (EquationSystems & es,
                                         diffusivity*(grad_u_old*dphi[i][qp]))
                                 );
 
-              for (unsigned int j=0; j<phi.size(); j++)
+              for (unsigned int j=0; j != n_dofs; j++)
                 {
                   // The matrix contribution
                   Ke(i,j) += JxW[qp]*(
@@ -740,21 +737,21 @@ void assemble_cd (EquationSystems & es,
       // solution continuity, i.e. they are not really "free".  We need
       // to constrain those DOFs in terms of non-constrained DOFs to
       // ensure a continuous solution.  The
-      // \p DofMap::constrain_element_matrix_and_vector() method does
+      // DofMap::constrain_element_matrix_and_vector() method does
       // just that.
       dof_map.constrain_element_matrix_and_vector (Ke, Fe, dof_indices);
 
       // The element matrix and right-hand-side are now built
       // for this element.  Add them to the global matrix and
-      // right-hand-side vector.  The \p SparseMatrix::add_matrix()
-      // and \p NumericVector::add_vector() members do this for us.
+      // right-hand-side vector.  The SparseMatrix::add_matrix()
+      // and NumericVector::add_vector() members do this for us.
       system.matrix->add_matrix (Ke, dof_indices);
       system.rhs->add_vector    (Fe, dof_indices);
 
     }
-  // Finished computing the sytem matrix and right-hand side.
-#endif // #ifdef LIBMESH_ENABLE_AMR
+  // Finished computing the system matrix and right-hand side.
 }
+#endif // #ifdef LIBMESH_ENABLE_AMR
 
 
 

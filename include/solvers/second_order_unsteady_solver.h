@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -50,33 +50,33 @@ public:
    */
   virtual ~SecondOrderUnsteadySolver ();
 
-  virtual unsigned int time_order() const libmesh_override
+  virtual unsigned int time_order() const override
   { return 2; }
 
   /**
    * The initialization function.  This method is used to
    * initialize internal data structures before a simulation begins.
    */
-  virtual void init () libmesh_override;
+  virtual void init () override;
 
   /**
    * The data initialization function.  This method is used to
    * initialize internal data structures after the underlying System
    * has been initialized
    */
-  virtual void init_data () libmesh_override;
+  virtual void init_data () override;
 
   /**
    * The reinitialization function.  This method is used to
    * resize internal data vectors after a mesh change.
    */
-  virtual void reinit () libmesh_override;
+  virtual void reinit () override;
 
   /**
    * This method retrieves all the stored solutions at the current
    * system.time
    */
-  virtual void retrieve_timestep () libmesh_override;
+  virtual void retrieve_timestep () override;
 
   /**
    * Specify non-zero initial velocity. Should be called before solve().
@@ -85,16 +85,16 @@ public:
    * with continuous derivatives.
    */
   void project_initial_rate(FunctionBase<Number> * f,
-                            FunctionBase<Gradient> * g = libmesh_nullptr);
+                            FunctionBase<Gradient> * g = nullptr);
 
   /**
-   * @returns the solution rate at the previous time step, \f$\dot{u}_n\f$,
+   * \returns The solution rate at the previous time step, \f$\dot{u}_n\f$,
    * for the specified global DOF.
    */
   Number old_solution_rate (const dof_id_type global_dof_number) const;
 
   /**
-   * @returns the solution acceleration at the previous time step, \f$\ddot{u}_n\f$,
+   * \returns The solution acceleration at the previous time step, \f$\ddot{u}_n\f$,
    * for the specified global DOF.
    */
   Number old_solution_accel (const dof_id_type global_dof_number) const;
@@ -104,12 +104,12 @@ protected:
   /**
    * Serial vector of previous time step velocity \f$ \dot{u}_n \f$
    */
-  UniquePtr<NumericVector<Number> > _old_local_solution_rate;
+  std::unique_ptr<NumericVector<Number>> _old_local_solution_rate;
 
   /**
-   * Serial vector of previous time step accleration \f$ \ddot{u}_n \f$
+   * Serial vector of previous time step acceleration \f$ \ddot{u}_n \f$
    */
-  UniquePtr<NumericVector<Number> > _old_local_solution_accel;
+  std::unique_ptr<NumericVector<Number>> _old_local_solution_accel;
 };
 
 } // end namespace libMesh

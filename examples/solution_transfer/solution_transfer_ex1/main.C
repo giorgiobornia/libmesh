@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -54,14 +54,19 @@ void initialize(EquationSystems & es,
 {
   ExplicitSystem & system = es.get_system<ExplicitSystem>(system_name);
   es.parameters.set<Real> ("time") = system.time = 0;
-  system.project_solution(initial_value, libmesh_nullptr, es.parameters);
+  system.project_solution(initial_value, nullptr, es.parameters);
 }
 
 int main(int argc, char * argv[])
 {
   LibMeshInit init (argc, argv);
 
-#ifdef LIBMESH_TRILINOS_HAVE_DTK
+#if !defined(LIBMESH_TRILINOS_HAVE_DTK)
+  // Skip this example (and use a different return code) if libMesh
+  // was compiled without Trilinos+DTK support.
+  libmesh_example_requires(false, "--enable-trilinos");
+
+#else
 
   Mesh from_mesh(init.comm());
   MeshTools::Generation::build_cube(from_mesh, 4, 4, 4, 0, 1, 0, 1, 0, 1, HEX8);

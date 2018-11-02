@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -31,6 +31,8 @@
 #include "libmesh/time_solver.h"
 #include "libmesh/transient_system.h"
 #include "libmesh/vtk_io.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
+#include "libmesh/enum_solver_package.h"
 
 #include <cstdio>
 #include <ctime>
@@ -81,7 +83,9 @@ void setup(EquationSystems & systems,
   imms.save_initial_mesh();
 
   // Fill global solution vector from local ones
-  aux_sys.reinit();
+  aux_sys.current_local_solution->close();
+  *aux_sys.solution = *aux_sys.current_local_solution;
+  aux_sys.solution->close();
 }
 
 
@@ -92,7 +96,7 @@ void run_timestepping(EquationSystems & systems, GetPot & args)
 
   SolidSystem & solid_system = systems.get_system<SolidSystem>("solid");
 
-  UniquePtr<VTKIO> io = UniquePtr<VTKIO>(new VTKIO(systems.get_mesh()));
+  std::unique_ptr<VTKIO> io = libmesh_make_unique<VTKIO>(systems.get_mesh());
 
   Real duration = args("duration", 1.0);
 
@@ -118,7 +122,9 @@ void run_timestepping(EquationSystems & systems, GetPot & args)
 
       out << "Solving Solid" << std::endl;
       solid_system.solve();
-      aux_system.reinit();
+      aux_system.current_local_solution->close();
+      *aux_system.solution = *aux_system.current_local_solution;
+      aux_system.solution->close();
 
       // Carry out the adaptive mesh refinement/coarsening
       out << "Doing a reinit of the equation systems" << std::endl;
@@ -149,6 +155,10 @@ int main(int argc, char ** argv)
   // Initialize libMesh and any dependent libraries
   LibMeshInit init(argc, argv);
 
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
+
   // Skip this example if we do not meet certain requirements
 #ifndef LIBMESH_HAVE_VTK
   libmesh_example_requires(false, "--enable-vtk");
@@ -175,7 +185,7 @@ int main(int argc, char ** argv)
   libmesh_example_requires(dim <= LIBMESH_DIM, "3D support");
 
   // Create a mesh distributed across the default MPI communicator.
-  Mesh mesh(init.comm(), dim);
+  Mesh mesh(init.comm(), cast_int<unsigned char>(dim));
 
   EquationSystems systems(mesh);
 

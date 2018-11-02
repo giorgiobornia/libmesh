@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,11 +20,11 @@
 #ifndef LIBMESH_MESHLESS_INTERPOLATION_FUNCTION_H
 #define LIBMESH_MESHLESS_INTERPOLATION_FUNCTION_H
 
-// Local Includes
+// libMesh Includes
 #include "libmesh/function_base.h"
 #include "libmesh/meshfree_interpolation.h"
 #include "libmesh/threads.h"
-
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
 
 // C++ includes
 #include <cstddef>
@@ -52,7 +52,7 @@ private:
 public:
 
   /**
-   * Constructor.  Requires a \p \pMeshlessInterpolation object.
+   * Constructor.  Requires a MeshlessInterpolation object.
    */
   MeshlessInterpolationFunction (const MeshfreeInterpolation & mfi,
                                  Threads::spin_mutex & mutex) :
@@ -74,11 +74,11 @@ public:
   /**
    * Returns a new deep copy of the function.
    */
-  virtual UniquePtr<FunctionBase<Number> > clone () const;
+  virtual std::unique_ptr<FunctionBase<Number>> clone () const;
 
   /**
-   * @returns the value at point \p p and time
-   * \p time, which defaults to zero.
+   * @returns the value at point p and time
+   * time, which defaults to zero.
    */
   Number operator() (const Point & p,
                      const Real time=0.);
@@ -141,10 +141,10 @@ void MeshlessInterpolationFunction::clear ()
 
 
 inline
-UniquePtr<FunctionBase<Number> >
+std::unique_ptr<FunctionBase<Number>>
 MeshlessInterpolationFunction::clone () const
 {
-  return UniquePtr<FunctionBase<Number> > (new MeshlessInterpolationFunction (_mfi, _mutex));
+  return libmesh_make_unique<MeshlessInterpolationFunction>(_mfi, _mutex);
 }
 
 

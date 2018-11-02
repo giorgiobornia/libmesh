@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -21,6 +21,7 @@
 #include "libmesh/dense_vector.h"
 #include "libmesh/factory.h"
 #include "libmesh/function_base.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
 
 using namespace libMesh;
 
@@ -44,9 +45,9 @@ class ExampleOneFunction : public FunctionBase<Number>
 
   virtual void init() {}
   virtual void clear() {}
-  virtual UniquePtr<FunctionBase<Number> > clone() const
+  virtual std::unique_ptr<FunctionBase<Number>> clone() const
   {
-    return UniquePtr<FunctionBase<Number> >(new ExampleOneFunction());
+    return libmesh_make_unique<ExampleOneFunction>();
   }
 };
 
@@ -55,17 +56,17 @@ namespace libMesh {
 #endif
 
 //-------------------------------------------------
-// Full specialization for the Factory<FunctionBase<Number> >
+// Full specialization for the Factory<FunctionBase<Number>>
 // So we can look up hand-coded functions by name string
 template<>
-std::map<std::string, Factory<FunctionBase<Number> >*> &
-Factory<FunctionBase<Number> >::factory_map()
+std::map<std::string, Factory<FunctionBase<Number>> *> &
+Factory<FunctionBase<Number>>::factory_map()
 {
-  static std::map<std::string, Factory<FunctionBase<Number> > *> _map;
+  static std::map<std::string, Factory<FunctionBase<Number>> *> _map;
   return _map;
 }
 
-FactoryImp<ExampleOneFunction, FunctionBase<Number> > example_one_factory ("example_one");
+FactoryImp<ExampleOneFunction, FunctionBase<Number>> example_one_factory ("example_one");
 
 #ifdef LIBMESH_USE_SEPARATE_NAMESPACE
 } // namespace libMesh

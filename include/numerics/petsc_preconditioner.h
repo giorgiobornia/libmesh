@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -27,11 +27,18 @@
 // Local includes
 #include "libmesh/preconditioner.h"
 #include "libmesh/libmesh_common.h"
-#include "libmesh/enum_solver_package.h"
-#include "libmesh/enum_preconditioner_type.h"
 #include "libmesh/reference_counted_object.h"
 #include "libmesh/libmesh.h"
 #include "libmesh/petsc_macro.h"
+
+#ifdef LIBMESH_FORWARD_DECLARE_ENUMS
+namespace libMesh
+{
+enum PreconditionerType : int;
+}
+#else
+#include "libmesh/enum_preconditioner_type.h"
+#endif
 
 // Petsc includes
 #include "petscpc.h"
@@ -45,8 +52,9 @@ template <typename T> class NumericVector;
 template <typename T> class ShellMatrix;
 
 /**
- * This class provides an interface to the suite of preconditioners available
- * from Petsc.
+ * This class provides an interface to the suite of preconditioners
+ * available from PETSc. All overridden virtual functions are
+ * documented in preconditioner.h.
  *
  * \author Derek Gaston
  * \date 2009
@@ -59,38 +67,27 @@ public:
   /**
    *  Constructor. Initializes PetscPreconditioner data structures
    */
-  PetscPreconditioner (const libMesh::Parallel::Communicator & comm_in
-                       LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
+  PetscPreconditioner (const libMesh::Parallel::Communicator & comm_in);
 
   /**
    * Destructor.
    */
   virtual ~PetscPreconditioner ();
 
-  /**
-   * Computes the preconditioned vector "y" based on input "x".
-   * Usually by solving Py=x to get the action of P^-1 x.
-   */
-  virtual void apply(const NumericVector<T> & x, NumericVector<T> & y) libmesh_override;
+  virtual void apply(const NumericVector<T> & x, NumericVector<T> & y) override;
+
+  virtual void clear () override;
+
+  virtual void init () override;
 
   /**
-   * Release all memory and clear data structures.
-   */
-  virtual void clear () libmesh_override;
-
-  /**
-   * Initialize data structures if not done so already.
-   */
-  virtual void init () libmesh_override;
-
-  /**
-   * Returns the actual Petsc PC struct.  Useful for more advanced
-   * purposes
+   * \returns The PETSc PC object.  Can be useful for implementing
+   * more advanced algorithms.
    */
   PC pc() { return _pc; }
 
   /**
-   * Tells PETSC to use the user-specified preconditioner
+   * Tells PETSc to use the user-specified preconditioner.
    */
   static void set_petsc_preconditioner_type (const PreconditionerType & preconditioner_type, PC & pc);
 
@@ -102,8 +99,7 @@ protected:
   PC _pc;
 
   /**
-   * Petsc Matrix that's been pulled out of the _matrix object.
-   * This happens during init...
+   * PETSc Mat pulled out of the _matrix object during init().
    */
   Mat _mat;
 

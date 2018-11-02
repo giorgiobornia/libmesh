@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,9 +20,16 @@
 #ifndef LIBMESH_ELEM_QUALITY_H
 #define LIBMESH_ELEM_QUALITY_H
 
-// Local includes
+#ifdef LIBMESH_FORWARD_DECLARE_ENUMS
+namespace libMesh
+{
+enum ElemType : int;
+enum ElemQuality : int;
+}
+#else
 #include "libmesh/enum_elem_type.h"
 #include "libmesh/enum_elem_quality.h"
+#endif
 
 // C++ includes
 #include <vector>
@@ -31,9 +38,12 @@
 namespace libMesh
 {
 
-
 /**
  * A namespace for quality utility functions.
+ *
+ * \author John W. Peterson
+ * \date 2002
+ * \brief Utility functions for computing element quality indicators.
  */
 namespace Quality
 {
@@ -45,24 +55,23 @@ namespace Quality
 const unsigned int num_quals = 16;
 
 /**
- * @returns a descriptive name for a \p ElemQuality
+ * \returns A descriptive name for a \p ElemQuality
  * \p enum
  */
-std::string              name     (const ElemQuality q);
+std::string name (const ElemQuality q);
 
 /**
- * @returns a description for a \p ElemQuality
+ * \returns A description for a \p ElemQuality
  * \p enum
  */
-std::string              describe (const ElemQuality q);
+std::string describe (const ElemQuality q);
 
 /**
- * @returns the valid \p ElemQuality metrics for a given
+ * \returns The valid \p ElemQuality metrics for a given
  * \p ElemType element type.
  */
-std::vector<ElemQuality> valid    (const ElemType    t);
+std::vector<ElemQuality> valid (const ElemType t);
 }
-
 
 } // namespace libMesh
 

@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# This script reindents a file using emacs-style indentation,
-# with no indentation in namespaces.
+# This script reindents files according to the libmesh style, which is
+# the standard emacs style with no indentation in namespaces.
 if [[ $# -lt 1 ]]; then
-    echo "Usage: $0 file.C"
+    echo "Usage: $0 file1.C file2.C ..."
     exit 1
 fi
 
@@ -19,18 +19,26 @@ if [ -z $EMACS ]; then
   EMACS=/usr/bin/emacs
 fi
 
-# Print file we are working on
-echo "Indenting $1"
+for i in $*; do
+  # Print name of file we are working on
+  echo "Indenting $i"
 
-# The following command:
-# .) Uses only spaces for tabs
-# .) Forces emacs to use C++ mode
-# .) Sets the indentation level within namespaces to 0
-# .) Runs indent-region on the entire file
-# .) Saves the buffer
-$EMACS -batch $1  \
-  --eval="(setq-default indent-tabs-mode nil)" \
-  --eval="(c++-mode)" \
-  --eval="(c-set-offset 'innamespace 0)" \
-  --eval="(indent-region (point-min) (point-max) nil)" \
-  -f save-buffer &> /dev/null
+  # The following command:
+  # .) Uses only spaces for tabs
+  # .) Forces emacs to use C++ mode
+  # .) Sets the indentation level within namespaces to 0
+  # .) Runs indent-region on the entire file
+  # .) Saves the buffer
+  $EMACS -batch $i  \
+    --eval="(setq-default indent-tabs-mode nil)" \
+    --eval="(c++-mode)" \
+    --eval="(c-set-offset 'innamespace 0)" \
+    --eval="(indent-region (point-min) (point-max) nil)" \
+    -f save-buffer &> /dev/null
+done
+
+
+# Local Variables:
+# sh-basic-offset: 2
+# sh-indentation: 2
+# End:

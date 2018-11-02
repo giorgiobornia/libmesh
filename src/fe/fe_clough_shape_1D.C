@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -16,21 +16,25 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-// C++ inlcludes
+// C++ includes
 
 // Local includes
 #include "libmesh/fe.h"
 #include "libmesh/elem.h"
 
 
-// Anonymous namespace for persistant variables.
+// Anonymous namespace for persistent variables.
 // This allows us to cache the global-to-local mapping transformation
 // This should also screw up multithreading royally
 namespace
 {
 using namespace libMesh;
 
+// Keep track of which element was most recently used to generate
+// cached data
 static dof_id_type old_elem_id = DofObject::invalid_id;
+static const Elem * old_elem_ptr = nullptr;
+
 // Coefficient naming: d(1)d(2n) is the coefficient of the
 // global shape function corresponding to value 1 in terms of the
 // local shape function corresponding to normal derivative 2
@@ -53,11 +57,13 @@ void clough_compute_coefs(const Elem * elem)
   // horribly with more than one thread.
   libmesh_assert_equal_to (libMesh::n_threads(), 1);
 
-  // Coefficients are cached from old elements
-  if (elem->id() == old_elem_id)
+  // Coefficients are cached from old elements; we rely on that cache
+  // except in dbg mode
+#ifndef DEBUG
+  if (elem->id() == old_elem_id &&
+      elem == old_elem_ptr)
     return;
-
-  old_elem_id = elem->id();
+#endif
 
   const Order mapping_order        (elem->default_order());
   const ElemType mapping_elem_type (elem->type());
@@ -85,6 +91,19 @@ void clough_compute_coefs(const Elem * elem)
     }
 
   // Calculate derivative scaling factors
+
+#ifdef DEBUG
+  // The cached factors should equal our calculations
+  if (elem->id() == old_elem_id &&
+      elem == old_elem_ptr)
+    {
+      libmesh_assert_equal_to(d1xd1x, dxdxi[0]);
+      libmesh_assert_equal_to(d2xd2x, dxdxi[1]);
+    }
+#endif
+
+  old_elem_id = elem->id();
+  old_elem_ptr = elem;
 
   d1xd1x = dxdxi[0];
   d2xd2x = dxdxi[1];
@@ -123,9 +142,6 @@ Real clough_raw_shape_second_deriv(const unsigned int basis_num,
       libmesh_error_msg("Invalid shape function derivative j = " <<
                         deriv_type);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -159,9 +175,6 @@ Real clough_raw_shape_deriv(const unsigned int basis_num,
       libmesh_error_msg("Invalid shape function derivative j = " <<
                         deriv_type);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 Real clough_raw_shape(const unsigned int basis_num,
@@ -184,9 +197,6 @@ Real clough_raw_shape(const unsigned int basis_num,
       libmesh_error_msg("Invalid shape function index i = " <<
                         basis_num);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -258,9 +268,6 @@ Real FE<1,CLOUGH>::shape(const Elem * elem,
     default:
       libmesh_error_msg("ERROR: Unsupported polynomial order = " << totalorder);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -326,9 +333,6 @@ Real FE<1,CLOUGH>::shape_deriv(const Elem * elem,
     default:
       libmesh_error_msg("ERROR: Unsupported polynomial order = " << totalorder);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -381,9 +385,6 @@ Real FE<1,CLOUGH>::shape_second_deriv(const Elem * elem,
     default:
       libmesh_error_msg("ERROR: Unsupported polynomial order = " << totalorder);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 } // namespace libMesh

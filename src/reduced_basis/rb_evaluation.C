@@ -29,6 +29,7 @@
 #include "libmesh/libmesh_logging.h"
 #include "libmesh/xdr_cxx.h"
 #include "libmesh/mesh_tools.h"
+#include "libmesh/utility.h"
 
 // C/C++ includes
 #include <sys/types.h>
@@ -36,6 +37,7 @@
 #include <errno.h>
 #include <fstream>
 #include <sstream>
+#include <iomanip>
 
 namespace libMesh
 {
@@ -45,7 +47,7 @@ RBEvaluation::RBEvaluation (const Parallel::Communicator & comm_in)
   ParallelObject(comm_in),
   evaluate_RB_error_bound(true),
   compute_RB_inner_product(false),
-  rb_theta_expansion(libmesh_nullptr)
+  rb_theta_expansion(nullptr)
 {
 
 }
@@ -57,28 +59,23 @@ RBEvaluation::~RBEvaluation()
 
 void RBEvaluation::clear()
 {
-  START_LOG("clear()", "RBEvaluation");
+  LOG_SCOPE("clear()", "RBEvaluation");
 
   // Clear the basis functions
-  for(unsigned int i=0; i<basis_functions.size(); i++)
-    {
-      if (basis_functions[i])
-        {
-          basis_functions[i]->clear();
-          delete basis_functions[i];
-          basis_functions[i] = libmesh_nullptr;
-        }
-    }
+  basis_functions.clear();
   set_n_basis_functions(0);
 
   clear_riesz_representors();
 
   // Clear the Greedy param list
-  for(unsigned int i=0; i<greedy_param_list.size(); i++)
+  for (std::size_t i=0; i<greedy_param_list.size(); i++)
     greedy_param_list[i].clear();
   greedy_param_list.clear();
+}
 
-  STOP_LOG("clear()", "RBEvaluation");
+void RBEvaluation::set_n_basis_functions(unsigned int n_bfs)
+{
+  basis_functions.resize(n_bfs);
 }
 
 void RBEvaluation::set_rb_theta_expansion(RBThetaExpansion & rb_theta_expansion_in)
@@ -88,7 +85,7 @@ void RBEvaluation::set_rb_theta_expansion(RBThetaExpansion & rb_theta_expansion_
 
 RBThetaExpansion & RBEvaluation::get_rb_theta_expansion()
 {
-  if(!is_rb_theta_expansion_initialized())
+  if (!is_rb_theta_expansion_initialized())
     libmesh_error_msg("Error: rb_theta_expansion hasn't been initialized yet");
 
   return *rb_theta_expansion;
@@ -96,7 +93,7 @@ RBThetaExpansion & RBEvaluation::get_rb_theta_expansion()
 
 bool RBEvaluation::is_rb_theta_expansion_initialized() const
 {
-  if(rb_theta_expansion)
+  if (rb_theta_expansion)
     {
       return true;
     }
@@ -109,19 +106,19 @@ bool RBEvaluation::is_rb_theta_expansion_initialized() const
 void RBEvaluation::resize_data_structures(const unsigned int Nmax,
                                           bool resize_error_bound_data)
 {
-  START_LOG("resize_data_structures()", "RBEvaluation");
+  LOG_SCOPE("resize_data_structures()", "RBEvaluation");
 
-  if(Nmax < this->get_n_basis_functions())
+  if (Nmax < this->get_n_basis_functions())
     libmesh_error_msg("Error: Cannot set Nmax to be less than the current number of basis functions.");
 
   // Resize/clear inner product matrix
-  if(compute_RB_inner_product)
+  if (compute_RB_inner_product)
     RB_inner_product_matrix.resize(Nmax,Nmax);
 
   // Allocate dense matrices for RB solves
   RB_Aq_vector.resize(rb_theta_expansion->get_n_A_terms());
 
-  for(unsigned int q=0; q<rb_theta_expansion->get_n_A_terms(); q++)
+  for (unsigned int q=0; q<rb_theta_expansion->get_n_A_terms(); q++)
     {
       // Initialize the memory for the RB matrices
       RB_Aq_vector[q].resize(Nmax,Nmax);
@@ -129,7 +126,7 @@ void RBEvaluation::resize_data_structures(const unsigned int Nmax,
 
   RB_Fq_vector.resize(rb_theta_expansion->get_n_F_terms());
 
-  for(unsigned int q=0; q<rb_theta_expansion->get_n_F_terms(); q++)
+  for (unsigned int q=0; q<rb_theta_expansion->get_n_F_terms(); q++)
     {
       // Initialize the memory for the RB vectors
       RB_Fq_vector[q].resize(Nmax);
@@ -138,10 +135,10 @@ void RBEvaluation::resize_data_structures(const unsigned int Nmax,
 
   // Initialize the RB output vectors
   RB_output_vectors.resize(rb_theta_expansion->get_n_outputs());
-  for(unsigned int n=0; n<rb_theta_expansion->get_n_outputs(); n++)
+  for (unsigned int n=0; n<rb_theta_expansion->get_n_outputs(); n++)
     {
       RB_output_vectors[n].resize(rb_theta_expansion->get_n_output_terms(n));
-      for(unsigned int q_l=0; q_l<rb_theta_expansion->get_n_output_terms(n); q_l++)
+      for (unsigned int q_l=0; q_l<rb_theta_expansion->get_n_output_terms(n); q_l++)
         {
           RB_output_vectors[n][q_l].resize(Nmax);
         }
@@ -151,7 +148,7 @@ void RBEvaluation::resize_data_structures(const unsigned int Nmax,
   RB_outputs.resize(rb_theta_expansion->get_n_outputs(), 0.);
 
 
-  if(resize_error_bound_data)
+  if (resize_error_bound_data)
     {
       // Initialize vectors for the norms of the Fq representors
       unsigned int Q_f_hat = rb_theta_expansion->get_n_F_terms()*(rb_theta_expansion->get_n_F_terms()+1)/2;
@@ -159,10 +156,10 @@ void RBEvaluation::resize_data_structures(const unsigned int Nmax,
 
       // Initialize vectors for the norms of the representors
       Fq_Aq_representor_innerprods.resize(rb_theta_expansion->get_n_F_terms());
-      for(unsigned int i=0; i<rb_theta_expansion->get_n_F_terms(); i++)
+      for (unsigned int i=0; i<rb_theta_expansion->get_n_F_terms(); i++)
         {
           Fq_Aq_representor_innerprods[i].resize(rb_theta_expansion->get_n_A_terms());
-          for(unsigned int j=0; j<rb_theta_expansion->get_n_A_terms(); j++)
+          for (unsigned int j=0; j<rb_theta_expansion->get_n_A_terms(); j++)
             {
               Fq_Aq_representor_innerprods[i][j].resize(Nmax, 0.);
             }
@@ -170,10 +167,10 @@ void RBEvaluation::resize_data_structures(const unsigned int Nmax,
 
       unsigned int Q_a_hat = rb_theta_expansion->get_n_A_terms()*(rb_theta_expansion->get_n_A_terms()+1)/2;
       Aq_Aq_representor_innerprods.resize(Q_a_hat);
-      for(unsigned int i=0; i<Q_a_hat; i++)
+      for (unsigned int i=0; i<Q_a_hat; i++)
         {
           Aq_Aq_representor_innerprods[i].resize(Nmax);
-          for(unsigned int j=0; j<Nmax; j++)
+          for (unsigned int j=0; j<Nmax; j++)
             {
               Aq_Aq_representor_innerprods[i][j].resize(Nmax, 0.);
             }
@@ -183,7 +180,7 @@ void RBEvaluation::resize_data_structures(const unsigned int Nmax,
 
       // Resize the output dual norm vectors
       output_dual_innerprods.resize(rb_theta_expansion->get_n_outputs());
-      for(unsigned int n=0; n<rb_theta_expansion->get_n_outputs(); n++)
+      for (unsigned int n=0; n<rb_theta_expansion->get_n_outputs(); n++)
         {
           unsigned int Q_l_hat = rb_theta_expansion->get_n_output_terms(n)*(rb_theta_expansion->get_n_output_terms(n)+1)/2;
           output_dual_innerprods[n].resize(Q_l_hat);
@@ -193,14 +190,11 @@ void RBEvaluation::resize_data_structures(const unsigned int Nmax,
       clear_riesz_representors();
 
       Aq_representor.resize(rb_theta_expansion->get_n_A_terms());
-      for(unsigned int q_a=0; q_a<rb_theta_expansion->get_n_A_terms(); q_a++)
+      for (unsigned int q_a=0; q_a<rb_theta_expansion->get_n_A_terms(); q_a++)
         {
           Aq_representor[q_a].resize(Nmax);
         }
     }
-
-
-  STOP_LOG("resize_data_structures()", "RBEvaluation");
 }
 
 NumericVector<Number> & RBEvaluation::get_basis_function(unsigned int i)
@@ -212,9 +206,9 @@ NumericVector<Number> & RBEvaluation::get_basis_function(unsigned int i)
 
 Real RBEvaluation::rb_solve(unsigned int N)
 {
-  START_LOG("rb_solve()", "RBEvaluation");
+  LOG_SCOPE("rb_solve()", "RBEvaluation");
 
-  if(N > get_n_basis_functions())
+  if (N > get_n_basis_functions())
     libmesh_error_msg("ERROR: N cannot be larger than the number of basis functions in rb_solve");
 
   const RBParameters & mu = get_parameters();
@@ -227,7 +221,7 @@ Real RBEvaluation::rb_solve(unsigned int N)
   RB_system_matrix.zero();
 
   DenseMatrix<Number> RB_Aq_a;
-  for(unsigned int q_a=0; q_a<rb_theta_expansion->get_n_A_terms(); q_a++)
+  for (unsigned int q_a=0; q_a<rb_theta_expansion->get_n_A_terms(); q_a++)
     {
       RB_Aq_vector[q_a].get_principal_submatrix(N, RB_Aq_a);
 
@@ -239,7 +233,7 @@ Real RBEvaluation::rb_solve(unsigned int N)
   RB_rhs.zero();
 
   DenseVector<Number> RB_Fq_f;
-  for(unsigned int q_f=0; q_f<rb_theta_expansion->get_n_F_terms(); q_f++)
+  for (unsigned int q_f=0; q_f<rb_theta_expansion->get_n_F_terms(); q_f++)
     {
       RB_Fq_vector[q_f].get_principal_subvector(N, RB_Fq_f);
 
@@ -247,24 +241,24 @@ Real RBEvaluation::rb_solve(unsigned int N)
     }
 
   // Solve the linear system
-  if(N > 0)
+  if (N > 0)
     {
       RB_system_matrix.lu_solve(RB_rhs, RB_solution);
     }
 
   // Evaluate RB outputs
   DenseVector<Number> RB_output_vector_N;
-  for(unsigned int n=0; n<rb_theta_expansion->get_n_outputs(); n++)
+  for (unsigned int n=0; n<rb_theta_expansion->get_n_outputs(); n++)
     {
       RB_outputs[n] = 0.;
-      for(unsigned int q_l=0; q_l<rb_theta_expansion->get_n_output_terms(n); q_l++)
+      for (unsigned int q_l=0; q_l<rb_theta_expansion->get_n_output_terms(n); q_l++)
         {
           RB_output_vectors[n][q_l].get_principal_subvector(N, RB_output_vector_N);
           RB_outputs[n] += rb_theta_expansion->eval_output_theta(n,q_l,mu)*RB_output_vector_N.dot(RB_solution);
         }
     }
 
-  if(evaluate_RB_error_bound) // Calculate the error bounds
+  if (evaluate_RB_error_bound) // Calculate the error bounds
     {
       // Evaluate the dual norm of the residual for RB_solution_vector
       Real epsilon_N = compute_residual_dual_norm(N);
@@ -278,31 +272,34 @@ Real RBEvaluation::rb_solve(unsigned int N)
       Real abs_error_bound = epsilon_N / residual_scaling_denom(alpha_LB);
 
       // Now compute the output error bounds
-      for(unsigned int n=0; n<rb_theta_expansion->get_n_outputs(); n++)
+      for (unsigned int n=0; n<rb_theta_expansion->get_n_outputs(); n++)
         {
           RB_output_error_bounds[n] = abs_error_bound * eval_output_dual_norm(n, mu);
         }
-
-      STOP_LOG("rb_solve()", "RBEvaluation");
 
       return abs_error_bound;
     }
   else // Don't calculate the error bounds
     {
-      STOP_LOG("rb_solve()", "RBEvaluation");
       // Just return -1. if we did not compute the error bound
       return -1.;
     }
 }
 
-Real RBEvaluation::get_rb_solution_norm()
+Real RBEvaluation::get_error_bound_normalization()
 {
-  return RB_solution.l2_norm();
+  // Normalize the error based on the error bound in the
+  // case of an empty reduced basis. The error bound is based
+  // on the residual F - AU, so with an empty basis this gives
+  // a value based on the norm of F at the current parameters.
+
+  Real normalization = rb_solve(0);
+  return normalization;
 }
 
 Real RBEvaluation::compute_residual_dual_norm(const unsigned int N)
 {
-  START_LOG("compute_residual_dual_norm()", "RBEvaluation");
+  LOG_SCOPE("compute_residual_dual_norm()", "RBEvaluation");
 
   const RBParameters & mu = get_parameters();
 
@@ -311,9 +308,9 @@ Real RBEvaluation::compute_residual_dual_norm(const unsigned int N)
   Number residual_norm_sq = 0.;
 
   unsigned int q=0;
-  for(unsigned int q_f1=0; q_f1<rb_theta_expansion->get_n_F_terms(); q_f1++)
+  for (unsigned int q_f1=0; q_f1<rb_theta_expansion->get_n_F_terms(); q_f1++)
     {
-      for(unsigned int q_f2=q_f1; q_f2<rb_theta_expansion->get_n_F_terms(); q_f2++)
+      for (unsigned int q_f2=q_f1; q_f2<rb_theta_expansion->get_n_F_terms(); q_f2++)
         {
           Real delta = (q_f1==q_f2) ? 1. : 2.;
           residual_norm_sq += delta * libmesh_real(
@@ -324,11 +321,11 @@ Real RBEvaluation::compute_residual_dual_norm(const unsigned int N)
         }
     }
 
-  for(unsigned int q_f=0; q_f<rb_theta_expansion->get_n_F_terms(); q_f++)
+  for (unsigned int q_f=0; q_f<rb_theta_expansion->get_n_F_terms(); q_f++)
     {
-      for(unsigned int q_a=0; q_a<rb_theta_expansion->get_n_A_terms(); q_a++)
+      for (unsigned int q_a=0; q_a<rb_theta_expansion->get_n_A_terms(); q_a++)
         {
-          for(unsigned int i=0; i<N; i++)
+          for (unsigned int i=0; i<N; i++)
             {
               Real delta = 2.;
               residual_norm_sq +=
@@ -340,15 +337,15 @@ Real RBEvaluation::compute_residual_dual_norm(const unsigned int N)
     }
 
   q=0;
-  for(unsigned int q_a1=0; q_a1<rb_theta_expansion->get_n_A_terms(); q_a1++)
+  for (unsigned int q_a1=0; q_a1<rb_theta_expansion->get_n_A_terms(); q_a1++)
     {
-      for(unsigned int q_a2=q_a1; q_a2<rb_theta_expansion->get_n_A_terms(); q_a2++)
+      for (unsigned int q_a2=q_a1; q_a2<rb_theta_expansion->get_n_A_terms(); q_a2++)
         {
           Real delta = (q_a1==q_a2) ? 1. : 2.;
 
-          for(unsigned int i=0; i<N; i++)
+          for (unsigned int i=0; i<N; i++)
             {
-              for(unsigned int j=0; j<N; j++)
+              for (unsigned int j=0; j<N; j++)
                 {
                   residual_norm_sq +=
                     delta * libmesh_real( libmesh_conj(rb_theta_expansion->eval_A_theta(q_a1, mu)) *
@@ -361,7 +358,7 @@ Real RBEvaluation::compute_residual_dual_norm(const unsigned int N)
         }
     }
 
-  if(libmesh_real(residual_norm_sq) < 0.)
+  if (libmesh_real(residual_norm_sq) < 0.)
     {
       //    libMesh::out << "Warning: Square of residual norm is negative "
       //                 << "in RBSystem::compute_residual_dual_norm()" << std::endl;
@@ -371,8 +368,6 @@ Real RBEvaluation::compute_residual_dual_norm(const unsigned int N)
       //     so shouldn't affect error bound much...
       residual_norm_sq = std::abs(residual_norm_sq);
     }
-
-  STOP_LOG("compute_residual_dual_norm()", "RBEvaluation");
 
   return std::sqrt( libmesh_real(residual_norm_sq) );
 }
@@ -396,9 +391,9 @@ Real RBEvaluation::eval_output_dual_norm(unsigned int n, const RBParameters & mu
 {
   Number output_bound_sq = 0.;
   unsigned int q=0;
-  for(unsigned int q_l1=0; q_l1<rb_theta_expansion->get_n_output_terms(n); q_l1++)
+  for (unsigned int q_l1=0; q_l1<rb_theta_expansion->get_n_output_terms(n); q_l1++)
     {
-      for(unsigned int q_l2=q_l1; q_l2<rb_theta_expansion->get_n_output_terms(n); q_l2++)
+      for (unsigned int q_l2=q_l1; q_l2<rb_theta_expansion->get_n_output_terms(n); q_l2++)
         {
           Real delta = (q_l1==q_l2) ? 1. : 2.;
           output_bound_sq += delta * libmesh_real(
@@ -413,23 +408,13 @@ Real RBEvaluation::eval_output_dual_norm(unsigned int n, const RBParameters & mu
 
 void RBEvaluation::clear_riesz_representors()
 {
-
-  // Clear the Aq_representors
-  for(unsigned int q_a=0; q_a<Aq_representor.size(); q_a++)
-    {
-      for(unsigned int i=0; i<Aq_representor[q_a].size(); i++)
-        {
-          delete Aq_representor[q_a][i];
-          Aq_representor[q_a][i] = libmesh_nullptr;
-        }
-    }
-
+  Aq_representor.clear();
 }
 
 void RBEvaluation::legacy_write_offline_data_to_files(const std::string & directory_name,
                                                       const bool write_binary_data)
 {
-  START_LOG("legacy_write_offline_data_to_files()", "RBEvaluation");
+  LOG_SCOPE("legacy_write_offline_data_to_files()", "RBEvaluation");
 
   // Get the number of basis functions
   unsigned int n_bfs = get_n_basis_functions();
@@ -440,12 +425,12 @@ void RBEvaluation::legacy_write_offline_data_to_files(const std::string & direct
   // The suffix to use for all the files that are written out
   const std::string suffix = write_binary_data ? ".xdr" : ".dat";
 
-  if(this->processor_id() == 0)
+  if (this->processor_id() == 0)
     {
 
       // Make a directory to store all the data files
-      mkdir(directory_name.c_str(), 0777);
-      //    if( mkdir(directory_name.c_str(), 0777) == -1)
+      Utility::mkdir(directory_name.c_str());
+      //    if (mkdir(directory_name.c_str(), 0777) == -1)
       //    {
       //      libMesh::out << "In RBEvaluation::write_offline_data_to_files, directory "
       //                   << directory_name << " already exists, overwriting contents." << std::endl;
@@ -479,14 +464,14 @@ void RBEvaluation::legacy_write_offline_data_to_files(const std::string & direct
       file_name << directory_name << "/Fq_innerprods" << suffix;
       Xdr RB_Fq_innerprods_out(file_name.str(), mode);
       unsigned int Q_f_hat = rb_theta_expansion->get_n_F_terms()*(rb_theta_expansion->get_n_F_terms()+1)/2;
-      for(unsigned int i=0; i<Q_f_hat; i++)
+      for (unsigned int i=0; i<Q_f_hat; i++)
         {
           RB_Fq_innerprods_out << Fq_representor_innerprods[i];
         }
       RB_Fq_innerprods_out.close();
 
       // Write out output data
-      for(unsigned int n=0; n<rb_theta_expansion->get_n_outputs(); n++)
+      for (unsigned int n=0; n<rb_theta_expansion->get_n_outputs(); n++)
         {
           file_name.str("");
           file_name << directory_name << "/output_";
@@ -500,7 +485,7 @@ void RBEvaluation::legacy_write_offline_data_to_files(const std::string & direct
           Xdr output_dual_innerprods_out(file_name.str(), mode);
 
           unsigned int Q_l_hat = rb_theta_expansion->get_n_output_terms(n)*(rb_theta_expansion->get_n_output_terms(n)+1)/2;
-          for(unsigned int q=0; q<Q_l_hat; q++)
+          for (unsigned int q=0; q<Q_l_hat; q++)
             {
               output_dual_innerprods_out << output_dual_innerprods[n][q];
             }
@@ -509,9 +494,9 @@ void RBEvaluation::legacy_write_offline_data_to_files(const std::string & direct
 
 
       // Write out output data to multiple files
-      for(unsigned int n=0; n<rb_theta_expansion->get_n_outputs(); n++)
+      for (unsigned int n=0; n<rb_theta_expansion->get_n_outputs(); n++)
         {
-          for(unsigned int q_l=0; q_l<rb_theta_expansion->get_n_output_terms(n); q_l++)
+          for (unsigned int q_l=0; q_l<rb_theta_expansion->get_n_output_terms(n); q_l++)
             {
               file_name.str("");
               file_name << directory_name << "/output_";
@@ -529,7 +514,7 @@ void RBEvaluation::legacy_write_offline_data_to_files(const std::string & direct
               file_name << suffix;
               Xdr output_n_out(file_name.str(), mode);
 
-              for(unsigned int j=0; j<n_bfs; j++)
+              for (unsigned int j=0; j<n_bfs; j++)
                 {
                   output_n_out << RB_output_vectors[n][q_l](j);
                 }
@@ -537,15 +522,15 @@ void RBEvaluation::legacy_write_offline_data_to_files(const std::string & direct
             }
         }
 
-      if(compute_RB_inner_product)
+      if (compute_RB_inner_product)
         {
           // Next write out the inner product matrix
           file_name.str("");
           file_name << directory_name << "/RB_inner_product_matrix" << suffix;
           Xdr RB_inner_product_matrix_out(file_name.str(), mode);
-          for(unsigned int i=0; i<n_bfs; i++)
+          for (unsigned int i=0; i<n_bfs; i++)
             {
-              for(unsigned int j=0; j<n_bfs; j++)
+              for (unsigned int j=0; j<n_bfs; j++)
                 {
                   RB_inner_product_matrix_out << RB_inner_product_matrix(i,j);
                 }
@@ -554,7 +539,7 @@ void RBEvaluation::legacy_write_offline_data_to_files(const std::string & direct
         }
 
       // Next write out the Fq vectors
-      for(unsigned int q_f=0; q_f<rb_theta_expansion->get_n_F_terms(); q_f++)
+      for (unsigned int q_f=0; q_f<rb_theta_expansion->get_n_F_terms(); q_f++)
         {
           file_name.str("");
           file_name << directory_name << "/RB_F_";
@@ -566,7 +551,7 @@ void RBEvaluation::legacy_write_offline_data_to_files(const std::string & direct
           file_name << suffix;
           Xdr RB_Fq_f_out(file_name.str(), mode);
 
-          for(unsigned int i=0; i<n_bfs; i++)
+          for (unsigned int i=0; i<n_bfs; i++)
             {
               RB_Fq_f_out << RB_Fq_vector[q_f](i);
             }
@@ -574,7 +559,7 @@ void RBEvaluation::legacy_write_offline_data_to_files(const std::string & direct
         }
 
       // Next write out the Aq matrices
-      for(unsigned int q_a=0; q_a<rb_theta_expansion->get_n_A_terms(); q_a++)
+      for (unsigned int q_a=0; q_a<rb_theta_expansion->get_n_A_terms(); q_a++)
         {
           file_name.str("");
           file_name << directory_name << "/RB_A_";
@@ -586,9 +571,9 @@ void RBEvaluation::legacy_write_offline_data_to_files(const std::string & direct
           file_name << suffix;
           Xdr RB_Aq_a_out(file_name.str(), mode);
 
-          for(unsigned int i=0; i<n_bfs; i++)
+          for (unsigned int i=0; i<n_bfs; i++)
             {
-              for(unsigned int j=0; j<n_bfs; j++)
+              for (unsigned int j=0; j<n_bfs; j++)
                 {
                   RB_Aq_a_out << RB_Aq_vector[q_a](i,j);
                 }
@@ -601,11 +586,11 @@ void RBEvaluation::legacy_write_offline_data_to_files(const std::string & direct
       file_name << directory_name << "/Fq_Aq_innerprods" << suffix;
       Xdr RB_Fq_Aq_innerprods_out(file_name.str(), mode);
 
-      for(unsigned int q_f=0; q_f<rb_theta_expansion->get_n_F_terms(); q_f++)
+      for (unsigned int q_f=0; q_f<rb_theta_expansion->get_n_F_terms(); q_f++)
         {
-          for(unsigned int q_a=0; q_a<rb_theta_expansion->get_n_A_terms(); q_a++)
+          for (unsigned int q_a=0; q_a<rb_theta_expansion->get_n_A_terms(); q_a++)
             {
-              for(unsigned int i=0; i<n_bfs; i++)
+              for (unsigned int i=0; i<n_bfs; i++)
                 {
                   RB_Fq_Aq_innerprods_out << Fq_Aq_representor_innerprods[q_f][q_a][i];
                 }
@@ -619,11 +604,11 @@ void RBEvaluation::legacy_write_offline_data_to_files(const std::string & direct
       Xdr RB_Aq_Aq_innerprods_out(file_name.str(), mode);
 
       unsigned int Q_a_hat = rb_theta_expansion->get_n_A_terms()*(rb_theta_expansion->get_n_A_terms()+1)/2;
-      for(unsigned int i=0; i<Q_a_hat; i++)
+      for (unsigned int i=0; i<Q_a_hat; i++)
         {
-          for(unsigned int j=0; j<n_bfs; j++)
+          for (unsigned int j=0; j<n_bfs; j++)
             {
-              for(unsigned int l=0; l<n_bfs; l++)
+              for (unsigned int l=0; l<n_bfs; l++)
                 {
                   RB_Aq_Aq_innerprods_out << Aq_Aq_representor_innerprods[i][j][l];
                 }
@@ -637,11 +622,11 @@ void RBEvaluation::legacy_write_offline_data_to_files(const std::string & direct
         file_name << directory_name << "/greedy_params" << suffix;
         Xdr greedy_params_out(file_name.str(), mode);
 
-        for(unsigned int i=0; i<greedy_param_list.size(); i++)
+        for (std::size_t i=0; i<greedy_param_list.size(); i++)
           {
             RBParameters::const_iterator it     = greedy_param_list[i].begin();
             RBParameters::const_iterator it_end = greedy_param_list[i].end();
-            for( ; it != it_end; ++it)
+            for ( ; it != it_end; ++it)
               {
                 // Need to make a copy of the value so that it's not const
                 // Xdr is not templated on const's
@@ -653,15 +638,13 @@ void RBEvaluation::legacy_write_offline_data_to_files(const std::string & direct
       }
 
     }
-
-  STOP_LOG("legacy_write_offline_data_to_files()", "RBEvaluation");
 }
 
 void RBEvaluation::legacy_read_offline_data_from_files(const std::string & directory_name,
                                                        bool read_error_bound_data,
                                                        const bool read_binary_data)
 {
-  START_LOG("legacy_read_offline_data_from_files()", "RBEvaluation");
+  LOG_SCOPE("legacy_read_offline_data_from_files()", "RBEvaluation");
 
   // The reading mode: DECODE for binary, READ for ASCII
   XdrMODE mode = read_binary_data ? DECODE : READ;
@@ -698,9 +681,9 @@ void RBEvaluation::legacy_read_offline_data_from_files(const std::string & direc
                                  read_binary_data);
 
   // Read in output data in multiple files
-  for(unsigned int n=0; n<rb_theta_expansion->get_n_outputs(); n++)
+  for (unsigned int n=0; n<rb_theta_expansion->get_n_outputs(); n++)
     {
-      for(unsigned int q_l=0; q_l<rb_theta_expansion->get_n_output_terms(n); q_l++)
+      for (unsigned int q_l=0; q_l<rb_theta_expansion->get_n_output_terms(n); q_l++)
         {
           file_name.str("");
           file_name << directory_name << "/output_";
@@ -720,7 +703,7 @@ void RBEvaluation::legacy_read_offline_data_from_files(const std::string & direc
 
           Xdr output_n_in(file_name.str(), mode);
 
-          for(unsigned int j=0; j<n_bfs; j++)
+          for (unsigned int j=0; j<n_bfs; j++)
             {
               Number value;
               output_n_in >> value;
@@ -730,7 +713,7 @@ void RBEvaluation::legacy_read_offline_data_from_files(const std::string & direc
         }
     }
 
-  if(compute_RB_inner_product)
+  if (compute_RB_inner_product)
     {
       // Next read in the inner product matrix
       file_name.str("");
@@ -739,9 +722,9 @@ void RBEvaluation::legacy_read_offline_data_from_files(const std::string & direc
 
       Xdr RB_inner_product_matrix_in(file_name.str(), mode);
 
-      for(unsigned int i=0; i<n_bfs; i++)
+      for (unsigned int i=0; i<n_bfs; i++)
         {
-          for(unsigned int j=0; j<n_bfs; j++)
+          for (unsigned int j=0; j<n_bfs; j++)
             {
               Number value;
               RB_inner_product_matrix_in >> value;
@@ -752,7 +735,7 @@ void RBEvaluation::legacy_read_offline_data_from_files(const std::string & direc
     }
 
   // Next read in the Fq vectors
-  for(unsigned int q_f=0; q_f<rb_theta_expansion->get_n_F_terms(); q_f++)
+  for (unsigned int q_f=0; q_f<rb_theta_expansion->get_n_F_terms(); q_f++)
     {
       file_name.str("");
       file_name << directory_name << "/RB_F_";
@@ -766,7 +749,7 @@ void RBEvaluation::legacy_read_offline_data_from_files(const std::string & direc
 
       Xdr RB_Fq_f_in(file_name.str(), mode);
 
-      for(unsigned int i=0; i<n_bfs; i++)
+      for (unsigned int i=0; i<n_bfs; i++)
         {
           Number value;
           RB_Fq_f_in >> value;
@@ -776,7 +759,7 @@ void RBEvaluation::legacy_read_offline_data_from_files(const std::string & direc
     }
 
   // Next read in the Aq matrices
-  for(unsigned int q_a=0; q_a<rb_theta_expansion->get_n_A_terms(); q_a++)
+  for (unsigned int q_a=0; q_a<rb_theta_expansion->get_n_A_terms(); q_a++)
     {
       file_name.str("");
       file_name << directory_name << "/RB_A_";
@@ -790,9 +773,9 @@ void RBEvaluation::legacy_read_offline_data_from_files(const std::string & direc
 
       Xdr RB_Aq_a_in(file_name.str(), mode);
 
-      for(unsigned int i=0; i<n_bfs; i++)
+      for (unsigned int i=0; i<n_bfs; i++)
         {
-          for(unsigned int j=0; j<n_bfs; j++)
+          for (unsigned int j=0; j<n_bfs; j++)
             {
               Number  value;
               RB_Aq_a_in >> value;
@@ -803,7 +786,7 @@ void RBEvaluation::legacy_read_offline_data_from_files(const std::string & direc
     }
 
 
-  if(read_error_bound_data)
+  if (read_error_bound_data)
     {
       // Next read in Fq representor norm data
       file_name.str("");
@@ -813,14 +796,14 @@ void RBEvaluation::legacy_read_offline_data_from_files(const std::string & direc
       Xdr RB_Fq_innerprods_in(file_name.str(), mode);
 
       unsigned int Q_f_hat = rb_theta_expansion->get_n_F_terms()*(rb_theta_expansion->get_n_F_terms()+1)/2;
-      for(unsigned int i=0; i<Q_f_hat; i++)
+      for (unsigned int i=0; i<Q_f_hat; i++)
         {
           RB_Fq_innerprods_in >> Fq_representor_innerprods[i];
         }
       RB_Fq_innerprods_in.close();
 
       // Read in output data
-      for(unsigned int n=0; n<rb_theta_expansion->get_n_outputs(); n++)
+      for (unsigned int n=0; n<rb_theta_expansion->get_n_outputs(); n++)
         {
           file_name.str("");
           file_name << directory_name << "/output_";
@@ -835,7 +818,7 @@ void RBEvaluation::legacy_read_offline_data_from_files(const std::string & direc
           Xdr output_dual_innerprods_in(file_name.str(), mode);
 
           unsigned int Q_l_hat = rb_theta_expansion->get_n_output_terms(n)*(rb_theta_expansion->get_n_output_terms(n)+1)/2;
-          for(unsigned int q=0; q<Q_l_hat; q++)
+          for (unsigned int q=0; q<Q_l_hat; q++)
             {
               output_dual_innerprods_in >> output_dual_innerprods[n][q];
             }
@@ -850,11 +833,11 @@ void RBEvaluation::legacy_read_offline_data_from_files(const std::string & direc
 
       Xdr RB_Fq_Aq_innerprods_in(file_name.str(), mode);
 
-      for(unsigned int q_f=0; q_f<rb_theta_expansion->get_n_F_terms(); q_f++)
+      for (unsigned int q_f=0; q_f<rb_theta_expansion->get_n_F_terms(); q_f++)
         {
-          for(unsigned int q_a=0; q_a<rb_theta_expansion->get_n_A_terms(); q_a++)
+          for (unsigned int q_a=0; q_a<rb_theta_expansion->get_n_A_terms(); q_a++)
             {
-              for(unsigned int i=0; i<n_bfs; i++)
+              for (unsigned int i=0; i<n_bfs; i++)
                 {
                   RB_Fq_Aq_innerprods_in >> Fq_Aq_representor_innerprods[q_f][q_a][i];
                 }
@@ -870,11 +853,11 @@ void RBEvaluation::legacy_read_offline_data_from_files(const std::string & direc
       Xdr RB_Aq_Aq_innerprods_in(file_name.str(), mode);
 
       unsigned int Q_a_hat = rb_theta_expansion->get_n_A_terms()*(rb_theta_expansion->get_n_A_terms()+1)/2;
-      for(unsigned int i=0; i<Q_a_hat; i++)
+      for (unsigned int i=0; i<Q_a_hat; i++)
         {
-          for(unsigned int j=0; j<n_bfs; j++)
+          for (unsigned int j=0; j<n_bfs; j++)
             {
-              for(unsigned int l=0; l<n_bfs; l++)
+              for (unsigned int l=0; l<n_bfs; l++)
                 {
                   RB_Aq_Aq_innerprods_in >> Aq_Aq_representor_innerprods[i][j][l];
                 }
@@ -885,19 +868,9 @@ void RBEvaluation::legacy_read_offline_data_from_files(const std::string & direc
 
   // Resize basis_functions even if we don't read them in so that
   // get_n_bfs() returns the correct value. Initialize the pointers
-  // to NULL
+  // to nullptr.
+  basis_functions.clear();
   set_n_basis_functions(n_bfs);
-  for(unsigned int i=0; i<basis_functions.size(); i++)
-    {
-      if(basis_functions[i])
-        {
-          basis_functions[i]->clear();
-          delete basis_functions[i];
-        }
-      basis_functions[i] = libmesh_nullptr;
-    }
-
-  STOP_LOG("legacy_read_offline_data_from_files()", "RBEvaluation");
 }
 
 void RBEvaluation::assert_file_exists(const std::string & file_name)
@@ -910,30 +883,33 @@ void RBEvaluation::write_out_basis_functions(System & sys,
                                              const std::string & directory_name,
                                              const bool write_binary_basis_functions)
 {
-  START_LOG("write_out_basis_functions()", "RBEvaluation");
+  LOG_SCOPE("write_out_basis_functions()", "RBEvaluation");
+
+  std::vector<NumericVector<Number>*> basis_functions_ptrs;
+  for(std::size_t i=0; i<basis_functions.size(); i++)
+  {
+    basis_functions_ptrs.push_back(basis_functions[i].get());
+  }
 
   write_out_vectors(sys,
-                    basis_functions,
+                    basis_functions_ptrs,
                     directory_name,
                     "bf",
                     write_binary_basis_functions);
-
-  STOP_LOG("write_out_basis_functions()", "RBEvaluation");
 }
 
 void RBEvaluation::write_out_vectors(System & sys,
-                                     std::vector<NumericVector<Number> *> & vectors,
+                                     std::vector<NumericVector<Number>*> & vectors,
                                      const std::string & directory_name,
                                      const std::string & data_name,
                                      const bool write_binary_vectors)
 {
-  START_LOG("write_out_vectors()", "RBEvaluation");
-  //libMesh::out << "Writing out the basis functions..." << std::endl;
+  LOG_SCOPE("write_out_vectors()", "RBEvaluation");
 
-  if(this->processor_id() == 0)
+  if (this->processor_id() == 0)
     {
       // Make a directory to store all the data files
-      mkdir(directory_name.c_str(), 0777);
+      Utility::mkdir(directory_name.c_str());
     }
 
   // Make sure processors are synced up before we begin
@@ -942,51 +918,30 @@ void RBEvaluation::write_out_vectors(System & sys,
   std::ostringstream file_name;
   const std::string basis_function_suffix = (write_binary_vectors ? ".xdr" : ".dat");
 
-  file_name << directory_name << "/" << data_name << "_header" << basis_function_suffix;
-  Xdr header_data(file_name.str(),
-                  write_binary_vectors ? ENCODE : WRITE);
-  sys.write_header(header_data, get_io_version_string(), /*write_additional_data=*/false);
+  file_name << directory_name << "/" << data_name << "_data" << basis_function_suffix;
+  Xdr bf_data(file_name.str(),
+              write_binary_vectors ? ENCODE : WRITE);
+
+  std::string version("libMesh-" + libMesh::get_io_compatibility_version());
+#ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
+  version += " with infinite elements";
+#endif
+  bf_data.data(version ,"# File Format Identifier");
+
+  sys.write_header(bf_data, /*(unused arg)*/ version, /*write_additional_data=*/false);
 
   // Following EquationSystemsIO::write, we use a temporary numbering (node major)
   // before writing out the data
   MeshTools::Private::globally_renumber_nodes_and_elements(sys.get_mesh());
 
-  // // Use System::write_serialized_data to write out the basis functions
-  // // by copying them into this->solution one at a time.
-  // for(unsigned int i=0; i<vectors.size(); i++)
-  // {
-  //   // No need to copy, just swap
-  //   // *solution = *vectors[i];
-  //   vectors[i]->swap(*sys.solution);
-  //   file_name.str(""); // reset the string
-  //   file_name << directory_name << "/bf" << i << basis_function_suffix;
-  //   Xdr bf_data(file_name.str(),
-  //               write_binary_vectors ? ENCODE : WRITE);
-  //   // set the current version
-  //   bf_data.set_version(LIBMESH_VERSION_ID(LIBMESH_MAJOR_VERSION,
-  //    LIBMESH_MINOR_VERSION,
-  //    LIBMESH_MICRO_VERSION));
-
-  //   sys.write_serialized_data(bf_data, false);
-
-  //   // Synchronize before moving on
-  //   this->comm().barrier();
-  //   // Swap back
-  //   vectors[i]->swap(*sys.solution);
-  // }
-
-  file_name.str("");
-  file_name << directory_name << "/" << data_name << "_data" << basis_function_suffix;
-
-  Xdr bf_data(file_name.str(),
-              write_binary_vectors ? ENCODE : WRITE);
-
   // Write all vectors at once.
   {
     // Note the API wants pointers to constant vectors, hence this...
-    std::vector<const NumericVector<Number> *> bf_out(vectors.begin(),
-                                                      vectors.end());
-    // for(unsigned int i=0; i<vectors.size(); i++)
+    std::vector<const NumericVector<Number> *> bf_out;
+    for (const auto & vec : vectors)
+      bf_out.push_back(vec);
+
+    // for (std::size_t i=0; i<vectors.size(); i++)
     //   bf_out.push_back(vectors[i]);
     sys.write_serialized_vectors (bf_data, bf_out);
   }
@@ -1000,32 +955,28 @@ void RBEvaluation::write_out_vectors(System & sys,
 
   // Undo the temporary renumbering
   sys.get_mesh().fix_broken_node_and_element_numbering();
-
-  STOP_LOG("write_out_vectors()", "RBEvaluation");
 }
 
 void RBEvaluation::read_in_basis_functions(System & sys,
                                            const std::string & directory_name,
                                            const bool read_binary_basis_functions)
 {
-  START_LOG("read_in_basis_functions()", "RBEvaluation");
+  LOG_SCOPE("read_in_basis_functions()", "RBEvaluation");
 
   read_in_vectors(sys,
                   basis_functions,
                   directory_name,
                   "bf",
                   read_binary_basis_functions);
-
-  STOP_LOG("read_in_basis_functions()", "RBEvaluation");
 }
 
 void RBEvaluation::read_in_vectors(System & sys,
-                                   std::vector<NumericVector<Number> *> & vectors,
+                                   std::vector<std::unique_ptr<NumericVector<Number>>> & vectors,
                                    const std::string & directory_name,
                                    const std::string & data_name,
                                    const bool read_binary_vectors)
 {
-  std::vector<std::vector<NumericVector<Number> *> *> vectors_vec;
+  std::vector<std::vector<std::unique_ptr<NumericVector<Number>>> *> vectors_vec;
   vectors_vec.push_back(&vectors);
 
   std::vector<std::string> directory_name_vec;
@@ -1042,17 +993,16 @@ void RBEvaluation::read_in_vectors(System & sys,
 }
 
 void RBEvaluation::read_in_vectors_from_multiple_files(System & sys,
-                                                       std::vector< std::vector<NumericVector<Number> *> * > multiple_vectors,
+                                                       std::vector<std::vector<std::unique_ptr<NumericVector<Number>>> *> multiple_vectors,
                                                        const std::vector<std::string> & multiple_directory_names,
                                                        const std::vector<std::string> & multiple_data_names,
                                                        const bool read_binary_vectors)
 {
-  START_LOG("read_in_vectors_from_multiple_files()", "RBEvaluation");
+  LOG_SCOPE("read_in_vectors_from_multiple_files()", "RBEvaluation");
 
-  unsigned int n_files = multiple_vectors.size();
-  unsigned int n_directories = multiple_directory_names.size();
-  unsigned int n_data_names = multiple_data_names.size();
-  libmesh_assert( (n_files == n_directories) && (n_files == n_data_names) );
+  std::size_t n_files = multiple_vectors.size();
+  std::size_t n_directories = multiple_directory_names.size();
+  libmesh_assert((n_files == n_directories) && (n_files == multiple_data_names.size()));
 
   if (n_files == 0)
     return;
@@ -1062,47 +1012,25 @@ void RBEvaluation::read_in_vectors_from_multiple_files(System & sys,
 
   std::ostringstream file_name;
   const std::string basis_function_suffix = (read_binary_vectors ? ".xdr" : ".dat");
-  struct stat stat_info;
-
-  // Assume that all the headers are the same, hence we can just use the first one.
-  file_name << multiple_directory_names[0] << "/"
-            << multiple_data_names[0] << "_header" << basis_function_suffix;
-  assert_file_exists(file_name.str());
-
-  Xdr header_data(file_name.str(),
-                  read_binary_vectors ? DECODE : READ);
-
-  // set the version number in header_data from io_version_string
-  // (same code as in EquationSystemsIO::_read_impl)
-  std::string io_version_string = get_io_version_string();
-  std::string::size_type lm_pos = io_version_string.find("libMesh");
-  std::istringstream iss(io_version_string.substr(lm_pos + 8));
-  int ver_major = 0, ver_minor = 0, ver_patch = 0;
-  char dot;
-  iss >> ver_major >> dot >> ver_minor >> dot >> ver_patch;
-  header_data.set_version(LIBMESH_VERSION_ID(ver_major, ver_minor, ver_patch));
-
-  // We need to call sys.read_header (e.g. to set _written_var_indices properly),
-  // but by setting the read_header argument to false, it doesn't reinitialize the system
-  sys.read_header(header_data, io_version_string, /*read_header=*/false, /*read_additional_data=*/false);
 
   // Following EquationSystemsIO::read, we use a temporary numbering (node major)
-  // before writing out the data
+  // before writing out the data. For the sake of efficiency, we do this once for
+  // all the vectors that we read in.
   MeshTools::Private::globally_renumber_nodes_and_elements(sys.get_mesh());
 
-  for (unsigned int data_index=0; data_index<n_directories; data_index++)
+  for (std::size_t data_index=0; data_index<n_directories; data_index++)
     {
-      std::vector<NumericVector<Number> *> & vectors = *multiple_vectors[data_index];
+      std::vector<std::unique_ptr<NumericVector<Number>>> & vectors = *multiple_vectors[data_index];
 
       // Allocate storage for each vector
-      for (unsigned int i=0; i<vectors.size(); i++)
+      for (std::size_t i=0; i<vectors.size(); i++)
         {
-          // vectors should all be NULL, otherwise we get a memory leak when
+          // vectors should all be nullptr, otherwise we get a memory leak when
           // we create the new vectors in RBEvaluation::read_in_vectors.
           if (vectors[i])
-            libmesh_error_msg("Non-NULL vector passed to read_in_vectors_from_multiple_files");
+            libmesh_error_msg("Non-nullptr vector passed to read_in_vectors_from_multiple_files");
 
-          vectors[i] = NumericVector<Number>::build(sys.comm()).release();
+          vectors[i] = NumericVector<Number>::build(sys.comm());
 
           vectors[i]->init (sys.n_dofs(),
                             sys.n_local_dofs(),
@@ -1118,6 +1046,7 @@ void RBEvaluation::read_in_vectors_from_multiple_files(System & sys,
       // On processor zero check to be sure the file exists
       if (this->processor_id() == 0)
         {
+          struct stat stat_info;
           int stat_result = stat(file_name.str().c_str(), &stat_info);
 
           if (stat_result != 0)
@@ -1128,27 +1057,38 @@ void RBEvaluation::read_in_vectors_from_multiple_files(System & sys,
       Xdr vector_data(file_name.str(),
                       read_binary_vectors ? DECODE : READ);
 
-      // The vector_data needs to know which version to read.
-      vector_data.set_version(LIBMESH_VERSION_ID(ver_major, ver_minor, ver_patch));
+      // Read the header data. This block of code is based on EquationSystems::_read_impl.
+      {
+        std::string version;
+        vector_data.data(version);
 
-      sys.read_serialized_vectors (vector_data, vectors);
+        const std::string libMesh_label = "libMesh-";
+        std::string::size_type lm_pos = version.find(libMesh_label);
+        if (lm_pos==std::string::npos)
+          libmesh_error_msg("version info missing in Xdr header");
+
+        std::istringstream iss(version.substr(lm_pos + libMesh_label.size()));
+        int ver_major = 0, ver_minor = 0, ver_patch = 0;
+        char dot;
+        iss >> ver_major >> dot >> ver_minor >> dot >> ver_patch;
+        vector_data.set_version(LIBMESH_VERSION_ID(ver_major, ver_minor, ver_patch));
+
+        // Actually read the header data. When we do this, set read_header=false
+        // so taht we do not reinit sys, since we assume that it has already been
+        // set up properly (e.g. the appropriate variables have already been added).
+        sys.read_header(vector_data, version, /*read_header=*/false, /*read_additional_data=*/false);
+      }
+
+      // Comply with the System::read_serialized_vectors() interface which uses dumb pointers.
+      std::vector<NumericVector<Number> *> vec_in;
+      for (auto & vec : vectors)
+        vec_in.push_back(vec.get());
+
+      sys.read_serialized_vectors (vector_data, vec_in);
     }
 
   // Undo the temporary renumbering
   sys.get_mesh().fix_broken_node_and_element_numbering();
-
-  STOP_LOG("read_in_vectors_from_multiple_files()", "RBEvaluation");
-}
-
-std::string RBEvaluation::get_io_version_string()
-{
-  std::string retval("libMesh-" + libMesh::get_io_compatibility_version());
-
-#ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
-  retval += " with infinite elements";
-#endif
-
-  return retval;
 }
 
 } // namespace libMesh

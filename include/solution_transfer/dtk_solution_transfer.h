@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -27,12 +27,16 @@
 #include "libmesh/solution_transfer.h"
 #include "libmesh/dtk_adapter.h"
 
+#include "libmesh/ignore_warnings.h"
+
 // Trilinos
 #include <Teuchos_CommHelpers.hpp>
 #include <Teuchos_DefaultComm.hpp>
 
 // DTK
 #include <DTK_SharedDomainMap.hpp>
+
+#include "libmesh/restore_warnings.h"
 
 #include <string>
 
@@ -50,8 +54,7 @@ namespace libMesh
 class DTKSolutionTransfer : public SolutionTransfer
 {
 public:
-  DTKSolutionTransfer(const libMesh::Parallel::Communicator & comm
-                      LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
+  DTKSolutionTransfer(const libMesh::Parallel::Communicator & comm);
   virtual ~DTKSolutionTransfer();
 
   /**
@@ -60,18 +63,18 @@ public:
    * This is meant for transferring values from one EquationSystems to
    * another even in the case of having different meshes.
    *
-   * Note that the first time this function is called for one
-   * combination of EquationSystems a lot of setup and caching is
-   * done.  Subsequent transfers between the same EquationSystems will
-   * be _much_ faster.
+   * \note The first time this function is called for one combination
+   * of EquationSystems, a lot of setup and caching is done.
+   * Subsequent transfers between the same EquationSystems will be \e
+   * much faster.
    */
-  virtual void transfer(const Variable & from_var, const Variable & to_var) libmesh_override;
+  virtual void transfer(const Variable & from_var, const Variable & to_var) override;
 
 protected:
   typedef DataTransferKit::SharedDomainMap<DTKAdapter::MeshContainerType,DTKAdapter::MeshContainerType> shared_domain_map_type;
 
   /// COMM_WORLD for now
-  Teuchos::RCP<const Teuchos::Comm<int> > comm_default;
+  Teuchos::RCP<const Teuchos::Comm<int>> comm_default;
 
   /// The DTKAdapter associated with each EquationSystems
   std::map<EquationSystems *, DTKAdapter *> adapters;

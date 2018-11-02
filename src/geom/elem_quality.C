@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,6 +22,9 @@
 // Local includes
 #include "libmesh/libmesh_common.h"
 #include "libmesh/elem_quality.h"
+#include "libmesh/enum_elem_type.h"
+#include "libmesh/enum_elem_quality.h"
+
 
 namespace libMesh
 {
@@ -220,7 +223,7 @@ std::string Quality::describe (const ElemQuality q)
 
     case TAPER:
       desc << "Maximum ratio of lengths\n"
-           << "derived from opposited edges.\n"
+           << "derived from opposite edges.\n"
            << '\n'
            << "Suggested ranges:\n"
            << "Quads: (0.7 -> 1)\n"
@@ -333,6 +336,7 @@ std::vector<ElemQuality> Quality::valid(const ElemType t)
       }
 
     case TRI3:
+    case TRISHELL3:
     case TRI6:
       {
         v.resize(7);
@@ -347,7 +351,9 @@ std::vector<ElemQuality> Quality::valid(const ElemType t)
       }
 
     case QUAD4:
+    case QUADSHELL4:
     case QUAD8:
+    case QUADSHELL8:
     case QUAD9:
       {
         v.resize(13);

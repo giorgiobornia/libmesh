@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -47,7 +47,7 @@ FrequencySystem::FrequencySystem (EquationSystems & es,
                                   const std::string & name_in,
                                   const unsigned int number_in) :
   LinearImplicitSystem      (es, name_in, number_in),
-  solve_system              (libmesh_nullptr),
+  solve_system              (nullptr),
   _finished_set_frequencies (false),
   _keep_solution_duplicates (true),
   _finished_init            (false),
@@ -120,7 +120,7 @@ void FrequencySystem::init_data ()
   LinearImplicitSystem::init_data();
 
   // Log how long initializing the system takes
-  START_LOG("init()", "FrequencySystem");
+  LOG_SCOPE("init()", "FrequencySystem");
 
   EquationSystems & es =
     this->get_equation_systems();
@@ -135,23 +135,21 @@ void FrequencySystem::init_data ()
        */
       if (es.parameters.have_parameter<unsigned int> ("n_frequencies"))
         {
+#ifndef NDEBUG
           const unsigned int n_freq =
             es.parameters.get<unsigned int>("n_frequencies");
 
           libmesh_assert_greater (n_freq, 0);
-
+#endif
           _finished_set_frequencies = true;
 
-          this->set_current_frequency(0);
+          this->set_current_frequency(0.);
         }
       else
         libmesh_error_msg("ERROR: Need to set frequencies before calling init().");
     }
 
   _finished_init = true;
-
-  // Stop logging init()
-  STOP_LOG("init()", "FrequencySystem");
 }
 
 
@@ -164,7 +162,7 @@ void FrequencySystem::assemble ()
     libmesh_error_msg("ERROR: Matrices already assembled.");
 
   // Log how long assemble() takes
-  START_LOG("assemble()", "FrequencySystem");
+  LOG_SCOPE("assemble()", "FrequencySystem");
 
   // prepare matrix with the help of the _dof_map,
   // fill with sparsity pattern, initialize the
@@ -175,15 +173,12 @@ void FrequencySystem::assemble ()
   //rhs.print    ();
 
   _finished_assemble = true;
-
-  // Log how long assemble() takes
-  STOP_LOG("assemble()", "FrequencySystem");
 }
 
 
 
-void FrequencySystem::set_frequencies_by_steps (const Real base_freq,
-                                                const Real freq_step,
+void FrequencySystem::set_frequencies_by_steps (const Number base_freq,
+                                                const Number freq_step,
                                                 const unsigned int n_freq,
                                                 const bool allocate_solution_duplicates)
 {
@@ -202,8 +197,8 @@ void FrequencySystem::set_frequencies_by_steps (const Real base_freq,
   for (unsigned int n=0; n<n_freq; n++)
     {
       // remember frequencies as parameters
-      es.parameters.set<Real>(this->form_freq_param_name(n)) =
-        base_freq + n * freq_step;
+      es.parameters.set<Number>(this->form_freq_param_name(n)) =
+        base_freq + Number(n) * freq_step;
 
       // build storage for solution vector, if wanted
       if (this->_keep_solution_duplicates)
@@ -218,15 +213,15 @@ void FrequencySystem::set_frequencies_by_steps (const Real base_freq,
 
 
 
-void FrequencySystem::set_frequencies_by_range (const Real min_freq,
-                                                const Real max_freq,
+void FrequencySystem::set_frequencies_by_range (const Number min_freq,
+                                                const Number max_freq,
                                                 const unsigned int n_freq,
                                                 const bool allocate_solution_duplicates)
 {
   this->_keep_solution_duplicates = allocate_solution_duplicates;
 
-  // sanity checks
-  libmesh_assert_greater (max_freq, min_freq);
+  // sanity checks. Only look at the real part.
+  libmesh_assert_greater_equal (std::real(max_freq), std::real(min_freq));
   libmesh_assert_greater (n_freq, 0);
 
   if (_finished_set_frequencies)
@@ -242,8 +237,8 @@ void FrequencySystem::set_frequencies_by_range (const Real min_freq,
   for (unsigned int n=0; n<n_freq; n++)
     {
       // remember frequencies as parameters
-      es.parameters.set<Real>(this->form_freq_param_name(n)) =
-        min_freq + n*(max_freq-min_freq)/(n_freq-1);
+      es.parameters.set<Number>(this->form_freq_param_name(n)) =
+        min_freq + static_cast<Number>(n)*(max_freq-min_freq)/static_cast<Number>(n_freq-1);
 
       // build storage for solution vector, if wanted
       if (this->_keep_solution_duplicates)
@@ -261,6 +256,7 @@ void FrequencySystem::set_frequencies_by_range (const Real min_freq,
 void FrequencySystem::set_frequencies (const std::vector<Real> & frequencies,
                                        const bool allocate_solution_duplicates)
 {
+  libmesh_deprecated();
   this->_keep_solution_duplicates = allocate_solution_duplicates;
 
   // sanity checks
@@ -276,10 +272,46 @@ void FrequencySystem::set_frequencies (const std::vector<Real> & frequencies,
   es.parameters.set<unsigned int>("n_frequencies") = frequencies.size();
 
   // set frequencies, build solution storage
-  for (unsigned int n=0; n<frequencies.size(); n++)
+  for (std::size_t n=0; n<frequencies.size(); n++)
     {
       // remember frequencies as parameters
-      es.parameters.set<Real>(this->form_freq_param_name(n)) = frequencies[n];
+      es.parameters.set<Number>(this->form_freq_param_name(n)) = static_cast<Number>(frequencies[n]);
+
+      // build storage for solution vector, if wanted
+      if (this->_keep_solution_duplicates)
+        System::add_vector(this->form_solu_vec_name(n));
+    }
+
+  _finished_set_frequencies = true;
+
+  // set the current frequency
+  this->set_current_frequency(0);
+}
+
+
+void FrequencySystem::set_frequencies (const std::vector<Number> & frequencies,
+                                       const bool allocate_solution_duplicates)
+{
+  libmesh_deprecated();
+  this->_keep_solution_duplicates = allocate_solution_duplicates;
+
+  // sanity checks
+  libmesh_assert(!frequencies.empty());
+
+  if (_finished_set_frequencies)
+    libmesh_error_msg("ERROR: frequencies already initialized.");
+
+  EquationSystems & es =
+    this->get_equation_systems();
+
+  // store number of frequencies as parameter
+  es.parameters.set<unsigned int>("n_frequencies") = frequencies.size();
+
+  // set frequencies, build solution storage
+  for (std::size_t n=0; n<frequencies.size(); n++)
+    {
+      // remember frequencies as parameters
+      es.parameters.set<Number>(this->form_freq_param_name(n)) = frequencies[n];
 
       // build storage for solution vector, if wanted
       if (this->_keep_solution_duplicates)
@@ -340,7 +372,7 @@ void FrequencySystem::solve (const unsigned int n_start,
 
 
   //   // return values
-  //   std::vector< std::pair<unsigned int, Real> > vec_rval;
+  //   std::vector<std::pair<unsigned int, Real>> vec_rval;
 
   // start solver loop
   for (unsigned int n=n_start; n<= n_stop; n++)
@@ -397,8 +429,8 @@ void FrequencySystem::set_current_frequency(unsigned int n)
   EquationSystems & es =
     this->get_equation_systems();
 
-  es.parameters.set<Real>("current frequency") =
-    es.parameters.get<Real>(this->form_freq_param_name(n));
+  es.parameters.set<Number>("current frequency") =
+    es.parameters.get<Number>(this->form_freq_param_name(n));
 }
 
 

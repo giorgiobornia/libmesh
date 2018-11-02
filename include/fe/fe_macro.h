@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,12 +22,9 @@
 
 
 
-/**
- * These macros help in instantiating specific versions
- * of the \p FE class.  Simply include this file, and
- * instantiate at the end for the desired dimension(s).
- */
-
+// These macros help in instantiating specific versions
+// of the \p FE class.  Simply include this file, and
+// instantiate at the end for the desired dimension(s).
 #define INSTANTIATE_MAPS(_dim,_type)                                    \
   template Point FE<_dim, _type>::map(const Elem *, const Point &);     \
   template Point FE<_dim, _type>::map_xi(const Elem *, const Point &);  \
@@ -45,6 +42,7 @@
 #ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
 
 #define INSTANTIATE_SUBDIVISION_FE                                      \
+  template FE<2,SUBDIVISION>::FE(const FEType & fet); \
   template unsigned int FE<2,SUBDIVISION>::n_shape_functions () const;  \
   template void         FE<2,SUBDIVISION>::attach_quadrature_rule (QBase *); \
   template unsigned int FE<2,SUBDIVISION>::n_quadrature_points () const; \
@@ -55,6 +53,7 @@
 #else // LIBMESH_ENABLE_INFINITE_ELEMENTS
 
 #define INSTANTIATE_SUBDIVISION_FE                                      \
+  template FE<2,SUBDIVISION>::FE(const FEType & fet);                     \
   template unsigned int FE<2,SUBDIVISION>::n_shape_functions () const;  \
   template void         FE<2,SUBDIVISION>::attach_quadrature_rule (QBase *); \
   template unsigned int FE<2,SUBDIVISION>::n_quadrature_points () const; \

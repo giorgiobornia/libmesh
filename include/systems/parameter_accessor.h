@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -21,10 +21,13 @@
 #define LIBMESH_PARAMETER_ACCESSOR_H
 
 
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/libmesh_common.h"
 #include "libmesh/compare_types.h" // remove_const
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
+
+// C++ includes
+#include <memory>
 
 namespace libMesh
 {
@@ -44,6 +47,10 @@ class ConstParameterProxy;
  * This is an abstract base class.  Derived objects may simply modify
  * the parameter value at some address in memory, or may call
  * arbitrary setter/getter functions.
+ *
+ * \author Roy Stogner
+ * \date 2015
+ * \brief Base class for reading/writing sensitivity parameters.
  */
 template <typename T=Number>
 class ParameterAccessor
@@ -70,8 +77,10 @@ public:
    * This is included for backward compatibility, but will be
    * deprecated in some classes and not implemented in others.
    */
+#ifdef LIBMESH_ENABLE_DEPRECATED
   virtual ParameterAccessor<T> &
   operator= (T * /* new_ptr */) { libmesh_error(); return *this; }
+#endif
 
   /**
    * Proxy: for backward compatibility, we allow codes to treat a
@@ -84,11 +93,11 @@ public:
   ConstParameterProxy<T> operator* () const { return ConstParameterProxy<T>(*this); }
 
   /**
-   * Returns a new copy of the accessor.  The new copy should probably
+   * \returns A new copy of the accessor.  The new copy should probably
    * be as shallow as possible, but should still access the same
    * parameter.
    */
-  virtual UniquePtr<ParameterAccessor<T> > clone() const = 0;
+  virtual std::unique_ptr<ParameterAccessor<T>> clone() const = 0;
 };
 
 template <typename T=Number>

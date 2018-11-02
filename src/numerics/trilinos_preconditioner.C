@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -17,16 +17,16 @@
 
 #include "libmesh/libmesh_common.h"
 
-#ifdef LIBMESH_HAVE_TRILINOS
-
-// C++ includes
+#ifdef LIBMESH_TRILINOS_HAVE_EPETRA
 
 // Local Includes
 #include "libmesh/trilinos_preconditioner.h"
 #include "libmesh/trilinos_epetra_matrix.h"
 #include "libmesh/trilinos_epetra_vector.h"
 #include "libmesh/libmesh_common.h"
+#include "libmesh/enum_preconditioner_type.h"
 
+#include "libmesh/ignore_warnings.h"
 #ifdef LIBMESH_TRILINOS_HAVE_IFPACK
 #include "Ifpack.h"
 #include "Ifpack_DiagPreconditioner.h"
@@ -40,6 +40,7 @@
 #ifdef LIBMESH_TRILINOS_HAVE_ML
 #include "ml_MultiLevelPreconditioner.h"
 #endif
+#include "libmesh/restore_warnings.h"
 
 namespace libMesh
 {
@@ -62,7 +63,7 @@ void TrilinosPreconditioner<T>::init ()
   // Clear the preconditioner in case it has been created in the past
   if (!this->_is_initialized)
     {
-      EpetraMatrix<T> * matrix = cast_ptr<EpetraMatrix<T> *, SparseMatrix<T> >(this->_matrix);
+      EpetraMatrix<T> * matrix = cast_ptr<EpetraMatrix<T> *, SparseMatrix<T>>(this->_matrix);
       _mat = matrix->mat();
     }
 
@@ -85,11 +86,11 @@ void
 TrilinosPreconditioner<T>::compute()
 {
 #ifdef LIBMESH_TRILINOS_HAVE_IFPACK
-  Ifpack_Preconditioner * ifpack = libmesh_nullptr;
+  Ifpack_Preconditioner * ifpack = nullptr;
 #endif
 
 #ifdef LIBMESH_TRILINOS_HAVE_ML
-  ML_Epetra::MultiLevelPreconditioner * ml = libmesh_nullptr;
+  ML_Epetra::MultiLevelPreconditioner * ml = nullptr;
 #endif
 
   switch (this->_preconditioner_type)
@@ -125,11 +126,11 @@ void
 TrilinosPreconditioner<T>::set_preconditioner_type (const PreconditionerType & preconditioner_type)
 {
 #ifdef LIBMESH_TRILINOS_HAVE_IFPACK
-  Ifpack_Preconditioner * pc = libmesh_nullptr;
+  Ifpack_Preconditioner * pc = nullptr;
 #endif
 
 #ifdef LIBMESH_TRILINOS_HAVE_ML
-  ML_Epetra::MultiLevelPreconditioner * ml = libmesh_nullptr;
+  ML_Epetra::MultiLevelPreconditioner * ml = nullptr;
 #endif
 
   switch (preconditioner_type)
@@ -261,4 +262,4 @@ template class TrilinosPreconditioner<Number>;
 
 } // namespace libMesh
 
-#endif // #ifdef LIBMESH_HAVE_TRILINOS
+#endif // LIBMESH_TRILINOS_HAVE_EPETRA

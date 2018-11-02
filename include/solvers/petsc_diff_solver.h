@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -27,6 +27,7 @@
 // Local includes
 #include "libmesh/diff_solver.h"
 #include "libmesh/petsc_macro.h"
+#include "libmesh/petsc_dm_wrapper.h"
 
 // PETSc includes
 # include <petscsnes.h>
@@ -66,17 +67,15 @@ public:
    * The reinitialization function.  This method is used after
    * changes in the mesh.
    */
-  virtual void reinit () libmesh_override;
+  virtual void reinit () override;
 
   /**
-   * The initialization function.  solve() calls this to create
-   * a new SNES context.
+   * The initialization function.
    */
-  virtual void init () libmesh_override;
+  virtual void init () override;
 
   /**
-   * The clear function.  solve() calls this to destroy
-   * a used SNES context.
+   * The clear function. Called if we reinit or when we destroy this object.
    */
   void clear ();
 
@@ -85,7 +84,7 @@ public:
    * this method will depend on the PETSc SNES settings.
    * See the PETSc documentation for more details.
    */
-  virtual unsigned int solve () libmesh_override;
+  virtual unsigned int solve () override;
 
 protected:
 
@@ -93,6 +92,18 @@ protected:
    * Nonlinear solver context
    */
   SNES _snes;
+
+  /**
+   * Wrapper object for interacting with PetscDM
+   */
+  PetscDMWrapper _dm_wrapper;
+
+private:
+
+  /**
+   * Common helper function to setup PETSc data structures
+   */
+  void setup_petsc_data();
 };
 
 } // namespace libMesh

@@ -10,7 +10,7 @@
 #
 #   Test for the Boost C++ libraries of a particular version (or newer)
 #
-#   If no path to the installed boost library is given the macro searchs
+#   If no path to the installed boost library is given the macro searches
 #   under /usr, /usr/local, /opt and /opt/local and evaluates the
 #   $BOOST_ROOT environment variable. Further documentation is available at
 #   <http://randspringer.de/boost/index.html>.
@@ -262,7 +262,7 @@ if test "x$want_boost" = "xyes"; then
     else
         AC_SUBST(BOOST_CPPFLAGS)
         AC_SUBST(BOOST_LDFLAGS)
-        AC_DEFINE(HAVE_BOOST,,[define if the Boost library is available])
+        AC_DEFINE(HAVE_BOOST,1,[define if the Boost library is available])
         # execute ACTION-IF-FOUND (if present):
         ifelse([$2], , :, [$2])
     fi

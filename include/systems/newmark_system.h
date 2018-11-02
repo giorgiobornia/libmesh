@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -35,7 +35,7 @@ namespace libMesh
  *
  * In the algorithm implemented here the system is solved for
  * displacements.
- * Curently the Newmark scheme is implemented for constant
+ * Currently the Newmark scheme is implemented for constant
  * time step sizes only. This time step is stored in the
  * \p EquationSystems parameter named \p "Newmark \p time \p step".
  * For the case of constant time steps the matrix only has to be
@@ -43,6 +43,10 @@ namespace libMesh
  * Default values of the Newmark parameters \p alpha and \p delta
  * used for time integration are provided.
  * For details refer to the examples section.
+ *
+ * \author Steffen Petersen
+ * \date 2003
+ * \brief Implements the Newmark time integration scheme.
  */
 class NewmarkSystem : public LinearImplicitSystem
 {
@@ -70,25 +74,25 @@ public:
    * Clear all the data structures associated with
    * the system.
    */
-  virtual void clear () libmesh_override;
+  virtual void clear () override;
 
   /**
    * Reinitializes the member data fields associated with
    * the system, so that, e.g., \p assemble() may be used.
    */
-  virtual void reinit () libmesh_override;
+  virtual void reinit () override;
 
   /**
    * Assemble the linear system.  Does not
    * actually call the solver.
    */
-  virtual void assemble () libmesh_override;
+  virtual void assemble () override;
 
   /**
-   * @returns \p "Newmark".  Helps in identifying
+   * \returns \p "Newmark".  Helps in identifying
    * the system type in an equation system file.
    */
-  virtual std::string system_type () const libmesh_override { return "Newmark"; }
+  virtual std::string system_type () const override { return "Newmark"; }
 
 
   //---------------------------------------------------------
@@ -140,7 +144,7 @@ private:
   Real _a_7;
 
   /**
-   * Returns true if the matrix assembly is finished.
+   * \p true if the matrix assembly is finished.
    */
   bool _finished_assemble;
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -67,7 +67,7 @@ extern "C"
       u.close();
 
       Vec petsc_res;
-      ierr = SNESGetFunction(snes, &petsc_res, libmesh_nullptr, libmesh_nullptr);
+      ierr = SNESGetFunction(snes, &petsc_res, nullptr, nullptr);
       CHKERRABORT(solver.comm().get(), ierr);
       PetscVector<Number> res(petsc_res, solver.comm());
       res.close();
@@ -109,11 +109,11 @@ extern "C"
     X_input.swap(X_system);
     R_input.swap(R_system);
 
-    // We may need to correct a non-conforming solution
-    sys.get_dof_map().enforce_constraints_exactly(sys);
-
     // We may need to localize a parallel solution
     sys.update();
+
+    // We may need to correct a non-conforming solution
+    sys.get_dof_map().enforce_constraints_exactly(sys, sys.current_local_solution.get());
 
     // Do DiffSystem assembly
     sys.assembly(true, false);
@@ -128,22 +128,18 @@ extern "C"
   }
 
 
-#if PETSC_RELEASE_LESS_THAN(3,5,0)
   PetscErrorCode
   __libmesh_petsc_diff_solver_jacobian (SNES,
                                         Vec x,
+#if PETSC_RELEASE_LESS_THAN(3,5,0)
                                         Mat * libmesh_dbg_var(j),
                                         Mat * pc,
                                         MatStructure * msflag,
-                                        void * ctx)
 #else
-    PetscErrorCode
-    __libmesh_petsc_diff_solver_jacobian (SNES,
-                                          Vec x,
-                                          Mat libmesh_dbg_var(j),
-                                          Mat pc,
-                                          void * ctx)
+                                        Mat libmesh_dbg_var(j),
+                                        Mat pc,
 #endif
+                                        void * ctx)
   {
     libmesh_assert(x);
     libmesh_assert(j);
@@ -176,11 +172,11 @@ extern "C"
     X_input.swap(X_system);
     J_input.swap(J_system);
 
-    // We may need to correct a non-conforming solution
-    sys.get_dof_map().enforce_constraints_exactly(sys);
-
     // We may need to localize a parallel solution
     sys.update();
+
+    // We may need to correct a non-conforming solution
+    sys.get_dof_map().enforce_constraints_exactly(sys, sys.current_local_solution.get());
 
     // Do DiffSystem assembly
     sys.assembly(false, true);
@@ -208,74 +204,46 @@ PetscDiffSolver::PetscDiffSolver (sys_type & s)
 
 void PetscDiffSolver::init ()
 {
-  START_LOG("init()", "PetscDiffSolver");
+  LOG_SCOPE("init()", "PetscDiffSolver");
 
   Parent::init();
 
-  int ierr=0;
-
-  ierr = SNESCreate(this->comm().get(),&_snes);
-  LIBMESH_CHKERR(ierr);
-
-  ierr = SNESMonitorSet (_snes, __libmesh_petsc_diff_solver_monitor,
-                         this, PETSC_NULL);
-  LIBMESH_CHKERR(ierr);
-
-  if (libMesh::on_command_line("--solver_system_names"))
-    {
-      ierr = SNESSetOptionsPrefix(_snes, (_system.name()+"_").c_str());
-      LIBMESH_CHKERR(ierr);
-    }
-
-  ierr = SNESSetFromOptions(_snes);
-  LIBMESH_CHKERR(ierr);
-
-  KSP my_ksp;
-  ierr = SNESGetKSP(_snes, &my_ksp);
-  LIBMESH_CHKERR(ierr);
-
-  PC my_pc;
-  ierr = KSPGetPC(my_ksp, &my_pc);
-  LIBMESH_CHKERR(ierr);
-
-  petsc_auto_fieldsplit(my_pc, _system);
-
-  STOP_LOG("init()", "PetscDiffSolver");
+  this->setup_petsc_data();
 }
 
 
 
 PetscDiffSolver::~PetscDiffSolver ()
 {
+  this->clear();
 }
 
 
 
 void PetscDiffSolver::clear()
 {
-  START_LOG("clear()", "PetscDiffSolver");
+  LOG_SCOPE("clear()", "PetscDiffSolver");
 
   int ierr = LibMeshSNESDestroy(&_snes);
   LIBMESH_CHKERR(ierr);
 
-  STOP_LOG("clear()", "PetscDiffSolver");
+  _dm_wrapper.clear();
 }
 
 
 
 void PetscDiffSolver::reinit()
 {
+  LOG_SCOPE("reinit()", "PetscDiffSolver");
+
+  // We need to wipe out all the old PETSc data
+  // if we are reinit'ing, since we'll need to build
+  // it all back up again.
+  this->clear();
+
   Parent::reinit();
 
-  KSP my_ksp;
-  int ierr = SNESGetKSP(_snes, &my_ksp);
-  LIBMESH_CHKERR(ierr);
-
-  PC my_pc;
-  ierr = KSPGetPC(my_ksp, &my_pc);
-  LIBMESH_CHKERR(ierr);
-
-  petsc_auto_fieldsplit(my_pc, _system);
+  this->setup_petsc_data();
 }
 
 
@@ -331,9 +299,7 @@ DiffSolver::SolveResult convert_solve_result(SNESConvergedReason r)
 
 unsigned int PetscDiffSolver::solve()
 {
-  this->init();
-
-  START_LOG("solve()", "PetscDiffSolver");
+  LOG_SCOPE("solve()", "PetscDiffSolver");
 
   PetscVector<Number> & x =
     *(cast_ptr<PetscVector<Number> *>(_system.solution.get()));
@@ -341,10 +307,6 @@ unsigned int PetscDiffSolver::solve()
     *(cast_ptr<PetscMatrix<Number> *>(_system.matrix));
   PetscVector<Number> & r =
     *(cast_ptr<PetscVector<Number> *>(_system.rhs));
-
-#ifdef LIBMESH_ENABLE_CONSTRAINTS
-  _system.get_dof_map().enforce_constraints_exactly(_system);
-#endif
 
   int ierr = 0;
 
@@ -356,19 +318,63 @@ unsigned int PetscDiffSolver::solve()
                           __libmesh_petsc_diff_solver_jacobian, this);
   LIBMESH_CHKERR(ierr);
 
+  ierr = SNESSetFromOptions(_snes);
+  LIBMESH_CHKERR(ierr);
+
   ierr = SNESSolve (_snes, PETSC_NULL, x.vec());
   LIBMESH_CHKERR(ierr);
 
-  STOP_LOG("solve()", "PetscDiffSolver");
+#ifdef LIBMESH_ENABLE_CONSTRAINTS
+  _system.get_dof_map().enforce_constraints_exactly(_system);
+#endif
 
   SNESConvergedReason reason;
   SNESGetConvergedReason(_snes, &reason);
 
-  this->clear();
-
   return convert_solve_result(reason);
 }
 
+void PetscDiffSolver::setup_petsc_data()
+{
+  int ierr=0;
+
+  ierr = SNESCreate(this->comm().get(),&_snes);
+  LIBMESH_CHKERR(ierr);
+
+  ierr = SNESMonitorSet (_snes, __libmesh_petsc_diff_solver_monitor,
+                         this, PETSC_NULL);
+  LIBMESH_CHKERR(ierr);
+
+  if (libMesh::on_command_line("--solver-system-names"))
+    {
+      ierr = SNESSetOptionsPrefix(_snes, (_system.name()+"_").c_str());
+      LIBMESH_CHKERR(ierr);
+    }
+
+  bool use_petsc_dm = libMesh::on_command_line("--use_petsc_dm");
+
+  // This needs to be called before SNESSetFromOptions
+  if (use_petsc_dm)
+    this->_dm_wrapper.init_and_attach_petscdm(_system, _snes);
+
+  // If we're not using PETSc DM, let's keep around
+  // the old style for fieldsplit
+  if (!use_petsc_dm)
+    {
+      ierr = SNESSetFromOptions(_snes);
+      LIBMESH_CHKERR(ierr);
+
+      KSP my_ksp;
+      ierr = SNESGetKSP(_snes, &my_ksp);
+      LIBMESH_CHKERR(ierr);
+
+      PC my_pc;
+      ierr = KSPGetPC(my_ksp, &my_pc);
+      LIBMESH_CHKERR(ierr);
+
+      petsc_auto_fieldsplit(my_pc, _system);
+    }
+}
 
 } // namespace libMesh
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -37,22 +37,39 @@
 #include "libmesh/quadrature.h"
 #include "libmesh/system.h"
 #include "libmesh/tensor_tools.h"
+#include "libmesh/enum_error_estimator_type.h"
+#include "libmesh/enum_norm_type.h"
 
 namespace libMesh
 {
 
 //-----------------------------------------------------------------
 // ErrorEstimator implementations
-void ExactErrorEstimator::attach_exact_value (Number fptr(const Point & p,
-                                                          const Parameters & parameters,
-                                                          const std::string & sys_name,
-                                                          const std::string & unknown_name))
+ExactErrorEstimator::ExactErrorEstimator() :
+    ErrorEstimator(),
+    _exact_value(nullptr),
+    _exact_deriv(nullptr),
+    _exact_hessian(nullptr),
+    _equation_systems_fine(nullptr),
+    _extra_order(0)
+{
+  error_norm = H1;
+}
+
+
+ErrorEstimatorType ExactErrorEstimator::type() const
+{
+  return EXACT;
+}
+
+
+void ExactErrorEstimator::attach_exact_value (ValueFunctionPointer fptr)
 {
   libmesh_assert(fptr);
   _exact_value = fptr;
 
   // We're not using a fine grid solution
-  _equation_systems_fine = libmesh_nullptr;
+  _equation_systems_fine = nullptr;
 
   // We're not using user-provided functors
   this->clear_functors();
@@ -61,20 +78,12 @@ void ExactErrorEstimator::attach_exact_value (Number fptr(const Point & p,
 
 void ExactErrorEstimator::attach_exact_values (std::vector<FunctionBase<Number> *> f)
 {
-  // Clear out any previous _exact_values entries, then add a new
+  // Automatically delete any previous _exact_values entries, then add a new
   // entry for each system.
-  for (unsigned int i=0; i != _exact_values.size(); ++i)
-    delete (_exact_values[i]);
-
   _exact_values.clear();
-  _exact_values.resize(f.size(), libmesh_nullptr);
 
-  // We use clone() to get non-sliced copies of FunctionBase
-  // subclasses, but we don't currently put the resulting UniquePtrs
-  // into an STL container.
-  for (unsigned int i=0; i != f.size(); ++i)
-    if (f[i])
-      _exact_values[i] = f[i]->clone().release();
+  for (auto ptr : f)
+    _exact_values.emplace_back(ptr ? ptr->clone() : nullptr);
 }
 
 
@@ -82,23 +91,20 @@ void ExactErrorEstimator::attach_exact_value (unsigned int sys_num,
                                               FunctionBase<Number> * f)
 {
   if (_exact_values.size() <= sys_num)
-    _exact_values.resize(sys_num+1, libmesh_nullptr);
+    _exact_values.resize(sys_num+1);
 
   if (f)
-    _exact_values[sys_num] = f->clone().release();
+    _exact_values[sys_num] = f->clone();
 }
 
 
-void ExactErrorEstimator::attach_exact_deriv (Gradient gptr(const Point & p,
-                                                            const Parameters & parameters,
-                                                            const std::string & sys_name,
-                                                            const std::string & unknown_name))
+void ExactErrorEstimator::attach_exact_deriv (GradientFunctionPointer gptr)
 {
   libmesh_assert(gptr);
   _exact_deriv = gptr;
 
   // We're not using a fine grid solution
-  _equation_systems_fine = libmesh_nullptr;
+  _equation_systems_fine = nullptr;
 
   // We're not using user-provided functors
   this->clear_functors();
@@ -107,20 +113,12 @@ void ExactErrorEstimator::attach_exact_deriv (Gradient gptr(const Point & p,
 
 void ExactErrorEstimator::attach_exact_derivs (std::vector<FunctionBase<Gradient> *> g)
 {
-  // Clear out any previous _exact_derivs entries, then add a new
+  // Automatically delete any previous _exact_derivs entries, then add a new
   // entry for each system.
-  for (unsigned int i=0; i != _exact_derivs.size(); ++i)
-    delete (_exact_derivs[i]);
-
   _exact_derivs.clear();
-  _exact_derivs.resize(g.size(), libmesh_nullptr);
 
-  // We use clone() to get non-sliced copies of FunctionBase
-  // subclasses, but we don't currently put the resulting UniquePtrs
-  // into an STL container.
-  for (unsigned int i=0; i != g.size(); ++i)
-    if (g[i])
-      _exact_derivs[i] = g[i]->clone().release();
+  for (auto ptr : g)
+    _exact_derivs.emplace_back(ptr ? ptr->clone() : nullptr);
 }
 
 
@@ -128,25 +126,22 @@ void ExactErrorEstimator::attach_exact_deriv (unsigned int sys_num,
                                               FunctionBase<Gradient> * g)
 {
   if (_exact_derivs.size() <= sys_num)
-    _exact_derivs.resize(sys_num+1, libmesh_nullptr);
+    _exact_derivs.resize(sys_num+1);
 
   if (g)
-    _exact_derivs[sys_num] = g->clone().release();
+    _exact_derivs[sys_num] = g->clone();
 }
 
 
 
 
-void ExactErrorEstimator::attach_exact_hessian (Tensor hptr(const Point & p,
-                                                            const Parameters & parameters,
-                                                            const std::string & sys_name,
-                                                            const std::string & unknown_name))
+void ExactErrorEstimator::attach_exact_hessian (HessianFunctionPointer hptr)
 {
   libmesh_assert(hptr);
   _exact_hessian = hptr;
 
   // We're not using a fine grid solution
-  _equation_systems_fine = libmesh_nullptr;
+  _equation_systems_fine = nullptr;
 
   // We're not using user-provided functors
   this->clear_functors();
@@ -155,20 +150,12 @@ void ExactErrorEstimator::attach_exact_hessian (Tensor hptr(const Point & p,
 
 void ExactErrorEstimator::attach_exact_hessians (std::vector<FunctionBase<Tensor> *> h)
 {
-  // Clear out any previous _exact_hessians entries, then add a new
+  // Automatically delete any previous _exact_hessians entries, then add a new
   // entry for each system.
-  for (unsigned int i=0; i != _exact_hessians.size(); ++i)
-    delete (_exact_hessians[i]);
-
   _exact_hessians.clear();
-  _exact_hessians.resize(h.size(), libmesh_nullptr);
 
-  // We use clone() to get non-sliced copies of FunctionBase
-  // subclasses, but we don't currently put the resulting UniquePtrs
-  // into an STL container.
-  for (unsigned int i=0; i != h.size(); ++i)
-    if (h[i])
-      _exact_hessians[i] = h[i]->clone().release();
+  for (auto ptr : h)
+    _exact_hessians.emplace_back(ptr ? ptr->clone() : nullptr);
 }
 
 
@@ -176,10 +163,10 @@ void ExactErrorEstimator::attach_exact_hessian (unsigned int sys_num,
                                                 FunctionBase<Tensor> * h)
 {
   if (_exact_hessians.size() <= sys_num)
-    _exact_hessians.resize(sys_num+1, libmesh_nullptr);
+    _exact_hessians.resize(sys_num+1);
 
   if (h)
-    _exact_hessians[sys_num] = h->clone().release();
+    _exact_hessians[sys_num] = h->clone();
 }
 
 
@@ -190,25 +177,21 @@ void ExactErrorEstimator::attach_reference_solution (EquationSystems * es_fine)
 
   // If we're using a fine grid solution, we're not using exact value
   // function pointers or functors.
-  _exact_value = libmesh_nullptr;
-  _exact_deriv = libmesh_nullptr;
-  _exact_hessian = libmesh_nullptr;
+  _exact_value = nullptr;
+  _exact_deriv = nullptr;
+  _exact_hessian = nullptr;
 
   this->clear_functors();
 }
 
-#ifdef LIBMESH_ENABLE_AMR
 void ExactErrorEstimator::estimate_error (const System & system,
                                           ErrorVector & error_per_cell,
                                           const NumericVector<Number> * solution_vector,
                                           bool estimate_parent_error)
-#else
-  void ExactErrorEstimator::estimate_error (const System & system,
-                                            ErrorVector & error_per_cell,
-                                            const NumericVector<Number> * solution_vector,
-                                            bool /* estimate_parent_error */ )
-#endif
 {
+  // Ignore the fact that this variable is unused when !LIBMESH_ENABLE_AMR
+  libmesh_ignore(estimate_parent_error);
+
   // The current mesh
   const MeshBase & mesh = system.get_mesh();
 
@@ -249,18 +232,18 @@ void ExactErrorEstimator::estimate_error (const System & system,
       // The type of finite element to use for this variable
       const FEType & fe_type = dof_map.variable_type (var);
 
-      UniquePtr<FEBase> fe (FEBase::build (dim, fe_type));
+      std::unique_ptr<FEBase> fe (FEBase::build (dim, fe_type));
 
       // Build an appropriate Gaussian quadrature rule
-      UniquePtr<QBase> qrule =
+      std::unique_ptr<QBase> qrule =
         fe_type.default_quadrature_rule (dim,
                                          _extra_order);
 
       fe->attach_quadrature_rule (qrule.get());
 
       // Prepare a global solution and a MeshFunction of the fine system if we need one
-      UniquePtr<MeshFunction> fine_values;
-      UniquePtr<NumericVector<Number> > fine_soln = NumericVector<Number>::build(system.comm());
+      std::unique_ptr<MeshFunction> fine_values;
+      std::unique_ptr<NumericVector<Number>> fine_soln = NumericVector<Number>::build(system.comm());
       if (_equation_systems_fine)
         {
           const System & fine_system = _equation_systems_fine->get_system(system.name());
@@ -275,7 +258,7 @@ void ExactErrorEstimator::estimate_error (const System & system,
              SERIAL);
           (*fine_soln) = global_soln;
 
-          fine_values = UniquePtr<MeshFunction>
+          fine_values = std::unique_ptr<MeshFunction>
             (new MeshFunction(*_equation_systems_fine,
                               *fine_soln,
                               fine_system.get_dof_map(),
@@ -283,17 +266,17 @@ void ExactErrorEstimator::estimate_error (const System & system,
           fine_values->init();
         } else {
         // Initialize functors if we're using them
-        for (unsigned int i=0; i != _exact_values.size(); ++i)
-          if (_exact_values[i])
-            _exact_values[i]->init();
+        for (auto & ev : _exact_values)
+          if (ev)
+            ev->init();
 
-        for (unsigned int i=0; i != _exact_derivs.size(); ++i)
-          if (_exact_derivs[i])
-            _exact_derivs[i]->init();
+        for (auto & ed : _exact_derivs)
+          if (ed)
+            ed->init();
 
-        for (unsigned int i=0; i != _exact_hessians.size(); ++i)
-          if (_exact_hessians[i])
-            _exact_hessians[i]->init();
+        for (auto & eh : _exact_hessians)
+          if (eh)
+            eh->init();
       }
 
       // Request the data we'll need to compute with
@@ -320,15 +303,8 @@ void ExactErrorEstimator::estimate_error (const System & system,
 
       // Iterate over all the active elements in the mesh
       // that live on this processor.
-      MeshBase::const_element_iterator
-        elem_it  = mesh.active_local_elements_begin();
-      const MeshBase::const_element_iterator
-        elem_end = mesh.active_local_elements_end();
-
-      for (;elem_it != elem_end; ++elem_it)
+      for (const auto & elem : mesh.active_local_element_ptr_range())
         {
-          // e is necessarily an active element on the local processor
-          const Elem * elem = *elem_it;
           const dof_id_type e_id = elem->id();
 
 #ifdef LIBMESH_ENABLE_AMR
@@ -342,8 +318,8 @@ void ExactErrorEstimator::estimate_error (const System & system,
           if (!parent || !estimate_parent_error)
             compute_on_parent = false;
           else
-            for (unsigned int c=0; c != parent->n_children(); ++c)
-              if (!parent->child(c)->active())
+            for (auto & child : parent->child_ref_range())
+              if (!child.active())
                 compute_on_parent = false;
 
           if (compute_on_parent &&
@@ -386,7 +362,7 @@ void ExactErrorEstimator::estimate_error (const System & system,
 
 
 
-  // Each processor has now computed the error contribuions
+  // Each processor has now computed the error contributions
   // for its local elements.  We need to sum the vector
   // and then take the square-root of each component.  Note
   // that we only need to sum if we are running on multiple
@@ -398,19 +374,15 @@ void ExactErrorEstimator::estimate_error (const System & system,
   this->reduce_error(error_per_cell, system.comm());
 
   // Compute the square-root of each component.
-  START_LOG("std::sqrt()", "ExactErrorEstimator");
-  for (dof_id_type i=0; i<error_per_cell.size(); i++)
-    {
-
-      if (error_per_cell[i] != 0.)
+  {
+    LOG_SCOPE("std::sqrt()", "ExactErrorEstimator");
+    for (auto & val : error_per_cell) // std::size_t i=0; i<error_per_cell.size(); i++)
+      if (val != 0.)
         {
-          libmesh_assert_greater (error_per_cell[i], 0.);
-          error_per_cell[i] = std::sqrt(error_per_cell[i]);
+          libmesh_assert_greater (val, 0.);
+          val = std::sqrt(val);
         }
-
-
-    }
-  STOP_LOG("std::sqrt()", "ExactErrorEstimator");
+  }
 
   // If we used a non-standard solution before, now is the time to fix
   // the current_local_solution
@@ -448,12 +420,12 @@ Real ExactErrorEstimator::find_squared_element_error(const System & system,
   fe->reinit (elem);
 
   // Get the data we need to compute with
-  const std::vector<Real> &                       JxW          = fe->get_JxW();
-  const std::vector<std::vector<Real> > &         phi_values   = fe->get_phi();
-  const std::vector<std::vector<RealGradient> > & dphi_values  = fe->get_dphi();
-  const std::vector<Point> &                      q_point      = fe->get_xyz();
+  const std::vector<Real> &                      JxW          = fe->get_JxW();
+  const std::vector<std::vector<Real>> &         phi_values   = fe->get_phi();
+  const std::vector<std::vector<RealGradient>> & dphi_values  = fe->get_dphi();
+  const std::vector<Point> &                     q_point      = fe->get_xyz();
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
-  const std::vector<std::vector<RealTensor> > &   d2phi_values = fe->get_d2phi();
+  const std::vector<std::vector<RealTensor>> &   d2phi_values = fe->get_d2phi();
 #endif
 
   // The number of shape functions
@@ -481,7 +453,7 @@ Real ExactErrorEstimator::find_squared_element_error(const System & system,
 #endif
 
       // Compute solution values at the current
-      // quadrature point.  This reqiures a sum
+      // quadrature point.  This requires a sum
       // over all the shape functions evaluated
       // at the quadrature point.
       for (unsigned int i=0; i<n_sf; i++)
@@ -519,12 +491,12 @@ Real ExactErrorEstimator::find_squared_element_error(const System & system,
           error_norm.type(var) == H2)
         {
           Gradient grad_error = grad_u_h;
-          if(_exact_deriv)
+          if (_exact_deriv)
             grad_error -= _exact_deriv(q_point[qp],parameters,sys_name,var_name);
           else if (_exact_derivs.size() > sys_num && _exact_derivs[sys_num])
             grad_error -= _exact_derivs[sys_num]->
               component(var_component, q_point[qp], system.time);
-          else if(_equation_systems_fine)
+          else if (_equation_systems_fine)
             grad_error -= fine_values->gradient(q_point[qp]);
 
           error_val += JxW[qp]*grad_error.norm_sq();
@@ -538,7 +510,7 @@ Real ExactErrorEstimator::find_squared_element_error(const System & system,
            error_norm.type(var) == H2))
         {
           Tensor grad2_error = grad2_u_h;
-          if(_exact_hessian)
+          if (_exact_hessian)
             grad2_error -= _exact_hessian(q_point[qp],parameters,sys_name,var_name);
           else if (_exact_hessians.size() > sys_num && _exact_hessians[sys_num])
             grad2_error -= _exact_hessians[sys_num]->
@@ -561,17 +533,9 @@ Real ExactErrorEstimator::find_squared_element_error(const System & system,
 
 void ExactErrorEstimator::clear_functors()
 {
-  // delete will clean up any cloned functors and no-op on any NULL
-  // pointers
-
-  for (unsigned int i=0; i != _exact_values.size(); ++i)
-    delete (_exact_values[i]);
-
-  for (unsigned int i=0; i != _exact_derivs.size(); ++i)
-    delete (_exact_derivs[i]);
-
-  for (unsigned int i=0; i != _exact_hessians.size(); ++i)
-    delete (_exact_hessians[i]);
+  _exact_values.clear();
+  _exact_derivs.clear();
+  _exact_hessians.clear();
 }
 
 

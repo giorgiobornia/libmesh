@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -15,12 +15,12 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-// C++ includes
-
 // Local includes
 #include "libmesh/side.h"
 #include "libmesh/edge_edge2.h"
 #include "libmesh/face_tri3.h"
+#include "libmesh/enum_io_package.h"
+#include "libmesh/enum_order.h"
 
 namespace libMesh
 {
@@ -29,7 +29,12 @@ namespace libMesh
 
 // ------------------------------------------------------------
 // Tri3 class static member initializations
-const unsigned int Tri3::side_nodes_map[3][2] =
+const int Tri3::num_nodes;
+const int Tri3::num_sides;
+const int Tri3::num_children;
+const int Tri3::nodes_per_side;
+
+const unsigned int Tri3::side_nodes_map[Tri3::num_sides][Tri3::nodes_per_side] =
   {
     {0, 1}, // Side 0
     {1, 2}, // Side 1
@@ -39,7 +44,7 @@ const unsigned int Tri3::side_nodes_map[3][2] =
 
 #ifdef LIBMESH_ENABLE_AMR
 
-const float Tri3::_embedding_matrix[4][3][3] =
+const float Tri3::_embedding_matrix[Tri3::num_children][Tri3::num_nodes][Tri3::num_nodes] =
   {
     // embedding matrix for child 0
     {
@@ -100,34 +105,42 @@ bool Tri3::is_node_on_side(const unsigned int n,
                            const unsigned int s) const
 {
   libmesh_assert_less (s, n_sides());
-  for (unsigned int i = 0; i != 2; ++i)
-    if (side_nodes_map[s][i] == n)
-      return true;
-  return false;
+  return std::find(std::begin(side_nodes_map[s]),
+                   std::end(side_nodes_map[s]),
+                   n) != std::end(side_nodes_map[s]);
 }
 
-UniquePtr<Elem> Tri3::build_side (const unsigned int i,
-                                  bool proxy) const
+std::vector<unsigned>
+Tri3::nodes_on_side(const unsigned int s) const
+{
+  libmesh_assert_less(s, n_sides());
+  return {std::begin(side_nodes_map[s]), std::end(side_nodes_map[s])};
+}
+
+Order Tri3::default_order() const
+{
+  return FIRST;
+}
+
+std::unique_ptr<Elem> Tri3::build_side_ptr (const unsigned int i,
+                                            bool proxy)
 {
   libmesh_assert_less (i, this->n_sides());
 
   if (proxy)
-    return UniquePtr<Elem>(new Side<Edge2,Tri3>(this,i));
+    return libmesh_make_unique<Side<Edge2,Tri3>>(this,i);
 
   else
     {
-      Elem * edge = new Edge2;
+      std::unique_ptr<Elem> edge = libmesh_make_unique<Edge2>();
       edge->subdomain_id() = this->subdomain_id();
 
       // Set the nodes
       for (unsigned n=0; n<edge->n_nodes(); ++n)
-        edge->set_node(n) = this->get_node(Tri3::side_nodes_map[i][n]);
+        edge->set_node(n) = this->node_ptr(Tri3::side_nodes_map[i][n]);
 
-      return UniquePtr<Elem>(edge);
+      return edge;
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return UniquePtr<Elem>();
 }
 
 
@@ -143,19 +156,19 @@ void Tri3::connectivity(const unsigned int libmesh_dbg_var(sf),
     case TECPLOT:
       {
         conn.resize(4);
-        conn[0] = this->node(0)+1;
-        conn[1] = this->node(1)+1;
-        conn[2] = this->node(2)+1;
-        conn[3] = this->node(2)+1;
+        conn[0] = this->node_id(0)+1;
+        conn[1] = this->node_id(1)+1;
+        conn[2] = this->node_id(2)+1;
+        conn[3] = this->node_id(2)+1;
         return;
       }
 
     case VTK:
       {
         conn.resize(3);
-        conn[0] = this->node(0);
-        conn[1] = this->node(1);
-        conn[2] = this->node(2);
+        conn[0] = this->node_id(0);
+        conn[1] = this->node_id(1);
+        conn[2] = this->node_id(2);
         return;
       }
 
@@ -172,11 +185,8 @@ void Tri3::connectivity(const unsigned int libmesh_dbg_var(sf),
 Real Tri3::volume () const
 {
   // 3-node triangles have the following formula for computing the area
-  Point v10 ( *(this->get_node(1)) - *(this->get_node(0)) );
-
-  Point v20 ( *(this->get_node(2)) - *(this->get_node(0)) );
-
-  return 0.5 * (v10.cross(v20)).norm() ;
+  return 0.5 * cross_norm(point(1) - point(0),
+                          point(2) - point(0));
 }
 
 
@@ -205,5 +215,42 @@ std::pair<Real, Real> Tri3::min_and_max_angle() const
   return std::make_pair(std::min(theta0, std::min(theta1,theta2)),
                         std::max(theta0, std::max(theta1,theta2)));
 }
+
+bool Tri3::contains_point (const Point & p, Real tol) const
+{
+  // See "Barycentric Technique" section at
+  // http://www.blackpawn.com/texts/pointinpoly for details.
+
+  // Compute vectors
+  Point v0 = this->point(1) - this->point(0);
+  Point v1 = this->point(2) - this->point(0);
+  Point v2 = p - this->point(0);
+
+  // Compute dot products
+  Real dot00 = v0 * v0;
+  Real dot01 = v0 * v1;
+  Real dot02 = v0 * v2;
+  Real dot11 = v1 * v1;
+  Real dot12 = v1 * v2;
+
+  // Out of plane check
+  if (std::abs(triple_product(v2, v0, v1)) / std::max(dot00, dot11) > tol)
+    return false;
+
+  // Compute barycentric coordinates
+  Real invDenom = 1 / (dot00 * dot11 - dot01 * dot01);
+  Real u = (dot11 * dot02 - dot01 * dot12) * invDenom;
+  Real v = (dot00 * dot12 - dot01 * dot02) * invDenom;
+
+  // Check if point is in triangle
+  return (u > -tol) && (v > -tol) && (u + v < 1 + tol);
+}
+
+BoundingBox
+Tri3::loose_bounding_box () const
+{
+  return Elem::loose_bounding_box();
+}
+
 
 } // namespace libMesh

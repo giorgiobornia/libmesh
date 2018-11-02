@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -64,7 +64,7 @@ public:
 
   // The application number controls what boundary conditions and/or
   // forcing functions are applied.  Current options are:
-  // 0 - discontinuous lid velociy driven cavity
+  // 0 - discontinuous lid velocity driven cavity
   // 1 - homogeneous Dirichlet BC with smooth forcing
   unsigned int application;
 

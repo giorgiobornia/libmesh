@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -32,7 +32,7 @@ namespace libMesh
  * \author Paul T. Bauman
  * \date 2012
  */
-template< typename OutputShape >
+template<typename OutputShape>
 class HCurlFETransformation : public FETransformationBase<OutputShape>
 {
 public:
@@ -43,30 +43,46 @@ public:
   virtual ~HCurlFETransformation(){}
 
   /**
-   * Evaluates shape functions in physical coordinates for HCurl
-   * conforming elements.  In this case \f$ \phi = (dx/d\xi)^{-T}
+   * Pre-requests any necessary data from FEMap
+   */
+  virtual void init_map_phi(const FEGenericBase<OutputShape> & fe) const override;
+
+  /**
+   * Pre-requests any necessary data from FEMap
+   */
+  virtual void init_map_dphi(const FEGenericBase<OutputShape> & fe) const override;
+
+  /**
+   * Pre-requests any necessary data from FEMap
+   */
+  virtual void init_map_d2phi(const FEGenericBase<OutputShape> & fe) const override;
+
+  /**
+   * Evaluates shape functions in physical coordinates for \f$ H(curl)
+   * \f$ conforming elements.  In this case \f$ \phi = (dx/d\xi)^{-T}
    * \hat{\phi} \f$, where \f$ (dx/d\xi)^{-T} \f$ is the
-   * inverse-transpose of the Jacobian matrix of the element map. Note
-   * here \f$ x, \xi \f$ are vectors.
+   * inverse-transpose of the Jacobian matrix of the element map.
+   *
+   * \note Here \f$ x, \xi \f$ are vectors.
    */
   virtual void map_phi(const unsigned int dim,
                        const Elem * const elem,
                        const std::vector<Point> & qp,
                        const FEGenericBase<OutputShape> & fe,
-                       std::vector<std::vector<OutputShape> > & phi) const libmesh_override;
+                       std::vector<std::vector<OutputShape>> & phi) const override;
 
   /**
    * Evaluates shape function gradients in physical coordinates for
-   * HCurl conforming elements.
+   * \f$ H(curl) \f$ conforming elements.
    */
   virtual void map_dphi(const unsigned int /*dim*/,
                         const Elem * const /*elem*/,
                         const std::vector<Point> & /*qp*/,
                         const FEGenericBase<OutputShape> & /*fe*/,
-                        std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputGradient> > & /*dphi*/,
-                        std::vector<std::vector<OutputShape> > & /*dphidx*/,
-                        std::vector<std::vector<OutputShape> > & /*dphidy*/,
-                        std::vector<std::vector<OutputShape> > & /*dphidz*/) const libmesh_override
+                        std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputGradient>> & /*dphi*/,
+                        std::vector<std::vector<OutputShape>> & /*dphidx*/,
+                        std::vector<std::vector<OutputShape>> & /*dphidy*/,
+                        std::vector<std::vector<OutputShape>> & /*dphidz*/) const override
   {
     libmesh_warning("WARNING: Shape function gradients for HCurl elements are not currently being computed!");
   }
@@ -74,25 +90,25 @@ public:
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
   /**
    * Evaluates shape function Hessians in physical coordinates based
-   * on HCurl conforming finite element transformation.
+   * on \f$ H(curl) \f$ conforming finite element transformation.
    */
   virtual void map_d2phi(const unsigned int /*dim*/,
                          const std::vector<Point> & /*qp*/,
                          const FEGenericBase<OutputShape> & /*fe*/,
-                         std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputTensor> > & /*d2phi*/,
-                         std::vector<std::vector<OutputShape> > & /*d2phidx2*/,
-                         std::vector<std::vector<OutputShape> > & /*d2phidxdy*/,
-                         std::vector<std::vector<OutputShape> > & /*d2phidxdz*/,
-                         std::vector<std::vector<OutputShape> > & /*d2phidy2*/,
-                         std::vector<std::vector<OutputShape> > & /*d2phidydz*/,
-                         std::vector<std::vector<OutputShape> > & /*d2phidz2*/) const libmesh_override
+                         std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputTensor>> & /*d2phi*/,
+                         std::vector<std::vector<OutputShape>> & /*d2phidx2*/,
+                         std::vector<std::vector<OutputShape>> & /*d2phidxdy*/,
+                         std::vector<std::vector<OutputShape>> & /*d2phidxdz*/,
+                         std::vector<std::vector<OutputShape>> & /*d2phidy2*/,
+                         std::vector<std::vector<OutputShape>> & /*d2phidydz*/,
+                         std::vector<std::vector<OutputShape>> & /*d2phidz2*/) const override
   {
     libmesh_warning("WARNING: Shape function Hessians for HCurl elements are not currently being computed!");
   }
 #endif //LIBMESH_ENABLE_SECOND_DERIVATIVES
 
   /**
-   * Evaluates the shape function curl in physical coordinates based on HCurl conforming
+   * Evaluates the shape function curl in physical coordinates based on \f$ H(curl) \f$ conforming
    * finite element transformation.
    * In 2-D, the transformation is \f$ \nabla \times \phi = J^{-1} * \nabla \times \hat{\phi} \f$ where
    * \f$ J = \det( dx/d\xi ) \f$
@@ -102,17 +118,17 @@ public:
                         const Elem * const elem,
                         const std::vector<Point> & qp,
                         const FEGenericBase<OutputShape> & fe,
-                        std::vector<std::vector<OutputShape> > & curl_phi) const libmesh_override;
+                        std::vector<std::vector<OutputShape>> & curl_phi) const override;
 
   /**
    * Evaluates the shape function divergence in physical coordinates
-   * based on HCurl conforming finite element transformation.
+   * based on \f$ H(curl) \f$ conforming finite element transformation.
    */
   virtual void map_div(const unsigned int /*dim*/,
                        const Elem * const /*elem*/,
                        const std::vector<Point> & /*qp*/,
                        const FEGenericBase<OutputShape> & /*fe*/,
-                       std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputDivergence> > & /*div_phi*/) const libmesh_override
+                       std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputDivergence>> & /*div_phi*/) const override
   {
     libmesh_warning("WARNING: Shape function divergences for HCurl elements are not currently being computed!");
   }

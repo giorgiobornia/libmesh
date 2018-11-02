@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -24,9 +24,9 @@ namespace libMesh
 {
 
 //Forward Declarations
-template< typename T > class FEGenericBase;
-template< typename T > class H1FETransformation;
-template< typename T > class HCurlFETransformation;
+template<typename T> class FEGenericBase;
+template<typename T> class H1FETransformation;
+template<typename T> class HCurlFETransformation;
 class FEType;
 
 /**
@@ -38,7 +38,7 @@ class FEType;
  * \author Paul T. Bauman
  * \date 2012
  */
-template< typename OutputShape >
+template<typename OutputShape>
 class FETransformationBase
 {
 public:
@@ -49,7 +49,22 @@ public:
   /**
    * Builds an FETransformation object based on the finite element type
    */
-  static UniquePtr<FETransformationBase<OutputShape> > build(const FEType & type);
+  static std::unique_ptr<FETransformationBase<OutputShape>> build(const FEType & type);
+
+  /**
+   * Pre-requests any necessary data from FEMap
+   */
+  virtual void init_map_phi(const FEGenericBase<OutputShape> & fe) const = 0;
+
+  /**
+   * Pre-requests any necessary data from FEMap
+   */
+  virtual void init_map_dphi(const FEGenericBase<OutputShape> & fe) const = 0;
+
+  /**
+   * Pre-requests any necessary data from FEMap
+   */
+  virtual void init_map_d2phi(const FEGenericBase<OutputShape> & fe) const = 0;
 
   /**
    * Evaluates shape functions in physical coordinates based on proper
@@ -59,7 +74,7 @@ public:
                        const Elem * const elem,
                        const std::vector<Point> & qp,
                        const FEGenericBase<OutputShape> & fe,
-                       std::vector<std::vector<OutputShape> > & phi) const = 0;
+                       std::vector<std::vector<OutputShape>> & phi) const = 0;
 
   /**
    * Evaluates shape function gradients in physical coordinates based on proper
@@ -69,10 +84,10 @@ public:
                         const Elem * const elem,
                         const std::vector<Point> & qp,
                         const FEGenericBase<OutputShape> & fe,
-                        std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputGradient> > & dphi,
-                        std::vector<std::vector<OutputShape> > & dphidx,
-                        std::vector<std::vector<OutputShape> > & dphidy,
-                        std::vector<std::vector<OutputShape> > & dphidz) const = 0;
+                        std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputGradient>> & dphi,
+                        std::vector<std::vector<OutputShape>> & dphidx,
+                        std::vector<std::vector<OutputShape>> & dphidy,
+                        std::vector<std::vector<OutputShape>> & dphidz) const = 0;
 
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
   /**
@@ -82,13 +97,13 @@ public:
   virtual void map_d2phi(const unsigned int dim,
                          const std::vector<Point> & qp,
                          const FEGenericBase<OutputShape> & fe,
-                         std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputTensor> > & d2phi,
-                         std::vector<std::vector<OutputShape> > & d2phidx2,
-                         std::vector<std::vector<OutputShape> > & d2phidxdy,
-                         std::vector<std::vector<OutputShape> > & d2phidxdz,
-                         std::vector<std::vector<OutputShape> > & d2phidy2,
-                         std::vector<std::vector<OutputShape> > & d2phidydz,
-                         std::vector<std::vector<OutputShape> > & d2phidz2) const = 0;
+                         std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputTensor>> & d2phi,
+                         std::vector<std::vector<OutputShape>> & d2phidx2,
+                         std::vector<std::vector<OutputShape>> & d2phidxdy,
+                         std::vector<std::vector<OutputShape>> & d2phidxdz,
+                         std::vector<std::vector<OutputShape>> & d2phidy2,
+                         std::vector<std::vector<OutputShape>> & d2phidydz,
+                         std::vector<std::vector<OutputShape>> & d2phidz2) const = 0;
 #endif //LIBMESH_ENABLE_SECOND_DERIVATIVES
 
 
@@ -100,7 +115,7 @@ public:
                         const Elem * const elem,
                         const std::vector<Point> & qp,
                         const FEGenericBase<OutputShape> & fe,
-                        std::vector<std::vector<OutputShape> > & curl_phi) const = 0;
+                        std::vector<std::vector<OutputShape>> & curl_phi) const = 0;
 
   /**
    * Evaluates the shape function divergence in physical coordinates based on proper
@@ -110,7 +125,7 @@ public:
                        const Elem * const elem,
                        const std::vector<Point> & qp,
                        const FEGenericBase<OutputShape> & fe,
-                       std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputDivergence> > & div_phi) const = 0;
+                       std::vector<std::vector<typename FEGenericBase<OutputShape>::OutputDivergence>> & div_phi) const = 0;
 
 }; // class FETransformationBase
 

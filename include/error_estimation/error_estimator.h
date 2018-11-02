@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -24,7 +24,15 @@
 #include "libmesh/libmesh_common.h"
 #include "libmesh/parallel.h"
 #include "libmesh/system_norm.h"
+
+#ifdef LIBMESH_FORWARD_DECLARE_ENUMS
+namespace libMesh
+{
+enum ErrorEstimatorType : int;
+}
+#else
 #include "libmesh/enum_error_estimator_type.h"
+#endif
 
 // C++ includes
 #include <cstddef>
@@ -45,9 +53,10 @@ template <typename T> class NumericVector;
  * This class holds functions that will estimate the error
  * in a finite element solution on a given mesh.  These error
  * estimates can be useful in their own right, or may be used
- * to guide adaptive mesh refinement.  Note that in general
- * the computed errors are stored as floats rather than doubles
- * since the required precision is low.
+ * to guide adaptive mesh refinement.
+ *
+ * \note The computed errors are stored as floats rather
+ * than doubles since the required precision is low.
  *
  * \author Benjamin S. Kirk
  * \date 2003
@@ -60,14 +69,17 @@ public:
    * Constructor.  Empty.  Derived classes should reset error_norm as
    * appropriate.
    */
-  ErrorEstimator() :
-    error_norm()
-  {}
+  ErrorEstimator() = default;
 
   /**
-   * Destructor.
+   * Copy/move ctor, copy/move assignment operator, and destructor are
+   * all explicitly defaulted for this simple class.
    */
-  virtual ~ErrorEstimator() {}
+  ErrorEstimator (const ErrorEstimator &) = default;
+  ErrorEstimator (ErrorEstimator &&) = default;
+  ErrorEstimator & operator= (const ErrorEstimator &) = default;
+  ErrorEstimator & operator= (ErrorEstimator &&) = default;
+  virtual ~ErrorEstimator() = default;
 
 
   /**
@@ -75,7 +87,7 @@ public:
    * in derived classes to compute the error for each
    * active element and place it in the "error_per_cell" vector.
    *
-   * If solution_vector is not libmesh_nullptr, the estimator will
+   * If solution_vector is not nullptr, the estimator will
    * (if able) attempt to estimate an error in that field
    * instead of in system.solution.
    *
@@ -85,7 +97,7 @@ public:
    */
   virtual void estimate_error (const System & system,
                                ErrorVector & error_per_cell,
-                               const NumericVector<Number> * solution_vector = libmesh_nullptr,
+                               const NumericVector<Number> * solution_vector = nullptr,
                                bool estimate_parent_error = false) = 0;
 
   /**
@@ -102,7 +114,7 @@ public:
   virtual void estimate_errors (const EquationSystems & equation_systems,
                                 ErrorVector & error_per_cell,
                                 const std::map<const System *, SystemNorm> & error_norms,
-                                const std::map<const System *, const NumericVector<Number> *> * solution_vectors = libmesh_nullptr,
+                                const std::map<const System *, const NumericVector<Number> *> * solution_vectors = nullptr,
                                 bool estimate_parent_error = false);
 
   /**
@@ -125,11 +137,11 @@ public:
    */
   virtual void estimate_errors (const EquationSystems & equation_systems,
                                 ErrorMap & errors_per_cell,
-                                const std::map<const System *, const NumericVector<Number> *> * solution_vectors = libmesh_nullptr,
+                                const std::map<const System *, const NumericVector<Number> *> * solution_vectors = nullptr,
                                 bool estimate_parent_error = false);
 
   /**
-   * Returns the type for the ErrorEstimator subclass.
+   * \returns The type for the ErrorEstimator subclass.
    */
   virtual ErrorEstimatorType type() const = 0;
 
@@ -155,9 +167,8 @@ protected:
    * \p error_per_cell from each processor and combines
    * them to get the global error vector.
    */
-  void reduce_error (std::vector<float> & error_per_cell,
-                     const Parallel::Communicator & comm
-                     LIBMESH_CAN_DEFAULT_TO_COMMWORLD) const;
+  void reduce_error (std::vector<ErrorVectorReal> & error_per_cell,
+                     const Parallel::Communicator & comm) const;
 };
 
 

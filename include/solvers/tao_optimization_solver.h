@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -35,7 +35,7 @@
 namespace libMesh
 {
 
-// Allow users access to these functions in case they want to reuse them.  Note that users shouldn't
+// Allow users access to these functions in case they want to reuse them.  Users shouldn't
 // need access to these most of the time as they are used internally by this object.
 extern "C"
 {
@@ -78,42 +78,43 @@ public:
   /**
    * Release all memory and clear data structures.
    */
-  virtual void clear () libmesh_override;
+  virtual void clear () override;
 
   /**
    * Initialize data structures if not done so already.
    */
-  virtual void init () libmesh_override;
+  virtual void init () override;
 
   /**
-   * Returns the raw PETSc Tao context pointer.
+   * \returns The raw PETSc Tao context pointer.
    */
   Tao tao() { this->init(); return _tao; }
 
   /**
    * Call the Tao solver.
    */
-  virtual void solve () libmesh_override;
+  virtual void solve () override;
 
   /**
    * Get the current values of dual variables associated with
    * inequality and equality constraints. The variables will
    * be stored in _system.lambda_eq and _system.lambda_ineq.
    */
-  virtual void get_dual_variables() libmesh_override;
+  virtual void get_dual_variables() override;
 
   /**
    * Prints a useful message about why the latest optimization solve
    * con(di)verged.
    */
-  virtual void print_converged_reason() libmesh_override;
+  virtual void print_converged_reason() override;
 
   /**
-   * Returns the currently-available (or most recently obtained, if the Tao object has
-   * been destroyed) convergence reason.  Refer to Tao docs for the meaning of different
-   * TaoConvergedReason.
+   * \returns The currently-available (or most recently obtained, if
+   * the Tao object has been destroyed) convergence reason.
+   *
+   * Refer to Tao docs for the meaning of different TaoConvergedReason.
    */
-  virtual int get_converged_reason() libmesh_override;
+  virtual int get_converged_reason() override;
 
 protected:
 
@@ -123,11 +124,14 @@ protected:
   Tao _tao;
 
   /**
-   * Store the reason for Tao convergence/divergence for use even after _tao
-   * has been cleared.  Note that print_converged_reason() will always *try* to
-   * get the current reason with TaoGetConvergedReason(), but if the Tao object
-   * has already been cleared, it will fall back on this stored value.  Note that
-   * this value is therefore necessarily *not* cleared by the clear() function.
+   * Store the reason for Tao convergence/divergence for use even
+   * after \p _tao has been cleared.
+   *
+   * \note \p print_converged_reason() will always \e try to get the
+   * current reason with TaoGetConvergedReason(), but if the Tao
+   * object has already been cleared, it will fall back on this stored
+   * value.  This value is therefore necessarily \e not cleared by the
+   * clear() function.
    */
   TaoConvergedReason _reason;
 

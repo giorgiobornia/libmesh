@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -47,6 +47,7 @@ class System;
  * \author Benjamin Kirk
  * \author John Peterson
  * \date 2004
+ * \brief Handles reading and writing of Exodus binary files.
  */
 class ExodusII_IO : public MeshInput<MeshBase>,
                     public MeshOutput<MeshBase>,
@@ -55,7 +56,7 @@ class ExodusII_IO : public MeshInput<MeshBase>,
 public:
 
   /**
-   * Constructor.  Takes a writeable reference to a mesh object.
+   * Constructor.  Takes a writable reference to a mesh object.
    * This is the constructor required to read a mesh.
    */
   explicit
@@ -74,12 +75,12 @@ public:
    * by cubit.  Works in 2D for \p TRIs, \p TRI6s, \p QUAD s, and \p QUAD9s.
    * Works in 3D for \p TET4s, \p TET10s, \p HEX8s, and \p HEX27s.
    */
-  virtual void read (const std::string & name) libmesh_override;
+  virtual void read (const std::string & name) override;
 
   /**
    * This method implements writing a mesh to a specified file.
    */
-  virtual void write (const std::string & fname) libmesh_override;
+  virtual void write (const std::string & fname) override;
 
   /**
    * Set the flag indicating if we should be verbose.
@@ -87,25 +88,31 @@ public:
   void verbose (bool set_verbosity);
 
   /**
-   * Returns an array containing the timesteps in the file
+   * \returns An array containing the timesteps in the file.
    */
   const std::vector<Real> & get_time_steps();
 
   /**
-   * Returns the number of timesteps currently stored in the Exodus
-   * file.  Knowing the number of time steps currently stored in the
-   * file is sometimes necessary when appending, so we can know where
-   * to start writing new data.  Throws an error if the file is not
-   * currently open for reading or writing.
+   * \returns The number of timesteps currently stored in the Exodus
+   * file.
+   *
+   * Knowing the number of time steps currently stored in the file is
+   * sometimes necessary when appending, so we can know where to start
+   * writing new data.  Throws an error if the file is not currently
+   * open for reading or writing.
    */
   int get_num_time_steps();
 
   /**
-   * Backward compatibility version of function that takes a single variable name
+   * Backward compatibility version of function that takes a single variable name.
+   *
+   * \deprecated Use the version of copy_nodal_solution() that takes two names.
    */
+#ifdef LIBMESH_ENABLE_DEPRECATED
   void copy_nodal_solution(System & system,
                            std::string var_name,
                            unsigned int timestep=1);
+#endif
 
   /**
    * If we read in a nodal solution while reading in a mesh, we can attempt
@@ -126,11 +133,51 @@ public:
                                unsigned int timestep=1);
 
   /**
+   * Given an elemental variable and a time step, returns a mapping from the
+   * elements (top parent) unique IDs to the value of the elemental variable at
+   * the corresponding time step index.
+   * Note that this function MUST only be called before renumbering!
+   * This function is essentially a wrapper for read_elemental_var_values from
+   * the exodus helper (which is not accessible outside this class).
+   * \param elemental_var_name Name of an elemental variable
+   * \param timestep The corresponding time step index
+   * \param unique_id_to_value_map The map to be filled
+   */
+  void read_elemental_variable(std::string elemental_var_name,
+                               unsigned int timestep,
+                               std::map<unsigned int, Real> & unique_id_to_value_map);
+
+  /**
+   * Given a vector of global variables and a time step, returns the values
+   * of the global variable at the corresponding time step index.
+   * \param global_var_names Vector of names of global variables
+   * \param timestep The corresponding time step index
+   * \param global_values The vector to be filled
+   */
+  void read_global_variable(std::vector<std::string> global_var_names,
+                            unsigned int timestep,
+                            std::vector<Real> & global_values);
+
+  /**
    * Writes a exodusII file with discontinuous data
    */
   void write_discontinuous_exodusII (const std::string & name,
                                      const EquationSystems & es,
-                                     const std::set<std::string> * system_names=libmesh_nullptr);
+                                     const std::set<std::string> * system_names=nullptr);
+
+  /**
+   * Writes a discontinuous solution at a specific timestep
+   * \param fname Name of the file to be written
+   * \param es EquationSystems object which contains the solution vector
+   * \param timestep The timestep to write out. (should be _1_ indexed)
+   * \param time The current simulation time
+   * \param system_names Optional list of systems to write solutions for.
+   */
+  void write_timestep_discontinuous (const std::string &fname,
+                                     const EquationSystems &es,
+                                     const int timestep,
+                                     const Real time,
+                                     const std::set<std::string> * system_names=nullptr);
 
   /**
    * Write out element solution.
@@ -138,18 +185,25 @@ public:
   void write_element_data (const EquationSystems & es);
 
   /**
+   * Bring in base class functionality for name resolution and to
+   * avoid warnings about hidden overloaded virtual functions.
+   */
+  using MeshOutput<MeshBase>::write_nodal_data;
+  using MeshOutput<MeshBase>::write_nodal_data_discontinuous;
+
+  /**
    * Write out a nodal solution.
    */
   virtual void write_nodal_data (const std::string &,
                                  const std::vector<Number> &,
-                                 const std::vector<std::string> &) libmesh_override;
+                                 const std::vector<std::string> &) override;
 
   /**
    * Write out a discontinuous nodal solution.
    */
   void write_nodal_data_discontinuous (const std::string &,
                                        const std::vector<Number> &,
-                                       const std::vector<std::string> &);
+                                       const std::vector<std::string> &) override;
 
   /**
    * Write out global variables.
@@ -164,12 +218,17 @@ public:
 
   /**
    * Writes out the solution at a specific timestep.
-   * @param timestep The timestep to write out, should be _1_ indexed.
+   * \param fname Name of the file to write to
+   * \param es EquationSystems object which contains the solution vector.
+   * \param timestep The timestep to write out, should be _1_ indexed.
+   * \param time The current simulation time.
+   * \param system_names Optional list of systems to write solutions for.
    */
   void write_timestep (const std::string & fname,
                        const EquationSystems & es,
                        const int timestep,
-                       const Real time);
+                       const Real time,
+                       const std::set<std::string> * system_names=nullptr);
 
   /**
    * Sets the list of variable names to be included in the output.
@@ -207,8 +266,18 @@ public:
   void write_as_dimension(unsigned dim);
 
   /**
-   * Allows you to set a vector that is added to the coordinates of all
-   * of the nodes.  Effectively, this "moves" the mesh to a particular position
+   * Allows you to set a vector that is added to the coordinates of
+   * all of the nodes. Effectively, this "moves" the mesh to a
+   * particular position.
+   *
+   * \deprecated As requested by Roy in libmesh PR #90, this function
+   * was "deprecated on arrival". There is not really a suitable
+   * replacement for it in the works, however. The same effect *could*
+   * be achieved by calling MeshTools::Modification::translate()
+   * twice, but that approach seems inefficient in the case of very
+   * large problems with millions of nodes. That said, this should
+   * probably become a base class API so that it works for all the
+   * different IO subclasses.
    */
   void set_coordinate_offset(Point p);
 
@@ -229,6 +298,21 @@ public:
    */
   const std::vector<std::string> & get_nodal_var_names();
 
+#ifdef LIBMESH_HAVE_EXODUS_API
+  /**
+   * Return a reference to the ExodusII_IO_Helper object.
+   */
+  ExodusII_IO_Helper & get_exio_helper();
+#endif
+
+  /**
+   * This function factors out a bunch of code which is common to the
+   * write_nodal_data() and write_nodal_data_discontinuous() functions
+   */
+  void write_nodal_data_common(std::string fname,
+                               const std::vector<std::string> & names,
+                               bool continuous=true);
+
 private:
   /**
    * Only attempt to instantiate an ExodusII helper class
@@ -236,8 +320,7 @@ private:
    * functionality when LIBMESH_HAVE_EXODUS_API is not defined.
    */
 #ifdef LIBMESH_HAVE_EXODUS_API
-  ExodusII_IO_Helper * exio_helper;
-#endif
+  std::unique_ptr<ExodusII_IO_Helper> exio_helper;
 
   /**
    * Stores the current value of the timestep when calling
@@ -251,24 +334,17 @@ private:
   bool _verbose;
 
   /**
-   * The names of the variables to be output.
-   * If this is empty then all variables are output.
-   */
-  std::vector<std::string> _output_variables;
-
-  /**
    * Default false.  If true, files will be opened with EX_WRITE
    * rather than created from scratch when writing.
    */
   bool _append;
+#endif
 
   /**
-   * This function factors out a bunch of code which is common to the
-   * write_nodal_data() and write_nodal_data_discontinuous() functions
+   * The names of the variables to be output.
+   * If this is empty then all variables are output.
    */
-  void write_nodal_data_common(std::string fname,
-                               const std::vector<std::string> & names,
-                               bool continuous=true);
+  std::vector<std::string> _output_variables;
 
   /**
    * If true, _output_variables is allowed to remain empty.

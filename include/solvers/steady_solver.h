@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -81,7 +81,7 @@ public:
    * to build a full residual/jacobian on an element.
    */
   virtual bool element_residual (bool request_jacobian,
-                                 DiffContext &) libmesh_override;
+                                 DiffContext &) override;
 
   /**
    * This method uses the DifferentiablePhysics'
@@ -89,7 +89,7 @@ public:
    * to build a full residual/jacobian on an element's side.
    */
   virtual bool side_residual (bool request_jacobian,
-                              DiffContext &) libmesh_override;
+                              DiffContext &) override;
 
   /**
    * This method uses the DifferentiablePhysics'
@@ -97,19 +97,19 @@ public:
    * to build a full residual/jacobian for non-local terms.
    */
   virtual bool nonlocal_residual (bool request_jacobian,
-                                  DiffContext &) libmesh_override;
+                                  DiffContext &) override;
 
   /**
-   * Nominally computes the size of the difference between
-   * successive solution iterates ||u^{n+1} - u^{n}|| in some norm,
-   * but for this class just returns 0.
+   * \returns 0, but derived classes should override this function to
+   * compute the size of the difference between successive solution
+   * iterates ||u^{n+1} - u^{n}|| in some norm.
    */
-  virtual Real du(const SystemNorm &) const libmesh_override { return 0; }
+  virtual Real du(const SystemNorm &) const override { return 0; }
 
   /**
    * This is a steady-state solver.
    */
-  virtual bool is_steady() const libmesh_override { return true; }
+  virtual bool is_steady() const override { return true; }
 
 protected:
 

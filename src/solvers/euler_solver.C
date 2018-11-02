@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -50,12 +50,16 @@ Real EulerSolver::error_order() const
 bool EulerSolver::element_residual (bool request_jacobian,
                                     DiffContext & context)
 {
+  bool compute_second_order_eqns = this->_system.get_physics()->have_second_order_vars();
+
   return this->_general_residual(request_jacobian,
                                  context,
                                  &DifferentiablePhysics::mass_residual,
+                                 &DifferentiablePhysics::damping_residual,
                                  &DifferentiablePhysics::_eulerian_time_deriv,
                                  &DifferentiablePhysics::element_constraint,
-                                 &DiffContext::elem_reinit);
+                                 &DiffContext::elem_reinit,
+                                 compute_second_order_eqns);
 }
 
 
@@ -66,9 +70,11 @@ bool EulerSolver::side_residual (bool request_jacobian,
   return this->_general_residual(request_jacobian,
                                  context,
                                  &DifferentiablePhysics::side_mass_residual,
+                                 &DifferentiablePhysics::side_damping_residual,
                                  &DifferentiablePhysics::side_time_derivative,
                                  &DifferentiablePhysics::side_constraint,
-                                 &DiffContext::elem_side_reinit);
+                                 &DiffContext::elem_side_reinit,
+                                 false);
 }
 
 
@@ -76,12 +82,16 @@ bool EulerSolver::side_residual (bool request_jacobian,
 bool EulerSolver::nonlocal_residual (bool request_jacobian,
                                      DiffContext & context)
 {
+  bool compute_second_order_eqns = this->_system.have_second_order_scalar_vars();
+
   return this->_general_residual(request_jacobian,
                                  context,
                                  &DifferentiablePhysics::nonlocal_mass_residual,
+                                 &DifferentiablePhysics::nonlocal_damping_residual,
                                  &DifferentiablePhysics::nonlocal_time_derivative,
                                  &DifferentiablePhysics::nonlocal_constraint,
-                                 &DiffContext::nonlocal_reinit);
+                                 &DiffContext::nonlocal_reinit,
+                                 compute_second_order_eqns);
 }
 
 
@@ -89,9 +99,11 @@ bool EulerSolver::nonlocal_residual (bool request_jacobian,
 bool EulerSolver::_general_residual (bool request_jacobian,
                                      DiffContext & context,
                                      ResFuncType mass,
+                                     ResFuncType damping,
                                      ResFuncType time_deriv,
                                      ResFuncType constraint,
-                                     ReinitFuncType reinit_func)
+                                     ReinitFuncType reinit_func,
+                                     bool compute_second_order_eqns)
 {
   unsigned int n_dofs = context.get_elem_solution().size();
 
@@ -114,6 +126,11 @@ bool EulerSolver::_general_residual (bool request_jacobian,
   context.get_elem_solution_rate() *=
     context.elem_solution_rate_derivative;
 
+  // If we are asked to compute residuals for second order variables,
+  // we also populate the acceleration part so the user can use that.
+  if (compute_second_order_eqns)
+    this->prepare_accel(context);
+
   // Local nonlinear solution at time t_theta
   DenseVector<Number> theta_solution(context.get_elem_solution());
   theta_solution *= theta;
@@ -129,17 +146,28 @@ bool EulerSolver::_general_residual (bool request_jacobian,
   // Move theta_->elem_, elem_->theta_
   context.get_elem_solution().swap(theta_solution);
 
-  // Move the mesh into place first if necessary
+  // Move the mesh into place first if necessary, set t = t_{\theta}
   (context.*reinit_func)(theta);
 
   // Get the time derivative at t_theta
   bool jacobian_computed =
-    (_system.*time_deriv)(request_jacobian, context);
+    (_system.get_physics()->*time_deriv)(request_jacobian, context);
 
-  jacobian_computed = (_system.*mass)(jacobian_computed, context) &&
+  jacobian_computed = (_system.get_physics()->*mass)(jacobian_computed, context) &&
     jacobian_computed;
 
-  // Restore the elem position if necessary
+  // If we have second-order variables, we need to get damping terms
+  // and the velocity equations
+  if (compute_second_order_eqns)
+    {
+      jacobian_computed = (_system.get_physics()->*damping)(jacobian_computed, context) &&
+        jacobian_computed;
+
+      jacobian_computed = this->compute_second_order_eqns(jacobian_computed, context) &&
+        jacobian_computed;
+    }
+
+  // Restore the elem position if necessary, set t = t_{n+1}
   (context.*reinit_func)(1);
 
   // Move elem_->elem_, theta_->theta_
@@ -147,7 +175,7 @@ bool EulerSolver::_general_residual (bool request_jacobian,
   context.elem_solution_derivative = 1;
 
   // Add the constraint term
-  jacobian_computed = (_system.*constraint)(jacobian_computed, context) &&
+  jacobian_computed = (_system.get_physics()->*constraint)(jacobian_computed, context) &&
     jacobian_computed;
 
   // Add back (or restore) the old jacobian

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -17,28 +17,25 @@
 
 
 
-// C++ Includes -------------------------------------
-#include <vector>
-
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/qoi_set.h"
 #include "libmesh/system.h"
+
+// C++ Includes
+#include <vector>
+
 
 namespace libMesh
 {
 
-// ------------------------------------------------------------
-// QoISet implementation
-
-
-QoISet::QoISet(const System & sys) : _indices(sys.qoi.size(), true) {}
+QoISet::QoISet(const System & sys) : _indices(sys.n_qois(), true) {}
 
 
 
-unsigned int QoISet::size (const System & sys) const
+std::size_t QoISet::size (const System & sys) const
 {
-  unsigned int qoi_count = 0;
-  for (unsigned int i=0; i != sys.qoi.size(); ++i)
+  std::size_t qoi_count = 0;
+  for (unsigned int i=0; i != sys.n_qois(); ++i)
     if (this->has_index(i))
       qoi_count++;
   return qoi_count;
@@ -49,15 +46,13 @@ unsigned int QoISet::size (const System & sys) const
 void QoISet::add_indices(const std::vector<unsigned int> & indices)
 {
   unsigned int max_size = 0;
-  for (std::vector<unsigned int>::const_iterator i = indices.begin();
-       i != indices.end(); ++i)
-    max_size = std::max(max_size, *i + 1);
+  for (const auto & i : indices)
+    max_size = std::max(max_size, i + 1);
 
   _indices.resize(max_size);
 
-  for (std::vector<unsigned int>::const_iterator i = indices.begin();
-       i != indices.end(); ++i)
-    _indices[*i] = true;
+  for (const auto & i : indices)
+    _indices[i] = true;
 }
 
 
@@ -65,9 +60,8 @@ void QoISet::add_indices(const std::vector<unsigned int> & indices)
 inline
 void QoISet::remove_indices(const std::vector<unsigned int> & indices)
 {
-  for (std::vector<unsigned int>::const_iterator i = indices.begin();
-       i != indices.end(); ++i)
-    _indices[*i] = false;
+  for (const auto & i : indices)
+    _indices[i] = false;
 }
 
 } // namespace libMesh

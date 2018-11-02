@@ -7,11 +7,14 @@ EXTRA_DIST = rebuild_makefile.sh
 
 BUILT_SOURCES = \
         auto_ptr.h \
+        default_coupling.h \
         dirichlet_boundaries.h \
         dof_map.h \
         dof_object.h \
         factory.h \
         getpot.h \
+        ghost_point_neighbors.h \
+        ghosting_functor.h \
         id_types.h \
         libmesh.h \
         libmesh_C_isnan.h \
@@ -27,9 +30,11 @@ BUILT_SOURCES = \
         periodic_boundaries.h \
         periodic_boundary.h \
         periodic_boundary_base.h \
+        point_neighbor_coupling.h \
         print_trace.h \
         reference_counted_object.h \
         reference_counter.h \
+        sibling_coupling.h \
         single_predicates.h \
         sparsity_pattern.h \
         variable.h \
@@ -84,6 +89,7 @@ BUILT_SOURCES = \
         inf_fe_instantiate_2D.h \
         inf_fe_instantiate_3D.h \
         inf_fe_macro.h \
+        bounding_box.h \
         cell.h \
         cell_hex.h \
         cell_hex20.h \
@@ -108,6 +114,7 @@ BUILT_SOURCES = \
         cell_tet.h \
         cell_tet10.h \
         cell_tet4.h \
+        compare_elems_by_level.h \
         edge.h \
         edge_edge2.h \
         edge_edge3.h \
@@ -124,10 +131,13 @@ BUILT_SOURCES = \
         face_inf_quad6.h \
         face_quad.h \
         face_quad4.h \
+        face_quad4_shell.h \
         face_quad8.h \
+        face_quad8_shell.h \
         face_quad9.h \
         face_tri.h \
         face_tri3.h \
+        face_tri3_shell.h \
         face_tri3_subdivision.h \
         face_tri6.h \
         node.h \
@@ -145,7 +155,7 @@ BUILT_SOURCES = \
         boundary_info.h \
         boundary_mesh.h \
         checkpoint_io.h \
-        diva_io.h \
+        distributed_mesh.h \
         ensight_io.h \
         exodusII_io.h \
         exodusII_io_helper.h \
@@ -154,13 +164,11 @@ BUILT_SOURCES = \
         gmv_io.h \
         gnuplot_io.h \
         inf_elem_builder.h \
-        legacy_xdr_io.h \
         matlab_io.h \
         medit_io.h \
         mesh.h \
         mesh_base.h \
         mesh_communication.h \
-        mesh_data.h \
         mesh_function.h \
         mesh_generation.h \
         mesh_input.h \
@@ -186,20 +194,16 @@ BUILT_SOURCES = \
         parallel_mesh.h \
         patch.h \
         postscript_io.h \
+        replicated_mesh.h \
         serial_mesh.h \
+        sync_refinement_flags.h \
         tecplot_io.h \
         tetgen_io.h \
         ucd_io.h \
         unstructured_mesh.h \
         unv_io.h \
         vtk_io.h \
-        xdr_head.h \
         xdr_io.h \
-        xdr_mesh.h \
-        xdr_mgf.h \
-        xdr_mhead.h \
-        xdr_shead.h \
-        xdr_soln.h \
         analytic_function.h \
         composite_fem_function.h \
         composite_function.h \
@@ -208,6 +212,7 @@ BUILT_SOURCES = \
         coupling_matrix.h \
         dense_matrix.h \
         dense_matrix_base.h \
+        dense_matrix_impl.h \
         dense_submatrix.h \
         dense_subvector.h \
         dense_vector.h \
@@ -244,6 +249,7 @@ BUILT_SOURCES = \
         trilinos_epetra_matrix.h \
         trilinos_epetra_vector.h \
         trilinos_preconditioner.h \
+        tuple_of.h \
         type_n_tensor.h \
         type_tensor.h \
         type_vector.h \
@@ -251,6 +257,13 @@ BUILT_SOURCES = \
         wrapped_function.h \
         wrapped_functor.h \
         zero_function.h \
+        attributes.h \
+        communicator.h \
+        data_type.h \
+        libmesh_call_mpi.h \
+        message_tag.h \
+        op_function.h \
+        packing.h \
         parallel.h \
         parallel_algebra.h \
         parallel_bin_sorter.h \
@@ -262,12 +275,28 @@ BUILT_SOURCES = \
         parallel_implementation.h \
         parallel_node.h \
         parallel_object.h \
+        parallel_only.h \
         parallel_sort.h \
+        parallel_sync.h \
+        post_wait_copy_buffer.h \
+        post_wait_delete_buffer.h \
+        post_wait_dereference_shared_ptr.h \
+        post_wait_dereference_tag.h \
+        post_wait_free_buffer.h \
+        post_wait_unpack_buffer.h \
+        post_wait_work.h \
+        request.h \
+        standard_type.h \
+        status.h \
         threads.h \
         threads_allocators.h \
+        threads_none.h \
+        threads_pthread.h \
+        threads_tbb.h \
         centroid_partitioner.h \
         hilbert_sfc_partitioner.h \
         linear_partitioner.h \
+        mapped_subdomain_partitioner.h \
         metis_csr_graph.h \
         metis_partitioner.h \
         morton_sfc_partitioner.h \
@@ -275,6 +304,7 @@ BUILT_SOURCES = \
         parmetis_partitioner.h \
         partitioner.h \
         sfc_partitioner.h \
+        subdomain_partitioner.h \
         diff_physics.h \
         diff_qoi.h \
         fem_physics.h \
@@ -312,6 +342,7 @@ BUILT_SOURCES = \
         transient_rb_construction.h \
         transient_rb_evaluation.h \
         transient_rb_theta_expansion.h \
+        boundary_volume_solution_transfer.h \
         direct_solution_transfer.h \
         dtk_adapter.h \
         dtk_evaluator.h \
@@ -341,6 +372,7 @@ BUILT_SOURCES = \
         optimization_solver.h \
         petsc_auto_fieldsplit.h \
         petsc_diff_solver.h \
+        petsc_dm_wrapper.h \
         petsc_linear_solver.h \
         petsc_nonlinear_solver.h \
         petscdmlibmesh.h \
@@ -368,6 +400,7 @@ BUILT_SOURCES = \
         fem_context.h \
         fem_system.h \
         frequency_system.h \
+        generic_projector.h \
         implicit_system.h \
         linear_implicit_system.h \
         newmark_system.h \
@@ -390,6 +423,7 @@ BUILT_SOURCES = \
         error_vector.h \
         hashword.h \
         ignore_warnings.h \
+        int_range.h \
         libmesh_nullptr.h \
         location_maps.h \
         mapvector.h \
@@ -401,11 +435,11 @@ BUILT_SOURCES = \
         perfmon.h \
         plt_loader.h \
         point_locator_base.h \
-        point_locator_list.h \
         point_locator_tree.h \
+        pointer_to_pointer_iter.h \
         pool_allocator.h \
         restore_warnings.h \
-        safe_bool.h \
+        simple_range.h \
         statistics.h \
         string_to_enum.h \
         timestamp.h \
@@ -491,16 +525,6 @@ netcdf.h: $(top_srcdir)/contrib/netcdf/v4/include/netcdf.h
 
 endif
 
-if LIBMESH_INSTALL_HINNANT_UNIQUE_PTR
-
-unique_ptr.hpp: $(top_srcdir)/contrib/unique_ptr/unique_ptr.hpp
-	$(AM_V_GEN)rm -f $@ && $(LN_S) $< $@
-
-  BUILT_SOURCES  += unique_ptr.hpp
-  DISTCLEANFILES += unique_ptr.hpp
-
-endif
-
 if LIBMESH_ENABLE_CAPNPROTO
 
 rb_data.capnp.h:
@@ -525,6 +549,9 @@ libmesh_config.h: $(top_builddir)/include/libmesh_config.h
 auto_ptr.h: $(top_srcdir)/include/base/auto_ptr.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
+default_coupling.h: $(top_srcdir)/include/base/default_coupling.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
 dirichlet_boundaries.h: $(top_srcdir)/include/base/dirichlet_boundaries.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
@@ -538,6 +565,12 @@ factory.h: $(top_srcdir)/include/base/factory.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 getpot.h: $(top_srcdir)/include/base/getpot.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+ghost_point_neighbors.h: $(top_srcdir)/include/base/ghost_point_neighbors.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+ghosting_functor.h: $(top_srcdir)/include/base/ghosting_functor.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 id_types.h: $(top_srcdir)/include/base/id_types.h
@@ -585,6 +618,9 @@ periodic_boundary.h: $(top_srcdir)/include/base/periodic_boundary.h
 periodic_boundary_base.h: $(top_srcdir)/include/base/periodic_boundary_base.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
+point_neighbor_coupling.h: $(top_srcdir)/include/base/point_neighbor_coupling.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
 print_trace.h: $(top_srcdir)/include/base/print_trace.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
@@ -592,6 +628,9 @@ reference_counted_object.h: $(top_srcdir)/include/base/reference_counted_object.
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 reference_counter.h: $(top_srcdir)/include/base/reference_counter.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+sibling_coupling.h: $(top_srcdir)/include/base/sibling_coupling.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 single_predicates.h: $(top_srcdir)/include/base/single_predicates.h
@@ -756,6 +795,9 @@ inf_fe_instantiate_3D.h: $(top_srcdir)/include/fe/inf_fe_instantiate_3D.h
 inf_fe_macro.h: $(top_srcdir)/include/fe/inf_fe_macro.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
+bounding_box.h: $(top_srcdir)/include/geom/bounding_box.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
 cell.h: $(top_srcdir)/include/geom/cell.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
@@ -828,6 +870,9 @@ cell_tet10.h: $(top_srcdir)/include/geom/cell_tet10.h
 cell_tet4.h: $(top_srcdir)/include/geom/cell_tet4.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
+compare_elems_by_level.h: $(top_srcdir)/include/geom/compare_elems_by_level.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
 edge.h: $(top_srcdir)/include/geom/edge.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
@@ -876,7 +921,13 @@ face_quad.h: $(top_srcdir)/include/geom/face_quad.h
 face_quad4.h: $(top_srcdir)/include/geom/face_quad4.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
+face_quad4_shell.h: $(top_srcdir)/include/geom/face_quad4_shell.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
 face_quad8.h: $(top_srcdir)/include/geom/face_quad8.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+face_quad8_shell.h: $(top_srcdir)/include/geom/face_quad8_shell.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 face_quad9.h: $(top_srcdir)/include/geom/face_quad9.h
@@ -886,6 +937,9 @@ face_tri.h: $(top_srcdir)/include/geom/face_tri.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 face_tri3.h: $(top_srcdir)/include/geom/face_tri3.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+face_tri3_shell.h: $(top_srcdir)/include/geom/face_tri3_shell.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 face_tri3_subdivision.h: $(top_srcdir)/include/geom/face_tri3_subdivision.h
@@ -939,7 +993,7 @@ boundary_mesh.h: $(top_srcdir)/include/mesh/boundary_mesh.h
 checkpoint_io.h: $(top_srcdir)/include/mesh/checkpoint_io.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
-diva_io.h: $(top_srcdir)/include/mesh/diva_io.h
+distributed_mesh.h: $(top_srcdir)/include/mesh/distributed_mesh.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 ensight_io.h: $(top_srcdir)/include/mesh/ensight_io.h
@@ -966,9 +1020,6 @@ gnuplot_io.h: $(top_srcdir)/include/mesh/gnuplot_io.h
 inf_elem_builder.h: $(top_srcdir)/include/mesh/inf_elem_builder.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
-legacy_xdr_io.h: $(top_srcdir)/include/mesh/legacy_xdr_io.h
-	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
-
 matlab_io.h: $(top_srcdir)/include/mesh/matlab_io.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
@@ -982,9 +1033,6 @@ mesh_base.h: $(top_srcdir)/include/mesh/mesh_base.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 mesh_communication.h: $(top_srcdir)/include/mesh/mesh_communication.h
-	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
-
-mesh_data.h: $(top_srcdir)/include/mesh/mesh_data.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 mesh_function.h: $(top_srcdir)/include/mesh/mesh_function.h
@@ -1062,7 +1110,13 @@ patch.h: $(top_srcdir)/include/mesh/patch.h
 postscript_io.h: $(top_srcdir)/include/mesh/postscript_io.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
+replicated_mesh.h: $(top_srcdir)/include/mesh/replicated_mesh.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
 serial_mesh.h: $(top_srcdir)/include/mesh/serial_mesh.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+sync_refinement_flags.h: $(top_srcdir)/include/mesh/sync_refinement_flags.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 tecplot_io.h: $(top_srcdir)/include/mesh/tecplot_io.h
@@ -1083,25 +1137,7 @@ unv_io.h: $(top_srcdir)/include/mesh/unv_io.h
 vtk_io.h: $(top_srcdir)/include/mesh/vtk_io.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
-xdr_head.h: $(top_srcdir)/include/mesh/xdr_head.h
-	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
-
 xdr_io.h: $(top_srcdir)/include/mesh/xdr_io.h
-	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
-
-xdr_mesh.h: $(top_srcdir)/include/mesh/xdr_mesh.h
-	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
-
-xdr_mgf.h: $(top_srcdir)/include/mesh/xdr_mgf.h
-	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
-
-xdr_mhead.h: $(top_srcdir)/include/mesh/xdr_mhead.h
-	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
-
-xdr_shead.h: $(top_srcdir)/include/mesh/xdr_shead.h
-	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
-
-xdr_soln.h: $(top_srcdir)/include/mesh/xdr_soln.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 analytic_function.h: $(top_srcdir)/include/numerics/analytic_function.h
@@ -1126,6 +1162,9 @@ dense_matrix.h: $(top_srcdir)/include/numerics/dense_matrix.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 dense_matrix_base.h: $(top_srcdir)/include/numerics/dense_matrix_base.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+dense_matrix_impl.h: $(top_srcdir)/include/numerics/dense_matrix_impl.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 dense_submatrix.h: $(top_srcdir)/include/numerics/dense_submatrix.h
@@ -1236,6 +1275,9 @@ trilinos_epetra_vector.h: $(top_srcdir)/include/numerics/trilinos_epetra_vector.
 trilinos_preconditioner.h: $(top_srcdir)/include/numerics/trilinos_preconditioner.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
+tuple_of.h: $(top_srcdir)/include/numerics/tuple_of.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
 type_n_tensor.h: $(top_srcdir)/include/numerics/type_n_tensor.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
@@ -1255,6 +1297,27 @@ wrapped_functor.h: $(top_srcdir)/include/numerics/wrapped_functor.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 zero_function.h: $(top_srcdir)/include/numerics/zero_function.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+attributes.h: $(top_srcdir)/include/parallel/attributes.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+communicator.h: $(top_srcdir)/include/parallel/communicator.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+data_type.h: $(top_srcdir)/include/parallel/data_type.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+libmesh_call_mpi.h: $(top_srcdir)/include/parallel/libmesh_call_mpi.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+message_tag.h: $(top_srcdir)/include/parallel/message_tag.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+op_function.h: $(top_srcdir)/include/parallel/op_function.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+packing.h: $(top_srcdir)/include/parallel/packing.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 parallel.h: $(top_srcdir)/include/parallel/parallel.h
@@ -1290,13 +1353,58 @@ parallel_node.h: $(top_srcdir)/include/parallel/parallel_node.h
 parallel_object.h: $(top_srcdir)/include/parallel/parallel_object.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
+parallel_only.h: $(top_srcdir)/include/parallel/parallel_only.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
 parallel_sort.h: $(top_srcdir)/include/parallel/parallel_sort.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+parallel_sync.h: $(top_srcdir)/include/parallel/parallel_sync.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+post_wait_copy_buffer.h: $(top_srcdir)/include/parallel/post_wait_copy_buffer.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+post_wait_delete_buffer.h: $(top_srcdir)/include/parallel/post_wait_delete_buffer.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+post_wait_dereference_shared_ptr.h: $(top_srcdir)/include/parallel/post_wait_dereference_shared_ptr.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+post_wait_dereference_tag.h: $(top_srcdir)/include/parallel/post_wait_dereference_tag.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+post_wait_free_buffer.h: $(top_srcdir)/include/parallel/post_wait_free_buffer.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+post_wait_unpack_buffer.h: $(top_srcdir)/include/parallel/post_wait_unpack_buffer.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+post_wait_work.h: $(top_srcdir)/include/parallel/post_wait_work.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+request.h: $(top_srcdir)/include/parallel/request.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+standard_type.h: $(top_srcdir)/include/parallel/standard_type.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+status.h: $(top_srcdir)/include/parallel/status.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 threads.h: $(top_srcdir)/include/parallel/threads.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 threads_allocators.h: $(top_srcdir)/include/parallel/threads_allocators.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+threads_none.h: $(top_srcdir)/include/parallel/threads_none.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+threads_pthread.h: $(top_srcdir)/include/parallel/threads_pthread.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+threads_tbb.h: $(top_srcdir)/include/parallel/threads_tbb.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 centroid_partitioner.h: $(top_srcdir)/include/partitioning/centroid_partitioner.h
@@ -1306,6 +1414,9 @@ hilbert_sfc_partitioner.h: $(top_srcdir)/include/partitioning/hilbert_sfc_partit
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 linear_partitioner.h: $(top_srcdir)/include/partitioning/linear_partitioner.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+mapped_subdomain_partitioner.h: $(top_srcdir)/include/partitioning/mapped_subdomain_partitioner.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 metis_csr_graph.h: $(top_srcdir)/include/partitioning/metis_csr_graph.h
@@ -1327,6 +1438,9 @@ partitioner.h: $(top_srcdir)/include/partitioning/partitioner.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 sfc_partitioner.h: $(top_srcdir)/include/partitioning/sfc_partitioner.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
+subdomain_partitioner.h: $(top_srcdir)/include/partitioning/subdomain_partitioner.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 diff_physics.h: $(top_srcdir)/include/physics/diff_physics.h
@@ -1440,6 +1554,9 @@ transient_rb_evaluation.h: $(top_srcdir)/include/reduced_basis/transient_rb_eval
 transient_rb_theta_expansion.h: $(top_srcdir)/include/reduced_basis/transient_rb_theta_expansion.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
+boundary_volume_solution_transfer.h: $(top_srcdir)/include/solution_transfer/boundary_volume_solution_transfer.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
 direct_solution_transfer.h: $(top_srcdir)/include/solution_transfer/direct_solution_transfer.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
@@ -1527,6 +1644,9 @@ petsc_auto_fieldsplit.h: $(top_srcdir)/include/solvers/petsc_auto_fieldsplit.h
 petsc_diff_solver.h: $(top_srcdir)/include/solvers/petsc_diff_solver.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
+petsc_dm_wrapper.h: $(top_srcdir)/include/solvers/petsc_dm_wrapper.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
 petsc_linear_solver.h: $(top_srcdir)/include/solvers/petsc_linear_solver.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
@@ -1608,6 +1728,9 @@ fem_system.h: $(top_srcdir)/include/systems/fem_system.h
 frequency_system.h: $(top_srcdir)/include/systems/frequency_system.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
+generic_projector.h: $(top_srcdir)/include/systems/generic_projector.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
 implicit_system.h: $(top_srcdir)/include/systems/implicit_system.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
@@ -1674,6 +1797,9 @@ hashword.h: $(top_srcdir)/include/utils/hashword.h
 ignore_warnings.h: $(top_srcdir)/include/utils/ignore_warnings.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
+int_range.h: $(top_srcdir)/include/utils/int_range.h
+	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
+
 libmesh_nullptr.h: $(top_srcdir)/include/utils/libmesh_nullptr.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
@@ -1707,10 +1833,10 @@ plt_loader.h: $(top_srcdir)/include/utils/plt_loader.h
 point_locator_base.h: $(top_srcdir)/include/utils/point_locator_base.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
-point_locator_list.h: $(top_srcdir)/include/utils/point_locator_list.h
+point_locator_tree.h: $(top_srcdir)/include/utils/point_locator_tree.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
-point_locator_tree.h: $(top_srcdir)/include/utils/point_locator_tree.h
+pointer_to_pointer_iter.h: $(top_srcdir)/include/utils/pointer_to_pointer_iter.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 pool_allocator.h: $(top_srcdir)/include/utils/pool_allocator.h
@@ -1719,7 +1845,7 @@ pool_allocator.h: $(top_srcdir)/include/utils/pool_allocator.h
 restore_warnings.h: $(top_srcdir)/include/utils/restore_warnings.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
-safe_bool.h: $(top_srcdir)/include/utils/safe_bool.h
+simple_range.h: $(top_srcdir)/include/utils/simple_range.h
 	$(AM_V_GEN)rm -f $@ && $(LN_S) -f $< $@
 
 statistics.h: $(top_srcdir)/include/utils/statistics.h

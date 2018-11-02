@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,6 +20,7 @@
 // Local includes
 #include "libmesh/fe.h"
 #include "libmesh/libmesh_logging.h"
+#include "libmesh/enum_elem_type.h"
 
 // For projection code:
 #include "libmesh/boundary_info.h"
@@ -37,12 +38,38 @@
 #include "libmesh/remote_elem.h"
 #include "libmesh/tensor_value.h"
 #include "libmesh/threads.h"
+#include "libmesh/enum_elem_type.h"
 
 namespace libMesh
 {
 
-UniquePtr<FEAbstract> FEAbstract::build(const unsigned int dim,
-                                        const FEType & fet)
+FEAbstract::FEAbstract(const unsigned int d,
+                       const FEType & fet) :
+  _fe_map( FEMap::build(fet) ),
+  dim(d),
+  calculations_started(false),
+  calculate_phi(false),
+  calculate_dphi(false),
+  calculate_d2phi(false),
+  calculate_curl_phi(false),
+  calculate_div_phi(false),
+  calculate_dphiref(false),
+  fe_type(fet),
+  elem_type(INVALID_ELEM),
+  _p_level(0),
+  qrule(nullptr),
+  shapes_on_quadrature(false)
+{
+}
+
+
+FEAbstract::~FEAbstract()
+{
+}
+
+
+std::unique_ptr<FEAbstract> FEAbstract::build(const unsigned int dim,
+                                              const FEType & fet)
 {
   switch (dim)
     {
@@ -52,42 +79,42 @@ UniquePtr<FEAbstract> FEAbstract::build(const unsigned int dim,
         switch (fet.family)
           {
           case CLOUGH:
-            return UniquePtr<FEAbstract>(new FE<0,CLOUGH>(fet));
+            return libmesh_make_unique<FE<0,CLOUGH>>(fet);
 
           case HERMITE:
-            return UniquePtr<FEAbstract>(new FE<0,HERMITE>(fet));
+            return libmesh_make_unique<FE<0,HERMITE>>(fet);
 
           case LAGRANGE:
-            return UniquePtr<FEAbstract>(new FE<0,LAGRANGE>(fet));
+            return libmesh_make_unique<FE<0,LAGRANGE>>(fet);
 
           case LAGRANGE_VEC:
-            return UniquePtr<FEAbstract>(new FE<0,LAGRANGE_VEC>(fet));
+            return libmesh_make_unique<FE<0,LAGRANGE_VEC>>(fet);
 
           case L2_LAGRANGE:
-            return UniquePtr<FEAbstract>(new FE<0,L2_LAGRANGE>(fet));
+            return libmesh_make_unique<FE<0,L2_LAGRANGE>>(fet);
 
           case HIERARCHIC:
-            return UniquePtr<FEAbstract>(new FE<0,HIERARCHIC>(fet));
+            return libmesh_make_unique<FE<0,HIERARCHIC>>(fet);
 
           case L2_HIERARCHIC:
-            return UniquePtr<FEAbstract>(new FE<0,L2_HIERARCHIC>(fet));
+            return libmesh_make_unique<FE<0,L2_HIERARCHIC>>(fet);
 
           case MONOMIAL:
-            return UniquePtr<FEAbstract>(new FE<0,MONOMIAL>(fet));
+            return libmesh_make_unique<FE<0,MONOMIAL>>(fet);
 
 #ifdef LIBMESH_ENABLE_HIGHER_ORDER_SHAPES
           case SZABAB:
-            return UniquePtr<FEAbstract>(new FE<0,SZABAB>(fet));
+            return libmesh_make_unique<FE<0,SZABAB>>(fet);
 
           case BERNSTEIN:
-            return UniquePtr<FEAbstract>(new FE<0,BERNSTEIN>(fet));
+            return libmesh_make_unique<FE<0,BERNSTEIN>>(fet);
 #endif
 
           case XYZ:
-            return UniquePtr<FEAbstract>(new FEXYZ<0>(fet));
+            return libmesh_make_unique<FEXYZ<0>>(fet);
 
           case SCALAR:
-            return UniquePtr<FEAbstract>(new FEScalar<0>(fet));
+            return libmesh_make_unique<FEScalar<0>>(fet);
 
           default:
             libmesh_error_msg("ERROR: Bad FEType.family= " << fet.family);
@@ -99,42 +126,42 @@ UniquePtr<FEAbstract> FEAbstract::build(const unsigned int dim,
         switch (fet.family)
           {
           case CLOUGH:
-            return UniquePtr<FEAbstract>(new FE<1,CLOUGH>(fet));
+            return libmesh_make_unique<FE<1,CLOUGH>>(fet);
 
           case HERMITE:
-            return UniquePtr<FEAbstract>(new FE<1,HERMITE>(fet));
+            return libmesh_make_unique<FE<1,HERMITE>>(fet);
 
           case LAGRANGE:
-            return UniquePtr<FEAbstract>(new FE<1,LAGRANGE>(fet));
+            return libmesh_make_unique<FE<1,LAGRANGE>>(fet);
 
           case LAGRANGE_VEC:
-            return UniquePtr<FEAbstract>(new FE<1,LAGRANGE_VEC>(fet));
+            return libmesh_make_unique<FE<1,LAGRANGE_VEC>>(fet);
 
           case L2_LAGRANGE:
-            return UniquePtr<FEAbstract>(new FE<1,L2_LAGRANGE>(fet));
+            return libmesh_make_unique<FE<1,L2_LAGRANGE>>(fet);
 
           case HIERARCHIC:
-            return UniquePtr<FEAbstract>(new FE<1,HIERARCHIC>(fet));
+            return libmesh_make_unique<FE<1,HIERARCHIC>>(fet);
 
           case L2_HIERARCHIC:
-            return UniquePtr<FEAbstract>(new FE<1,L2_HIERARCHIC>(fet));
+            return libmesh_make_unique<FE<1,L2_HIERARCHIC>>(fet);
 
           case MONOMIAL:
-            return UniquePtr<FEAbstract>(new FE<1,MONOMIAL>(fet));
+            return libmesh_make_unique<FE<1,MONOMIAL>>(fet);
 
 #ifdef LIBMESH_ENABLE_HIGHER_ORDER_SHAPES
           case SZABAB:
-            return UniquePtr<FEAbstract>(new FE<1,SZABAB>(fet));
+            return libmesh_make_unique<FE<1,SZABAB>>(fet);
 
           case BERNSTEIN:
-            return UniquePtr<FEAbstract>(new FE<1,BERNSTEIN>(fet));
+            return libmesh_make_unique<FE<1,BERNSTEIN>>(fet);
 #endif
 
           case XYZ:
-            return UniquePtr<FEAbstract>(new FEXYZ<1>(fet));
+            return libmesh_make_unique<FEXYZ<1>>(fet);
 
           case SCALAR:
-            return UniquePtr<FEAbstract>(new FEScalar<1>(fet));
+            return libmesh_make_unique<FEScalar<1>>(fet);
 
           default:
             libmesh_error_msg("ERROR: Bad FEType.family= " << fet.family);
@@ -148,48 +175,48 @@ UniquePtr<FEAbstract> FEAbstract::build(const unsigned int dim,
         switch (fet.family)
           {
           case CLOUGH:
-            return UniquePtr<FEAbstract>(new FE<2,CLOUGH>(fet));
+            return libmesh_make_unique<FE<2,CLOUGH>>(fet);
 
           case HERMITE:
-            return UniquePtr<FEAbstract>(new FE<2,HERMITE>(fet));
+            return libmesh_make_unique<FE<2,HERMITE>>(fet);
 
           case LAGRANGE:
-            return UniquePtr<FEAbstract>(new FE<2,LAGRANGE>(fet));
+            return libmesh_make_unique<FE<2,LAGRANGE>>(fet);
 
           case LAGRANGE_VEC:
-            return UniquePtr<FEAbstract>(new FE<2,LAGRANGE_VEC>(fet));
+            return libmesh_make_unique<FE<2,LAGRANGE_VEC>>(fet);
 
           case L2_LAGRANGE:
-            return UniquePtr<FEAbstract>(new FE<2,L2_LAGRANGE>(fet));
+            return libmesh_make_unique<FE<2,L2_LAGRANGE>>(fet);
 
           case HIERARCHIC:
-            return UniquePtr<FEAbstract>(new FE<2,HIERARCHIC>(fet));
+            return libmesh_make_unique<FE<2,HIERARCHIC>>(fet);
 
           case L2_HIERARCHIC:
-            return UniquePtr<FEAbstract>(new FE<2,L2_HIERARCHIC>(fet));
+            return libmesh_make_unique<FE<2,L2_HIERARCHIC>>(fet);
 
           case MONOMIAL:
-            return UniquePtr<FEAbstract>(new FE<2,MONOMIAL>(fet));
+            return libmesh_make_unique<FE<2,MONOMIAL>>(fet);
 
 #ifdef LIBMESH_ENABLE_HIGHER_ORDER_SHAPES
           case SZABAB:
-            return UniquePtr<FEAbstract>(new FE<2,SZABAB>(fet));
+            return libmesh_make_unique<FE<2,SZABAB>>(fet);
 
           case BERNSTEIN:
-            return UniquePtr<FEAbstract>(new FE<2,BERNSTEIN>(fet));
+            return libmesh_make_unique<FE<2,BERNSTEIN>>(fet);
 #endif
 
           case XYZ:
-            return UniquePtr<FEAbstract>(new FEXYZ<2>(fet));
+            return libmesh_make_unique<FEXYZ<2>>(fet);
 
           case SCALAR:
-            return UniquePtr<FEAbstract>(new FEScalar<2>(fet));
+            return libmesh_make_unique<FEScalar<2>>(fet);
 
           case NEDELEC_ONE:
-            return UniquePtr<FEAbstract>(new FENedelecOne<2>(fet));
+            return libmesh_make_unique<FENedelecOne<2>>(fet);
 
           case SUBDIVISION:
-            return UniquePtr<FEAbstract>(new FESubdivision(fet));
+            return libmesh_make_unique<FESubdivision>(fet);
 
           default:
             libmesh_error_msg("ERROR: Bad FEType.family= " << fet.family);
@@ -206,42 +233,42 @@ UniquePtr<FEAbstract> FEAbstract::build(const unsigned int dim,
             libmesh_error_msg("ERROR: Clough-Tocher elements currently only support 1D and 2D");
 
           case HERMITE:
-            return UniquePtr<FEAbstract>(new FE<3,HERMITE>(fet));
+            return libmesh_make_unique<FE<3,HERMITE>>(fet);
 
           case LAGRANGE:
-            return UniquePtr<FEAbstract>(new FE<3,LAGRANGE>(fet));
+            return libmesh_make_unique<FE<3,LAGRANGE>>(fet);
 
           case LAGRANGE_VEC:
-            return UniquePtr<FEAbstract>(new FE<3,LAGRANGE_VEC>(fet));
+            return libmesh_make_unique<FE<3,LAGRANGE_VEC>>(fet);
 
           case L2_LAGRANGE:
-            return UniquePtr<FEAbstract>(new FE<3,L2_LAGRANGE>(fet));
+            return libmesh_make_unique<FE<3,L2_LAGRANGE>>(fet);
 
           case HIERARCHIC:
-            return UniquePtr<FEAbstract>(new FE<3,HIERARCHIC>(fet));
+            return libmesh_make_unique<FE<3,HIERARCHIC>>(fet);
 
           case L2_HIERARCHIC:
-            return UniquePtr<FEAbstract>(new FE<3,L2_HIERARCHIC>(fet));
+            return libmesh_make_unique<FE<3,L2_HIERARCHIC>>(fet);
 
           case MONOMIAL:
-            return UniquePtr<FEAbstract>(new FE<3,MONOMIAL>(fet));
+            return libmesh_make_unique<FE<3,MONOMIAL>>(fet);
 
 #ifdef LIBMESH_ENABLE_HIGHER_ORDER_SHAPES
           case SZABAB:
-            return UniquePtr<FEAbstract>(new FE<3,SZABAB>(fet));
+            return libmesh_make_unique<FE<3,SZABAB>>(fet);
 
           case BERNSTEIN:
-            return UniquePtr<FEAbstract>(new FE<3,BERNSTEIN>(fet));
+            return libmesh_make_unique<FE<3,BERNSTEIN>>(fet);
 #endif
 
           case XYZ:
-            return UniquePtr<FEAbstract>(new FEXYZ<3>(fet));
+            return libmesh_make_unique<FEXYZ<3>>(fet);
 
           case SCALAR:
-            return UniquePtr<FEAbstract>(new FEScalar<3>(fet));
+            return libmesh_make_unique<FEScalar<3>>(fet);
 
           case NEDELEC_ONE:
-            return UniquePtr<FEAbstract>(new FENedelecOne<3>(fet));
+            return libmesh_make_unique<FENedelecOne<3>>(fet);
 
           default:
             libmesh_error_msg("ERROR: Bad FEType.family= " << fet.family);
@@ -251,9 +278,6 @@ UniquePtr<FEAbstract> FEAbstract::build(const unsigned int dim,
     default:
       libmesh_error_msg("Invalid dimension dim = " << dim);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return UniquePtr<FEAbstract>();
 }
 
 void FEAbstract::get_refspace_nodes(const ElemType itemType, std::vector<Point> & nodes)
@@ -276,6 +300,7 @@ void FEAbstract::get_refspace_nodes(const ElemType itemType, std::vector<Point> 
         return;
       }
     case TRI3:
+    case TRISHELL3:
       {
         nodes.resize(3);
         nodes[0] = Point (0.,0.,0.);
@@ -295,6 +320,7 @@ void FEAbstract::get_refspace_nodes(const ElemType itemType, std::vector<Point> 
         return;
       }
     case QUAD4:
+    case QUADSHELL4:
       {
         nodes.resize(4);
         nodes[0] = Point (-1.,-1.,0.);
@@ -304,6 +330,7 @@ void FEAbstract::get_refspace_nodes(const ElemType itemType, std::vector<Point> 
         return;
       }
     case QUAD8:
+    case QUADSHELL8:
       {
         nodes.resize(8);
         nodes[0] = Point (-1.,-1.,0.);
@@ -587,9 +614,10 @@ bool FEAbstract::on_reference_element(const Point & p, const ElemType t, const R
 
 
     case TRI3:
+    case TRISHELL3:
     case TRI6:
       {
-        // The reference triangle is isocoles
+        // The reference triangle is isosceles
         // and is bound by xi=0, eta=0, and xi+eta=1.
         if ((xi  >= 0.-eps) &&
             (eta >= 0.-eps) &&
@@ -601,7 +629,9 @@ bool FEAbstract::on_reference_element(const Point & p, const ElemType t, const R
 
 
     case QUAD4:
+    case QUADSHELL4:
     case QUAD8:
+    case QUADSHELL8:
     case QUAD9:
       {
         // The reference quadrilateral element is [-1,1]^2.
@@ -618,7 +648,7 @@ bool FEAbstract::on_reference_element(const Point & p, const ElemType t, const R
     case TET4:
     case TET10:
       {
-        // The reference tetrahedral is isocoles
+        // The reference tetrahedral is isosceles
         // and is bound by xi=0, eta=0, zeta=0,
         // and xi+eta+zeta=1.
         if ((xi   >= 0.-eps) &&
@@ -666,7 +696,7 @@ bool FEAbstract::on_reference_element(const Point & p, const ElemType t, const R
     case PRISM18:
       {
         // Figure this one out...
-        // inside the reference triange with zeta in [-1,1]
+        // inside the reference triangle with zeta in [-1,1]
         if ((xi   >=  0.-eps) &&
             (eta  >=  0.-eps) &&
             (zeta >= -1.-eps) &&
@@ -702,6 +732,8 @@ bool FEAbstract::on_reference_element(const Point & p, const ElemType t, const R
 
 #ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
     case INFHEX8:
+    case INFHEX16:
+    case INFHEX18:
       {
         // The reference infhex8 is a [-1,1]^3.
         if ((xi   >= -1.-eps) &&
@@ -717,8 +749,9 @@ bool FEAbstract::on_reference_element(const Point & p, const ElemType t, const R
       }
 
     case INFPRISM6:
+    case INFPRISM12:
       {
-        // inside the reference triange with zeta in [-1,1]
+        // inside the reference triangle with zeta in [-1,1]
         if ((xi   >=  0.-eps) &&
             (eta  >=  0.-eps) &&
             (zeta >= -1.-eps) &&
@@ -741,7 +774,6 @@ bool FEAbstract::on_reference_element(const Point & p, const ElemType t, const R
 
   return false;
 }
-
 
 
 
@@ -807,22 +839,22 @@ void FEAbstract::compute_node_constraints (NodeConstraints & constraints,
 
   // Look at the element faces.  Check to see if we need to
   // build constraints.
-  for (unsigned int s=0; s<elem->n_sides(); s++)
-    if (elem->neighbor(s) != libmesh_nullptr &&
-        elem->neighbor(s) != remote_elem)
-      if (elem->neighbor(s)->level() < elem->level()) // constrain dofs shared between
-        {                                                     // this element and ones coarser
+  for (auto s : elem->side_index_range())
+    if (elem->neighbor_ptr(s) != nullptr &&
+        elem->neighbor_ptr(s) != remote_elem)
+      if (elem->neighbor_ptr(s)->level() < elem->level()) // constrain dofs shared between
+        {                                                 // this element and ones coarser
           // than this element.
           // Get pointers to the elements of interest and its parent.
           const Elem * parent = elem->parent();
 
-          // This can't happen...  Only level-0 elements have NULL
+          // This can't happen...  Only level-0 elements have nullptr
           // parents, and no level-0 elements can be at a higher
           // level than their neighbors!
           libmesh_assert(parent);
 
-          const UniquePtr<Elem> my_side     (elem->build_side(s));
-          const UniquePtr<Elem> parent_side (parent->build_side(s));
+          const std::unique_ptr<const Elem> my_side     (elem->build_side_ptr(s));
+          const std::unique_ptr<const Elem> parent_side (parent->build_side_ptr(s));
 
           const unsigned int n_side_nodes = my_side->n_nodes();
 
@@ -832,10 +864,10 @@ void FEAbstract::compute_node_constraints (NodeConstraints & constraints,
           parent_nodes.reserve (n_side_nodes);
 
           for (unsigned int n=0; n != n_side_nodes; ++n)
-            my_nodes.push_back(my_side->get_node(n));
+            my_nodes.push_back(my_side->node_ptr(n));
 
           for (unsigned int n=0; n != n_side_nodes; ++n)
-            parent_nodes.push_back(parent_side->get_node(n));
+            parent_nodes.push_back(parent_side->node_ptr(n));
 
           for (unsigned int my_side_n=0;
                my_side_n < n_side_nodes;
@@ -954,15 +986,14 @@ void FEAbstract::compute_periodic_node_constraints (NodeConstraints & constraint
   // Look at the element faces.  Check to see if we need to
   // build constraints.
   std::vector<boundary_id_type> bc_ids;
-  for (unsigned short int s=0; s<elem->n_sides(); s++)
+  for (auto s : elem->side_index_range())
     {
-      if (elem->neighbor(s))
+      if (elem->neighbor_ptr(s))
         continue;
 
       mesh.get_boundary_info().boundary_ids (elem, s, bc_ids);
-      for (std::vector<boundary_id_type>::const_iterator id_it=bc_ids.begin(); id_it!=bc_ids.end(); ++id_it)
+      for (const auto & boundary_id : bc_ids)
         {
-          const boundary_id_type boundary_id = *id_it;
           const PeriodicBoundaryBase * periodic = boundaries.boundary(boundary_id);
           if (periodic)
             {
@@ -985,8 +1016,8 @@ void FEAbstract::compute_periodic_node_constraints (NodeConstraints & constraint
                   libmesh_assert(neigh->active());
 #endif // #ifdef LIBMESH_ENABLE_AMR
 
-                  const UniquePtr<Elem> my_side    (elem->build_side(s));
-                  const UniquePtr<Elem> neigh_side (neigh->build_side(s_neigh));
+                  const std::unique_ptr<const Elem> my_side    (elem->build_side_ptr(s));
+                  const std::unique_ptr<const Elem> neigh_side (neigh->build_side_ptr(s_neigh));
 
                   const unsigned int n_side_nodes = my_side->n_nodes();
 
@@ -996,10 +1027,10 @@ void FEAbstract::compute_periodic_node_constraints (NodeConstraints & constraint
                   neigh_nodes.reserve (n_side_nodes);
 
                   for (unsigned int n=0; n != n_side_nodes; ++n)
-                    my_nodes.push_back(my_side->get_node(n));
+                    my_nodes.push_back(my_side->node_ptr(n));
 
                   for (unsigned int n=0; n != n_side_nodes; ++n)
-                    neigh_nodes.push_back(neigh_side->get_node(n));
+                    neigh_nodes.push_back(neigh_side->node_ptr(n));
 
                   // Make sure we're not adding recursive constraints
                   // due to the redundancy in the way we add periodic

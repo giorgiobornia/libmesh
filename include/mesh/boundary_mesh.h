@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,10 +20,8 @@
 #ifndef LIBMESH_BOUNDARY_MESH_H
 #define LIBMESH_BOUNDARY_MESH_H
 
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/mesh.h"
-
-// C++ Includes   -----------------------------------
 
 namespace libMesh
 {
@@ -33,26 +31,20 @@ namespace libMesh
  * contains a description of the boundary of some other mesh.
  * This is useful for writing the boundary of a domain for inspecting
  * boundary conditions and other things.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2002
+ * \brief Specialized mesh used for keeping track of boundary elements.
  */
 class BoundaryMesh : public Mesh
 {
 public:
   /**
-   * Constructor. Initializes dimenstion and processor id.
+   * Constructor. Initializes dimension and processor id.
    */
   explicit
   BoundaryMesh (const Parallel::Communicator & comm_in,
                 unsigned char dim=1);
-
-#ifndef LIBMESH_DISABLE_COMMWORLD
-  /**
-   * Deprecated constructor.  Takes \p dim, the dimension of the mesh.
-   * The mesh dimension can be changed (and may automatically be
-   * changed by mesh generation/loading) later.
-   */
-  explicit
-  BoundaryMesh (unsigned char dim=1);
-#endif
 
   /**
    * Destructor.

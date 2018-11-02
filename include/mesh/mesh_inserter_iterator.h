@@ -1,6 +1,5 @@
-
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -32,11 +31,17 @@
 namespace libMesh
 {
 
-// A class for templated methods that expect output iterator
-// arguments, which adds objects to the Mesh.
-// Although any mesh_inserter_iterator can add any object, we
-// template it around object type so that type inference and
-// iterator_traits will work.
+/**
+ * A class for templated methods that expect output iterator
+ * arguments, which adds objects to the Mesh.
+ * Although any mesh_inserter_iterator can add any object, we
+ * template it around object type so that type inference and
+ * iterator_traits will work.
+ *
+ * \author Roy Stogner
+ * \date 2012
+ * \brief An output iterator for use with packed_range functions.
+ */
 template <typename T>
 struct mesh_inserter_iterator
   : std::iterator<std::output_iterator_tag, T>

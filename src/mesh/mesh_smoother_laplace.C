@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -50,12 +50,13 @@ void LaplaceMeshSmoother::smooth(unsigned int n_iterations)
   // Don't smooth the nodes on the boundary...
   // this would change the mesh geometry which
   // is probably not something we want!
-  std::vector<bool> on_boundary;
-  MeshTools::find_boundary_nodes(_mesh, on_boundary);
+  auto on_boundary = MeshTools::find_boundary_nodes(_mesh);
 
-  // Ensure that the find_boundary_nodes() function returned a properly-sized vector
-  if (on_boundary.size() != _mesh.n_nodes())
-    libmesh_error_msg("MeshTools::find_boundary_nodes() returned incorrect length vector!");
+  // Also: don't smooth block bondary nodes
+  auto on_block_boundary = MeshTools::find_block_boundary_nodes(_mesh);
+
+  // Merge them
+  on_boundary.insert(on_block_boundary.begin(), on_block_boundary.end());
 
   // We can only update the nodes after all new positions were
   // determined. We store the new positions here
@@ -63,62 +64,46 @@ void LaplaceMeshSmoother::smooth(unsigned int n_iterations)
 
   for (unsigned int n=0; n<n_iterations; n++)
     {
-      new_positions.resize(_mesh.n_nodes());
+      new_positions.resize(_mesh.max_node_id());
 
-      {
-        MeshBase::node_iterator       it     = _mesh.local_nodes_begin();
-        const MeshBase::node_iterator it_end = _mesh.local_nodes_end();
-        for (; it != it_end; ++it)
-          {
-            Node * node = *it;
+      for (auto & node : _mesh.local_node_ptr_range())
+        {
+          if (node == nullptr)
+            libmesh_error_msg("[" << _mesh.processor_id() << "]: Node iterator returned nullptr.");
 
-            if (node == libmesh_nullptr)
-              libmesh_error_msg("[" << _mesh.processor_id() << "]: Node iterator returned NULL pointer.");
+          // leave the boundary intact
+          // Only relocate the nodes which are vertices of an element
+          // All other entries of _graph (the secondary nodes) are empty
+          if (!on_boundary.count(node->id()) && (_graph[node->id()].size() > 0))
+            {
+              Point avg_position(0.,0.,0.);
 
-            // leave the boundary intact
-            // Only relocate the nodes which are vertices of an element
-            // All other entries of _graph (the secondary nodes) are empty
-            if (!on_boundary[node->id()] && (_graph[node->id()].size() > 0))
-              {
-                Point avg_position(0.,0.,0.);
+              for (std::size_t j=0; j<_graph[node->id()].size(); ++j)
+                {
+                  // Will these nodal positions always be available
+                  // or will they refer to remote nodes?  This will
+                  // fail an assertion in the latter case, which
+                  // shouldn't occur if DistributedMesh is working
+                  // correctly.
+                  const Point & connected_node = _mesh.point(_graph[node->id()][j]);
 
-                for (unsigned j=0; j<_graph[node->id()].size(); ++j)
-                  {
-                    // Will these nodal positions always be available
-                    // or will they refer to remote nodes?  To be
-                    // careful, we grab a pointer and test it against
-                    // NULL.
-                    Node * connected_node = _mesh.node_ptr(_graph[node->id()][j]);
+                  avg_position.add( connected_node );
+                } // end for (j)
 
-                    if (connected_node == libmesh_nullptr)
-                      libmesh_error_msg("Error! Libmesh returned NULL pointer for node " << _graph[connected_node->id()][j]);
-
-                    avg_position.add( *connected_node );
-                  } // end for(j)
-
-                // Compute the average, store in the new_positions vector
-                new_positions[node->id()] = avg_position / static_cast<Real>(_graph[node->id()].size());
-              } // end if
-          } // end for
-      } // end scope
+              // Compute the average, store in the new_positions vector
+              new_positions[node->id()] = avg_position / static_cast<Real>(_graph[node->id()].size());
+            } // end if
+        } // end for
 
 
       // now update the node positions (local node positions only)
-      {
-        MeshBase::node_iterator it           = _mesh.local_nodes_begin();
-        const MeshBase::node_iterator it_end = _mesh.local_nodes_end();
-        for (; it != it_end; ++it)
+      for (auto & node : _mesh.local_node_ptr_range())
+        if (!on_boundary.count(node->id()) && (_graph[node->id()].size() > 0))
           {
-            Node * node = *it;
-
-            if (!on_boundary[node->id()] && (_graph[node->id()].size() > 0))
-              {
-                // Should call Point::op=
-                // libMesh::out << "Setting node id " << node->id() << " to position " << new_positions[node->id()];
-                _mesh.node(node->id()) = new_positions[node->id()];
-              }
-          } // end for
-      } // end scope
+            // Should call Point::op=
+            // libMesh::out << "Setting node id " << node->id() << " to position " << new_positions[node->id()];
+            _mesh.node_ref(node->id()) = new_positions[node->id()];
+          }
 
       // Now the nodes which are ghosts on this processor may have been moved on
       // the processors which own them.  So we need to synchronize with our neighbors
@@ -132,14 +117,8 @@ void LaplaceMeshSmoother::smooth(unsigned int n_iterations)
   // finally adjust the second order nodes (those located between vertices)
   // these nodes will be located between their adjacent nodes
   // do this element-wise
-  MeshBase::element_iterator       el  = _mesh.active_elements_begin();
-  const MeshBase::element_iterator end = _mesh.active_elements_end();
-
-  for (; el != end; ++el)
+  for (auto & elem : _mesh.active_element_ptr_range())
     {
-      // Constant handle for the element
-      const Elem * elem = *el;
-
       // get the second order nodes (son)
       // their element indices start at n_vertices and go to n_nodes
       const unsigned int son_begin = elem->n_vertices();
@@ -149,7 +128,7 @@ void LaplaceMeshSmoother::smooth(unsigned int n_iterations)
       for (unsigned int son=son_begin; son<son_end; son++)
         {
           // Don't smooth second-order nodes which are on the boundary
-          if (!on_boundary[elem->node(son)])
+          if (!on_boundary.count(elem->node_id(son)))
             {
               const unsigned int n_adjacent_vertices =
                 elem->n_second_order_adjacent_vertices(son);
@@ -159,9 +138,9 @@ void LaplaceMeshSmoother::smooth(unsigned int n_iterations)
               Point avg_position(0,0,0);
               for (unsigned int v=0; v<n_adjacent_vertices; v++)
                 avg_position +=
-                  _mesh.point( elem->node( elem->second_order_adjacent_vertex(son,v) ) );
+                  _mesh.point( elem->node_id( elem->second_order_adjacent_vertex(son,v) ) );
 
-              _mesh.node(elem->node(son)) = avg_position / n_adjacent_vertices;
+              _mesh.node_ref(elem->node_id(son)) = avg_position / n_adjacent_vertices;
             }
         }
     }
@@ -182,34 +161,26 @@ void LaplaceMeshSmoother::init()
 
     case 2: // Stolen directly from build_L_graph in mesh_base.C
       {
-        // Initialize space in the graph.  It is n_nodes long.  Each
-        // node may be connected to an arbitrary number of other nodes
-        // via edges.
-        _graph.resize(_mesh.n_nodes());
+        // Initialize space in the graph.  It is indexed by node id.
+        // Each node may be connected to an arbitrary number of other
+        // nodes via edges.
+        _graph.resize(_mesh.max_node_id());
 
-        MeshBase::element_iterator       el  = _mesh.active_local_elements_begin();
-        const MeshBase::element_iterator end = _mesh.active_local_elements_end();
-
-        for (; el != end; ++el)
-          {
-            // Constant handle for the element
-            const Elem * elem = *el;
-
-            for (unsigned int s=0; s<elem->n_neighbors(); s++)
-              {
-                // Only operate on sides which are on the
-                // boundary or for which the current element's
-                // id is greater than its neighbor's.
-                // Sides get only built once.
-                if ((elem->neighbor(s) == libmesh_nullptr) ||
-                    (elem->id() > elem->neighbor(s)->id()))
-                  {
-                    UniquePtr<Elem> side(elem->build_side(s));
-                    _graph[side->node(0)].push_back(side->node(1));
-                    _graph[side->node(1)].push_back(side->node(0));
-                  }
-              }
-          }
+        for (auto & elem : _mesh.active_local_element_ptr_range())
+          for (auto s : elem->side_index_range())
+            {
+              // Only operate on sides which are on the
+              // boundary or for which the current element's
+              // id is greater than its neighbor's.
+              // Sides get only built once.
+              if ((elem->neighbor_ptr(s) == nullptr) ||
+                  (elem->id() > elem->neighbor_ptr(s)->id()))
+                {
+                  std::unique_ptr<const Elem> side(elem->build_side_ptr(s));
+                  _graph[side->node_id(0)].push_back(side->node_id(1));
+                  _graph[side->node_id(1)].push_back(side->node_id(0));
+                }
+            }
         _initialized = true;
         break;
       } // case 2
@@ -217,37 +188,29 @@ void LaplaceMeshSmoother::init()
     case 3: // Stolen blatantly from build_L_graph in mesh_base.C
       {
         // Initialize space in the graph.
-        _graph.resize(_mesh.n_nodes());
+        _graph.resize(_mesh.max_node_id());
 
-        MeshBase::element_iterator       el  = _mesh.active_local_elements_begin();
-        const MeshBase::element_iterator end = _mesh.active_local_elements_end();
+        for (auto & elem : _mesh.active_local_element_ptr_range())
+          for (auto f : elem->side_index_range()) // Loop over faces
+            if ((elem->neighbor_ptr(f) == nullptr) ||
+                (elem->id() > elem->neighbor_ptr(f)->id()))
+              {
+                // We need a full (i.e. non-proxy) element for the face, since we will
+                // be looking at its sides as well!
+                std::unique_ptr<const Elem> face = elem->build_side_ptr(f, /*proxy=*/false);
 
-        for (; el != end; ++el)
-          {
-            // Shortcut notation for simplicity
-            const Elem * elem = *el;
+                for (auto s : face->side_index_range()) // Loop over face's edges
+                  {
+                    // Here we can use a proxy
+                    std::unique_ptr<const Elem> side = face->build_side_ptr(s);
 
-            for (unsigned int f=0; f<elem->n_neighbors(); f++) // Loop over faces
-              if ((elem->neighbor(f) == libmesh_nullptr) ||
-                  (elem->id() > elem->neighbor(f)->id()))
-                {
-                  // We need a full (i.e. non-proxy) element for the face, since we will
-                  // be looking at its sides as well!
-                  UniquePtr<Elem> face = elem->build_side(f, /*proxy=*/false);
-
-                  for (unsigned int s=0; s<face->n_neighbors(); s++) // Loop over face's edges
-                    {
-                      // Here we can use a proxy
-                      UniquePtr<Elem> side = face->build_side(s);
-
-                      // At this point, we just insert the node numbers
-                      // again.  At the end we'll call sort and unique
-                      // to make sure there are no duplicates
-                      _graph[side->node(0)].push_back(side->node(1));
-                      _graph[side->node(1)].push_back(side->node(0));
-                    }
-                }
-          }
+                    // At this point, we just insert the node numbers
+                    // again.  At the end we'll call sort and unique
+                    // to make sure there are no duplicates
+                    _graph[side->node_id(0)].push_back(side->node_id(1));
+                    _graph[side->node_id(1)].push_back(side->node_id(0));
+                  }
+              }
 
         _initialized = true;
         break;
@@ -268,7 +231,7 @@ void LaplaceMeshSmoother::init()
   // now have duplicate entries and we need to remove them so
   // they don't foul up the averaging algorithm employed by the
   // Laplace smoother.
-  for (unsigned i=0; i<_graph.size(); ++i)
+  for (std::size_t i=0; i<_graph.size(); ++i)
     {
       // The std::unique algorithm removes duplicate *consecutive* elements from a range,
       // so it only makes sense to call it on a sorted range...
@@ -283,7 +246,7 @@ void LaplaceMeshSmoother::init()
 
 void LaplaceMeshSmoother::print_graph(std::ostream & out_stream) const
 {
-  for (unsigned int i=0; i<_graph.size(); ++i)
+  for (std::size_t i=0; i<_graph.size(); ++i)
     {
       out_stream << i << ": ";
       std::copy(_graph[i].begin(),
@@ -327,18 +290,18 @@ void LaplaceMeshSmoother::allgather_graph()
   // Now reconstruct _graph from the allgathered flat_graph.
 
   // // (Delete me later, the copy is just for printing purposes.)
-  // std::vector<std::vector<unsigned > > copy_of_graph(_graph);
+  // std::vector<std::vector<unsigned >> copy_of_graph(_graph);
 
   // Make sure the old graph is cleared out
   _graph.clear();
-  _graph.resize(_mesh.n_nodes());
+  _graph.resize(_mesh.max_node_id());
 
   // Our current position in the allgather'd flat_graph
   std::size_t cursor=0;
 
-  // There are n_nodes * n_processors vectors to read in total
+  // There are max_node_id * n_processors entries to read in total
   for (processor_id_type p=0; p<_mesh.n_processors(); ++p)
-    for (dof_id_type node_ctr=0; node_ctr<_mesh.n_nodes(); ++node_ctr)
+    for (dof_id_type node_ctr=0; node_ctr<_mesh.max_node_id(); ++node_ctr)
       {
         // Read the number of entries for this node, move cursor
         std::size_t n_entries = flat_graph[cursor++];

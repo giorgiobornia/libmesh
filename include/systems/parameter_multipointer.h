@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -21,11 +21,11 @@
 #define LIBMESH_PARAMETER_MULTIPOINTER_H
 
 
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/libmesh_common.h"
 #include "libmesh/parameter_accessor.h"
 
-// C++ ----------------------------------------------
+// C++ Includes
 #include <vector>
 
 namespace libMesh
@@ -38,6 +38,10 @@ namespace libMesh
  * This is a slightly flexible ParameterAccessor subclass: it stores
  * all user-provided pointers to copies of the parameter, and modifies
  * the value at each location in memory.
+ *
+ * \author Roy Stogner
+ * \date 2015
+ * \brief Stores multiple user-provided pointers.
  */
 template <typename T=Number>
 class ParameterMultiPointer : public ParameterAccessor<T>
@@ -56,24 +60,26 @@ public:
   /**
    * A simple reseater won't work with a multipointer
    */
+#ifdef LIBMESH_ENABLE_DEPRECATED
   virtual ParameterAccessor<T> &
-  operator= (T * /* new_ptr */) libmesh_override
+  operator= (T * /* new_ptr */) override
   {
     libmesh_error();
     return *this;
   }
+#endif
 
   /**
    * Setter: change the value of the parameter we access.
    */
-  virtual void set (const T & new_value) libmesh_override
+  virtual void set (const T & new_value) override
   {
     libmesh_assert(!_ptrs.empty());
 #ifndef NDEBUG
     // Compare other values to the last one we'll change
     const T & val = *_ptrs.back();
 #endif
-    for (unsigned int i=0; i != _ptrs.size(); ++i)
+    for (std::size_t i=0; i != _ptrs.size(); ++i)
       {
         // If you're already using inconsistent parameters we can't
         // help you.
@@ -85,34 +91,34 @@ public:
   /**
    * Getter: get the value of the parameter we access.
    */
-  virtual const T & get () const libmesh_override
+  virtual const T & get () const override
   {
     libmesh_assert(!_ptrs.empty());
     T & val = *_ptrs[0];
 #ifndef NDEBUG
     // If you're already using inconsistent parameters we can't help
     // you.
-    for (unsigned int i=1; i < _ptrs.size(); ++i)
+    for (std::size_t i=1; i < _ptrs.size(); ++i)
       libmesh_assert_equal_to(*_ptrs[i], val);
 #endif
     return val;
   }
 
   /**
-   * Returns a new copy of the accessor.
+   * \returns A new copy of the accessor.
    */
-  virtual UniquePtr<ParameterAccessor<T> > clone() const libmesh_override
+  virtual std::unique_ptr<ParameterAccessor<T>> clone() const override
   {
     ParameterMultiPointer * pmp = new ParameterMultiPointer<T>();
     pmp->_ptrs = _ptrs;
 
-    return UniquePtr<ParameterAccessor<T> >(pmp);
+    return std::unique_ptr<ParameterAccessor<T>>(pmp);
   }
 
   void push_back (T * new_ptr) { _ptrs.push_back(new_ptr); }
 
   /**
-   * Returns the number of data associated with this parameter.
+   * \returns The number of data associated with this parameter.
    * Useful for testing if the multipointer is empty/invalid.
    */
   std::size_t size() const { return _ptrs.size(); }

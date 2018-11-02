@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -107,7 +107,7 @@ NumericVector<T> & EigenSparseVector<T>::operator -= (const NumericVector<T> & v
 
 
 template <typename T>
-NumericVector<T> & EigenSparseVector<T>::operator /= (NumericVector<T> & v_in)
+NumericVector<T> & EigenSparseVector<T>::operator /= (const NumericVector<T> & v_in)
 {
   libmesh_assert (this->closed());
   libmesh_assert_equal_to(size(), v_in.size());
@@ -239,12 +239,12 @@ void EigenSparseVector<T>::abs()
 
 
 template <typename T>
-T EigenSparseVector<T>::dot (const NumericVector<T> & V) const
+T EigenSparseVector<T>::dot (const NumericVector<T> & v_in) const
 {
   libmesh_assert (this->initialized());
 
   // Make sure the NumericVector passed in is really a EigenSparseVector
-  const EigenSparseVector<T> * v = cast_ptr<const EigenSparseVector<T> *>(&V);
+  const EigenSparseVector<T> * v = cast_ptr<const EigenSparseVector<T> *>(&v_in);
   libmesh_assert(v);
 
   return _vec.dot(v->_vec);
@@ -347,6 +347,19 @@ void EigenSparseVector<T>::localize (NumericVector<T> & v_local_in,
   libmesh_assert_less_equal (send_list.size(), v_local->size());
 
   *v_local = *this;
+}
+
+
+
+template <typename T>
+void EigenSparseVector<T>::localize (std::vector<T> & v_local,
+                                     const std::vector<numeric_index_type> & indices) const
+{
+  // EigenSparseVectors are serial, so we can just copy values
+  v_local.resize(indices.size());
+
+  for (numeric_index_type i=0; i<v_local.size(); i++)
+    v_local[i] = (*this)(indices[i]);
 }
 
 

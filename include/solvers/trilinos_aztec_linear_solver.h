@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -26,12 +26,14 @@
 #include "libmesh/libmesh_common.h"
 #include "libmesh/linear_solver.h"
 
-/**
- * Trilinos include files.
- */
 #ifdef LIBMESH_TRILINOS_HAVE_AZTECOO
+
+// Trilinos include files.  AztecOO requires Epetra, so there's no
+// need to check for both.
+#include "libmesh/ignore_warnings.h"
 #include <Epetra_LinearProblem.h>
 #include <AztecOO.h>
+#include "libmesh/restore_warnings.h"
 
 // C++ includes
 #include <vector>
@@ -54,8 +56,7 @@ public:
   /**
    *  Constructor. Initializes Aztec data structures
    */
-  AztecLinearSolver (const libMesh::Parallel::Communicator & comm
-                     LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
+  AztecLinearSolver (const libMesh::Parallel::Communicator & comm);
 
   /**
    * Destructor.
@@ -65,12 +66,12 @@ public:
   /**
    * Release all memory and clear data structures.
    */
-  virtual void clear () libmesh_override;
+  virtual void clear () override;
 
   /**
    * Initialize data structures if not done so already.
    */
-  virtual void init (const char * name=libmesh_nullptr) libmesh_override;
+  virtual void init (const char * name=nullptr) override;
 
   /**
    * Call the Aztec solver.  It calls the method below, using the
@@ -81,15 +82,16 @@ public:
          NumericVector<T> & solution_in,
          NumericVector<T> & rhs_in,
          const double tol,
-         const unsigned int m_its) libmesh_override
+         const unsigned int m_its) override
   {
     return this->solve(matrix_in, matrix_in, solution_in, rhs_in, tol, m_its);
   }
 
   /**
    * This method allows you to call a linear solver while specifying
-   * the matrix to use as the (left) preconditioning matrix.  Note
-   * that the linear solver will not compute a preconditioner in this
+   * the matrix to use as the (left) preconditioning matrix.
+   *
+   * \note The linear solver will not compute a preconditioner in this
    * case, and will instead premultiply by the matrix you provide.
    */
   virtual std::pair<unsigned int, Real>
@@ -98,7 +100,7 @@ public:
          NumericVector<T> & solution,
          NumericVector<T> & rhs,
          const double tol,
-         const unsigned int m_its) libmesh_override;
+         const unsigned int m_its) override;
 
   /**
    * This function solves a system whose matrix is a shell matrix.
@@ -108,7 +110,7 @@ public:
          NumericVector<T> & solution_in,
          NumericVector<T> & rhs_in,
          const double tol,
-         const unsigned int m_its) libmesh_override;
+         const unsigned int m_its) override;
 
   /**
    * This function solves a system whose matrix is a shell matrix, but
@@ -121,7 +123,7 @@ public:
          NumericVector<T> & solution_in,
          NumericVector<T> & rhs_in,
          const double tol,
-         const unsigned int m_its) libmesh_override;
+         const unsigned int m_its) override;
 
   /**
    * Fills the input vector with the sequence of residual norms
@@ -130,17 +132,24 @@ public:
   void get_residual_history(std::vector<double> & hist);
 
   /**
-   * Returns just the initial residual for the solve just
-   * completed with this interface.  Use this method instead
-   * of the one above if you just want the starting residual
-   * and not the entire history.
+   * \returns The initial residual for the solve just completed with
+   * this interface.
+   *
+   * Use this method instead of the one above if you just want the
+   * starting residual and not the entire history.
    */
   Real get_initial_residual();
 
   /**
-   * Returns the solver's convergence flag
+   * Prints a useful message about why the latest linear solve
+   * con(di)verged.
    */
-  virtual LinearConvergenceReason get_converged_reason() const libmesh_override;
+  virtual void print_converged_reason() const override;
+
+  /**
+   * \returns The solver's convergence flag
+   */
+  virtual LinearConvergenceReason get_converged_reason() const override;
 
 private:
 
@@ -163,19 +172,6 @@ private:
 
 
 /*----------------------- functions ----------------------------------*/
-template <typename T>
-inline
-AztecLinearSolver<T>::AztecLinearSolver (const libMesh::Parallel::Communicator & comm) :
-  LinearSolver<T>(comm)
-{
-  if (this->n_processors() == 1)
-    this->_preconditioner_type = ILU_PRECOND;
-  else
-    this->_preconditioner_type = BLOCK_JACOBI_PRECOND;
-}
-
-
-
 template <typename T>
 inline
 AztecLinearSolver<T>::~AztecLinearSolver ()

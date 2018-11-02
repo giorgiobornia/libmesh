@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -44,10 +44,12 @@ namespace libMesh
 
 /**
  * ParsedFEMFunction provides support for FParser-based parsed
- * functions in FEMSystem.
+ * functions in FEMSystem. All overridden virtual functions are
+ * documented in fem_function_base.h.
  *
  * \author Roy Stogner
  * \date 2014
+ * \brief Support for using parsed functions in FEMSystem.
  */
 template <typename Output=Number>
 class ParsedFEMFunction : public FEMFunctionBase<Output>
@@ -60,76 +62,71 @@ public:
   explicit
   ParsedFEMFunction (const System & sys,
                      const std::string & expression,
-                     const std::vector<std::string> * additional_vars=libmesh_nullptr,
-                     const std::vector<Output> * initial_vals=libmesh_nullptr);
+                     const std::vector<std::string> * additional_vars=nullptr,
+                     const std::vector<Output> * initial_vals=nullptr);
 
   /**
-   * Destructor.
+   * This class contains a const reference so it can't be copy or move-assigned.
    */
-  virtual ~ParsedFEMFunction () {}
+  ParsedFEMFunction & operator= (const ParsedFEMFunction &) = delete;
+  ParsedFEMFunction & operator= (ParsedFEMFunction &&) = delete;
 
-  // Re-parse with new expression
+  /**
+   * The remaining 5 special functions can be safely defaulted.
+   *
+   * \note The underlying FunctionParserBase class has a copy
+   * constructor, so this class should be default-constructible.  And,
+   * although FunctionParserBase's move constructor is deleted, _this_
+   * class should still be move-constructible because
+   * FunctionParserBase only appears in a vector.
+   */
+  ParsedFEMFunction (const ParsedFEMFunction &) = default;
+  ParsedFEMFunction (ParsedFEMFunction &&) = default;
+  virtual ~ParsedFEMFunction () = default;
+
+  /**
+   * Re-parse with new expression.
+   */
   void reparse (const std::string & expression);
 
-  /**
-   * Prepares a context object for use.
-   */
-  virtual void init_context (const FEMContext & c) libmesh_override;
+  virtual void init_context (const FEMContext & c) override;
 
-  /**
-   * Returns a new copy of the function.  The new copy should be as
-   * ``deep'' as necessary to allow independent destruction and
-   * simultaneous evaluations of the copies in different threads.
-   */
-  virtual UniquePtr<FEMFunctionBase<Output> > clone () const libmesh_override;
+  virtual std::unique_ptr<FEMFunctionBase<Output>> clone () const override;
 
-  // ------------------------------------------------------
-  // misc
-  /**
-   * @returns the scalar value at coordinate
-   * \p p and time \p time, which defaults to zero.
-   * Purely virtual, so you have to overload it.
-   * Note that this cannot be a const method, check \p MeshFunction.
-   */
   virtual Output operator() (const FEMContext & c,
                              const Point & p,
-                             const Real time = 0.) libmesh_override;
+                             const Real time = 0.) override;
 
-  /**
-   * Return function for vectors.
-   * Returns in \p output the values of the data at the
-   * coordinate \p p and for time \p time.
-   */
   void operator() (const FEMContext & c,
                    const Point & p,
                    const Real time,
-                   DenseVector<Output> & output) libmesh_override;
+                   DenseVector<Output> & output) override;
 
-  /**
-   * @returns the vector component \p i at coordinate
-   * \p p and time \p time.
-   */
   virtual Output component(const FEMContext & c,
                            unsigned int i,
                            const Point & p,
-                           Real time=0.) libmesh_override;
+                           Real time=0.) override;
 
   const std::string & expression() { return _expression; }
 
   /**
-   * @returns the value of an inline variable.  Will *only* be correct
-   * if the inline variable value is independent of input variables,
-   * if the inline variable is not redefined within any subexpression,
-   * and if the inline variable takes the same value within any
-   * subexpressions where it appears.
+   * \returns The value of an inline variable.
+   *
+   * \note Will *only* be correct if the inline variable value is
+   * independent of input variables, if the inline variable is not
+   * redefined within any subexpression, and if the inline variable
+   * takes the same value within any subexpressions where it appears.
    */
   Output get_inline_value(const std::string & inline_var_name) const;
 
   /**
-   * Changes the value of an inline variable.  Forever after the
-   * variable value will take the given constant, independent of input
-   * variables, in every subexpression where it is already defined.
-   * Currently only works if the inline variable is not redefined
+   * Changes the value of an inline variable.
+   *
+   * \note Forever after, the variable value will take the given
+   * constant, independent of input variables, in every subexpression
+   * where it is already defined.
+   *
+   * \note Currently only works if the inline variable is not redefined
    * within any one subexpression.
    */
   void set_inline_value(const std::string & inline_var_name,
@@ -169,7 +166,7 @@ private:
     _n_requested_hess_components;
   bool _requested_normals;
 #ifdef LIBMESH_HAVE_FPARSER
-  std::vector<FunctionParserBase<Output> > parsers;
+  std::vector<FunctionParserBase<Output>> parsers;
 #else
   std::vector<char> parsers;
 #endif
@@ -340,7 +337,7 @@ ParsedFEMFunction<Output>::reparse (const std::string & expression)
   unsigned int offset = LIBMESH_DIM + 1 + _n_requested_vars +
     _n_requested_grad_components + _n_requested_hess_components;
 
-  for (unsigned int i=0; i < _additional_vars.size(); ++i)
+  for (std::size_t i=0; i < _additional_vars.size(); ++i)
     {
       variables += "," + _additional_vars[i];
       // Initialize extra variables to the vector passed in or zero
@@ -386,10 +383,10 @@ ParsedFEMFunction<Output>::init_context (const FEMContext & c)
 
 template <typename Output>
 inline
-UniquePtr<FEMFunctionBase<Output> >
+std::unique_ptr<FEMFunctionBase<Output>>
 ParsedFEMFunction<Output>::clone () const
 {
-  return UniquePtr<FEMFunctionBase<Output> >
+  return std::unique_ptr<FEMFunctionBase<Output>>
     (new ParsedFEMFunction(_sys, _expression, &_additional_vars, &_initial_vals));
 }
 
@@ -450,9 +447,9 @@ ParsedFEMFunction<Output>::get_inline_value(const std::string & inline_var_name)
 #ifndef NDEBUG
   bool found_var_name = false;
 #endif
-  Output old_var_value;
+  Output old_var_value(0.);
 
-  for (unsigned int s=0; s != _subexpressions.size(); ++s)
+  for (std::size_t s=0; s != _subexpressions.size(); ++s)
     {
       const std::string & subexpression = _subexpressions[s];
       const std::size_t varname_i =
@@ -466,7 +463,7 @@ ParsedFEMFunction<Output>::get_inline_value(const std::string & inline_var_name)
       libmesh_assert_not_equal_to(assignment_i, std::string::npos);
 
       libmesh_assert_equal_to(subexpression[assignment_i+1], '=');
-      for (unsigned int i = varname_i+1; i != assignment_i; ++i)
+      for (std::size_t i = varname_i+1; i != assignment_i; ++i)
         libmesh_assert_equal_to(subexpression[i], ' ');
 
       std::size_t end_assignment_i =
@@ -525,7 +522,7 @@ ParsedFEMFunction<Output>::set_inline_value (const std::string & inline_var_name
 #ifndef NDEBUG
   bool found_var_name = false;
 #endif
-  for (unsigned int s=0; s != _subexpressions.size(); ++s)
+  for (std::size_t s=0; s != _subexpressions.size(); ++s)
     {
       const std::string & subexpression = _subexpressions[s];
       const std::size_t varname_i =
@@ -543,7 +540,7 @@ ParsedFEMFunction<Output>::set_inline_value (const std::string & inline_var_name
       libmesh_assert_not_equal_to(assignment_i, std::string::npos);
 
       libmesh_assert_equal_to(subexpression[assignment_i+1], '=');
-      for (unsigned int i = varname_i+1; i != assignment_i; ++i)
+      for (std::size_t i = varname_i+1; i != assignment_i; ++i)
         libmesh_assert_equal_to(subexpression[i], ' ');
 
       std::size_t end_assignment_i =
@@ -569,7 +566,7 @@ ParsedFEMFunction<Output>::set_inline_value (const std::string & inline_var_name
 
   std::string new_expression;
 
-  for (unsigned int s=0; s != _subexpressions.size(); ++s)
+  for (std::size_t s=0; s != _subexpressions.size(); ++s)
     {
       new_expression += '{';
       new_expression += _subexpressions[s];
@@ -772,7 +769,7 @@ ParsedFEMFunction<Output>::eval_args (const FEMContext & c,
 #ifndef NDEBUG
       bool at_quadrature_point = false;
 #endif
-      for (unsigned int qp = 0; qp != normals.size(); ++qp)
+      for (std::size_t qp = 0; qp != normals.size(); ++qp)
         {
           if (p == xyz[qp])
             {
@@ -816,7 +813,7 @@ ParsedFEMFunction<Output>::eval (FunctionParserBase<Output> & parser,
                    << " of expression '"
                    << function_name
                    << "' with arguments:\n";
-      for (unsigned int j=0; j<_spacetime.size(); ++j)
+      for (std::size_t j=0; j<_spacetime.size(); ++j)
         libMesh::err << '\t' << _spacetime[j] << '\n';
       libMesh::err << '\n';
 
@@ -856,9 +853,9 @@ ParsedFEMFunction<Output>::eval (FunctionParserBase<Output> & parser,
 template <typename Output>
 inline
 Output
-ParsedFEMFunction<Output>::eval (char & libmesh_dbg_var(parser),
-                                 const std::string & libmesh_dbg_var(function_name),
-                                 unsigned int libmesh_dbg_var(component_idx)) const
+ParsedFEMFunction<Output>::eval (char & /*parser*/,
+                                 const std::string & /*function_name*/,
+                                 unsigned int /*component_idx*/) const
 {
   libmesh_error_msg("ERROR: This functionality requires fparser!");
   return Output(0);

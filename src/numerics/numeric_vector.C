@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -31,6 +31,8 @@
 #include "libmesh/trilinos_epetra_vector.h"
 #include "libmesh/shell_matrix.h"
 #include "libmesh/tensor_tools.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
+#include "libmesh/enum_solver_package.h"
 
 namespace libMesh
 {
@@ -42,7 +44,7 @@ namespace libMesh
 
 // Full specialization for Real datatypes
 template <typename T>
-UniquePtr<NumericVector<T> >
+std::unique_ptr<NumericVector<T>>
 NumericVector<T>::build(const Parallel::Communicator & comm, const SolverPackage solver_package)
 {
   // Build the appropriate vector
@@ -51,42 +53,28 @@ NumericVector<T>::build(const Parallel::Communicator & comm, const SolverPackage
 
 #ifdef LIBMESH_HAVE_LASPACK
     case LASPACK_SOLVERS:
-      return UniquePtr<NumericVector<T> >(new LaspackVector<T>(comm, AUTOMATIC));
+      return libmesh_make_unique<LaspackVector<T>>(comm, AUTOMATIC);
 #endif
 
 #ifdef LIBMESH_HAVE_PETSC
     case PETSC_SOLVERS:
-      return UniquePtr<NumericVector<T> >(new PetscVector<T>(comm, AUTOMATIC));
+      return libmesh_make_unique<PetscVector<T>>(comm, AUTOMATIC);
 #endif
 
-#ifdef LIBMESH_HAVE_TRILINOS
+#ifdef LIBMESH_TRILINOS_HAVE_EPETRA
     case TRILINOS_SOLVERS:
-      return UniquePtr<NumericVector<T> >(new EpetraVector<T>(comm, AUTOMATIC));
+      return libmesh_make_unique<EpetraVector<T>>(comm, AUTOMATIC);
 #endif
 
 #ifdef LIBMESH_HAVE_EIGEN
     case EIGEN_SOLVERS:
-      return UniquePtr<NumericVector<T> >(new EigenSparseVector<T>(comm, AUTOMATIC));
+      return libmesh_make_unique<EigenSparseVector<T>>(comm, AUTOMATIC);
 #endif
 
     default:
-      return UniquePtr<NumericVector<T> >(new DistributedVector<T>(comm, AUTOMATIC));
+      return libmesh_make_unique<DistributedVector<T>>(comm, AUTOMATIC);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return UniquePtr<NumericVector<T> >();
 }
-
-
-#ifndef LIBMESH_DISABLE_COMMWORLD
-template <typename T>
-UniquePtr<NumericVector<T> >
-NumericVector<T>::build(const SolverPackage solver_package)
-{
-  libmesh_deprecated();
-  return NumericVector<T>::build(CommWorld, solver_package);
-}
-#endif
 
 
 
@@ -126,7 +114,7 @@ int NumericVector<T>::compare (const NumericVector<T> & other_vector,
 
   do
     {
-      if ( std::abs( (*this)(i) - other_vector(i) ) > threshold )
+      if (std::abs((*this)(i) - other_vector(i)) > threshold)
         first_different_i = i;
       else
         i++;
@@ -158,8 +146,8 @@ int NumericVector<T>::local_relative_compare (const NumericVector<T> & other_vec
 
   do
     {
-      if ( std::abs( (*this)(i) - other_vector(i) ) > threshold *
-           std::max(std::abs((*this)(i)), std::abs(other_vector(i))))
+      if (std::abs((*this)(i) - other_vector(i)) > threshold *
+          std::max(std::abs((*this)(i)), std::abs(other_vector(i))))
         first_different_i = i;
       else
         i++;
@@ -195,7 +183,7 @@ int NumericVector<T>::global_relative_compare (const NumericVector<T> & other_ve
 
   do
     {
-      if ( std::abs( (*this)(i) - other_vector(i) ) > abs_threshold )
+      if (std::abs((*this)(i) - other_vector(i) ) > abs_threshold)
         first_different_i = i;
       else
         i++;
@@ -229,7 +217,7 @@ numeric_index_type i = first_local_index();
 
 do
 {
-if ( std::abs( (*this)(i) - other_vector(i) ) > threshold )
+if (std::abs((*this)(i) - other_vector(i) ) > threshold)
 rvalue = i;
 else
 i++;
@@ -254,7 +242,7 @@ numeric_index_type i = first_local_index();
 
 do
 {
-if ( std::abs( (*this)(i) - other_vector(i) ) > threshold )
+if (std::abs((*this)(i) - other_vector(i) ) > threshold)
 rvalue = i;
 else
 i++;
@@ -280,7 +268,7 @@ numeric_index_type i = first_local_index();
 
 do
 {
-if ( std::abs( (*this)(i) - other_vector(i) ) > threshold )
+if (std::abs((*this)(i) - other_vector(i) ) > threshold)
 rvalue = i;
 else
 i++;
@@ -307,7 +295,7 @@ numeric_index_type i = first_local_index();
 
 do
 {
-if (( std::abs( (*this)(i).real() - other_vector(i).real() ) > threshold ) || ( std::abs( (*this)(i).imag() - other_vector(i).imag() ) > threshold ))
+if ((std::abs((*this)(i).real() - other_vector(i).real()) > threshold) || (std::abs((*this)(i).imag() - other_vector(i).imag()) > threshold))
 rvalue = i;
 else
 i++;
@@ -329,7 +317,7 @@ Real NumericVector<T>::subset_l1_norm (const std::set<numeric_index_type> & indi
 
   Real norm = 0;
 
-  for(; it!=it_end; ++it)
+  for (; it!=it_end; ++it)
     norm += std::abs(v(*it));
 
   this->comm().sum(norm);
@@ -347,7 +335,7 @@ Real NumericVector<T>::subset_l2_norm (const std::set<numeric_index_type> & indi
 
   Real norm = 0;
 
-  for(; it!=it_end; ++it)
+  for (; it!=it_end; ++it)
     norm += TensorTools::norm_sq(v(*it));
 
   this->comm().sum(norm);
@@ -365,10 +353,10 @@ Real NumericVector<T>::subset_linfty_norm (const std::set<numeric_index_type> & 
 
   Real norm = 0;
 
-  for(; it!=it_end; ++it)
+  for (; it!=it_end; ++it)
     {
       Real value = std::abs(v(*it));
-      if(value > norm)
+      if (value > norm)
         norm = value;
     }
 
@@ -383,8 +371,7 @@ template <typename T>
 void NumericVector<T>::add_vector (const T * v,
                                    const std::vector<numeric_index_type> & dof_indices)
 {
-  int n = dof_indices.size();
-  for (int i=0; i<n; i++)
+  for (std::size_t i=0, n = dof_indices.size(); i != n; i++)
     this->add (dof_indices[i], v[i]);
 }
 
@@ -394,9 +381,9 @@ template <typename T>
 void NumericVector<T>::add_vector (const NumericVector<T> & v,
                                    const std::vector<numeric_index_type> & dof_indices)
 {
-  int n = dof_indices.size();
-  libmesh_assert_equal_to(v.size(), static_cast<unsigned>(n));
-  for (int i=0; i<n; i++)
+  const std::size_t n = dof_indices.size();
+  libmesh_assert_equal_to(v.size(), n);
+  for (numeric_index_type i=0; i != n; i++)
     this->add (dof_indices[i], v(i));
 }
 

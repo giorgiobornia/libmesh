@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -72,6 +72,7 @@
 
 #include "libmesh/string_to_enum.h"
 #include "libmesh/getpot.h"
+#include "libmesh/enum_solver_package.h"
 
 // Bring in everything from the libMesh namespace
 using namespace libMesh;
@@ -80,9 +81,9 @@ using namespace libMesh;
 
 // Function prototype.  This is the function that will assemble
 // the linear system for our Poisson problem.  Note that the
-// function will take the \p EquationSystems object and the
+// function will take the EquationSystems object and the
 // name of the system we are assembling as input.  From the
-// \p EquationSystems object we have acess to the \p Mesh and
+// EquationSystems object we have access to the Mesh and
 // other objects we might need.
 void assemble_poisson(EquationSystems & es,
                       const std::string & system_name);
@@ -95,7 +96,7 @@ Real exact_solution (const Real x,
 // Begin the main program.
 int main (int argc, char ** argv)
 {
-  // Initialize libMesh and any dependent libaries, like in example 2.
+  // Initialize libMesh and any dependent libraries, like in example 2.
   LibMeshInit init (argc, argv);
 
   // Only our PETSc interface currently supports solves restricted to
@@ -170,7 +171,7 @@ int main (int argc, char ** argv)
 
   // Use the MeshTools::Generation mesh generator to create a uniform
   // grid on the square [-1,1]^D.  We instruct the mesh generator
-  // to build a mesh of 8x8 \p Quad9 elements in 2D, or \p Hex27
+  // to build a mesh of 8x8 Quad9 elements in 2D, or Hex27
   // elements in 3D.  Building these higher-order elements allows
   // us to use higher-order approximation, as in example 3.
 
@@ -206,7 +207,7 @@ int main (int argc, char ** argv)
     }
 
 
-  // To demonstate solving on a subdomain, we will solve only on the
+  // To demonstrate solving on a subdomain, we will solve only on the
   // interior of a circle (ball in 3d) with radius 0.8.  So show that
   // this also works well on locally refined meshes, we refine once
   // all elements that are located on the boundary of this circle (or
@@ -216,43 +217,28 @@ int main (int argc, char ** argv)
     MeshRefinement meshRefinement(mesh);
 
     // Loop over all elements.
-    MeshBase::element_iterator       elem_it  = mesh.elements_begin();
-    const MeshBase::element_iterator elem_end = mesh.elements_end();
-    for (; elem_it != elem_end; ++elem_it)
-      {
-        Elem * elem = *elem_it;
-        if (elem->active())
-          {
-            // Just check whether the current element has at least one
-            // node inside and one node outside the circle.
-            bool node_in = false;
-            bool node_out = false;
-            for (unsigned int i=0; i<elem->n_nodes(); i++)
-              {
-                double d = elem->point(i).size();
-                if (d<0.8)
-                  {
-                    node_in = true;
-                  }
-                else
-                  {
-                    node_out = true;
-                  }
-              }
-            if (node_in && node_out)
-              {
-                elem->set_refinement_flag(Elem::REFINE);
-              }
-            else
-              {
-                elem->set_refinement_flag(Elem::DO_NOTHING);
-              }
-          }
-        else
-          {
-            elem->set_refinement_flag(Elem::INACTIVE);
-          }
-      }
+    for (auto & elem : mesh.element_ptr_range())
+      if (elem->active())
+        {
+          // Just check whether the current element has at least one
+          // node inside and one node outside the circle.
+          bool node_in = false;
+          bool node_out = false;
+          for (auto & n : elem->node_ref_range())
+            {
+              double d = n.norm();
+              if (d<0.8)
+                node_in = true;
+              else
+                node_out = true;
+            }
+          if (node_in && node_out)
+            elem->set_refinement_flag(Elem::REFINE);
+          else
+            elem->set_refinement_flag(Elem::DO_NOTHING);
+        }
+      else
+        elem->set_refinement_flag(Elem::INACTIVE);
 
     // Now actually refine.
     meshRefinement.refine_elements();
@@ -263,20 +249,12 @@ int main (int argc, char ** argv)
 
   // Now set the subdomain_id of all elements whose centroid is inside
   // the circle to 1.
-  {
-    // Loop over all elements.
-    MeshBase::element_iterator       elem_it  = mesh.elements_begin();
-    const MeshBase::element_iterator elem_end = mesh.elements_end();
-    for (; elem_it != elem_end; ++elem_it)
-      {
-        Elem * elem = *elem_it;
-        double d = elem->centroid().size();
-        if (d<0.8)
-          {
-            elem->subdomain_id() = 1;
-          }
-      }
-  }
+  for (auto elem : mesh.element_ptr_range())
+    {
+      double d = elem->centroid().norm();
+      if (d < 0.8)
+        elem->subdomain_id() = 1;
+    }
 
   // Create an equation systems object.
   EquationSystems equation_systems (mesh);
@@ -311,7 +289,7 @@ int main (int argc, char ** argv)
   SystemSubsetBySubdomain subset(system, selection);
   system.restrict_solve_to(&subset, SUBSET_ZERO);
 
-  // Note that using \p SUBSET_ZERO will cause all dofs outside the
+  // Note that using SUBSET_ZERO will cause all dofs outside the
   // subdomain to be cleared.  This will, however, cause some hanging
   // nodes outside the subdomain to have inconsistent values.
 
@@ -350,12 +328,11 @@ int main (int argc, char ** argv)
 // account the boundary conditions, which will be handled
 // via a penalty method.
 void assemble_poisson(EquationSystems & es,
-                      const std::string & system_name)
+                      const std::string & libmesh_dbg_var(system_name))
 {
   // It is a good idea to make sure we are assembling
   // the proper system.
   libmesh_assert_equal_to (system_name, "Poisson");
-
 
   // Declare a performance log.  Give it a descriptive
   // string to identify what part of the code we are
@@ -372,9 +349,9 @@ void assemble_poisson(EquationSystems & es,
   // Get a reference to the LinearImplicitSystem we are solving
   LinearImplicitSystem & system = es.get_system<LinearImplicitSystem>("Poisson");
 
-  // A reference to the \p DofMap object for this system.  The \p DofMap
+  // A reference to the DofMap object for this system.  The DofMap
   // object handles the index translation from node and element numbers
-  // to degree of freedom numbers.  We will talk more about the \p DofMap
+  // to degree of freedom numbers.  We will talk more about the DofMap
   // in future examples.
   const DofMap & dof_map = system.get_dof_map();
 
@@ -383,10 +360,10 @@ void assemble_poisson(EquationSystems & es,
   FEType fe_type = dof_map.variable_type(0);
 
   // Build a Finite Element object of the specified type.  Since the
-  // \p FEBase::build() member dynamically creates memory we will
-  // store the object as an \p UniquePtr<FEBase>.  This can be thought
+  // FEBase::build() member dynamically creates memory we will
+  // store the object as a std::unique_ptr<FEBase>.  This can be thought
   // of as a pointer that will clean up after itself.
-  UniquePtr<FEBase> fe (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe (FEBase::build(dim, fe_type));
 
   // A 5th order Gauss quadrature rule for numerical integration.
   QGauss qrule (dim, FIFTH);
@@ -396,14 +373,14 @@ void assemble_poisson(EquationSystems & es,
 
   // Declare a special finite element object for
   // boundary integration.
-  UniquePtr<FEBase> fe_face (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe_face (FEBase::build(dim, fe_type));
 
-  // Boundary integration requires one quadraure rule,
+  // Boundary integration requires one quadrature rule,
   // with dimensionality one less than the dimensionality
   // of the element.
   QGauss qface(dim-1, FIFTH);
 
-  // Tell the finte element object to use our
+  // Tell the finite element object to use our
   // quadrature rule.
   fe_face->attach_quadrature_rule (&qface);
 
@@ -419,11 +396,11 @@ void assemble_poisson(EquationSystems & es,
   const std::vector<Point> & q_point = fe->get_xyz();
 
   // The element shape functions evaluated at the quadrature points.
-  const std::vector<std::vector<Real> > & phi = fe->get_phi();
+  const std::vector<std::vector<Real>> & phi = fe->get_phi();
 
   // The element shape function gradients evaluated at the quadrature
   // points.
-  const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+  const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
   // Define data structures to contain the element matrix
   // and right-hand-side vector contribution.  Following
@@ -441,15 +418,8 @@ void assemble_poisson(EquationSystems & es,
   // We will compute the element matrix and right-hand-side
   // contribution.  See example 3 for a discussion of the
   // element iterators.
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-  for ( ; el != end_el; ++el)
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      // Store a pointer to the element we are currently
-      // working on.  This allows for nicer syntax later.
-      const Elem * elem = *el;
-
       // Elements with subdomain_id other than 1 are not in the active
       // subdomain.  We don't assemble anything for them.
       if (elem->subdomain_id()==1)
@@ -488,19 +458,19 @@ void assemble_poisson(EquationSystems & es,
           perf_log.pop("elem init");
 
           // Now we will build the element matrix.  This involves
-          // a double loop to integrate the test funcions (i) against
+          // a double loop to integrate the test functions (i) against
           // the trial functions (j).
           //
           // We have split the numeric integration into two loops
           // so that we can log the matrix and right-hand-side
-          // computation seperately.
+          // computation separately.
           //
           // Now start logging the element matrix computation
           perf_log.push ("Ke");
 
           for (unsigned int qp=0; qp<qrule.n_points(); qp++)
-            for (unsigned int i=0; i<phi.size(); i++)
-              for (unsigned int j=0; j<phi.size(); j++)
+            for (std::size_t i=0; i<phi.size(); i++)
+              for (std::size_t j=0; j<phi.size(); j++)
                 Ke(i,j) += JxW[qp]*(dphi[i][qp]*dphi[j][qp]);
 
 
@@ -569,7 +539,7 @@ void assemble_poisson(EquationSystems & es,
                 }
 
               // Add the RHS contribution
-              for (unsigned int i=0; i<phi.size(); i++)
+              for (std::size_t i=0; i<phi.size(); i++)
                 Fe(i) += JxW[qp]*fxy*phi[i][qp];
             }
 
@@ -593,9 +563,9 @@ void assemble_poisson(EquationSystems & es,
             // neighbor, check that neighbor's subdomain_id; if that
             // is different from 1, the side is also located on the
             // boundary.
-            for (unsigned int side=0; side<elem->n_sides(); side++)
-              if ((elem->neighbor(side) == libmesh_nullptr) ||
-                  (elem->neighbor(side)->subdomain_id()!=1))
+            for (auto side : elem->side_index_range())
+              if ((elem->neighbor_ptr(side) == nullptr) ||
+                  (elem->neighbor_ptr(side)->subdomain_id()!=1))
                 {
 
                   // The penalty value.  \frac{1}{\epsilon}
@@ -604,7 +574,7 @@ void assemble_poisson(EquationSystems & es,
 
                   // The value of the shape functions at the quadrature
                   // points.
-                  const std::vector<std::vector<Real> > & phi_face = fe_face->get_phi();
+                  const std::vector<std::vector<Real>> & phi_face = fe_face->get_phi();
 
                   // The Jacobian * Quadrature Weight at the quadrature
                   // points on the face.
@@ -641,13 +611,13 @@ void assemble_poisson(EquationSystems & es,
                       const Real value = exact_solution(xf, yf, zf);
 
                       // Matrix contribution of the L2 projection.
-                      for (unsigned int i=0; i<phi_face.size(); i++)
-                        for (unsigned int j=0; j<phi_face.size(); j++)
+                      for (std::size_t i=0; i<phi_face.size(); i++)
+                        for (std::size_t j=0; j<phi_face.size(); j++)
                           Ke(i,j) += JxW_face[qp]*penalty*phi_face[i][qp]*phi_face[j][qp];
 
                       // Right-hand-side contribution of the L2
                       // projection.
-                      for (unsigned int i=0; i<phi_face.size(); i++)
+                      for (std::size_t i=0; i<phi_face.size(); i++)
                         Fe(i) += JxW_face[qp]*penalty*value*phi_face[i][qp];
                     }
                 }
@@ -663,8 +633,8 @@ void assemble_poisson(EquationSystems & es,
 
           // The element matrix and right-hand-side are now built
           // for this element.  Add them to the global matrix and
-          // right-hand-side vector.  The \p SparseMatrix::add_matrix()
-          // and \p NumericVector::add_vector() members do this for us.
+          // right-hand-side vector.  The SparseMatrix::add_matrix()
+          // and NumericVector::add_vector() members do this for us.
           // Start logging the insertion of the local (element)
           // matrix and vector into the global matrix and vector
           perf_log.push ("matrix insertion");

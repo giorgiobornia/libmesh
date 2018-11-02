@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -55,7 +55,7 @@ struct RawFieldType<Tensor>
 };
 
 template<>
-struct RawFieldType<TypeNTensor<3, Number> >
+struct RawFieldType<TypeNTensor<3, Number>>
 {
   typedef Number type;
 };
@@ -80,7 +80,7 @@ struct RawFieldType<RealTensor>
 };
 
 template<>
-struct RawFieldType<TypeNTensor<3, Real> >
+struct RawFieldType<TypeNTensor<3, Real>>
 {
   typedef Real type;
 };
@@ -147,7 +147,7 @@ Number & RawAccessor<Tensor>::operator()( unsigned int k )
  * Stub implementations for stub TypeNTensor object
  */
 template <unsigned int N, typename ScalarType>
-class RawAccessor<TypeNTensor<N, ScalarType> >
+class RawAccessor<TypeNTensor<N, ScalarType>>
 {
 public:
 
@@ -178,7 +178,7 @@ private:
 #ifdef LIBMESH_USE_COMPLEX_NUMBERS
 template<>
 inline
-Real & RawAccessor<Real>::operator()( unsigned int i )
+Real & RawAccessor<Real>::operator()( unsigned int libmesh_dbg_var(i) )
 {
   libmesh_assert_equal_to (i, 0);
   return this->_data;

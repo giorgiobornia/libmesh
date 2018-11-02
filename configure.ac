@@ -1,10 +1,8 @@
 # --------------------------------------------------------------
-# $Id$
+# configure.ac file for libmesh.  Used by Automake to generate
+# aclocal.m4 and Makefile.in. See also: http://tinyurl.com/hatuyfn
 # --------------------------------------------------------------
-
-
-
-AC_INIT([libmesh], [1.0.0-pre], [libmesh-users@lists.sourceforge.net], [libmesh], [http://libmesh.github.io])
+AC_INIT([libmesh], [1.4.0-pre], [libmesh-users@lists.sourceforge.net], [libmesh], [http://libmesh.github.io])
 AC_PREREQ([2.69])
 
 # by default CFLAGS and CXXFLAGS are set to '-g -O2' on systems that support them.
@@ -52,7 +50,6 @@ AC_CONFIG_FILES([Makefile
 AC_CONFIG_FILES(contrib/bin/libmesh-config,          [chmod +x contrib/bin/libmesh-config])
 #AC_CONFIG_FILES(contrib/bin/strip_dup_libs.pl,       [chmod +x contrib/bin/strip_dup_libs.pl])
 #AC_CONFIG_FILES(contrib/bin/strip_dup_incl_paths.pl, [chmod +x contrib/bin/strip_dup_incl_paths.pl])
-AC_CONFIG_FILES(contrib/bin/xda2mgf,                 [chmod +x contrib/bin/xda2mgf])
 AC_CONFIG_FILES(contrib/bin/create_libmesh_release,  [chmod +x contrib/bin/create_libmesh_release])
 AC_CONFIG_FILES(doc/dot,                             [chmod +x doc/dot])
 AC_CONFIG_FILES(tests/run_unit_tests.sh,             [chmod +x tests/run_unit_tests.sh])
@@ -106,9 +103,8 @@ AM_MAINTAINER_MODE
 # create links for the example source files.
 # --------------------------------------------------------------
 AC_CHECK_FILE(src/base/libmesh.C, [libmesh_vpath_build=no], [libmesh_vpath_build=yes])
-if (test $libmesh_vpath_build = yes); then
-    AC_MSG_RESULT(<<< Configuring build directory for VPATH build >>>)
-fi
+AS_IF([test $libmesh_vpath_build = yes],
+      [AC_MSG_RESULT(<<< Configuring build directory for VPATH build >>>)])
 AM_CONDITIONAL(LIBMESH_VPATH_BUILD, test x$libmesh_vpath_build = xyes)
 
 # --------------------------------------------------------------
@@ -130,29 +126,85 @@ AC_SUBST(PERL)
 # --------------------------------------------------------------
 LIBMESH_SET_COMPILERS
 
+# By default we do not set any -march flag, but this can be turned on
+# by configuring with --enable-march
+AC_ARG_ENABLE(march,
+              AC_HELP_STRING([--enable-march],
+                             [Determine the correct -march flag for this system]),
+              [AS_CASE("${enableval}",
+                       [yes], [enablemarch=yes],
+                       [no],  [enablemarch=no],
+                       [AC_MSG_ERROR(bad value ${enableval} for --enable-march)])],
+              [enablemarch=no])
+
+# Set the value of the cache variable $ax_cv_gcc_archflag based
+# on the current architecture. For the first argument:
+# [yes] = generate portable code (-mtune)
+# [no]  = generate architecture-specific code (-march)
+# This script is specifc to GCC; the flags it determines might not
+# work for other compilers. There is also an optional third
+# argument which controls what happens when determining an arch flag
+# fails, we don't do anything in that case.
+AS_IF([test "x$enablemarch" != "xno"],
+      [
+        AX_GCC_ARCHFLAG([no],
+                        [
+                          dnl Action if success - append $ax_cv_gcc_archflag to CXXFLAGS flags for
+                          dnl all but debugging METHODS. I don't think it is needed with -O0 when
+                          dnl debugging.
+                          CXXFLAGS_OPT="$CXXFLAGS_OPT $ax_cv_gcc_archflag"
+                          CXXFLAGS_DEVEL="$CXXFLAGS_DEVEL $ax_cv_gcc_archflag"
+                          CXXFLAGS_PROF="$CXXFLAGS_PROF $ax_cv_gcc_archflag"
+                          CXXFLAGS_OPROF="$CXXFLAGS_OPROF $ax_cv_gcc_archflag"
+                        ])
+      ])
+
 # --------------------------------------------------------------
 # Allow the user to explicitly turn off C++11 support by saying
-# --disable-cxx11.  Otherwise, C++11 support is enabled by default
-# although libmesh does not (currently) use any C++11 features.
+# --disable-cxx11?  This is no longer supported.
+#
+# We'll leave the "option" in place for a release, though, just in
+# case anyone is specifying --enable-cxx11 in their build scripts
 # --------------------------------------------------------------
 AC_ARG_ENABLE(cxx11,
               AC_HELP_STRING([--disable-cxx11],
-                             [build without C++11 support]),
-                             [case "${enableval}" in
-                   yes) enablecxx11=yes ;;
-                   no)  enablecxx11=no ;;
-                   *)   AC_MSG_ERROR(bad value ${enableval} for --disable-cxx11) ;;
-                   esac],
-                   [enablecxx11=yes])
+                             [build without C++11 support (no longer supported!)]),
+              [AS_CASE("${enableval}",
+                       [yes], [enablecxx11=yes],
+                       [no],  [AC_MSG_ERROR(libMesh now requires C++11)],
+                       [AC_MSG_ERROR(bad value ${enableval} for --disable-cxx11)])],
+              [enablecxx11=irrelevant])
 
-if (test "x$enablecxx11" = "xyes"); then
-  # --------------------------------------------------------------
-  # Standard autoconf macro for determining the proper -std=c++11
-  # flag for the current compiler.  Adds the result to CXXFLAGS if
-  # one is found.  See ax_cxx_compile_stdcxx_11.m4 for details.
-  # --------------------------------------------------------------
-  AX_CXX_COMPILE_STDCXX_11([],[optional])
-fi
+AS_IF([test $enablecxx11 != irrelevant],
+      [AC_MSG_WARN([--enable/disable-cxx11 are now deprecated])])
+enablecxx11=yes
+
+# --------------------------------------------------------------
+# Setting --enable-cxx11-required causes an error to be emitted during
+# configure if the compiler does not support a specific subset of
+# C++11 features.  This is useful for app codes which require C++11,
+# since it prevents situations where libmesh is built without C++11
+# support (which may take a very long time), and then the app fails to
+# compile, requiring you to redo everything.
+# --------------------------------------------------------------
+AC_ARG_ENABLE(cxx11-required,
+              AC_HELP_STRING([--enable-cxx11-required],
+                             [Error if compiler does not support C++11]),
+              [AS_CASE("${enableval}",
+                       [yes], [cxx11required=yes],
+                       [no],  [cxx11required=no],
+                       [AC_MSG_ERROR(bad value ${enableval} for --enable-cxx11-required)])],
+              [cxx11required=irrelevant])
+
+AS_IF([test $cxx11required != irrelevant],
+      [AC_MSG_WARN([C++11 is now always required for libMesh])])
+
+# --------------------------------------------------------------
+# Standard autoconf macro for determining the proper -std=c++11
+# flag for the current compiler.  Adds the result to CXXFLAGS if
+# one is found.  See ax_cxx_compile_stdcxx_11.m4 for details.
+# --------------------------------------------------------------
+AX_CXX_COMPILE_STDCXX_11([],[mandatory])
 
 # --------------------------------------------------------------
 # See compiler.m4 for the definition of this function.  It uses the
@@ -175,24 +227,153 @@ libmesh_CXXFLAGS="$GCOV_FLAGS $libmesh_CXXFLAGS"
 #-----------------------------------------------------
 LIBMESH_SET_METHODS
 
+# By default we merely enable some warnings, but we can turn those
+# into errors (for library code only, not contrib or external code)
+# by configuring with --enable-werror
+AC_ARG_ENABLE(werror,
+              AC_HELP_STRING([--enable-werror],
+                             [Turn compilation warnings into errors]),
+              [AS_CASE("${enableval}",
+                       [yes], [enablewerror=yes],
+                       [no],  [enablewerror=no],
+                       [AC_MSG_ERROR(bad value ${enableval} for --enable-werror)])],
+              [enablewerror=no])
+
+ANY_WERROR_FLAG=$WERROR_FLAGS
+AS_IF([test "x$enablewerror" != "xyes"],
+        [ANY_WERROR_FLAG=''
+         AC_MSG_RESULT(<<< Compiler warnings are just warnings >>>)],
+        [AX_CHECK_COMPILE_FLAG($WERROR_FLAGS,
+          [AC_MSG_RESULT(<<< Compiler warnings are now errors >>>)],
+          [ANY_WERROR_FLAG=''
+           AC_MSG_RESULT(<<< Compiler does not support $WERROR_FLAGS >>>)
+           AC_MSG_RESULT(<<< Compiler warnings are just warnings >>>)])])
+AC_SUBST(ANY_WERROR_FLAG)
+
+# By default we merely enable some of the most common compiler
+# warnings, but we can turn on as many warnings as we avoid triggering
+# (for library code only, not contrib or external code) by configuring
+# with --enable-paranoid-warnings
+AC_ARG_ENABLE(paranoid-warnings,
+              AC_HELP_STRING([--enable-paranoid-warnings],
+                             [Turn on paranoid compiler warnings]),
+              [AS_CASE("${enableval}",
+                       [yes], [enableparanoid=yes],
+                       [no],  [enableparanoid=no],
+                       [AC_MSG_ERROR(bad value ${enableval} for --enable-paranoid-warnings)])],
+              [enableparanoid=no])
+
+dnl Test paranoid warning flags with -Werror on so we can detect if
+dnl some are unrecognized
+ANY_PARANOID_FLAGS=$PARANOID_FLAGS
+AS_IF([test "x$enableparanoid" != "xyes"],
+        [ANY_PARANOID_FLAGS=''
+         AC_MSG_RESULT(<<< Disabling extra paranoid compiler warnings >>>)],
+        [old_CXXFLAGS="$CXXFLAGS"
+         CXXFLAGS="$CXXFLAGS $WERROR_FLAGS $PARANOID_FLAGS"
+         AC_COMPILE_IFELSE([AC_LANG_PROGRAM()],
+          [AC_MSG_RESULT(<<< Enabled extra paranoid compiler warnings >>>)],
+          [ANY_PARANOID_FLAGS=''
+           AC_MSG_RESULT(<<< Compiler may not support all of $PARANOID_FLAGS >>>)
+           AC_MSG_RESULT(<<< Disabling extra paranoid compiler warnings >>>)])
+         CXXFLAGS="$old_CXXFLAGS"])
+AC_SUBST(ANY_PARANOID_FLAGS)
+
 # --------------------------------------------------------------
-# Test for specific C++11 features.  Note, we still run these
-# tests even when C++11 has been explicitly disabled even though
-# we know they will fail, since they contain AM_CONDITIONALs.
+# Test for mandatory C++11 features, those which libMesh now requires
+# for internal use.
 # --------------------------------------------------------------
-LIBMESH_TEST_CXX11_MOVE
-LIBMESH_TEST_CXX11_SHARED_PTR
-LIBMESH_TEST_CXX11_UNIQUE_PTR
-LIBMESH_TEST_CXX11_REGEX
-LIBMESH_TEST_CXX11_OVERRIDE
+LIBMESH_TEST_CXX11_AUTO
+AS_IF([test "x$have_cxx11_auto" != "xyes"],
+      [AC_MSG_ERROR([libMesh requires C++11 auto variable support])])
+
+LIBMESH_TEST_CXX11_RANGEFOR
+AS_IF([test "x$have_cxx11_rangefor" != "xyes"],
+      [AC_MSG_ERROR([libMesh requires C++11 ranged-for loop support])])
+
+# Technically we require uniform initialization, but this is the
+# closest test we have
 LIBMESH_TEST_CXX11_INITIALIZER_LIST
+AS_IF([test "x$have_cxx11_initializer_list" != "xyes"],
+      [AC_MSG_ERROR([libMesh requires C++11 initializer list support])])
+
+LIBMESH_TEST_CXX11_UNIQUE_PTR
+AS_IF([test "x$have_cxx11_unique_ptr" != "xyes"],
+      [AC_MSG_ERROR([libMesh requires C++11 std::unique_ptr support])])
+
+LIBMESH_TEST_CXX11_MAKE_UNIQUE_WORKAROUND
+AS_IF([test "x$have_cxx11_make_unique_workaround" != "xyes"],
+      [AC_MSG_ERROR([libMesh requires C++11 variadic template support])])
+
+LIBMESH_TEST_CXX11_TUPLE
+AS_IF([test "x$have_cxx11_tuple" != "xyes"],
+      [AC_MSG_ERROR([libMesh requires C++11 std::tuple support])])
+
+LIBMESH_TEST_CXX11_LAMBDA
+AS_IF([test "x$have_cxx11_lambda" != "xyes"],
+      [AC_MSG_ERROR([libMesh requires C++11 lambda support])])
+
+LIBMESH_TEST_CXX11_FIXED_TYPE_ENUM
+AS_IF([test "x$have_cxx11_fixed_type_enum" != "xyes"],
+      [AC_MSG_ERROR([libMesh requires C++11 fixed type enumeration support])])
+
+LIBMESH_TEST_CXX11_FIXED_TYPE_ENUM_FWD
+AS_IF([test "x$have_cxx11_fixed_type_enum_fwd" != "xyes"],
+      [AC_MSG_ERROR([libMesh requires C++11 fixed type enumeration forward declaration support])])
+
+LIBMESH_TEST_CXX11_OVERRIDE
+AS_IF([test "x$have_cxx11_override" != "xyes"],
+      [AC_MSG_ERROR([libMesh requires C++11 compiler support the override keyword])])
+
+LIBMESH_TEST_CXX11_MOVE_CONSTRUCTORS
+AS_IF([test "x$have_cxx11_move_constructors" != "xyes"],
+      [AC_MSG_ERROR([libMesh requires C++11 move constructor support])])
+
+LIBMESH_TEST_CXX11_DELETED_FUNCTIONS
+AS_IF([test "x$have_cxx11_deleted_functions" != "xyes"],
+      [AC_MSG_ERROR([libMesh requires C++11 deleted function support])])
+
+LIBMESH_TEST_CXX11_DEFAULTED_FUNCTIONS
+AS_IF([test "x$have_cxx11_defaulted_functions" != "xyes"],
+      [AC_MSG_ERROR([libMesh requires C++11 defaulted function support])])
+
+LIBMESH_TEST_CXX11_NULLPTR
+AS_IF([test "x$have_cxx11_nullptr" != "xyes"],
+      [AC_MSG_ERROR([libMesh requires the C++11 nullptr keyword])])
+
+LIBMESH_TEST_CXX11_FINAL
+AS_IF([test "x$have_cxx11_final" != "xyes"],
+      [AC_MSG_ERROR([libMesh requires the C++11 final keyword])])
+
+LIBMESH_TEST_CXX11_DECLTYPE
+AS_IF([test "x$have_cxx11_decltype" != "xyes"],
+      [AC_MSG_ERROR([libMesh requires the C++11 decltype keyword])])
+
+LIBMESH_TEST_CXX11_BEGIN_END
+AS_IF([test "x$have_cxx11_begin_end" != "xyes"],
+      [AC_MSG_ERROR([libMesh requires C++11 std::begin/end support])])
+
+LIBMESH_TEST_CXX11_CONTAINER_ERASE
+AS_IF([test "x$have_cxx11_container_erase" != "xyes"],
+      [AC_MSG_ERROR([libMesh requires C++11 support for std container erase() functions returning iterators])])
+
+# --------------------------------------------------------------
+# Test for optional modern C++ features, which libMesh offers shims
+# for and/or which libMesh applications may want to selectively use.
+# --------------------------------------------------------------
+LIBMESH_TEST_CXX11_RVALUE_REFERENCES
+LIBMESH_TEST_CXX11_CONSTEXPR
+LIBMESH_TEST_CXX11_ALIAS_DECLARATIONS
+LIBMESH_TEST_CXX11_SHARED_PTR
+LIBMESH_TEST_CXX14_MAKE_UNIQUE
+LIBMESH_TEST_CXX11_REGEX
 LIBMESH_TEST_CXX11_VARIADIC_TEMPLATES
 LIBMESH_TEST_CXX11_THREAD
+LIBMESH_TEST_CXX11_CONDITION_VARIABLE
 LIBMESH_TEST_CXX11_TYPE_TRAITS
-LIBMESH_TEST_CXX11_INVERSE_HYPERBOLIC_FUNCS
-LIBMESH_TEST_CXX11_DELETED_FUNCTIONS
-LIBMESH_TEST_CXX11_FINAL
-LIBMESH_TEST_CXX11_NULLPTR
+LIBMESH_TEST_CXX11_MATH_FUNCS
+LIBMESH_TEST_CXX11_TO_STRING
+LIBMESH_TEST_CXX17_FALLTHROUGH_ATTRIBUTE
 
 #-----------------------------------------------------
 # Initialize libtool.  By default, we will build
@@ -216,7 +397,7 @@ AC_DEFINE_UNQUOTED(MICRO_VERSION,            [$AX_POINT_VERSION],  [libMesh micr
 AC_DEFINE_UNQUOTED(LIB_VERSION,              ["$VERSION"],         [libMesh version number])
 AC_DEFINE_UNQUOTED(LIB_RELEASE,              ["$BUILD_DEVSTATUS"], [libMesh source code version])
 AC_DEFINE_UNQUOTED(CXX,                      ["$CXX"],             [C++ compiler])
-AC_DEFINE_UNQUOTED(IO_COMPATIBILITY_VERSION, ["0.7.4"],            [libMesh I/O file format compatiblity string])
+AC_DEFINE_UNQUOTED(IO_COMPATIBILITY_VERSION, ["0.7.4"],            [libMesh I/O file format compatibility string])
 
 
 
@@ -248,16 +429,15 @@ AC_SUBST(SED)
 
 
 # -------------------------------------------------------------
-# pkg-config - used to configure installed pakages.  We can
+# pkg-config - used to configure installed packages.  We can
 # use it to query our installed targets, if it exists.
-# Otherwise we caln fall back to libmesh-config.
+# Otherwise we can fall back to libmesh-config.
 #
 # Not required to build libmesh, but we can install a config
 # file so that users can use 'pkg-config libmesh ...'
 # -------------------------------------------------------------
-if (test -z "$PKG_CONFIG"); then
-  AC_PATH_PROG(PKG_CONFIG, pkg-config, no)
-fi
+AS_IF([test -z "$PKG_CONFIG"],
+      [AC_PATH_PROG(PKG_CONFIG, pkg-config, no)])
 # -------------------------------------------------------------
 
 
@@ -297,22 +477,21 @@ AC_SUBST(METHOD)
 # mpCC if it is there instead of xlC, but only do this
 # _after_ configure is finished using CXX!
 # --------------------------------------------------------------
-if test "$CXX" = xlC_r; then
-  #           Var   | look for | name if found | name if not | where
-  AC_CHECK_PROG(MPCXX,  mpCC_r,      mpCC_r,           $CXX,         $PATH)
-  CXX=$MPCXX
-  if test "$CXX" = mpCC_r; then
-    AC_MSG_RESULT(<<< Using $CXX instead of xlC_r to compile C++ >>>)
-  fi
-fi
-if test "$CXX" = xlC; then
-  #           Var   | look for | name if found | name if not | where
-  AC_CHECK_PROG(MPCXX,  mpCC,      mpCC,           $CXX,         $PATH)
-  CXX=$MPCXX
-  if test "$CXX" = mpCC; then
-    AC_MSG_RESULT(<<< Using $CXX instead of xlC to compile C++ >>>)
-  fi
-fi
+AS_IF([test "$CXX" = xlC_r],
+      [
+        AC_CHECK_PROG(MPCXX,mpCC_r,mpCC_r,$CXX,$PATH)
+        CXX=$MPCXX
+        AS_IF([test "$CXX" = mpCC_r],
+              [AC_MSG_RESULT(<<< Using $CXX instead of xlC_r to compile C++ >>>)])
+      ])
+
+AS_IF([test "$CXX" = xlC],
+      [
+        AC_CHECK_PROG(MPCXX,mpCC,mpCC,$CXX,$PATH)
+        CXX=$MPCXX
+        AS_IF([test "$CXX" = mpCC],
+              [AC_MSG_RESULT(<<< Using $CXX instead of xlC to compile C++ >>>)])
+      ])
 # --------------------------------------------------------------
 
 
@@ -341,90 +520,94 @@ LIBMESH_CONFIGURE_OPTIONAL_PACKAGES
 AX_SUMMARIZE_ENV
 
 # Each example gets a makefile
-if (test "x$enableexamples" = "xyes"); then
-   AC_CONFIG_FILES([
-                examples/introduction/introduction_ex1/Makefile
-                examples/introduction/introduction_ex2/Makefile
-                examples/introduction/introduction_ex3/Makefile
-                examples/introduction/introduction_ex4/Makefile
-                examples/introduction/introduction_ex5/Makefile
-                examples/adaptivity/adaptivity_ex1/Makefile
-                examples/adaptivity/adaptivity_ex2/Makefile
-                examples/adaptivity/adaptivity_ex3/Makefile
-                examples/adaptivity/adaptivity_ex4/Makefile
-                examples/adaptivity/adaptivity_ex5/Makefile
-                examples/adjoints/adjoints_ex1/Makefile
-                examples/adjoints/adjoints_ex2/Makefile
-                examples/adjoints/adjoints_ex3/Makefile
-                examples/adjoints/adjoints_ex4/Makefile
-                examples/adjoints/adjoints_ex5/Makefile
-                examples/eigenproblems/eigenproblems_ex1/Makefile
-                examples/eigenproblems/eigenproblems_ex2/Makefile
-                examples/eigenproblems/eigenproblems_ex3/Makefile
-                examples/fem_system/fem_system_ex1/Makefile
-                examples/fem_system/fem_system_ex2/Makefile
-                examples/fem_system/fem_system_ex3/Makefile
-                examples/fem_system/fem_system_ex4/Makefile
-                examples/solution_transfer/solution_transfer_ex1/Makefile
-                examples/miscellaneous/miscellaneous_ex1/Makefile
-                examples/miscellaneous/miscellaneous_ex2/Makefile
-                examples/miscellaneous/miscellaneous_ex3/Makefile
-                examples/miscellaneous/miscellaneous_ex4/Makefile
-                examples/miscellaneous/miscellaneous_ex5/Makefile
-                examples/miscellaneous/miscellaneous_ex6/Makefile
-                examples/miscellaneous/miscellaneous_ex7/Makefile
-                examples/miscellaneous/miscellaneous_ex8/Makefile
-                examples/miscellaneous/miscellaneous_ex9/Makefile
-                examples/miscellaneous/miscellaneous_ex10/Makefile
-                examples/miscellaneous/miscellaneous_ex11/Makefile
-                examples/miscellaneous/miscellaneous_ex12/Makefile
-                examples/optimization/optimization_ex1/Makefile
-                examples/optimization/optimization_ex2/Makefile
-                examples/subdomains/subdomains_ex1/Makefile
-                examples/subdomains/subdomains_ex2/Makefile
-                examples/subdomains/subdomains_ex3/Makefile
-                examples/systems_of_equations/systems_of_equations_ex1/Makefile
-                examples/systems_of_equations/systems_of_equations_ex2/Makefile
-                examples/systems_of_equations/systems_of_equations_ex3/Makefile
-                examples/systems_of_equations/systems_of_equations_ex4/Makefile
-                examples/systems_of_equations/systems_of_equations_ex5/Makefile
-                examples/systems_of_equations/systems_of_equations_ex6/Makefile
-                examples/systems_of_equations/systems_of_equations_ex7/Makefile
-                examples/systems_of_equations/systems_of_equations_ex8/Makefile
-                examples/reduced_basis/reduced_basis_ex1/Makefile
-                examples/reduced_basis/reduced_basis_ex2/Makefile
-                examples/reduced_basis/reduced_basis_ex3/Makefile
-                examples/reduced_basis/reduced_basis_ex4/Makefile
-                examples/reduced_basis/reduced_basis_ex5/Makefile
-                examples/reduced_basis/reduced_basis_ex6/Makefile
-                examples/reduced_basis/reduced_basis_ex7/Makefile
-                examples/transient/transient_ex1/Makefile
-                examples/transient/transient_ex2/Makefile
-                examples/vector_fe/vector_fe_ex1/Makefile
-                examples/vector_fe/vector_fe_ex2/Makefile
-                examples/vector_fe/vector_fe_ex3/Makefile
-                examples/vector_fe/vector_fe_ex4/Makefile
-                examples/Makefile
-                ])
-fi
+AS_IF([test "x$enableexamples" = "xyes"],
+      [
+        AC_CONFIG_FILES([examples/introduction/introduction_ex1/Makefile
+                         examples/introduction/introduction_ex2/Makefile
+                         examples/introduction/introduction_ex3/Makefile
+                         examples/introduction/introduction_ex4/Makefile
+                         examples/introduction/introduction_ex5/Makefile
+                         examples/adaptivity/adaptivity_ex1/Makefile
+                         examples/adaptivity/adaptivity_ex2/Makefile
+                         examples/adaptivity/adaptivity_ex3/Makefile
+                         examples/adaptivity/adaptivity_ex4/Makefile
+                         examples/adaptivity/adaptivity_ex5/Makefile
+                         examples/adjoints/adjoints_ex1/Makefile
+                         examples/adjoints/adjoints_ex2/Makefile
+                         examples/adjoints/adjoints_ex3/Makefile
+                         examples/adjoints/adjoints_ex4/Makefile
+                         examples/adjoints/adjoints_ex5/Makefile
+                         examples/adjoints/adjoints_ex6/Makefile
+                         examples/eigenproblems/eigenproblems_ex1/Makefile
+                         examples/eigenproblems/eigenproblems_ex2/Makefile
+                         examples/eigenproblems/eigenproblems_ex3/Makefile
+                         examples/fem_system/fem_system_ex1/Makefile
+                         examples/fem_system/fem_system_ex2/Makefile
+                         examples/fem_system/fem_system_ex3/Makefile
+                         examples/fem_system/fem_system_ex4/Makefile
+                         examples/solution_transfer/solution_transfer_ex1/Makefile
+                         examples/miscellaneous/miscellaneous_ex1/Makefile
+                         examples/miscellaneous/miscellaneous_ex2/Makefile
+                         examples/miscellaneous/miscellaneous_ex3/Makefile
+                         examples/miscellaneous/miscellaneous_ex4/Makefile
+                         examples/miscellaneous/miscellaneous_ex5/Makefile
+                         examples/miscellaneous/miscellaneous_ex6/Makefile
+                         examples/miscellaneous/miscellaneous_ex7/Makefile
+                         examples/miscellaneous/miscellaneous_ex8/Makefile
+                         examples/miscellaneous/miscellaneous_ex9/Makefile
+                         examples/miscellaneous/miscellaneous_ex10/Makefile
+                         examples/miscellaneous/miscellaneous_ex11/Makefile
+                         examples/miscellaneous/miscellaneous_ex12/Makefile
+                         examples/miscellaneous/miscellaneous_ex13/Makefile
+                         examples/miscellaneous/miscellaneous_ex14/Makefile
+                         examples/optimization/optimization_ex1/Makefile
+                         examples/optimization/optimization_ex2/Makefile
+                         examples/subdomains/subdomains_ex1/Makefile
+                         examples/subdomains/subdomains_ex2/Makefile
+                         examples/subdomains/subdomains_ex3/Makefile
+                         examples/systems_of_equations/systems_of_equations_ex1/Makefile
+                         examples/systems_of_equations/systems_of_equations_ex2/Makefile
+                         examples/systems_of_equations/systems_of_equations_ex3/Makefile
+                         examples/systems_of_equations/systems_of_equations_ex4/Makefile
+                         examples/systems_of_equations/systems_of_equations_ex5/Makefile
+                         examples/systems_of_equations/systems_of_equations_ex6/Makefile
+                         examples/systems_of_equations/systems_of_equations_ex7/Makefile
+                         examples/systems_of_equations/systems_of_equations_ex8/Makefile
+                         examples/systems_of_equations/systems_of_equations_ex9/Makefile
+                         examples/reduced_basis/reduced_basis_ex1/Makefile
+                         examples/reduced_basis/reduced_basis_ex2/Makefile
+                         examples/reduced_basis/reduced_basis_ex3/Makefile
+                         examples/reduced_basis/reduced_basis_ex4/Makefile
+                         examples/reduced_basis/reduced_basis_ex5/Makefile
+                         examples/reduced_basis/reduced_basis_ex6/Makefile
+                         examples/reduced_basis/reduced_basis_ex7/Makefile
+                         examples/transient/transient_ex1/Makefile
+                         examples/transient/transient_ex2/Makefile
+                         examples/vector_fe/vector_fe_ex1/Makefile
+                         examples/vector_fe/vector_fe_ex2/Makefile
+                         examples/vector_fe/vector_fe_ex3/Makefile
+                         examples/vector_fe/vector_fe_ex4/Makefile
+                         examples/Makefile])
+     ])
+
 
 
 # hackery.  If we are supporting nested autoconf packages and we want to specify
 # additional arguments to be passed to those packages, do that here.
 # Specifically, we append libmesh_subpackage_arguments to ac_configure_args
 # before AC_OUTPUT recurses into our subpackages
-if (test "x$enablenested" = "xyes"); then
-  ac_configure_args_SAVE="$ac_configure_args"
-  ac_configure_args="$ac_configure_args $libmesh_subpackage_arguments CXX='$CXX' CC='$CC' F77='$F77' FC='$FC' CPPFLAGS='$HDF5_CPPFLAGS $CPPFLAGS' LIBS='$HDF5_LIBS $LIBS'"
-fi
+AS_IF([test "x$enablenested" = "xyes"],
+      [
+        ac_configure_args_SAVE="$ac_configure_args"
+        ac_configure_args="$ac_configure_args $libmesh_subpackage_arguments CXX='$CXX' CC='$CC' F77='$F77' FC='$FC' CPPFLAGS='$HDF5_CPPFLAGS $CPPFLAGS' LIBS='$HDF5_LIBS $LIBS'"
+      ])
 
 # Create output files. Also configures any subpackages
 AC_OUTPUT
 
 # end hackery
-if (test "x$enablenested" = "xyes"); then
-  ac_configure_args="$ac_configure_args_SAVE"
-fi
+AS_IF([test "x$enablenested" = "xyes"],
+      [ac_configure_args="$ac_configure_args_SAVE"])
 
 # Final summary
 AX_SUMMARIZE_CONFIG

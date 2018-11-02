@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -53,6 +53,8 @@
 #include "libmesh/libmesh_logging.h"
 #include "libmesh/rb_data_serialization.h"
 #include "libmesh/rb_data_deserialization.h"
+#include "libmesh/enum_solver_package.h"
+#include "libmesh/enum_solver_type.h"
 
 // local includes
 #include "rb_classes.h"
@@ -84,6 +86,10 @@ int main(int argc, char ** argv)
   // Initialize libMesh.
   LibMeshInit init (argc, argv);
 
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
+
 #if !defined(LIBMESH_HAVE_XDR)
   // We need XDR support to write out reduced bases
   libmesh_example_requires(false, "--enable-xdr");
@@ -94,6 +100,14 @@ int main(int argc, char ** argv)
   // I have no idea why long double isn't working here... [RHS]
   libmesh_example_requires(false, "double precision");
 #endif
+
+  // Eigen can take forever to solve the offline mode portion of this
+  // example
+  libmesh_example_requires(libMesh::default_solver_package() != EIGEN_SOLVERS, "--enable-petsc or --enable-laspack");
+
+  // Trilinos reports "true residual is too large" in the offline mode
+  // portion of this example
+  libmesh_example_requires(libMesh::default_solver_package() != TRILINOS_SOLVERS, "--enable-petsc or --enable-laspack");
 
   // This example only works if libMesh was compiled for 3D
   const unsigned int dim = 3;
@@ -128,16 +142,15 @@ int main(int argc, char ** argv)
                                      0., z_size,
                                      HEX8);
 
-  // Let's add a some node boundary condition so that we can impose a point load
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-  for ( ; el != end_el; ++el)
+  // Let's add a node boundary condition so that we can impose a point
+  // load.
+  // Each processor should know about each boundary condition it can
+  // see, so we loop over all elements, not just local elements.
+  for (const auto & elem : mesh.element_ptr_range())
     {
-      const Elem * elem = *el;
-
       unsigned int side_max_x = 0, side_max_y = 0, side_max_z = 0;
       bool found_side_max_x = false, found_side_max_y = false, found_side_max_z = false;
-      for (unsigned int side=0; side<elem->n_sides(); side++)
+      for (auto side : elem->side_index_range())
         {
           if (mesh.get_boundary_info().has_boundary_id(elem, side, BOUNDARY_ID_MAX_X))
             {
@@ -163,13 +176,13 @@ int main(int argc, char ** argv)
       // then let's set a node boundary condition
       if (found_side_max_x && found_side_max_y && found_side_max_z)
         {
-          for (unsigned int n=0; n<elem->n_nodes(); n++)
+          for (auto n : elem->node_index_range())
             {
               if (elem->is_node_on_side(n, side_max_x) &&
                   elem->is_node_on_side(n, side_max_y) &&
                   elem->is_node_on_side(n, side_max_z))
                 {
-                  mesh.get_boundary_info().add_node(elem->get_node(n), NODE_BOUNDARY_ID);
+                  mesh.get_boundary_info().add_node(elem->node_ptr(n), NODE_BOUNDARY_ID);
                 }
             }
         }
@@ -259,7 +272,7 @@ int main(int argc, char ** argv)
       rb_eval.legacy_read_offline_data_from_files();
 #endif
 
-      // Iinitialize online parameters
+      // Initialize online parameters
       Real online_x_scaling = infile("online_x_scaling", 0.);
       Real online_load_Fx   = infile("online_load_Fx",   0.);
       Real online_load_Fy   = infile("online_load_Fy",   0.);
@@ -304,15 +317,8 @@ void scale_mesh_and_plot(EquationSystems & es,
   // Loop over the mesh nodes and move them!
   MeshBase & mesh = es.get_mesh();
 
-  MeshBase::node_iterator       node_it  = mesh.nodes_begin();
-  const MeshBase::node_iterator node_end = mesh.nodes_end();
-
-  for ( ; node_it != node_end; node_it++)
-    {
-      Node * node = *node_it;
-
-      (*node)(0) *= mu.get_value("x_scaling");
-    }
+  for (auto & node : mesh.node_ptr_range())
+    (*node)(0) *= mu.get_value("x_scaling");
 
   // Post-process the solution to compute the stresses
   compute_stresses(es);
@@ -322,19 +328,13 @@ void scale_mesh_and_plot(EquationSystems & es,
 #endif
 
   // Loop over the mesh nodes and move them!
-  node_it = mesh.nodes_begin();
-
-  for ( ; node_it != node_end; node_it++)
-    {
-      Node * node = *node_it;
-
-      (*node)(0) /= mu.get_value("x_scaling");
-    }
+  for (auto & node : mesh.node_ptr_range())
+    (*node)(0) /= mu.get_value("x_scaling");
 }
 
 void compute_stresses(EquationSystems & es)
 {
-  START_LOG("compute_stresses()", "main");
+  LOG_SCOPE("compute_stresses()", "main");
 
   const MeshBase & mesh = es.get_mesh();
 
@@ -350,12 +350,12 @@ void compute_stresses(EquationSystems & es)
 
   const DofMap & dof_map = system.get_dof_map();
   FEType fe_type = dof_map.variable_type(u_var);
-  UniquePtr<FEBase> fe (FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe (FEBase::build(dim, fe_type));
   QGauss qrule (dim, fe_type.default_quadrature_order());
   fe->attach_quadrature_rule (&qrule);
 
   const std::vector<Real> & JxW = fe->get_JxW();
-  const std::vector<std::vector<RealGradient> > & dphi = fe->get_dphi();
+  const std::vector<std::vector<RealGradient>> & dphi = fe->get_dphi();
 
   // Also, get a reference to the ExplicitSystem
   ExplicitSystem & stress_system = es.get_system<ExplicitSystem>("StressSystem");
@@ -373,19 +373,14 @@ void compute_stresses(EquationSystems & es)
   unsigned int vonMises_var = stress_system.variable_number ("vonMises");
 
   // Storage for the stress dof indices on each element
-  std::vector<std::vector<dof_id_type> > dof_indices_var(system.n_vars());
+  std::vector<std::vector<dof_id_type>> dof_indices_var(system.n_vars());
   std::vector<dof_id_type> stress_dof_indices_var;
 
   // To store the stress tensor on each element
   DenseMatrix<Number> elem_sigma;
 
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-  for ( ; el != end_el; ++el)
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      const Elem * elem = *el;
-
       for (unsigned int var=0; var<3; var++)
         dof_map.dof_indices (elem, dof_indices_var[var], displacement_vars[var]);
 
@@ -449,6 +444,4 @@ void compute_stresses(EquationSystems & es)
   // Should call close and update when we set vector entries directly
   stress_system.solution->close();
   stress_system.update();
-
-  STOP_LOG("compute_stresses()", "main");
 }

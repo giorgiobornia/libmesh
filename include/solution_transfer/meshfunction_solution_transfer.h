@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -29,19 +29,23 @@ namespace libMesh
  * Implementation of a SolutionTransfer object that only works for
  * transferring the solution using a MeshFunction
  *
- * Note: A serialization of the "from" solution vector will be
+ * \note A serialization of the "from" solution vector will be
  * performed!  This can be slow in parallel and take a lot of memory!
+ *
+ * \author Derek Gaston
+ * \date 2013
+ * \brief SolutionTransfer object which uses a MeshFunction.
  */
 class MeshFunctionSolutionTransfer : public SolutionTransfer
 {
 public:
-  MeshFunctionSolutionTransfer(const libMesh::Parallel::Communicator & comm LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
+  MeshFunctionSolutionTransfer(const libMesh::Parallel::Communicator & comm);
   virtual ~MeshFunctionSolutionTransfer();
 
   /**
    * Transfer the values of a variable to another.
    */
-  virtual void transfer(const Variable & from_var, const Variable & to_var) libmesh_override;
+  virtual void transfer(const Variable & from_var, const Variable & to_var) override;
 };
 
 } // namespace libMesh

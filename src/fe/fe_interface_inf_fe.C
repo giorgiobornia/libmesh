@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -62,9 +62,6 @@ unsigned int FEInterface::ifem_n_shape_functions(const unsigned int dim,
     default:
       libmesh_error_msg("Unsupported dim = " << dim);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0;
 }
 
 
@@ -97,9 +94,6 @@ unsigned int FEInterface::ifem_n_dofs(const unsigned int dim,
     default:
       libmesh_error_msg("Unsupported dim = " << dim);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0;
 }
 
 
@@ -132,9 +126,6 @@ unsigned int FEInterface::ifem_n_dofs_at_node(const unsigned int dim,
     default:
       libmesh_error_msg("Unsupported dim = " << dim);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0;
 }
 
 
@@ -167,9 +158,6 @@ unsigned int FEInterface::ifem_n_dofs_per_elem(const unsigned int dim,
     default:
       libmesh_error_msg("Unsupported dim = " << dim);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0;
 }
 
 
@@ -190,7 +178,7 @@ void FEInterface::ifem_nodal_soln(const unsigned int dim,
         switch (fe_t.radial_family)
           {
           case INFINITE_MAP:
-            libmesh_error_msg("ERROR: INFINTE_MAP is not a valid shape family for radial approximation.");
+            libmesh_error_msg("ERROR: INFINITE_MAP is not a valid shape family for radial approximation.");
 
           case JACOBI_20_00:
             {
@@ -268,7 +256,7 @@ void FEInterface::ifem_nodal_soln(const unsigned int dim,
         switch (fe_t.radial_family)
           {
           case INFINITE_MAP:
-            libmesh_error_msg("ERROR: INFINTE_MAP is not a valid shape family for radial approximation.");
+            libmesh_error_msg("ERROR: INFINITE_MAP is not a valid shape family for radial approximation.");
 
           case JACOBI_20_00:
             {
@@ -346,7 +334,7 @@ void FEInterface::ifem_nodal_soln(const unsigned int dim,
         switch (fe_t.radial_family)
           {
           case INFINITE_MAP:
-            libmesh_error_msg("ERROR: INFINTE_MAP is not a valid shape family for radial approximation.");
+            libmesh_error_msg("ERROR: INFINITE_MAP is not a valid shape family for radial approximation.");
 
           case JACOBI_20_00:
             {
@@ -425,6 +413,34 @@ void FEInterface::ifem_nodal_soln(const unsigned int dim,
 
 
 
+Point FEInterface::ifem_map (const unsigned int dim,
+                             const FEType & fe_t,
+                             const Elem * elem,
+                             const Point & p)
+{
+  switch (fe_t.inf_map)
+    {
+    case CARTESIAN:
+      {
+        switch (dim)
+          {
+          case 1:
+            return InfFE<1,JACOBI_20_00,CARTESIAN>::map(elem, p);
+          case 2:
+            return InfFE<2,JACOBI_20_00,CARTESIAN>::map(elem, p);
+          case 3:
+            return InfFE<3,JACOBI_20_00,CARTESIAN>::map(elem, p);
+          default:
+            libmesh_error_msg("Invalid dim = " << dim);
+          }
+      }
+    case SPHERICAL:
+    case ELLIPSOIDAL:
+      libmesh_not_implemented_msg("ERROR: Spherical and Ellipsoidal IFEMs not (yet) implemented.");
+    default:
+      libmesh_error_msg("Invalid map = " << fe_t.inf_map);
+    }
+}
 
 
 
@@ -517,10 +533,6 @@ Point FEInterface::ifem_inverse_map (const unsigned int dim,
     default:
       libmesh_error_msg("Invalid dim = " << dim);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  Point pt;
-  return pt;
 }
 
 
@@ -690,9 +702,6 @@ Real FEInterface::ifem_shape(const unsigned int dim,
     default:
       libmesh_error_msg("Invalid dim = " << dim);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -791,9 +800,6 @@ Real FEInterface::ifem_shape(const unsigned int dim,
     default:
       libmesh_error_msg("Invalid dim = " << dim);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 

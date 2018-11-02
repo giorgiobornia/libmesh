@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -44,9 +44,10 @@
 #include "libmesh/dense_matrix.h"
 #include "libmesh/dense_vector.h"
 #include "libmesh/linear_implicit_system.h"
+#include "libmesh/enum_solver_package.h"
 
-// For systems of equations the \p DenseSubMatrix
-// and \p DenseSubVector provide convenient ways for
+// For systems of equations the DenseSubMatrix
+// and DenseSubVector provide convenient ways for
 // assembling the element matrix and vector on a
 // component-by-component basis.
 #include "libmesh/dense_submatrix.h"
@@ -69,6 +70,10 @@ int main (int argc, char ** argv)
   // Initialize libMesh.
   LibMeshInit init (argc, argv);
 
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
+
   // Skip this 2D example if libMesh was compiled as 1D-only.
   libmesh_example_requires(2 <= LIBMESH_DIM, "2D support");
 
@@ -84,7 +89,7 @@ int main (int argc, char ** argv)
 
   // Use the MeshTools::Generation mesh generator to create a uniform
   // 2D grid on the square [-1,1]^2.  We instruct the mesh generator
-  // to build a mesh of 8x8 \p Quad9 elements.  Building these
+  // to build a mesh of 8x8 Quad9 elements.  Building these
   // higher-order elements allows us to use higher-order
   // approximation, as in example 3.
   MeshTools::Generation::build_square (mesh,
@@ -100,7 +105,7 @@ int main (int argc, char ** argv)
   EquationSystems equation_systems (mesh);
 
   // Declare the system and its variables.
-  // Create a transient system named "Convection-Diffusion"
+  // Create a transient system named "Stokes"
   LinearImplicitSystem & system =
     equation_systems.add_system<LinearImplicitSystem> ("Stokes");
 
@@ -141,7 +146,7 @@ int main (int argc, char ** argv)
 }
 
 void assemble_stokes (EquationSystems & es,
-                      const std::string & system_name)
+                      const std::string & libmesh_dbg_var(system_name))
 {
   // It is a good idea to make sure we are assembling
   // the proper system.
@@ -171,14 +176,14 @@ void assemble_stokes (EquationSystems & es,
 
   // Build a Finite Element object of the specified type for
   // the velocity variables.
-  UniquePtr<FEBase> fe_vel  (FEBase::build(dim, fe_vel_type));
+  std::unique_ptr<FEBase> fe_vel  (FEBase::build(dim, fe_vel_type));
 
   // Build a Finite Element object of the specified type for
   // the pressure variables.
-  UniquePtr<FEBase> fe_pres (FEBase::build(dim, fe_pres_type));
+  std::unique_ptr<FEBase> fe_pres (FEBase::build(dim, fe_pres_type));
 
   // A Gauss quadrature rule for numerical integration.
-  // Let the \p FEType object decide what order rule is appropriate.
+  // Let the FEType object decide what order rule is appropriate.
   QGauss qrule (dim, fe_vel_type.default_quadrature_order());
 
   // Tell the finite element objects to use our quadrature rule.
@@ -193,15 +198,15 @@ void assemble_stokes (EquationSystems & es,
 
   // The element shape function gradients for the velocity
   // variables evaluated at the quadrature points.
-  const std::vector<std::vector<RealGradient> > & dphi = fe_vel->get_dphi();
+  const std::vector<std::vector<RealGradient>> & dphi = fe_vel->get_dphi();
 
   // The element shape functions for the pressure variable
   // evaluated at the quadrature points.
-  const std::vector<std::vector<Real> > & psi = fe_pres->get_phi();
+  const std::vector<std::vector<Real>> & psi = fe_pres->get_phi();
 
-  // A reference to the \p DofMap object for this system.  The \p DofMap
+  // A reference to the DofMap object for this system.  The DofMap
   // object handles the index translation from node and element numbers
-  // to degree of freedom numbers.  We will talk more about the \p DofMap
+  // to degree of freedom numbers.  We will talk more about the DofMap
   // in future examples.
   const DofMap & dof_map = system.get_dof_map();
 
@@ -235,17 +240,9 @@ void assemble_stokes (EquationSystems & es,
   // matrix and right-hand-side contribution.  In case users later
   // modify this program to include refinement, we will be safe and
   // will only consider the active elements; hence we use a variant of
-  // the \p active_elem_iterator.
-
-  MeshBase::const_element_iterator       el     = mesh.active_local_elements_begin();
-  const MeshBase::const_element_iterator end_el = mesh.active_local_elements_end();
-
-  for ( ; el != end_el; ++el)
+  // the active_elem_iterator.
+  for (const auto & elem : mesh.active_local_element_ptr_range())
     {
-      // Store a pointer to the element we are currently
-      // working on.  This allows for nicer syntax later.
-      const Elem * elem = *el;
-
       // Get the degree of freedom indices for the
       // current element.  These define where in the global
       // matrix and right-hand-side this element will
@@ -284,10 +281,10 @@ void assemble_stokes (EquationSystems & es,
       //        | Kpu Kpv Kpp |        | Fp |
       //         -           -          -  -
       //
-      // The \p DenseSubMatrix.repostition () member takes the
+      // The DenseSubMatrix.reposition () member takes the
       // (row_offset, column_offset, row_size, column_size).
       //
-      // Similarly, the \p DenseSubVector.reposition () member
+      // Similarly, the DenseSubVector.reposition () member
       // takes the (row_offset, row_size)
       Kuu.reposition (u_var*n_u_dofs, u_var*n_u_dofs, n_u_dofs, n_u_dofs);
       Kuv.reposition (u_var*n_u_dofs, v_var*n_u_dofs, n_u_dofs, n_v_dofs);
@@ -357,13 +354,13 @@ void assemble_stokes (EquationSystems & es,
         // The following loops over the sides of the element.
         // If the element has no neighbor on a side then that
         // side MUST live on a boundary of the domain.
-        for (unsigned int s=0; s<elem->n_sides(); s++)
-          if (elem->neighbor(s) == libmesh_nullptr)
+        for (auto s : elem->side_index_range())
+          if (elem->neighbor_ptr(s) == nullptr)
             {
-              UniquePtr<Elem> side (elem->build_side(s));
+              std::unique_ptr<const Elem> side (elem->build_side_ptr(s));
 
               // Loop over the nodes on the side.
-              for (unsigned int ns=0; ns<side->n_nodes(); ns++)
+              for (auto ns : side->node_index_range())
                 {
                   // The location on the boundary of the current
                   // node.
@@ -385,8 +382,8 @@ void assemble_stokes (EquationSystems & es,
                   // Find the node on the element matching this node on
                   // the side.  That defined where in the element matrix
                   // the boundary condition will be applied.
-                  for (unsigned int n=0; n<elem->n_nodes(); n++)
-                    if (elem->node(n) == side->node(ns))
+                  for (auto n : elem->node_index_range())
+                    if (elem->node_id(n) == side->node_id(ns))
                       {
                         // Matrix contribution.
                         Kuu(n,n) += penalty;
@@ -397,7 +394,7 @@ void assemble_stokes (EquationSystems & es,
                         Fv(n) += penalty*v_value;
                       }
                 } // end face node loop
-            } // end if (elem->neighbor(side) == libmesh_nullptr)
+            } // end if (elem->neighbor(side) == nullptr)
       } // end boundary condition section
 
       // If this assembly program were to be used on an adaptive mesh,
@@ -406,8 +403,8 @@ void assemble_stokes (EquationSystems & es,
 
       // The element matrix and right-hand-side are now built
       // for this element.  Add them to the global matrix and
-      // right-hand-side vector.  The \p NumericMatrix::add_matrix()
-      // and \p NumericVector::add_vector() members do this for us.
+      // right-hand-side vector.  The NumericMatrix::add_matrix()
+      // and NumericVector::add_vector() members do this for us.
       system.matrix->add_matrix (Ke, dof_indices);
       system.rhs->add_vector    (Fe, dof_indices);
     } // end of element loop

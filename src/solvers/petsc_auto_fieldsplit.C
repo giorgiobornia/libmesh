@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -42,7 +42,7 @@ void indices_to_fieldsplit (const Parallel::Communicator & comm,
     idx = reinterpret_cast<const PetscInt *>(&indices[0]);
 
   IS is;
-  int ierr = ISCreateLibMesh(comm.get(), indices.size(),
+  int ierr = ISCreateLibMesh(comm.get(), cast_int<PetscInt>(indices.size()),
                              idx, PETSC_COPY_VALUES, &is);
   CHKERRABORT(comm.get(), ierr);
 
@@ -60,14 +60,14 @@ void petsc_auto_fieldsplit (PC my_pc,
 {
   std::string sys_prefix = "--solver_group_";
 
-  if (libMesh::on_command_line("--solver_system_names"))
+  if (libMesh::on_command_line("--solver-system-names"))
     {
       sys_prefix = sys_prefix + sys.name() + "_";
     }
 
-  std::map<std::string, std::vector<dof_id_type> > group_indices;
+  std::map<std::string, std::vector<dof_id_type>> group_indices;
 
-  if (libMesh::on_command_line("--solver_variable_names"))
+  if (libMesh::on_command_line("--solver-variable-names"))
     {
       for (unsigned int v = 0; v != sys.n_vars(); ++v)
         {
@@ -101,11 +101,8 @@ void petsc_auto_fieldsplit (PC my_pc,
         }
     }
 
-  for (std::map<std::string, std::vector<dof_id_type> >::const_iterator
-         i = group_indices.begin(); i != group_indices.end(); ++i)
-    {
-      indices_to_fieldsplit(sys.comm(), i->second, my_pc, i->first);
-    }
+  for (const auto & pr : group_indices)
+    indices_to_fieldsplit(sys.comm(), pr.second, my_pc, pr.first);
 }
 
 } // namespace libMesh
@@ -118,7 +115,7 @@ namespace libMesh
 void petsc_auto_fieldsplit (PC /* my_pc */,
                             const System & /* sys */)
 {
-  if (libMesh::on_command_line("--solver_variable_names"))
+  if (libMesh::on_command_line("--solver-variable-names"))
     {
       libmesh_do_once(
                       libMesh::out << "WARNING: libMesh does not support setting field splits" <<

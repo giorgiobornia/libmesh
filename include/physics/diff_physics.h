@@ -1,6 +1,5 @@
-
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -23,10 +22,11 @@
 
 // Local Includes
 #include "libmesh/libmesh.h"
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
 
 // C++ includes
 #include <vector>
+#include <memory>
 
 namespace libMesh
 {
@@ -54,7 +54,7 @@ class DiffContext;
  * for unsteady TimeSolver and \f$ F(u) = 0\f$ for steady
  * TimeSolver. \f$F(u)\f$ is computed by element/side_time_derivative,
  * \f$G(u)\f$ is computed using element/side_constraint,
- * \f$C(u,\dot{u})\dot{u}\f$ is computed using the dampling_residual methods
+ * \f$C(u,\dot{u})\dot{u}\f$ is computed using the damping_residual methods
  * and \f$ -M(u,\ddot{u})\ddot{u}\f$ is computed using the mass_residual
  * methods. This is the sign convention used by the default implementation;
  * if the method is overridden, the user can choose any self-consistent sign
@@ -82,7 +82,7 @@ public:
    */
   DifferentiablePhysics () :
     compute_internal_sides (false),
-    _mesh_sys              (libmesh_nullptr),
+    _mesh_sys              (nullptr),
     _mesh_x_var            (libMesh::invalid_uint),
     _mesh_y_var            (libMesh::invalid_uint),
     _mesh_z_var            (libMesh::invalid_uint)
@@ -96,7 +96,7 @@ public:
   /**
    * Copy of this object. User should override to copy any needed state.
    */
-  virtual UniquePtr<DifferentiablePhysics> clone_physics() = 0;
+  virtual std::unique_ptr<DifferentiablePhysics> clone_physics() = 0;
 
   /**
    * Clear any data structures associated with the physics.
@@ -222,7 +222,7 @@ public:
    * should return false.
    *
    * Users may need to reimplement this for PDEs on systems to which
-   * SCALAR variables with non-tranient equations have been added.
+   * SCALAR variables with non-transient equations have been added.
    */
   virtual bool nonlocal_constraint (bool request_jacobian,
                                     DiffContext &) {
@@ -237,24 +237,49 @@ public:
    * behave like du/dt = F(u), and should not call time_evolving()
    * for any variables which behave like 0 = G(u).
    *
-   * Most derived systems will not have to reimplment this function; however
+   * Most derived systems will not have to reimplement this function; however
+   * any system which reimplements mass_residual() may have to reimplement
+   * time_evolving() to prepare data structures.
+   *
+   * \deprecated Instead, use the time_evolving override and specify
+   * the order-in-time of the variable, either 1 or 2. This method
+   * assumes the variable is first order for backward compatibility.
+   */
+#ifdef LIBMESH_ENABLE_DEPRECATED
+  virtual void time_evolving (unsigned int var)
+  {
+    libmesh_deprecated();
+    this->time_evolving(var,1);
+  }
+#endif
+
+  /**
+   * Tells the DiffSystem that variable var is evolving with
+   * respect to time.  In general, the user's init() function
+   * should call time_evolving() with order 1 for any variables which
+   * behave like du/dt = F(u), with order 2 for any variables that
+   * behave like d^2u/dt^2 = F(u), and should not call time_evolving()
+   * for any variables which behave like 0 = G(u).
+   *
+   * Most derived systems will not have to reimplement this function; however
    * any system which reimplements mass_residual() may have to reimplement
    * time_evolving() to prepare data structures.
    */
-  virtual void time_evolving (unsigned int var) {
-    if (_time_evolving.size() <= var)
-      _time_evolving.resize(var+1, false);
-    _time_evolving[var] = true;
-  }
+  virtual void time_evolving (unsigned int var, unsigned int order);
 
   /**
-   * Returns true iff variable \p var is evolving with
+   * \returns \p true iff variable \p var is evolving with
    * respect to time.  In general, the user's init() function
    * should have set time_evolving() for any variables which
    * behave like du/dt = F(u), and should not call time_evolving()
    * for any variables which behave like 0 = G(u).
    */
-  bool is_time_evolving (unsigned int var) const {
+  bool is_time_evolving (unsigned int var) const
+  {
+    libmesh_assert_less(var,_time_evolving.size());
+    libmesh_assert( _time_evolving[var] == 0 ||
+                    _time_evolving[var] == 1 ||
+                    _time_evolving[var] == 2 );
     return _time_evolving[var];
   }
 
@@ -408,7 +433,7 @@ public:
    * geometry is correctly repositioned when evaluating element residuals.
    *
    * Currently \p sys must be \p *this for a tightly coupled moving
-   * mesh problem or NULL to stop mesh movement; loosely coupled
+   * mesh problem or nullptr to stop mesh movement; loosely coupled
    * moving mesh problems are not implemented.
    *
    * This code is experimental.  "Trust but verify, and not in that
@@ -417,15 +442,15 @@ public:
   virtual void set_mesh_system(System * sys);
 
   /**
-   * Returns a const reference to the system with variables corresponding to
-   * mesh nodal coordinates, or NULL if the mesh is fixed.
+   * \returns A const reference to the system with variables corresponding to
+   * mesh nodal coordinates, or nullptr if the mesh is fixed.
    * Useful for ALE calculations.
    */
   const System * get_mesh_system() const;
 
   /**
-   * Returns a reference to the system with variables corresponding to
-   * mesh nodal coordinates, or NULL if the mesh is fixed.
+   * \returns A reference to the system with variables corresponding to
+   * mesh nodal coordinates, or nullptr if the mesh is fixed.
    */
   System * get_mesh_system();
 
@@ -446,7 +471,7 @@ public:
   virtual void set_mesh_x_var(unsigned int var);
 
   /**
-   * Returns the variable number corresponding to the
+   * \returns The variable number corresponding to the
    * mesh x coordinate. Useful for ALE calculations.
    */
   unsigned int get_mesh_x_var() const;
@@ -458,7 +483,7 @@ public:
   virtual void set_mesh_y_var(unsigned int var);
 
   /**
-   * Returns the variable number corresponding to the
+   * \returns The variable number corresponding to the
    * mesh y coordinate. Useful for ALE calculations.
    */
   unsigned int get_mesh_y_var() const;
@@ -470,7 +495,7 @@ public:
   virtual void set_mesh_z_var(unsigned int var);
 
   /**
-   * Returns the variable number corresponding to the
+   * \returns The variable number corresponding to the
    * mesh z coordinate. Useful for ALE calculations.
    */
   unsigned int get_mesh_z_var() const;
@@ -482,6 +507,31 @@ public:
    */
   bool _eulerian_time_deriv (bool request_jacobian,
                              DiffContext &);
+
+  bool have_first_order_vars() const
+  { return !_first_order_vars.empty(); }
+
+  /**
+   * \returns The set of first order in time variable indices. May be empty.
+   */
+  const std::set<unsigned int> & get_first_order_vars() const
+  { return _first_order_vars; }
+
+  bool is_first_order_var( unsigned int var ) const
+  { return _first_order_vars.find(var) != _first_order_vars.end(); }
+
+
+  bool have_second_order_vars() const
+  { return !_second_order_vars.empty(); }
+
+  /**
+   * \returns The set of second order in time variable indices. May be empty.
+   */
+  const std::set<unsigned int> & get_second_order_vars() const
+  { return _second_order_vars; }
+
+  bool is_second_order_var( unsigned int var ) const
+  { return _second_order_vars.find(var) != _second_order_vars.end(); }
 
 
 protected:
@@ -497,13 +547,30 @@ protected:
   unsigned int _mesh_x_var, _mesh_y_var, _mesh_z_var;
 
   /**
-   * Stores bools to tell us which variables are evolving
-   * in time and which are just constraints
+   * Stores unsigned int to tell us which variables are evolving
+   * as first order in time (1), second order in time (2), or are
+   * not time evolving (0).
    */
-  std::vector<bool> _time_evolving;
+  std::vector<unsigned int> _time_evolving;
+
+  /**
+   * Variable indices for those variables that are first order in time.
+   */
+  std::set<unsigned int> _first_order_vars;
+
+  /**
+   * Variable indices for those variables that are second order in time.
+   */
+  std::set<unsigned int> _second_order_vars;
+
+  /**
+   * If the user adds any second order variables, then we need to also
+   * cache the map to their corresponding dot variable that will
+   * be added by this TimeSolver class.
+   */
+  std::map<unsigned int,unsigned int> _second_order_dot_vars;
+
 };
-
-
 
 // ------------------------------------------------------------
 // DifferentiablePhysics inline methods

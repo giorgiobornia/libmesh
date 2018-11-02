@@ -54,8 +54,7 @@ public:
   /**
    * Constructor.
    */
-  TransientRBEvaluation (const Parallel::Communicator & comm_in
-                         LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
+  TransientRBEvaluation (const Parallel::Communicator & comm_in);
 
   /**
    * Destructor.
@@ -71,7 +70,7 @@ public:
    * Clear this TransientRBEvaluation object.
    * Override to also clear the M_q representors
    */
-  virtual void clear() libmesh_override;
+  virtual void clear() override;
 
   /**
    * Resize and clear the data vectors corresponding to the
@@ -81,14 +80,14 @@ public:
    * case.
    */
   virtual void resize_data_structures(const unsigned int Nmax,
-                                      bool resize_error_bound_data=true) libmesh_override;
+                                      bool resize_error_bound_data=true) override;
 
   /**
    * Perform online solve for current_params
    * with the N basis functions. Overridden
    * to perform a time-dependent solve.
    */
-  virtual Real rb_solve(unsigned int N) libmesh_override;
+  virtual Real rb_solve(unsigned int N) override;
 
   /**
    * If a solve has already been performed, then we cached some data
@@ -98,9 +97,10 @@ public:
   virtual Real rb_solve_again();
 
   /**
-   * Override to return the L2 norm of RB_solution.
+   * \returns A scaling factor that we can use to provide a consistent
+   * scaling of the RB error bound across different parameter values.
    */
-  virtual Real get_rb_solution_norm() libmesh_override;
+  virtual Real get_error_bound_normalization() override;
 
   /**
    * Specifies the residual scaling on the numerator to
@@ -114,7 +114,7 @@ public:
    * saved in RB_solution. This function uses the cached time-independent
    * data.
    */
-  virtual Real compute_residual_dual_norm(const unsigned int N) libmesh_override;
+  virtual Real compute_residual_dual_norm(const unsigned int N) override;
 
   /**
    * Compute the dual norm of the residual for the solution
@@ -137,24 +137,26 @@ public:
    * we may not need the representors any more.
    * Override to clear the M_q representors.
    */
-  virtual void clear_riesz_representors() libmesh_override;
+  virtual void clear_riesz_representors() override;
 
   /**
    * Write out all the data to text files in order to segregate the
    * Offline stage from the Online stage.
-   * Note: This is a legacy method, use RBDataSerialization instead.
+   *
+   * \note This is a legacy method, use RBDataSerialization instead.
    */
   virtual void legacy_write_offline_data_to_files(const std::string & directory_name = "offline_data",
-                                                  const bool write_binary_data=true) libmesh_override;
+                                                  const bool write_binary_data=true) override;
 
   /**
    * Read in the saved Offline reduced basis data
    * to initialize the system for Online solves.
-   * Note: This is a legacy method, use RBDataSerialization instead.
+   *
+   * \note This is a legacy method, use RBDataSerialization instead.
    */
   virtual void legacy_read_offline_data_from_files(const std::string & directory_name = "offline_data",
                                                    bool read_error_bound_data=true,
-                                                   const bool read_binary_data=true) libmesh_override;
+                                                   const bool read_binary_data=true) override;
 
   //----------- PUBLIC DATA MEMBERS -----------//
 
@@ -173,19 +175,19 @@ public:
   /**
    * Dense matrices for the RB mass matrices.
    */
-  std::vector< DenseMatrix<Number> > RB_M_q_vector;
+  std::vector<DenseMatrix<Number>> RB_M_q_vector;
 
   /**
    * The RB outputs for all time-levels from the
    * most recent rb_solve.
    */
-  std::vector< std::vector<Number> > RB_outputs_all_k;
+  std::vector<std::vector<Number>> RB_outputs_all_k;
 
   /**
    * The error bounds for each RB output for all
    * time-levels from the most recent rb_solve.
    */
-  std::vector< std::vector<Real> > RB_output_error_bounds_all_k;
+  std::vector<std::vector<Real>> RB_output_error_bounds_all_k;
 
   /**
    * The RB solution at the previous time-level.
@@ -195,13 +197,13 @@ public:
   /**
    * Array storing the solution data at each time level from the most recent solve.
    */
-  std::vector< DenseVector<Number> > RB_temporal_solution_data;
+  std::vector<DenseVector<Number>> RB_temporal_solution_data;
 
   /**
    * The error bound data for all time-levels from the
    * most recent rb_solve.
    */
-  std::vector< Real > error_bound_all_k;
+  std::vector<Real > error_bound_all_k;
 
   /**
    * Vector storing initial L2 error for all
@@ -213,15 +215,15 @@ public:
    * The RB initial conditions (i.e. L2 projection of the truth
    * initial condition) for each N.
    */
-  std::vector< DenseVector<Number> > RB_initial_condition_all_N;
+  std::vector<DenseVector<Number>> RB_initial_condition_all_N;
 
   /**
    * Vectors storing the residual representor inner products
    * to be used in computing the residuals online.
    */
-  std::vector< std::vector< std::vector<Number> > > Fq_Mq_representor_innerprods;
-  std::vector< std::vector< std::vector<Number> > > Mq_Mq_representor_innerprods;
-  std::vector< std::vector< std::vector< std::vector<Number> > > > Aq_Mq_representor_innerprods;
+  std::vector<std::vector<std::vector<Number>>> Fq_Mq_representor_innerprods;
+  std::vector<std::vector<std::vector<Number>>> Mq_Mq_representor_innerprods;
+  std::vector<std::vector<std::vector<std::vector<Number>>>> Aq_Mq_representor_innerprods;
 
 
   /**
@@ -239,7 +241,7 @@ public:
    * Vector storing the mass matrix representors.
    * These are basis dependent and hence stored here.
    */
-  std::vector< std::vector< NumericVector<Number> * > > M_q_representor;
+  std::vector<std::vector<std::unique_ptr<NumericVector<Number>>>> M_q_representor;
 
   /**
    * Check that the data has been cached in case of using rb_solve_again

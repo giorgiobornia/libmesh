@@ -5,12 +5,22 @@
 #include <libmesh/restore_warnings.h>
 
 #include <libmesh/libmesh.h>
-#include <libmesh/serial_mesh.h>
+#include <libmesh/replicated_mesh.h>
 #include <libmesh/elem.h>
 #include <libmesh/mesh_generation.h>
 #include <libmesh/mesh_modification.h>
 
 #include "test_comm.h"
+
+// THE CPPUNIT_TEST_SUITE_END macro expands to code that involves
+// std::auto_ptr, which in turn produces -Wdeprecated-declarations
+// warnings.  These can be ignored in GCC as long as we wrap the
+// offending code in appropriate pragmas.  We can't get away with a
+// single ignore_warnings.h inclusion at the beginning of this file,
+// since the libmesh headers pull in a restore_warnings.h at some
+// point.  We also don't bother restoring warnings at the end of this
+// file since it's not a header.
+#include <libmesh/ignore_warnings.h>
 
 using namespace libMesh;
 
@@ -26,14 +36,18 @@ public:
   CPPUNIT_TEST_SUITE( AllTriTest );
 
   // 2D tests
+#if LIBMESH_DIM > 1
   CPPUNIT_TEST( testAllTriTri );
   CPPUNIT_TEST( testAllTriQuad );
   CPPUNIT_TEST( testAllTriQuad8 );
   CPPUNIT_TEST( testAllTriQuad9 );
+#endif
 
   // 3D tests
+#if LIBMESH_DIM > 2
   CPPUNIT_TEST( testAllTriPrism6 );
   CPPUNIT_TEST( testAllTriPrism18 );
+#endif
 
   CPPUNIT_TEST_SUITE_END();
 
@@ -43,7 +57,7 @@ protected:
                       dof_id_type n_elem_expected,
                       std::size_t n_boundary_conds_expected)
   {
-    SerialMesh mesh(*TestCommWorld, /*dim=*/2);
+    ReplicatedMesh mesh(*TestCommWorld, /*dim=*/2);
 
     // Build a 2x1 TRI3 mesh and ask to split it into triangles.
     // Should be a no-op
@@ -67,7 +81,7 @@ protected:
                       dof_id_type n_elem_expected,
                       std::size_t n_boundary_conds_expected)
   {
-    SerialMesh mesh(*TestCommWorld, /*dim=*/3);
+    ReplicatedMesh mesh(*TestCommWorld, /*dim=*/3);
 
     // Build a 2x1 TRI3 mesh and ask to split it into triangles.
     // Should be a no-op

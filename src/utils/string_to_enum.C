@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -111,12 +111,15 @@ void init_elem_type_to_enum ()
 
       elem_type_to_enum["TRI"            ]=TRI3;
       elem_type_to_enum["TRI3"           ]=TRI3;
+      elem_type_to_enum["TRISHELL3"      ]=TRISHELL3;
       elem_type_to_enum["TRI3SUBDIVISION"]=TRI3SUBDIVISION;
       elem_type_to_enum["TRI6"           ]=TRI6;
 
       elem_type_to_enum["QUAD"           ]=QUAD4;
       elem_type_to_enum["QUAD4"          ]=QUAD4;
+      elem_type_to_enum["QUADSHELL4"     ]=QUADSHELL4;
       elem_type_to_enum["QUAD8"          ]=QUAD8;
+      elem_type_to_enum["QUADSHELL8"     ]=QUADSHELL8;
       elem_type_to_enum["QUAD9"          ]=QUAD9;
 
       elem_type_to_enum["TET"            ]=TET4;
@@ -189,7 +192,6 @@ void init_order_to_enum ()
       order_to_enum["SIXTEENTH"    ]=SIXTEENTH;
       order_to_enum["SEVENTEENTH"  ]=SEVENTEENTH;
       order_to_enum["EIGHTTEENTH"  ]=EIGHTTEENTH;
-      order_to_enum["NINTEENTH"    ]=NINTEENTH; // deprecated
       order_to_enum["NINETEENTH"   ]=NINETEENTH;
       order_to_enum["TWENTIETH"    ]=TWENTIETH;
 
@@ -506,7 +508,6 @@ void init_point_locator_type_to_enum ()
   if (point_locator_type_to_enum.empty())
     {
       point_locator_type_to_enum["TREE" ]=TREE;
-      point_locator_type_to_enum["LIST" ]=LIST;
       point_locator_type_to_enum["INVALID_LOCATOR" ]=INVALID_LOCATOR;
     }
 }
@@ -585,6 +586,7 @@ void init_linear_convergence_reason_to_enum ()
       linear_convergence_reason_to_enum["DIVERGED_INDEFINITE_PC"]    = DIVERGED_INDEFINITE_PC;
       linear_convergence_reason_to_enum["DIVERGED_NAN"]              = DIVERGED_NAN;
       linear_convergence_reason_to_enum["DIVERGED_INDEFINITE_MAT"]   = DIVERGED_INDEFINITE_MAT;
+      linear_convergence_reason_to_enum["DIVERGED_PCSETUP_FAILED"]   = DIVERGED_PCSETUP_FAILED;
       linear_convergence_reason_to_enum["CONVERGED_ITERATING"]       = CONVERGED_ITERATING;
       linear_convergence_reason_to_enum["UNKNOWN_FLAG"]              = UNKNOWN_FLAG;
     }

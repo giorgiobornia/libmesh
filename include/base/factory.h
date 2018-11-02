@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -23,7 +23,7 @@
 
 // Local includes
 #include "libmesh/libmesh_common.h"
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
 
 // C++ includes
 #include <cstddef>
@@ -36,7 +36,11 @@ namespace libMesh
 
 
 /**
- * Factory class defintion.
+ * Factory class definition.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2002
+ * \brief Handles name-based creation of objects.
  */
 template <class Base>
 class Factory
@@ -58,13 +62,13 @@ public:
   /**
    * Builds an object of type Base identified by name.
    */
-  static UniquePtr<Base> build (const std::string & name);
+  static std::unique_ptr<Base> build (const std::string & name);
 
   /**
    * Create a Base class.  Force this to be implemented
    * later.
    */
-  virtual UniquePtr<Base> create () = 0;
+  virtual std::unique_ptr<Base> create () = 0;
 
 
 protected:
@@ -98,9 +102,9 @@ public:
 private:
 
   /**
-   * @returns a new object of type Derived.
+   * \returns A new object of type Derived.
    */
-  virtual UniquePtr<Base> create () libmesh_override;
+  virtual std::unique_ptr<Base> create () override;
 };
 
 
@@ -122,7 +126,7 @@ Factory<Base>::Factory (const std::string & name)
 
 template <class Base>
 inline
-UniquePtr<Base> Factory<Base>::build (const std::string & name)
+std::unique_ptr<Base> Factory<Base>::build (const std::string & name)
 {
   // name not found in the map
   if (!factory_map().count(name))
@@ -131,38 +135,23 @@ UniquePtr<Base> Factory<Base>::build (const std::string & name)
 
       libMesh::err << "valid options are:" << std::endl;
 
-      for (typename std::map<std::string,Factory<Base> *>::const_iterator
-             it = factory_map().begin(); it != factory_map().end(); ++it)
-        libMesh::err << "  " << it->first << std::endl;
+      for (const auto & pr : factory_map())
+        libMesh::err << "  " << pr.first << std::endl;
 
       libmesh_error_msg("Exiting...");
-
-      // We'll never get here
-      return UniquePtr<Base>();
     }
 
   Factory<Base> * f = factory_map()[name];
-  return UniquePtr<Base>(f->create());
+  return std::unique_ptr<Base>(f->create());
 }
-
-
-
-// Note - this cannot be inlined!
-// template <class Base>
-// std::map<std::string, Factory<Base> *> & Factory<Base>::factory_map()
-// {
-//   static std::map<std::string, Factory<Base> *> _factory_map;
-
-//   return _factory_map;
-// }
 
 
 
 template <class Derived, class Base>
 inline
-UniquePtr<Base> FactoryImp<Derived,Base>::create ()
+std::unique_ptr<Base> FactoryImp<Derived,Base>::create ()
 {
-  return UniquePtr<Base>(new Derived);
+  return libmesh_make_unique<Derived>();
 }
 
 

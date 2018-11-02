@@ -14,6 +14,7 @@ SUBDIRS = \
 	adjoints/adjoints_ex3 \
 	adjoints/adjoints_ex4 \
 	adjoints/adjoints_ex5 \
+	adjoints/adjoints_ex6 \
 	eigenproblems/eigenproblems_ex1 \
 	eigenproblems/eigenproblems_ex2 \
 	eigenproblems/eigenproblems_ex3 \
@@ -34,6 +35,8 @@ SUBDIRS = \
 	miscellaneous/miscellaneous_ex10 \
 	miscellaneous/miscellaneous_ex11 \
 	miscellaneous/miscellaneous_ex12 \
+	miscellaneous/miscellaneous_ex13 \
+	miscellaneous/miscellaneous_ex14 \
 	optimization/optimization_ex1 \
 	optimization/optimization_ex2 \
 	subdomains/subdomains_ex1 \
@@ -47,6 +50,7 @@ SUBDIRS = \
 	systems_of_equations/systems_of_equations_ex6 \
 	systems_of_equations/systems_of_equations_ex7 \
 	systems_of_equations/systems_of_equations_ex8 \
+	systems_of_equations/systems_of_equations_ex9 \
 	reduced_basis/reduced_basis_ex1 \
 	reduced_basis/reduced_basis_ex2 \
 	reduced_basis/reduced_basis_ex3 \

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -27,6 +27,8 @@
 #include <string>
 #include <sstream>
 
+#define libmesh_noexcept noexcept
+
 namespace libMesh {
 
 /**
@@ -37,6 +39,7 @@ class LogicError : public std::logic_error
 {
 public:
   LogicError() : std::logic_error( "Error in libMesh internal logic" ) {}
+  LogicError(const std::string & msg) : std::logic_error( msg ) {}
 };
 
 
@@ -116,12 +119,12 @@ public:
   /**
    * Virtual destructor, gotta have one of those.
    */
-  virtual ~SolverException() throw() {};
+  virtual ~SolverException() noexcept {};
 
   /**
    * Override the what() function to provide a generic error message.
    */
-  virtual const char * what() const throw()
+  virtual const char * what() const noexcept
   {
     // std::string::c_str() is noexcept in C++11, so it's safe to call
     // in what() because it can't throw.
@@ -142,10 +145,14 @@ public:
 }
 
 #define LIBMESH_THROW(e) do { throw e; } while (0)
+#define libmesh_try try
+#define libmesh_catch(e) catch(e)
 
 #else
 
 #define LIBMESH_THROW(e) do { std::abort(); } while (0)
+#define libmesh_try
+#define libmesh_catch(e) if (0)
 
 #endif // LIBMESH_ENABLE_EXCEPTIONS
 

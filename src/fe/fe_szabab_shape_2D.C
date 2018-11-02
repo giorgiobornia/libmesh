@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -87,6 +87,7 @@ Real FE<2,SZABAB>::shape(const Elem * elem,
           {
 
             // Szabo-Babuska shape functions on the triangle.
+          case TRI3:
           case TRI6:
             {
               const Real l1 = 1-p(0)-p(1);
@@ -112,6 +113,7 @@ Real FE<2,SZABAB>::shape(const Elem * elem,
 
 
             // Szabo-Babuska shape functions on the quadrilateral.
+          case QUAD4:
           case QUAD8:
           case QUAD9:
             {
@@ -221,7 +223,8 @@ Real FE<2,SZABAB>::shape(const Elem * elem,
                   break;
 
                 default:
-                  libmesh_error_msg("Invalid shape function index i = " << i);
+                  // Everything else keeps f=1
+                  break;
                 }
 
               return f*(FE<1,SZABAB>::shape(EDGE3, totalorder, i0[i], xi)*
@@ -322,7 +325,8 @@ Real FE<2,SZABAB>::shape(const Elem * elem,
                   break;
 
                 default:
-                  libmesh_error_msg("Invalid shape function index i = " << i);
+                  // Everything else keeps f=1
+                  break;
                 }
 
               return f*(FE<1,SZABAB>::shape(EDGE3, totalorder, i0[i], xi)*
@@ -436,7 +440,8 @@ Real FE<2,SZABAB>::shape(const Elem * elem,
                   break;
 
                 default:
-                  libmesh_error_msg("Invalid shape function index i = " << i);
+                  // Everything else keeps f=1
+                  break;
                 }
 
               return f*(FE<1,SZABAB>::shape(EDGE3, totalorder, i0[i], xi)*
@@ -560,7 +565,8 @@ Real FE<2,SZABAB>::shape(const Elem * elem,
                   break;
 
                 default:
-                  libmesh_error_msg("Invalid shape function index i = " << i);
+                  // Everything else keeps f=1
+                  break;
                 }
 
               return f*(FE<1,SZABAB>::shape(EDGE3, totalorder, i0[i], xi)*
@@ -700,7 +706,8 @@ Real FE<2,SZABAB>::shape(const Elem * elem,
                   break;
 
                 default:
-                  libmesh_error_msg("Invalid shape function index i = " << i);
+                  // Everything else keeps f=1
+                  break;
                 }
 
               return f*(FE<1,SZABAB>::shape(EDGE3, totalorder, i0[i], xi)*
@@ -720,9 +727,6 @@ Real FE<2,SZABAB>::shape(const Elem * elem,
     default:
       libmesh_error_msg("ERROR: Unsupported polynomial order!");
     } // switch order
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -766,6 +770,7 @@ Real FE<2,SZABAB>::shape_deriv(const Elem * elem,
           {
 
             // Szabo-Babuska shape functions on the triangle.
+          case TRI3:
           case TRI6:
             {
               // Here we use finite differences to compute the derivatives!
@@ -804,6 +809,7 @@ Real FE<2,SZABAB>::shape_deriv(const Elem * elem,
 
 
             // Szabo-Babuska shape functions on the quadrilateral.
+          case QUAD4:
           case QUAD8:
           case QUAD9:
             {
@@ -916,7 +922,8 @@ Real FE<2,SZABAB>::shape_deriv(const Elem * elem,
                   break;
 
                 default:
-                  libmesh_error_msg("Invalid shape function index i = " << i);
+                  // Everything else keeps f=1
+                  break;
                 }
 
 
@@ -1022,7 +1029,8 @@ Real FE<2,SZABAB>::shape_deriv(const Elem * elem,
                   break;
 
                 default:
-                  libmesh_error_msg("Invalid shape function index i = " << i);
+                  // Everything else keeps f=1
+                  break;
                 }
 
 
@@ -1131,7 +1139,8 @@ Real FE<2,SZABAB>::shape_deriv(const Elem * elem,
                   break;
 
                 default:
-                  libmesh_error_msg("Invalid shape function index i = " << i);
+                  // Everything else keeps f=1
+                  break;
                 }
 
 
@@ -1238,7 +1247,8 @@ Real FE<2,SZABAB>::shape_deriv(const Elem * elem,
                   break;
 
                 default:
-                  libmesh_error_msg("Invalid shape function index i = " << i);
+                  // Everything else keeps f=1
+                  break;
                 }
 
 
@@ -1349,7 +1359,8 @@ Real FE<2,SZABAB>::shape_deriv(const Elem * elem,
                   break;
 
                 default:
-                  libmesh_error_msg("Invalid shape function index i = " << i);
+                  // Everything else keeps f=1
+                  break;
                 }
 
 
@@ -1381,9 +1392,6 @@ Real FE<2,SZABAB>::shape_deriv(const Elem * elem,
     default:
       libmesh_error_msg("ERROR: Unsupported polynomial order!");
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 

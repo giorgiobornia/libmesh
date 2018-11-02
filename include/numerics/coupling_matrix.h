@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -46,6 +46,10 @@ class ConstCouplingRowConstIterator;
  * how different components in a system couple with each
  * other.  A coupling matrix is necessarily square but not
  * necessarily symmetric.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2002
+ * \brief Defines the coupling between variables of a System.
  */
 class CouplingMatrix
 {
@@ -58,20 +62,20 @@ public:
   CouplingMatrix (const unsigned int n=0);
 
   /**
-   * @returns the (i,j) entry of the matrix.
+   * \returns The (i,j) entry of the matrix.
    */
   bool operator() (const unsigned int i,
                    const unsigned int j) const;
 
   /**
-   * @returns the (i,j) entry of the matrix as
+   * \returns The (i,j) entry of the matrix as
    * a smart-reference.
    */
   CouplingAccessor operator() (const unsigned int i,
                                const unsigned int j);
 
   /**
-   * @returns the size of the matrix, i.e. N for an
+   * \returns The size of the matrix, i.e. N for an
    * NxN matrix.
    */
   unsigned int size() const;
@@ -88,9 +92,11 @@ public:
   void clear();
 
   /**
-   * @returns true if the matrix is empty.
+   * \returns \p true if the matrix is empty.
    */
   bool empty() const;
+
+  CouplingMatrix & operator&= (const CouplingMatrix & other);
 
 private:
 
@@ -230,13 +236,15 @@ public:
         libmesh_assert_less_equal(firstloc, _location);
 
 #ifdef DEBUG
-        CouplingMatrix::rc_type::const_iterator next = lb;
-        next++;
-        if (next != _my_mat._ranges.end())
-          {
-            // Ranges should be sorted and should not touch
-            libmesh_assert_greater(next->first, lastloc+1);
-          }
+        {
+          CouplingMatrix::rc_type::const_iterator next = lb;
+          next++;
+          if (next != _my_mat._ranges.end())
+            {
+              // Ranges should be sorted and should not touch
+              libmesh_assert_greater(next->first, lastloc+1);
+            }
+        }
 #endif
 
         // If we're in this range, we might need to shorten or remove
@@ -331,12 +339,14 @@ class ConstCouplingRow
 public:
   ConstCouplingRow(unsigned int row_in,
                    const CouplingMatrix & mat_in) :
-    _row_i(row_in), _mat(mat_in)
+    _row_i(row_in), _mat(mat_in),
+    _end_location(_row_i*_mat.size()+_mat.size()-1)
   {
     libmesh_assert_less(_row_i, _mat.size());
 
-    // Location for i,N
-    _begin_location = _row_i*_mat.size()+_mat.size()-1;
+    // Location for i,N, where we'll start looking for our beginning
+    // range
+    _begin_location = _end_location;
 
     const std::size_t max_size = std::numeric_limits<std::size_t>::max();
 
@@ -432,6 +442,11 @@ protected:
   // row, or numeric_limits<size_t>::max() for an empty row.
   std::size_t _begin_location;
 
+  // The location (i*size+j) corresponding to the end of this row
+  // (regardless of whether that end falls within a range).  Cached
+  // because every ++iterator call needs to use it.
+  const std::size_t _end_location;
+
   // Iterator to the range containing the first row element, or
   // _row._mat._ranges.end() if no CouplingMatrix values are true for
   // this row
@@ -468,15 +483,17 @@ public:
   {
     libmesh_assert_not_equal_to
       (_location, std::numeric_limits<std::size_t>::max());
-    return _location % _row._mat.size();
+    return cast_int<unsigned int>(_location % _row._mat.size());
   }
 
   ConstCouplingRowConstIterator & operator++ ()
   {
     libmesh_assert_not_equal_to
       (_location, std::numeric_limits<std::size_t>::max());
+    libmesh_assert
+      (_it != _row._mat._ranges.end());
 
-    if (_location == _it->second)
+    if (_location >= _it->second)
       {
         ++_it;
 
@@ -486,14 +503,14 @@ public:
         else
           {
             _location = _it->first;
-            // Are we past the end of the row?
-            if (_location >= _row._mat.size()*(_row._row_i+1))
-              {
-                _location = std::numeric_limits<std::size_t>::max();
-                _it = _row._mat._ranges.end();
-              }
+            // Is the new range past the end of the row?
+            if (_location > _row._end_location)
+              _location = std::numeric_limits<std::size_t>::max();
           }
       }
+    // Would incrementing put us past the end of the row?
+    else if (_location >= _row._end_location)
+      _location = std::numeric_limits<std::size_t>::max();
     else
       ++_location;
 
@@ -506,8 +523,12 @@ public:
     // is not even wrong
     libmesh_assert(_row == other._row);
 
-    return ((_location == other._location) &&
-            (_it == other._it));
+    return (_location == other._location);
+    // Testing for equality of _it is either redundant (for a
+    // dereferenceable iterator, where _it is defined to be the range
+    // which includes _location) or wrong (for an end iterator, where
+    // we don't always bother to set _it)
+    //        && (_it == other._it);
   }
 
   bool operator!= (const ConstCouplingRowConstIterator & other) const

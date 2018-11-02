@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -71,9 +71,6 @@ Real FE<1,SZABAB>::shape(const ElemType,
     default:
       libmesh_error_msg("Invalid shape function index!");
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 
@@ -133,9 +130,6 @@ Real FE<1,SZABAB>::shape_deriv(const ElemType,
     default:
       libmesh_error_msg("Invalid shape function index!");
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0.;
 }
 
 

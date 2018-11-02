@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -27,6 +27,7 @@
 #include "libmesh/quadrature.h"
 #include "libmesh/string_to_enum.h"
 #include "libmesh/zero_function.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
 
 #include "coupled_system.h"
 
@@ -61,8 +62,8 @@ public:
     output(_v_var) = 0;
   }
 
-  virtual UniquePtr<FunctionBase<Number> > clone() const
-  { return UniquePtr<FunctionBase<Number> > (new BdyFunction(_u_var, _v_var, _sign)); }
+  virtual std::unique_ptr<FunctionBase<Number>> clone() const
+  { return libmesh_make_unique<BdyFunction>(_u_var, _v_var, _sign); }
 
 private:
   const unsigned int _u_var, _v_var;
@@ -104,11 +105,12 @@ void CoupledSystem::init_data ()
   C_var = this->add_variable ("C", static_cast<Order>(pressure_p+1),
                               fefamily);
 
-  // Tell the system to march velocity forward in time, but
-  // leave p as a constraint only
-  this->time_evolving(u_var);
-  this->time_evolving(v_var);
-  this->time_evolving(C_var);
+  // Tell the system to march velocity and concentration forward in
+  // time, with first order time derivatives, but leave pressure as a
+  // constraint only
+  this->time_evolving(u_var, 1);
+  this->time_evolving(v_var, 1);
+  this->time_evolving(C_var, 1);
 
   // Useful debugging options
   this->verify_analytic_jacobians = infile("verify_analytic_jacobians", 0.);
@@ -180,18 +182,18 @@ void CoupledSystem::init_context(DiffContext & context)
   // we will need to build the linear system.
   // Note that the concentration and velocity components
   // use the same basis.
-  FEBase * u_elem_fe = libmesh_nullptr;
+  FEBase * u_elem_fe = nullptr;
   c.get_element_fe(u_var, u_elem_fe);
   u_elem_fe->get_JxW();
   u_elem_fe->get_phi();
   u_elem_fe->get_dphi();
   u_elem_fe->get_xyz();
 
-  FEBase * p_elem_fe = libmesh_nullptr;
+  FEBase * p_elem_fe = nullptr;
   c.get_element_fe(p_var, p_elem_fe);
   p_elem_fe->get_phi();
 
-  FEBase * side_fe = libmesh_nullptr;
+  FEBase * side_fe = nullptr;
   c.get_side_fe(u_var, side_fe);
 
   side_fe->get_JxW();
@@ -207,30 +209,30 @@ bool CoupledSystem::element_time_derivative (bool request_jacobian,
 
   // First we get some references to cell-specific data that
   // will be used to assemble the linear system.
-  FEBase * u_elem_fe = libmesh_nullptr;
+  FEBase * u_elem_fe = nullptr;
   c.get_element_fe(u_var, u_elem_fe);
 
   // Element Jacobian * quadrature weights for interior integration
   const std::vector<Real> & JxW = u_elem_fe->get_JxW();
 
   // The velocity shape functions at interior quadrature points.
-  const std::vector<std::vector<Real> > & phi = u_elem_fe->get_phi();
+  const std::vector<std::vector<Real>> & phi = u_elem_fe->get_phi();
 
   // The velocity shape function gradients at interior
   // quadrature points.
-  const std::vector<std::vector<RealGradient> > & dphi = u_elem_fe->get_dphi();
+  const std::vector<std::vector<RealGradient>> & dphi = u_elem_fe->get_dphi();
 
   // The pressure shape functions at interior
   // quadrature points.
-  FEBase * p_elem_fe = libmesh_nullptr;
+  FEBase * p_elem_fe = nullptr;
   c.get_element_fe(p_var, p_elem_fe);
 
-  const std::vector<std::vector<Real> > & psi = p_elem_fe->get_phi();
+  const std::vector<std::vector<Real>> & psi = p_elem_fe->get_phi();
 
   // The number of local degrees of freedom in each variable
-  const unsigned int n_p_dofs = c.get_dof_indices(p_var).size();
-  const unsigned int n_u_dofs = c.get_dof_indices(u_var).size();
-  libmesh_assert_equal_to (n_u_dofs, c.get_dof_indices(v_var).size());
+  const unsigned int n_p_dofs = c.n_dof_indices(p_var);
+  const unsigned int n_u_dofs = c.n_dof_indices(u_var);
+  libmesh_assert_equal_to (n_u_dofs, c.n_dof_indices(v_var));
 
   // The subvectors and submatrices we need to fill:
   DenseSubMatrix<Number> & Kuu = c.get_elem_jacobian(u_var, u_var);
@@ -333,10 +335,10 @@ bool CoupledSystem::element_constraint (bool request_jacobian,
 
   // Here we define some references to cell-specific data that
   // will be used to assemble the linear system.
-  FEBase * u_elem_fe = libmesh_nullptr;
+  FEBase * u_elem_fe = nullptr;
   c.get_element_fe(u_var, u_elem_fe);
 
-  FEBase * p_elem_fe = libmesh_nullptr;
+  FEBase * p_elem_fe = nullptr;
   c.get_element_fe(p_var, p_elem_fe);
 
   // Element Jacobian * quadrature weight for interior integration
@@ -344,15 +346,15 @@ bool CoupledSystem::element_constraint (bool request_jacobian,
 
   // The velocity shape function gradients at interior
   // quadrature points.
-  const std::vector<std::vector<RealGradient> > & dphi = u_elem_fe->get_dphi();
+  const std::vector<std::vector<RealGradient>> & dphi = u_elem_fe->get_dphi();
 
   // The pressure shape functions at interior
   // quadrature points.
-  const std::vector<std::vector<Real> > & psi = p_elem_fe->get_phi();
+  const std::vector<std::vector<Real>> & psi = p_elem_fe->get_phi();
 
   // The number of local degrees of freedom in each variable
-  const unsigned int n_u_dofs = c.get_dof_indices(u_var).size();
-  const unsigned int n_p_dofs = c.get_dof_indices(p_var).size();
+  const unsigned int n_u_dofs = c.n_dof_indices(u_var);
+  const unsigned int n_p_dofs = c.n_dof_indices(p_var);
 
   // The subvectors and submatrices we need to fill:
   DenseSubMatrix<Number> & Kpu = c.get_elem_jacobian(p_var, u_var);
@@ -405,7 +407,7 @@ void CoupledSystem::postprocess()
 // ||e((u_2)_h C,2)||_{L2} ||e(C^*)||_{L2} + ||e(u2 C,2_h)||_{L2} ||e(C^*)||_{L2}
 // These functions compute (u_1)_h or C,1_h , and (u_2)_h or C,2_h , and supply it to the weighted patch recovery error estimator
 // In CoupledFEMFunctionsx, the object built with var = 0, returns the (u_1)_h weight, while
-// the object built with var = 1, returns the C,1_h weight. The switch statment
+// the object built with var = 1, returns the C,1_h weight. The switch statement
 // distinguishes the behavior of the two objects
 // Same thing for CoupledFEMFunctionsy
 Number CoupledFEMFunctionsx::operator()(const FEMContext & c,

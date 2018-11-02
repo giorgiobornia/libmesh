@@ -91,7 +91,7 @@ public:
   RBEvaluation & get_rb_evaluation();
 
   /**
-   * @return true if rb_eval is initialized. False, otherwise.
+   * \returns \p true if rb_eval is initialized. False, otherwise.
    */
   bool is_rb_eval_initialized() const;
 
@@ -107,12 +107,12 @@ public:
   void set_rb_assembly_expansion(RBAssemblyExpansion & rb_assembly_expansion_in);
 
   /**
-   * @return a reference to the rb_assembly_expansion object
+   * \returns A reference to the rb_assembly_expansion object
    */
   RBAssemblyExpansion & get_rb_assembly_expansion();
 
   /**
-   * @returns a clever pointer to the system.
+   * \returns A reference to *this.
    */
   sys_type & system () { return *this; }
 
@@ -125,12 +125,12 @@ public:
    * Clear all the data structures associated with
    * the system.
    */
-  virtual void clear () libmesh_override;
+  virtual void clear () override;
 
   /**
-   * @returns a string indicating the type of the system.
+   * \returns A string indicating the type of the system.
    */
-  virtual std::string system_type () const libmesh_override;
+  virtual std::string system_type () const override;
 
   /**
    * Perform a "truth" solve, i.e. solve the finite element system at
@@ -154,9 +154,16 @@ public:
    * set it to false if, for example, we are continuing from a previous
    * training run and don't want to clobber the existing rb_eval data.
    *
-   * @returns the final maximum a posteriori error bound on the training set.
+   * \returns The final maximum a posteriori error bound on the training set.
    */
   virtual Real train_reduced_basis(const bool resize_rb_eval_data=true);
+
+  /**
+   * This function computes one basis function for each rhs term. This is
+   * useful in some cases since we can avoid doing a full greedy if we know
+   * that we do not have any "left-hand side" parameters, for example.
+   */
+  void enrich_basis_from_rhs_terms(const bool resize_rb_eval_data=true);
 
   /**
    * (i) Compute the a posteriori error bound for each set of parameters
@@ -172,11 +179,25 @@ public:
   const RBParameters & get_greedy_parameter(unsigned int i);
 
   /**
-   * Get/set the tolerance for the basis training.
+   * Get/set the relative tolerance for the basis training.
    */
-  void set_training_tolerance(Real new_training_tolerance)
-  {this->training_tolerance = new_training_tolerance; }
-  Real get_training_tolerance() { return training_tolerance; }
+  void set_rel_training_tolerance(Real new_training_tolerance)
+  {this->rel_training_tolerance = new_training_tolerance; }
+  Real get_rel_training_tolerance() { return rel_training_tolerance; }
+
+  /**
+   * Get/set the absolute tolerance for the basis training.
+   */
+  void set_abs_training_tolerance(Real new_training_tolerance)
+  {this->abs_training_tolerance = new_training_tolerance; }
+  Real get_abs_training_tolerance() { return abs_training_tolerance; }
+
+  /**
+   * Get/set the boolean to indicate if we normalize the RB error in the greedy.
+   */
+  void set_normalize_rb_bound_in_greedy(bool normalize_rb_bound_in_greedy_in)
+  {this->normalize_rb_bound_in_greedy = normalize_rb_bound_in_greedy_in; }
+  bool get_normalize_rb_bound_in_greedy() { return normalize_rb_bound_in_greedy; }
 
   /**
    * Get/set Nmax, the maximum number of RB
@@ -184,20 +205,6 @@ public:
    */
   unsigned int get_Nmax() const    { return Nmax; }
   virtual void set_Nmax(unsigned int Nmax);
-
-  /**
-   * Set the quiet_mode flag. If quiet == false then
-   * we print out a lot of extra information
-   * during the Offline stage.
-   */
-  void set_quiet_mode(bool quiet_mode_in)
-  { this->quiet_mode = quiet_mode_in; }
-
-  /**
-   * Is the system in quiet mode?
-   */
-  bool is_quiet() const
-  { return this->quiet_mode; }
 
   /**
    * Load the i^th RB function into the RBConstruction
@@ -220,6 +227,19 @@ public:
   SparseMatrix<Number> * get_inner_product_matrix();
 
   /**
+   * Get the non-Dirichlet (or more generally no-constraints) version
+   * of the inner-product matrix. This is useful for performing multiplications
+   * on vectors that already have constraints enforced.
+   */
+  SparseMatrix<Number> * get_non_dirichlet_inner_product_matrix();
+
+  /**
+   * Get the non-Dirichlet inner-product matrix if it's available,
+   * otherwise get the inner-product matrix with constraints.
+   */
+  SparseMatrix<Number> * get_non_dirichlet_inner_product_matrix_if_avail();
+
+  /**
    * Get a pointer to Aq.
    */
   SparseMatrix<Number> * get_Aq(unsigned int q);
@@ -228,6 +248,12 @@ public:
    * Get a pointer to non_dirichlet_Aq.
    */
   SparseMatrix<Number> * get_non_dirichlet_Aq(unsigned int q);
+
+  /**
+   * Get a pointer to non_dirichlet_Aq if it's available, otherwise
+   * get Aq.
+   */
+  SparseMatrix<Number> * get_non_dirichlet_Aq_if_avail(unsigned int q);
 
   /**
    * Allocate all the data structures necessary for the construction
@@ -250,6 +276,12 @@ public:
    * Get a pointer to non-Dirichlet Fq.
    */
   NumericVector<Number> * get_non_dirichlet_Fq(unsigned int q);
+
+  /**
+   * Get a pointer to non_dirichlet_Fq if it's available, otherwise
+   * get Fq.
+   */
+  NumericVector<Number> * get_non_dirichlet_Fq_if_avail(unsigned int q);
 
   /**
    * Get a pointer to the n^th output.
@@ -346,14 +378,15 @@ public:
    */
   void set_rb_construction_parameters(unsigned int n_training_samples_in,
                                       bool deterministic_training_in,
-                                      bool use_relative_bound_in_greedy_in,
                                       unsigned int training_parameters_random_seed_in,
                                       bool quiet_mode_in,
                                       unsigned int Nmax_in,
-                                      Real training_tolerance_in,
+                                      Real rel_training_tolerance_in,
+                                      Real abs_training_tolerance_in,
+                                      bool normalize_rb_error_bound_in_greedy_in,
                                       RBParameters mu_min_in,
                                       RBParameters mu_max_in,
-                                      std::map< std::string, std::vector<Real> > discrete_parameter_values_in,
+                                      std::map<std::string, std::vector<Real>> discrete_parameter_values_in,
                                       std::map<std::string,bool> log_scaling);
 
   /**
@@ -383,7 +416,7 @@ public:
   void set_inner_product_assembly(ElemAssembly & inner_product_assembly_in);
 
   /**
-   * @return a reference to the inner product assembly object
+   * \returns A reference to the inner product assembly object
    */
   ElemAssembly & get_inner_product_assembly();
 
@@ -397,7 +430,7 @@ public:
    * It's helpful to be able to generate a DirichletBoundary that stores a ZeroFunction in order
    * to impose Dirichlet boundary conditions.
    */
-  static UniquePtr<DirichletBoundary> build_zero_dirichlet_boundary_object();
+  static std::unique_ptr<DirichletBoundary> build_zero_dirichlet_boundary_object();
 
   /**
    * Setter for the flag determining if convergence should be
@@ -421,7 +454,7 @@ public:
    * use for solving all systems in which the system matrix is set
    * to inner_product_matrix.
    */
-  UniquePtr< LinearSolver<Number> > inner_product_solver;
+  std::unique_ptr<LinearSolver<Number>> inner_product_solver;
 
   /**
    * Also, we store a pointer to an extra linear solver. This can be
@@ -434,19 +467,19 @@ public:
   /**
    * The inner product matrix.
    */
-  UniquePtr< SparseMatrix<Number> > inner_product_matrix;
+  std::unique_ptr<SparseMatrix<Number>> inner_product_matrix;
 
   /**
    * Vector storing the truth output values from the most
    * recent truth solve.
    */
-  std::vector< Number > truth_outputs;
+  std::vector<Number > truth_outputs;
 
   /**
    * The vector storing the dual norm inner product terms
    * for each output.
    */
-  std::vector< std::vector< Number > > output_dual_innerprods;
+  std::vector<std::vector<Number >> output_dual_innerprods;
 
   /**
    * Vector storing the residual representors associated with the
@@ -454,7 +487,7 @@ public:
    * These are basis independent and hence stored here, whereas
    * the Aq_representors are stored in RBEvaluation
    */
-  std::vector< NumericVector<Number> * > Fq_representor;
+  std::vector<std::unique_ptr<NumericVector<Number>>> Fq_representor;
 
   /**
    * Vectors storing the residual representor inner products
@@ -466,11 +499,13 @@ public:
   std::vector<Number> Fq_representor_innerprods;
 
   /**
-   * Boolean flag to indicate whether we use an absolute or
-   * relative error bound in the Greedy algorithm for training
-   * a Reduced Basis.
+   * Boolean flag to indicate if we skip residual calculations
+   * in train_reduced_basis. This should only be used in
+   * special cases, e.g. when we know a priori that we want
+   * exactly one basis function and hence we do not need the
+   * residual based error indicator.
    */
-  bool use_relative_bound_in_greedy;
+  bool skip_residual_in_train_reduced_basis;
 
   /**
    * Boolean flag to indicate whether we exit the greedy if
@@ -486,6 +521,14 @@ public:
    * on internal element boundaries in the assembly routines.
    */
   bool impose_internal_fluxes;
+
+  /**
+   * In some cases meshes are intentionally created with degenerate sides
+   * as a way to represent, say, triangles using a hex-only mesh. In this
+   * situation we should detect and skip any degenerate sides in order to
+   * prevent zero or negative element Jacobian errors.
+   */
+  bool skip_degenerate_sides;
 
   /**
    * Boolean flag to indicate whether we compute the RB_inner_product_matrix.
@@ -535,7 +578,7 @@ protected:
    * evaluations on each element. We use DGFEMContext since it
    * allows for both DG and continuous Galerkin formulations.
    */
-  virtual UniquePtr<DGFEMContext> build_context();
+  virtual std::unique_ptr<DGFEMContext> build_context();
 
   /**
    * Return the matrix for the output residual dual
@@ -546,9 +589,11 @@ protected:
 
   /**
    * Function that indicates when to terminate the Greedy
-   * basis training. Overload in subclasses to specialize.
+   * basis training. Override in subclasses to specialize.
    */
-  virtual bool greedy_termination_test(Real training_greedy_error, int count);
+  virtual bool greedy_termination_test(Real abs_greedy_error,
+                                       Real initial_greedy_error,
+                                       int count);
 
   /**
    * Update the list of Greedily chosen parameters with
@@ -633,8 +678,9 @@ protected:
   virtual void update_system();
 
   /**
-   * This function returns the RB error bound for the current parameters and
-   * is used in the Greedy algorithm to select the next parameter.
+   * \returns The RB error bound for the current parameters.
+   *
+   * Used in the Greedy algorithm to select the next parameter.
    */
   virtual Real get_RB_error_bound();
 
@@ -687,12 +733,6 @@ protected:
   unsigned int delta_N;
 
   /**
-   * Flag to indicate whether we print out extra information during
-   * the Offline stage.
-   */
-  bool quiet_mode;
-
-  /**
    * A boolean flag to indicate whether or not the output dual norms
    * have already been computed --- used to make sure that we don't
    * recompute them unnecessarily.
@@ -730,33 +770,42 @@ private:
   /**
    * Vector storing the Q_a matrices from the affine expansion
    */
-  std::vector< SparseMatrix<Number> * > Aq_vector;
+  std::vector<std::unique_ptr<SparseMatrix<Number>>> Aq_vector;
 
   /**
    * Vector storing the Q_f vectors in the affine decomposition
    * of the right-hand side.
    */
-  std::vector< NumericVector<Number> * > Fq_vector;
+  std::vector<std::unique_ptr<NumericVector<Number>>> Fq_vector;
 
   /**
    * The libMesh vectors that define the output functionals.
    * Each row corresponds to the affine expansion of an output.
    */
-  std::vector< std::vector< NumericVector<Number> * > > outputs_vector;
+  std::vector<std::vector<std::unique_ptr<NumericVector<Number>>>> outputs_vector;
 
   /**
    * We may also need a second set of matrices/vectors
    * that do not have the Dirichlet boundary conditions
    * enforced.
    */
-  std::vector< SparseMatrix<Number> * > non_dirichlet_Aq_vector;
-  std::vector< NumericVector<Number> * > non_dirichlet_Fq_vector;
-  std::vector< std::vector< NumericVector<Number> * > > non_dirichlet_outputs_vector;
+  std::vector<std::unique_ptr<SparseMatrix<Number>>> non_dirichlet_Aq_vector;
+  std::vector<std::unique_ptr<NumericVector<Number>>> non_dirichlet_Fq_vector;
+  std::vector<std::vector<std::unique_ptr<NumericVector<Number>>>> non_dirichlet_outputs_vector;
+  std::unique_ptr<SparseMatrix<Number>> non_dirichlet_inner_product_matrix;
 
   /**
-   * Tolerance for training reduced basis using the Greedy scheme.
+   * Relative and absolute tolerances for training reduced basis
+   * using the Greedy scheme.
    */
-  Real training_tolerance;
+  Real rel_training_tolerance;
+  Real abs_training_tolerance;
+
+  /**
+   * This boolean indicates if we normalize the RB error in the greedy using
+   * RBEvaluation::get_error_bound_normalization().
+   */
+  bool normalize_rb_bound_in_greedy;
 
 };
 

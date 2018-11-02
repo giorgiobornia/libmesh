@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,20 +20,19 @@
 #ifndef LIBMESH_TOPOLOGY_MAP_H
 #define LIBMESH_TOPOLOGY_MAP_H
 
+// Local Includes
 #include "libmesh/libmesh_config.h"
-
-// Local Includes -----------------------------------
 #include "libmesh/libmesh_common.h"
 
-// C++ Includes   -----------------------------------
-#include LIBMESH_INCLUDE_UNORDERED_MAP
-#include LIBMESH_INCLUDE_HASH
+// C++ Includes
+#include <unordered_map>
+#include <functional> // std::hash
 #include <vector>
 
 namespace libMesh
 {
 
-// Forward Declarations -----------------------------
+// Forward Declarations
 class Elem;
 class MeshBase;
 class Node;
@@ -46,7 +45,7 @@ public:
   {
     // recommendation from
     // http://stackoverflow.com/questions/5889238/why-is-xor-the-default-way-to-combine-hashes
-    return 3 * LIBMESH_BEST_HASH<T1>()(x.first) + LIBMESH_BEST_HASH<T2>()(x.second);
+    return 3 * std::hash<T1>()(x.first) + std::hash<T2>()(x.second);
   }
 };
 
@@ -62,21 +61,15 @@ public:
  *
  * For efficiency we will use a hashed map if it is available,
  * otherwise a regular map.
+ *
+ * \author Roy Stogner
+ * \date 2015
+ * \brief Enables topology-based lookups of nodes.
  */
 class TopologyMap
 {
-  // We need to supply our own hash function if we're hashing
-#if defined(LIBMESH_HAVE_STD_UNORDERED_MAP) ||  \
-  defined(LIBMESH_HAVE_TR1_UNORDERED_MAP) ||    \
-  defined(LIBMESH_HAVE_EXT_HASH_MAP) ||         \
-  defined(LIBMESH_HAVE_HASH_MAP)
-#  define MYHASH ,myhash
-#else
-#  define MYHASH
-#endif
-
-  typedef LIBMESH_BEST_UNORDERED_MAP<std::pair<dof_id_type, dof_id_type>,
-                                     dof_id_type MYHASH> map_type;
+  // We need to supply our own hash function.
+  typedef std::unordered_map<std::pair<dof_id_type, dof_id_type>, dof_id_type, myhash> map_type;
 public:
   void init(MeshBase &);
 
@@ -88,7 +81,7 @@ public:
    */
   void add_node(const Node & mid_node,
                 const std::vector<
-                std::pair<dof_id_type, dof_id_type> > &
+                std::pair<dof_id_type, dof_id_type>> &
                 bracketing_nodes);
 
   bool empty() const { return _map.empty(); }
@@ -97,7 +90,7 @@ public:
                    dof_id_type bracket_node2) const;
 
   dof_id_type find(const std::vector<
-                   std::pair<dof_id_type, dof_id_type> > &
+                   std::pair<dof_id_type, dof_id_type>> &
                    bracketing_nodes) const;
 
 protected:

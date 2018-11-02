@@ -16,8 +16,9 @@ using namespace libMesh;
 
 void LaplaceSystem::init_data ()
 {
-  this->add_variable ("T", static_cast<Order>(_fe_order),
-                      Utility::string_to_enum<FEFamily>(_fe_family));
+  unsigned int T_var =
+    this->add_variable ("T", static_cast<Order>(_fe_order),
+                        Utility::string_to_enum<FEFamily>(_fe_family));
 
   GetPot infile("l-shaped.in");
   exact_QoI[0] = infile("QoI_0", 0.0);
@@ -26,7 +27,8 @@ void LaplaceSystem::init_data ()
   // Do the parent's initialization after variables are defined
   FEMSystem::init_data();
 
-  this->time_evolving(0);
+  // The temperature is evolving, with a first order time derivative
+  this->time_evolving(T_var, 1);
 }
 
 void LaplaceSystem::init_context(DiffContext & context)
@@ -35,13 +37,14 @@ void LaplaceSystem::init_context(DiffContext & context)
 
   // Now make sure we have requested all the data
   // we need to build the linear system.
-  FEBase * elem_fe = libmesh_nullptr;
+  FEBase * elem_fe = nullptr;
   c.get_element_fe(0, elem_fe);
   elem_fe->get_JxW();
   elem_fe->get_phi();
   elem_fe->get_dphi();
+  elem_fe->get_xyz();
 
-  FEBase * side_fe = libmesh_nullptr;
+  FEBase * side_fe = nullptr;
   c.get_side_fe(0, side_fe);
 
   side_fe->get_JxW();
@@ -62,17 +65,17 @@ bool LaplaceSystem::element_time_derivative (bool request_jacobian,
 
   // First we get some references to cell-specific data that
   // will be used to assemble the linear system.
-  FEBase * elem_fe = libmesh_nullptr;
+  FEBase * elem_fe = nullptr;
   c.get_element_fe(0, elem_fe);
 
   // Element Jacobian * quadrature weights for interior integration
   const std::vector<Real> & JxW = elem_fe->get_JxW();
 
   // Element basis functions
-  const std::vector<std::vector<RealGradient> > & dphi = elem_fe->get_dphi();
+  const std::vector<std::vector<RealGradient>> & dphi = elem_fe->get_dphi();
 
   // The number of local degrees of freedom in each variable
-  const unsigned int n_T_dofs = c.get_dof_indices(0).size();
+  const unsigned int n_T_dofs = c.n_dof_indices(0);
 
   // The subvectors and submatrices we need to fill:
   DenseSubMatrix<Number> & K = c.get_elem_jacobian(0, 0);
@@ -115,20 +118,20 @@ bool LaplaceSystem::side_constraint (bool request_jacobian,
 
   // First we get some references to cell-specific data that
   // will be used to assemble the linear system.
-  FEBase * side_fe = libmesh_nullptr;
+  FEBase * side_fe = nullptr;
   c.get_side_fe(0, side_fe);
 
   // Element Jacobian * quadrature weights for interior integration
   const std::vector<Real> & JxW = side_fe->get_JxW();
 
   // Side basis functions
-  const std::vector<std::vector<Real> > & phi = side_fe->get_phi();
+  const std::vector<std::vector<Real>> & phi = side_fe->get_phi();
 
   // Side Quadrature points
   const std::vector<Point > & qside_point = side_fe->get_xyz();
 
   // The number of local degrees of freedom in each variable
-  const unsigned int n_T_dofs = c.get_dof_indices(0).size();
+  const unsigned int n_T_dofs = c.n_dof_indices(0);
 
   // The subvectors and submatrices we need to fill:
   DenseSubMatrix<Number> & K = c.get_elem_jacobian(0, 0);

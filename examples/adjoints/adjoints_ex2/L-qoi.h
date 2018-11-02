@@ -9,6 +9,7 @@
 #include "libmesh/point.h"
 #include "libmesh/quadrature.h"
 #include "libmesh/diff_qoi.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
 
 // Bring in everything from the libMesh namespace
 using namespace libMesh;
@@ -21,15 +22,18 @@ public:
 
   virtual void init_qoi(std::vector<Number> & sys_qoi);
 
+  // Context initialization
+  virtual void init_context (DiffContext & context);
+
   virtual void postprocess() {}
 
   virtual void element_qoi_derivative(DiffContext & context, const QoISet & qois);
 
   virtual void element_qoi (DiffContext & context, const QoISet & qois);
 
-  virtual UniquePtr<DifferentiableQoI> clone()
+  virtual std::unique_ptr<DifferentiableQoI> clone()
   {
-    return UniquePtr<DifferentiableQoI> (new LaplaceQoI(*this));
+    return libmesh_make_unique<LaplaceQoI>(*this);
   }
 
 };

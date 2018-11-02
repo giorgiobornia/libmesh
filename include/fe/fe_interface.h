@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -22,9 +22,7 @@
 
 // Local includes
 #include "libmesh/libmesh_common.h"
-#include "libmesh/enum_elem_type.h"
 #include "libmesh/vector_value.h"
-#include "libmesh/enum_fe_family.h"
 
 // C++ includes
 #include <map>
@@ -43,6 +41,10 @@ class FEType;
 class FEComputeData;
 class Point;
 class MeshBase;
+enum FEFamily : int;
+enum Order : int;
+enum FEFieldType : int;
+enum ElemType : int;
 
 #ifdef LIBMESH_ENABLE_PERIODIC
 class PeriodicBoundaries;
@@ -50,13 +52,14 @@ class PointLocatorBase;
 #endif
 
 /**
- * This class provides an encapsulated access to all @e static
+ * This class provides an encapsulated access to all static
  * public member functions of finite element classes.
  * Using this class, one need not worry about the correct
  * finite element class.
  *
  * \author Daniel Dreyer
  * \date 2002-2007
+ * \brief Interface class which provides access to FE functions.
  */
 class FEInterface
 {
@@ -75,7 +78,7 @@ public:
   virtual ~FEInterface() {}
 
   /**
-   * @returns the number of shape functions associated with this
+   * \returns The number of shape functions associated with this
    * finite element of type \p fe_t.
    * Automatically decides which finite element class to use.
    *
@@ -86,7 +89,7 @@ public:
                                         const ElemType t);
 
   /**
-   * @returns the number of shape functions associated with this
+   * \returns The number of shape functions associated with this
    * finite element.
    * Automatically decides which finite element class to use.
    *
@@ -97,7 +100,7 @@ public:
                              const ElemType t);
 
   /**
-   * @returns the number of dofs at node n for a finite element
+   * \returns The number of dofs at node n for a finite element
    * of type \p fe_t.
    * Automatically decides which finite element class to use.
    *
@@ -108,8 +111,20 @@ public:
                                      const ElemType t,
                                      const unsigned int n);
 
+  typedef unsigned int (*n_dofs_at_node_ptr) (const ElemType,
+                                              const Order,
+                                              const unsigned int);
+
   /**
-   * @returns the number of dofs interior to the element,
+   * \returns A function which evaluates n_dofs_at_node for the
+   * requested FE type and dimension.
+   */
+  static n_dofs_at_node_ptr
+  n_dofs_at_node_function(const unsigned int dim,
+                          const FEType & fe_t);
+
+  /**
+   * \returns The number of dofs interior to the element,
    * not associated with any interior nodes.
    * Automatically decides which finite element class to use.
    *
@@ -163,8 +178,8 @@ public:
                          std::vector<Number> & nodal_soln);
 
   /**
-   * Returns the point in physical space of the reference point
-   * refpoint which is passed in.
+   * \returns The point in physical space corresponding to the
+   * reference point \p p which is passed in.
    */
   static Point map(unsigned int dim,
                    const FEType & fe_t,
@@ -172,7 +187,7 @@ public:
                    const Point & p);
 
   /**
-   * @returns the location (on the reference element) of the
+   * \returns The location (on the reference element) of the
    * point \p p located in physical space.  This function requires
    * inverting the (probably nonlinear) transformation map, so
    * it is not trivial. The optional parameter \p tolerance defines
@@ -188,7 +203,7 @@ public:
                             const bool secure = true);
 
   /**
-   * @returns the location (on the reference element) of the points \p
+   * \returns The location (on the reference element) of the points \p
    * physical_points located in physical space.  This function
    * requires inverting the (probably nonlinear) transformation map,
    * so it is not trivial. The location of each point on the reference
@@ -207,23 +222,24 @@ public:
                             const bool secure = true);
 
   /**
-   * @returns true if the point p is located on the reference element
-   * for element type t, false otherwise.
+   * \returns \p true if the point \p p is located on the reference element
+   * for element type t, \p false otherwise.
    *
-   * Since we are doing floating point comparisons here the parameter
+   * Since we are doing floating point comparisons, the parameter
    * \p eps can be specified to indicate a tolerance.  For example,
-   * \f$ \xi \le 1 \f$  becomes \f$ \xi \le 1 + \epsilon \f$.
+   * \f$ \xi \le 1 \f$ becomes \f$ \xi \le 1 + \epsilon \f$.
    */
   static bool on_reference_element(const Point & p,
                                    const ElemType t,
                                    const Real eps=TOLERANCE);
   /**
-   * @returns the value of the \f$ i^{th} \f$ shape function at
+   * \returns The value of the \f$ i^{th} \f$ shape function at
    * point \p p. This method allows you to specify the dimension,
    * element type, and order directly. Automatically passes the
    * request to the appropriate finite element class member.
    *
-   * On a p-refined element, \p fe_t.order should be the total order of the element.
+   * \note On a p-refined element, \p fe_t.order should be the total
+   * order of the element.
    */
   static Real shape(const unsigned int dim,
                     const FEType & fe_t,
@@ -232,12 +248,13 @@ public:
                     const Point & p);
 
   /**
-   * @returns the value of the \f$ i^{th} \f$ shape function at
+   * \returns The value of the \f$ i^{th} \f$ shape function at
    * point \p p. This method allows you to specify the dimension,
    * element type, and order directly. Automatically passes the
    * request to the appropriate finite element class member.
    *
-   * On a p-refined element, \p fe_t.order should be the base order of the element.
+   * \note On a p-refined element, \p fe_t.order should be the base
+   * order of the element.
    */
   static Real shape(const unsigned int dim,
                     const FEType & fe_t,
@@ -246,14 +263,15 @@ public:
                     const Point & p);
 
   /**
-   * @returns the value of the \f$ i^{th} \f$ shape function at
+   * \returns The value of the \f$ i^{th} \f$ shape function at
    * point \p p. This method allows you to specify the dimension,
    * element type, and order directly. Automatically passes the
    * request to the appropriate *scalar* finite element class member.
    *
-   * On a p-refined element, \p fe_t.order should be the total order of the element.
+   * \note On a p-refined element, \p fe_t.order should be the total
+   * order of the element.
    */
-  template< typename OutputType>
+  template<typename OutputType>
   static void shape(const unsigned int dim,
                     const FEType & fe_t,
                     const ElemType t,
@@ -262,14 +280,15 @@ public:
                     OutputType & phi);
 
   /**
-   * @returns the value of the \f$ i^{th} \f$ shape function at
+   * \returns The value of the \f$ i^{th} \f$ shape function at
    * point \p p. This method allows you to specify the dimension,
    * element type, and order directly. Automatically passes the
    * request to the appropriate *scalar* finite element class member.
    *
-   * On a p-refined element, \p fe_t.order should be the total order of the element.
+   * \note On a p-refined element, \p fe_t.order should be the total
+   * order of the element.
    */
-  template< typename OutputType>
+  template<typename OutputType>
   static void shape(const unsigned int dim,
                     const FEType & fe_t,
                     const Elem * elem,
@@ -279,12 +298,13 @@ public:
 
   /**
    * Lets the appropriate child of \p FEBase compute the requested
-   * data for the input specified in \p data, and returns the values
-   * also through \p data.  See this as a generalization of \p shape().
-   * Currently, with disabled infinite elements, returns a vector of
-   * all shape functions of \p elem evaluated ap \p p.
+   * data for the input specified in \p data, and sets the values in
+   * \p data.  See this as a generalization of \p shape().  With
+   * infinite elements disabled, computes values for all shape
+   * functions of \p elem evaluated at \p p.
    *
-   * On a p-refined element, \p fe_t.order should be the base order of the element.
+   * \note On a p-refined element, \p fe_t.order should be the base
+   * order of the element.
    */
   static void compute_data(const unsigned int dim,
                            const FEType & fe_t,
@@ -319,32 +339,32 @@ public:
 #endif // #ifdef LIBMESH_ENABLE_PERIODIC
 
   /**
-   * Returns the maximum polynomial degree that the given finite
+   * \returns The maximum polynomial degree that the given finite
    * element family can support on the given geometric element.
    */
   static unsigned int max_order (const FEType & fe_t,
                                  const ElemType & el_t);
 
   /**
-   * Returns true if separate degrees of freedom must be allocated for
+   * \returns \p true if separate degrees of freedom must be allocated for
    * vertex DoFs and edge/face DoFs at a hanging node.
    */
   static bool extra_hanging_dofs (const FEType & fe_t);
 
   /**
-   * Returns the number of components of a vector-valued element.
+   * \returns The number of components of a vector-valued element.
    * Scalar-valued elements return 1.
    */
   static FEFieldType field_type (const FEType & fe_type);
 
   /**
-   * Returns the number of components of a vector-valued element.
+   * \returns The number of components of a vector-valued element.
    * Scalar-valued elements return 1.
    */
   static FEFieldType field_type (const FEFamily & fe_family);
 
   /**
-   * Returns the number of components of a vector-valued element.
+   * \returns The number of components of a vector-valued element.
    * Scalar-valued elements return 1.
    */
   static unsigned int n_vec_dim (const MeshBase & mesh,
@@ -354,20 +374,17 @@ private:
 
 
   /**
-   * @returns true if \p et is an element to be processed by
-   * class \p InfFE.  Otherwise, it returns false.
-   * For compatibility with disabled infinite elements
-   * it always returns false.
+   * \returns \p true if \p et is an element to be processed by class
+   * \p InfFE, false otherwise or when !LIBMESH_ENABLE_INFINITE_ELEMENTS.
    */
   static bool is_InfFE_elem(const ElemType et);
 
 
 #ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
 
-  // ------------------------------------------------------------
   /*
    * All these private members do the same as their public
-   * counterparts, but for infinite elements. This dis-entangles
+   * counterparts, except for infinite elements. This disentangles
    * the calls to \p FE and \p InfFE.
    */
 
@@ -393,6 +410,11 @@ private:
                               const Elem * elem,
                               const std::vector<Number> & elem_soln,
                               std::vector<Number> & nodal_soln);
+
+  static Point ifem_map (const unsigned int dim,
+                         const FEType & fe_t,
+                         const Elem * elem,
+                         const Point & p);
 
   static Point ifem_inverse_map (const unsigned int dim,
                                  const FEType & fe_t,
@@ -436,52 +458,6 @@ private:
 
 };
 
-
-
-
-
-// ------------------------------------------------------------
-// FEInterface class inline members
-#ifndef LIBMESH_ENABLE_INFINITE_ELEMENTS
-
-inline bool FEInterface::is_InfFE_elem(const ElemType)
-{
-  return false;
-}
-
-#else
-
-inline bool FEInterface::is_InfFE_elem(const ElemType et)
-{
-
-  switch (et)
-    {
-    case INFEDGE2:
-    case INFQUAD4:
-    case INFQUAD6:
-    case INFHEX8:
-    case INFHEX16:
-    case INFHEX18:
-    case INFPRISM6:
-    case INFPRISM12:
-      {
-        return true;
-      }
-
-    default:
-      {
-        return false;
-      }
-    }
-}
-
-#endif //ifndef LIBMESH_ENABLE_INFINITE_ELEMENTS
-
-
-
 } // namespace libMesh
-
-
-
 
 #endif // LIBMESH_FE_INTERFACE_H

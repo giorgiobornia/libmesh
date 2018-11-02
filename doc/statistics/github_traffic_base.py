@@ -13,8 +13,6 @@ import calendar
 # numbers of unique visitors and views for the last two weeks only...
 # So as long as I check back at least once every two weeks I can keep
 # a record of it?  Great...
-# Update Oct. 12, 2015: GitHub now only provides the most recent one
-# week of data.
 
 # https://github.com/libMesh/libmesh/graphs/traffic
 
@@ -52,26 +50,25 @@ class PlotData(object):
     Part of title string describing the average
     """
 
-    self.data_array = []
+    self.data_file = ''
     """
-    The 3-column array of data to be plotted
+    Name of a CSV file with date, total, unique data.
     """
 
   # Function which plots the two datasets on a single plot with two y axes.
   def plot_data(self):
-    # Extract the dates from the data array
-    date_strings = self.data_array[0::3]
+    # Read the data from the CSV file. "|S11" refers to an 11 character string.
+    # When you specify the dtype argument, the data is read into a structured
+    # array and the columns can be accessed with the 'f0', 'f1', etc. names.
+    data = np.genfromtxt(self.data_file, delimiter=',', dtype=("|S11", int, int))
+    date_strings = data['f0']
+    data_column2 = data['f1']
+    data_column3 = data['f2']
 
-    # Convert date strings into numbers
+    # Convert date strings into numbers.
     date_nums = []
     for d in date_strings:
       date_nums.append(date2num(datetime.strptime(d, '%Y-%b-%d')))
-
-    # Extract second column of data (n. views or n. clones).
-    data_column2 = self.data_array[1::3]
-
-    # Extract third column of data (unique visitors or unique cloners).
-    data_column3 = self.data_array[2::3]
 
     # Initialize an array with 1, 7, 14, ...
     N = len(date_strings)
@@ -91,9 +88,15 @@ class PlotData(object):
     # Get a reference to the figure
     fig = plt.figure()
 
+    # The colors used come from sns.color_palette("muted").as_hex() They
+    # are the "same basic order of hues as the default matplotlib color
+    # cycle but more attractive colors."
+    muted_dark_blue = u'#4878cf'
+    muted_green = u'#6acc65'
+
     # 111 is equivalent to Matlab's subplot(1,1,1) command
     ax1 = fig.add_subplot(111)
-    ax1.plot(x_axis, weekly_column2, 'bo-')
+    ax1.plot(x_axis, weekly_column2, color=muted_dark_blue, marker='o', linestyle='-', markersize=3)
     ax1.set_ylabel(self.left_axis_label + ' (blue circles)')
 
     # Choose the number of labels to create, then use linspace to create
@@ -107,7 +110,7 @@ class PlotData(object):
 
     # Plot the weekly column 3 data.
     ax2 = ax1.twinx()
-    ax2.plot(x_axis, weekly_column3, 'gs--')
+    ax2.plot(x_axis, weekly_column3, color=muted_green, marker='s', linestyle='-', markersize=3)
     ax2.set_ylabel(self.right_axis_label + ' (green squares)')
 
     # Add title
@@ -128,7 +131,7 @@ class PlotData(object):
     # Make monthly plot
     fig.clf()
 
-    # Generate date numbers at montly intervals starting from '2014-Feb-17'
+    # Generate date numbers at monthly intervals starting from '2014-Feb-17'
     now = datetime.now()
     month_intervals = [735281] # date2num for '2014-Feb-17'
     for yr in xrange(2014, now.year+1):
@@ -163,12 +166,12 @@ class PlotData(object):
 
     # 111 is equivalent to Matlab's subplot(1,1,1) command
     ax1 = fig.add_subplot(111)
-    ax1.plot(x_axis, monthly_column2, 'bo-')
+    ax1.plot(x_axis, monthly_column2, color=muted_dark_blue, marker='o', linestyle='-')
     ax1.set_ylabel(self.left_axis_label + ' (blue circles)')
 
     # Place an x-axis tick mark every x_step months.  As we get more data,
     # we'll have to increase x_step.
-    x_step = 4
+    x_step = 8
     x_axis_ticks = range(0, len(x_axis), x_step)
 
     # Set tick labels and positions
@@ -177,7 +180,7 @@ class PlotData(object):
 
     # Plot the average weekly unique visitors
     ax2 = ax1.twinx()
-    ax2.plot(x_axis, monthly_column3, 'gs--')
+    ax2.plot(x_axis, monthly_column3, color=muted_green, marker='s', linestyle='-')
     ax2.set_ylabel(self.right_axis_label + ' (green squares)')
 
     # Save as PDF
@@ -186,4 +189,3 @@ class PlotData(object):
 # Local Variables:
 # python-indent: 2
 # End:
-

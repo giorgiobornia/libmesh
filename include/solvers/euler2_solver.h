@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -68,7 +68,7 @@ public:
   /**
    * Error convergence order: 2 for Crank-Nicolson, 1 otherwise
    */
-  virtual Real error_order() const libmesh_override;
+  virtual Real error_order() const override;
 
   /**
    * This method uses the DifferentiablePhysics'
@@ -77,7 +77,7 @@ public:
    * it uses will depend on theta.
    */
   virtual bool element_residual (bool request_jacobian,
-                                 DiffContext &) libmesh_override;
+                                 DiffContext &) override;
 
   /**
    * This method uses the DifferentiablePhysics'
@@ -86,7 +86,7 @@ public:
    * What combination it uses will depend on theta.
    */
   virtual bool side_residual (bool request_jacobian,
-                              DiffContext &) libmesh_override;
+                              DiffContext &) override;
 
   /**
    * This method uses the DifferentiablePhysics'
@@ -95,7 +95,7 @@ public:
    * What combination it uses will depend on theta.
    */
   virtual bool nonlocal_residual (bool request_jacobian,
-                                  DiffContext &) libmesh_override;
+                                  DiffContext &) override;
 
   /**
    * The value for the theta method to employ: 1.0 corresponds
@@ -113,9 +113,11 @@ protected:
   virtual bool _general_residual (bool request_jacobian,
                                   DiffContext &,
                                   ResFuncType mass,
+                                  ResFuncType damping,
                                   ResFuncType time_deriv,
                                   ResFuncType constraint,
-                                  ReinitFuncType reinit);
+                                  ReinitFuncType reinit,
+                                  bool compute_second_order_eqns);
 
 };
 

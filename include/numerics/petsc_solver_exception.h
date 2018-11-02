@@ -28,6 +28,9 @@
 namespace libMesh
 {
 
+// The SolverException class is only defined when exceptions are enabled.
+#ifdef LIBMESH_ENABLE_EXCEPTIONS
+
 /**
  * A specialization of the SolverException class for PETSc.
  */
@@ -40,7 +43,7 @@ public:
     const char * text;
     // This is one scenario where we don't catch the error code
     // returned by a PETSc function :)
-    PetscErrorMessage(error_code, &text, libmesh_nullptr);
+    PetscErrorMessage(error_code, &text, nullptr);
     what_message = text;
   }
 };
@@ -48,13 +51,11 @@ public:
 
 
 // Macro which we call after every PETSc function that returns an error code.
-#ifdef LIBMESH_ENABLE_EXCEPTIONS
-
 #define LIBMESH_CHKERR(ierr)                    \
   do {                                          \
     if (ierr != 0) {                            \
       throw PetscSolverException(ierr);         \
-    } } while(0)
+    } } while (0)
 
 #else
 

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -21,23 +21,27 @@
 #define LIBMESH_SENSITIVITY_DATA_H
 
 
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/libmesh_common.h"
 #include "libmesh/parameter_vector.h"
 #include "libmesh/system.h"
 
-// C++ Includes   -----------------------------------
+// C++ Includes
 #include <vector>
 
 namespace libMesh
 {
 
-// Forward declaractions
+// Forward declarations
 class QoISet;
 
 /**
  * Data structure for holding completed parameter sensitivity
  * calculations.
+ *
+ * \author Roy Stogner
+ * \date 2009
+ * \brief Holds completed parameter sensitivity calculations.
  */
 class SensitivityData
 {
@@ -99,14 +103,14 @@ public:
                              const ParameterVector & parameter_vector);
 
   /**
-   * Returns the parameter sensitivity derivative for the specified
+   * \returns The parameter sensitivity derivative for the specified
    * quantity of interest for the specified parameter
    */
   const Number & derivative (unsigned int qoi_index,
                              unsigned int parameter_index) const;
 
   /**
-   * Returns the parameter sensitivity derivative for the specified
+   * \returns The parameter sensitivity derivative for the specified
    * quantity of interest for the specified pair of parameters
    */
   const Number & second_derivative (unsigned int qoi_index,
@@ -141,8 +145,8 @@ private:
   /**
    * Data storage; currently pretty trivial
    */
-  std::vector<std::vector<Number> > _grad_data;
-  std::vector<std::vector<std::vector<Number> > > _hess_data;
+  std::vector<std::vector<Number>> _grad_data;
+  std::vector<std::vector<std::vector<Number>>> _hess_data;
 };
 
 
@@ -168,8 +172,7 @@ void SensitivityData::allocate_data(const QoISet & qoi_indices,
                                     const ParameterVector & parameter_vector)
 {
   const std::size_t Np = parameter_vector.size();
-  const unsigned int Nq =
-    cast_int<unsigned int>(sys.qoi.size());
+  const unsigned int Nq = sys.n_qois();
 
   if (_grad_data.size() < Nq)
     _grad_data.resize(Nq);
@@ -190,8 +193,7 @@ void SensitivityData::allocate_hessian_data(const QoISet & qoi_indices,
                                             const ParameterVector & parameter_vector)
 {
   const std::size_t Np = parameter_vector.size();
-  const unsigned int Nq =
-    cast_int<unsigned int>(sys.qoi.size());
+  const unsigned int Nq = sys.n_qois();
 
   if (_hess_data.size() < Nq)
     _hess_data.resize(Nq);

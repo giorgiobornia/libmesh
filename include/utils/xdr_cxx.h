@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -23,19 +23,17 @@
 // Local includes
 #include "libmesh/libmesh_common.h"
 #include "libmesh/libmesh.h"
-#include "libmesh/enum_xdr_mode.h"
-#include "libmesh/auto_ptr.h"
+#include "libmesh/enum_xdr_mode.h" // READ, WRITE, etc.
+#include "libmesh/auto_ptr.h" // deprecated
 
 // C++ includes
+#include <memory>
+#include <cstdio> // FILE
 #ifdef LIBMESH_HAVE_XDR
-#  ifdef LIBMESH_HAVE_RPC_RPC_H
-#    include <rpc/rpc.h>
-#  elif  LIBMESH_HAVE_RPC_XDR_H
-#    include <rpc/xdr.h>
-#  endif
+# include <rpc/rpc.h>
+# include <rpc/xdr.h>
 #endif
 
-#include <cstdio> // FILE
 #include <iosfwd>
 #include <vector>
 #include <string>
@@ -63,6 +61,7 @@ namespace libMesh
  *
  * \author Benjamin Kirk
  * \date 2003
+ * \brief C++ interface for the XDR (eXternal Data Representation) format.
  */
 class Xdr
 {
@@ -91,33 +90,34 @@ public:
   void close();
 
   /**
-   * Returns true if the Xdr file is open, false
+   * \returns \p true if the Xdr file is open, false
    * if it is closed.
    */
   bool is_open() const;
 
   /**
-   * Returns true if the Xdr file being read is at End-Of-File.
-   * Note that this is *not* a const method - the only portable way to
+   * \returns \p true if the Xdr file being read is at End-Of-File.
+   *
+   * \note This is \e not a const method - the only portable way to
    * test for an impending EOF is to peek at the next byte of the file
    * first, which may set the eof flag on the istream.
    */
   bool is_eof();
 
   /**
-   * Returns true if the file is opened in a reading
+   * \returns \p true if the file is opened in a reading
    * state, false otherwise.
    */
   bool reading() const { return ((mode == DECODE) || (mode == READ)); }
 
   /**
-   * Returns true if the file is opened in a writing
+   * \returns \p true if the file is opened in a writing
    * state, false otherwise.
    */
   bool writing() const { return ((mode == ENCODE) || (mode == WRITE)); }
 
   /**
-   * Returns the mode used to access the file.  Valid modes
+   * \returns The mode used to access the file.  Valid modes
    * are ENCODE, DECODE, READ, or WRITE.
    */
   XdrMODE access_mode () const { return mode; }
@@ -178,7 +178,7 @@ private:
   void do_read(std::vector<T> & a);
 
   template <typename T>
-  void do_read(std::vector<std::complex<T> > & a);
+  void do_read(std::vector<std::complex<T>> & a);
 
   /**
    * Helper method for writing different data types
@@ -193,7 +193,7 @@ private:
   void do_write(std::vector<T> & a);
 
   template <typename T>
-  void do_write(std::vector<std::complex<T> > & a);
+  void do_write(std::vector<std::complex<T>> & a);
 
   /**
    * The mode used for accessing the file.
@@ -208,12 +208,10 @@ private:
 #ifdef LIBMESH_HAVE_XDR
 
   /**
-   * Pointer to the standard @p xdr
-   * struct.  See the standard
-   * header file rpc/rpc.h
-   * for more information.
+   * Pointer to the standard XDR struct.  See the standard header file
+   * rpc/rpc.h for more information.
    */
-  XDR * xdrs;
+  std::unique_ptr<XDR> xdrs;
 
   /**
    * File pointer.
@@ -225,12 +223,12 @@ private:
   /**
    * The input file stream.
    */
-  UniquePtr<std::istream> in;
+  std::unique_ptr<std::istream> in;
 
   /**
    * The output file stream.
    */
-  UniquePtr<std::ostream> out;
+  std::unique_ptr<std::ostream> out;
 
   /**
    * A buffer to put comment strings into.

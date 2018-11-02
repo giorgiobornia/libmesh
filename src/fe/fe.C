@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -25,6 +25,7 @@
 #include "libmesh/libmesh_logging.h"
 #include "libmesh/quadrature.h"
 #include "libmesh/tensor_value.h"
+#include "libmesh/enum_elem_type.h"
 
 namespace libMesh
 {
@@ -32,6 +33,19 @@ namespace libMesh
 
 // ------------------------------------------------------------
 // FE class members
+template <unsigned int Dim, FEFamily T>
+FE<Dim,T>::FE (const FEType & fet) :
+  FEGenericBase<typename FEOutputType<T>::type> (Dim,fet),
+  last_side(INVALID_ELEM),
+  last_edge(libMesh::invalid_uint)
+{
+  // Sanity check.  Make sure the
+  // Family specified in the template instantiation
+  // matches the one in the FEType object
+  libmesh_assert_equal_to (T, this->get_family());
+}
+
+
 template <unsigned int Dim, FEFamily T>
 unsigned int FE<Dim,T>::n_shape_functions () const
 {
@@ -120,6 +134,9 @@ void FE<Dim,T>::reinit(const Elem * elem,
   // dofs we'll still have work to do.
   // libmesh_assert(elem);
 
+  // We're calculating now!  Time to determine what.
+  this->determine_calculations();
+
   // Try to avoid calling init_shape_functions
   // even when shapes_need_reinit
   bool cached_nodes_still_fit = false;
@@ -129,7 +146,7 @@ void FE<Dim,T>::reinit(const Elem * elem,
     {
       // Initialize the shape functions at the user-specified
       // points
-      if (pts != libmesh_nullptr)
+      if (pts != nullptr)
         {
           // Set the type and p level for this element
           this->elem_type = elem->type();
@@ -156,7 +173,7 @@ void FE<Dim,T>::reinit(const Elem * elem,
           libmesh_assert(this->qrule);
           this->qrule->init(elem->type(), elem->p_level());
 
-          if(this->qrule->shapes_need_reinit())
+          if (this->qrule->shapes_need_reinit())
             this->shapes_on_quadrature = false;
 
           if (this->elem_type != elem->type() ||
@@ -243,9 +260,9 @@ void FE<Dim,T>::reinit(const Elem * elem,
     }
 
   // Compute the map for this element.
-  if (pts != libmesh_nullptr)
+  if (pts != nullptr)
     {
-      if (weights != libmesh_nullptr)
+      if (weights != nullptr)
         {
           this->_fe_map->compute_map (this->dim, *weights, elem, this->calculate_d2phi);
         }
@@ -264,7 +281,7 @@ void FE<Dim,T>::reinit(const Elem * elem,
   // quadrature points.
   if (!cached_nodes_still_fit)
     {
-      if (pts != libmesh_nullptr)
+      if (pts != nullptr)
         this->compute_shape_functions (elem,*pts);
       else
         this->compute_shape_functions(elem,this->qrule->get_points());
@@ -277,40 +294,8 @@ template <unsigned int Dim, FEFamily T>
 void FE<Dim,T>::init_shape_functions(const std::vector<Point> & qp,
                                      const Elem * elem)
 {
-  // We can be called with no element.  If we're evaluating SCALAR
-  // dofs we'll still have work to do.
-  // libmesh_assert(elem);
-
-  this->calculations_started = true;
-
-  // If the user forgot to request anything, we'll be safe and
-  // calculate everything:
-#ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
-  if (!this->calculate_phi && !this->calculate_dphi && !this->calculate_d2phi
-      && !this->calculate_curl_phi && !this->calculate_div_phi)
-    {
-      this->calculate_phi = this->calculate_dphi = this->calculate_d2phi = this->calculate_dphiref = true;
-      if( FEInterface::field_type(T) == TYPE_VECTOR )
-        {
-          this->calculate_curl_phi = true;
-          this->calculate_div_phi  = true;
-        }
-    }
-#else
-  if (!this->calculate_phi && !this->calculate_dphi && !this->calculate_curl_phi && !this->calculate_div_phi)
-    {
-      this->calculate_phi = this->calculate_dphi = this->calculate_dphiref = true;
-      if( FEInterface::field_type(T) == TYPE_VECTOR )
-        {
-          this->calculate_curl_phi = true;
-          this->calculate_div_phi  = true;
-        }
-    }
-#endif // LIBMESH_ENABLE_SECOND_DERIVATIVES
-
   // Start logging the shape function initialization
-  START_LOG("init_shape_functions()", "FE");
-
+  LOG_SCOPE("init_shape_functions()", "FE");
 
   // The number of quadrature points.
   const unsigned int n_qp = cast_int<unsigned int>(qp.size());
@@ -335,7 +320,7 @@ void FE<Dim,T>::init_shape_functions(const std::vector<Point> & qp,
       this->dphidz.resize  (n_approx_shape_functions);
     }
 
-  if(this->calculate_dphiref)
+  if (this->calculate_dphiref)
     {
       if (Dim > 0)
         this->dphidxi.resize (n_approx_shape_functions);
@@ -347,10 +332,10 @@ void FE<Dim,T>::init_shape_functions(const std::vector<Point> & qp,
         this->dphidzeta.resize     (n_approx_shape_functions);
     }
 
-  if( this->calculate_curl_phi && (FEInterface::field_type(T) == TYPE_VECTOR) )
+  if (this->calculate_curl_phi && (FEInterface::field_type(T) == TYPE_VECTOR))
     this->curl_phi.resize(n_approx_shape_functions);
 
-  if( this->calculate_div_phi && (FEInterface::field_type(T) == TYPE_VECTOR) )
+  if (this->calculate_div_phi && (FEInterface::field_type(T) == TYPE_VECTOR))
     this->div_phi.resize(n_approx_shape_functions);
 
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
@@ -393,7 +378,7 @@ void FE<Dim,T>::init_shape_functions(const std::vector<Point> & qp,
           this->dphidz[i].resize      (n_qp);
         }
 
-      if(this->calculate_dphiref)
+      if (this->calculate_dphiref)
         {
           if (Dim > 0)
             this->dphidxi[i].resize(n_qp);
@@ -405,10 +390,10 @@ void FE<Dim,T>::init_shape_functions(const std::vector<Point> & qp,
             this->dphidzeta[i].resize(n_qp);
         }
 
-      if(this->calculate_curl_phi && (FEInterface::field_type(T) == TYPE_VECTOR) )
+      if (this->calculate_curl_phi && (FEInterface::field_type(T) == TYPE_VECTOR))
         this->curl_phi[i].resize(n_qp);
 
-      if(this->calculate_div_phi && (FEInterface::field_type(T) == TYPE_VECTOR) )
+      if (this->calculate_div_phi && (FEInterface::field_type(T) == TYPE_VECTOR))
         this->div_phi[i].resize(n_qp);
 
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
@@ -555,11 +540,7 @@ void FE<Dim,T>::init_shape_functions(const std::vector<Point> & qp,
     default:
       libmesh_error_msg("Invalid dimension Dim = " << Dim);
     }
-
-  // Stop logging the shape function initialization
-  STOP_LOG("init_shape_functions()", "FE");
 }
-
 
 
 
@@ -569,10 +550,6 @@ template <unsigned int Dim, FEFamily T>
 void FE<Dim,T>::init_base_shape_functions(const std::vector<Point> & qp,
                                           const Elem * e)
 {
-  // I don't understand infinite elements well enough to risk
-  // calculating too little.  :-(  RHS
-  this->calculate_phi = this->calculate_dphi = this->calculate_d2phi = true;
-
   this->elem_type = e->type();
   this->_fe_map->template init_reference_to_physical_map<Dim>(qp, e);
   init_shape_functions(qp, e);

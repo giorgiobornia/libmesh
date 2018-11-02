@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -78,6 +78,9 @@ Real NewtonSolver::line_search(Real tol,
       if (verbose)
         libMesh::out << "  Shrinking Newton step to "
                      << bx << std::endl;
+
+      // We may need to localize a parallel solution
+      _system.update();
 
       // Check residual with fractional Newton step
       _system.assembly (true, false);
@@ -186,6 +189,8 @@ Real NewtonSolver::line_search(Real tol,
         libMesh::out << "  Shrinking Newton step to "
                      << bx << std::endl;
 
+      // We may need to localize a parallel solution
+      _system.update();
       _system.assembly (true, false);
 
       rhs.close();
@@ -237,7 +242,7 @@ NewtonSolver::NewtonSolver (sys_type & s)
     track_linear_convergence(false),
     minsteplength(1e-5),
     linear_tolerance_multiplier(1e-3),
-    linear_solver(LinearSolver<Number>::build(s.comm()))
+    _linear_solver(LinearSolver<Number>::build(s.comm()))
 {
 }
 
@@ -253,12 +258,12 @@ void NewtonSolver::init()
 {
   Parent::init();
 
-  if (libMesh::on_command_line("--solver_system_names"))
-    linear_solver->init((_system.name()+"_").c_str());
+  if (libMesh::on_command_line("--solver-system-names"))
+    _linear_solver->init((_system.name()+"_").c_str());
   else
-    linear_solver->init();
+    _linear_solver->init();
 
-  linear_solver->init_names(_system);
+  _linear_solver->init_names(_system);
 }
 
 
@@ -267,23 +272,23 @@ void NewtonSolver::reinit()
 {
   Parent::reinit();
 
-  linear_solver->clear();
+  _linear_solver->clear();
 
-  linear_solver->init_names(_system);
+  _linear_solver->init_names(_system);
 }
 
 
 
 unsigned int NewtonSolver::solve()
 {
-  START_LOG("solve()", "NewtonSolver");
+  LOG_SCOPE("solve()", "NewtonSolver");
 
   // Reset any prior solve result
   _solve_result = INVALID_SOLVE_RESULT;
 
   NumericVector<Number> & newton_iterate = *(_system.solution);
 
-  UniquePtr<NumericVector<Number> > linear_solution_ptr = newton_iterate.zero_clone();
+  std::unique_ptr<NumericVector<Number>> linear_solution_ptr = newton_iterate.zero_clone();
   NumericVector<Number> & linear_solution = *linear_solution_ptr;
   NumericVector<Number> & rhs = *(_system.rhs);
 
@@ -307,6 +312,9 @@ unsigned int NewtonSolver::solve()
   for (_outer_iterations=0; _outer_iterations<max_nonlinear_iterations;
        ++_outer_iterations)
     {
+      // We may need to localize a parallel solution
+      _system.update();
+
       if (verbose)
         libMesh::out << "Assembling the System" << std::endl;
 
@@ -392,13 +400,13 @@ unsigned int NewtonSolver::solve()
 
       // Solve the linear system.
       const std::pair<unsigned int, Real> rval =
-        linear_solver->solve (matrix, _system.request_matrix("Preconditioner"),
-                              linear_solution, rhs, current_linear_tolerance,
-                              max_linear_iterations);
+        _linear_solver->solve (matrix, _system.request_matrix("Preconditioner"),
+                               linear_solution, rhs, current_linear_tolerance,
+                               max_linear_iterations);
 
       if (track_linear_convergence)
         {
-          LinearConvergenceReason linear_c_reason = linear_solver->get_converged_reason();
+          LinearConvergenceReason linear_c_reason = _linear_solver->get_converged_reason();
 
           // Check if something went wrong during the linear solve
           if (linear_c_reason < 0)
@@ -459,6 +467,7 @@ unsigned int NewtonSolver::solve()
           _outer_iterations+1 < max_nonlinear_iterations ||
           !continue_after_max_iterations)
         {
+          _system.update ();
           _system.assembly(true, false);
 
           rhs.close();
@@ -547,8 +556,6 @@ unsigned int NewtonSolver::solve()
 
   // We may need to localize a parallel solution
   _system.update ();
-
-  STOP_LOG("solve()", "NewtonSolver");
 
   // Make sure we are returning something sensible as the
   // _solve_result, except in the edge case where we weren't really asked to

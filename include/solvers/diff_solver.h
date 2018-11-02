@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -21,13 +21,14 @@
 #define LIBMESH_DIFF_SOLVER_H
 
 // Local includes
-#include "libmesh/auto_ptr.h"
+#include "libmesh/auto_ptr.h" // deprecated
 #include "libmesh/libmesh_common.h"
 #include "libmesh/reference_counted_object.h"
 #include "libmesh/parallel_object.h"
 
 // C++ includes
 #include <vector>
+#include <memory>
 
 namespace libMesh
 {
@@ -83,10 +84,12 @@ public:
   DiffSolver (sys_type & s);
 
   /**
-   * Factory.  Requires a reference to the system
-   * to be solved.  Returns a NewtonSolver by default
+   * Factory method.  Requires a reference to the system
+   * to be solved.
+   *
+   * \returns A NewtonSolver by default.
    */
-  static UniquePtr<DiffSolver> build(sys_type & s);
+  static std::unique_ptr<DiffSolver> build(sys_type & s);
 
   /**
    * Destructor.
@@ -113,29 +116,29 @@ public:
   virtual unsigned int solve () = 0;
 
   /**
-   * @returns the number of "outer" (e.g. quasi-Newton) iterations
+   * \returns The number of "outer" (e.g. quasi-Newton) iterations
    * required by the last solve.
    */
   unsigned int total_outer_iterations() { return _outer_iterations; }
 
   /**
-   * @returns the number of "inner" (e.g. Krylov) iterations
+   * \returns The number of "inner" (e.g. Krylov) iterations
    * required by the last solve.
    */
   unsigned int total_inner_iterations() { return _inner_iterations; }
 
   /**
-   * @returns the value of the SolveResult from the last solve.
+   * \returns The value of the SolveResult from the last solve.
    */
   unsigned int solve_result() { return _solve_result; }
 
   /**
-   * @returns a constant reference to the system we are solving.
+   * \returns A constant reference to the system we are solving.
    */
   const sys_type & system () const { return _system; }
 
   /**
-   * @returns a writeable reference to the system we are solving.
+   * \returns A writable reference to the system we are solving.
    */
   sys_type & system () { return _system; }
 
@@ -283,7 +286,7 @@ public:
   /**
    * Pointer to functor which is called right after each linear solve
    */
-  UniquePtr<LinearSolutionMonitor> linear_solution_monitor;
+  std::unique_ptr<LinearSolutionMonitor> linear_solution_monitor;
 
 protected:
 

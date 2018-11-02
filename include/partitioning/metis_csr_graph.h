@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,22 +20,24 @@
 #ifndef LIBMESH_METIS_CSR_GRAPH_H
 #define LIBMESH_METIS_CSR_GRAPH_H
 
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/libmesh_common.h"
 
-// C++ Includes   -----------------------------------
+// C++ Includes
 #include <vector>
 #include <numeric>
-
-
 
 namespace libMesh
 {
 
 /**
  * This utility class provides a convenient implementation for
- * building the compressed-row-storage graph required for the METIS/ParMETIS
- * graph partitioning schemes.
+ * building the compressed-row-storage graph required for the
+ * METIS/ParMETIS graph partitioning schemes.
+ *
+ * \author Benjamin S. Kirk
+ * \date 2013
+ * \brief Compressed graph data structure used by MetisPartitioner.
  */
 template <class IndexType>
 class METIS_CSR_Graph
@@ -43,6 +45,10 @@ class METIS_CSR_Graph
 public:
   std::vector<IndexType> offsets, vals;
 
+  /**
+   * Sets the number of non-zero values in the given row.  The
+   * internal indexing is 1-based.
+   */
   void prep_n_nonzeros(const libMesh::dof_id_type row,
                        const libMesh::dof_id_type n_nonzeros_in)
   {
@@ -50,15 +56,20 @@ public:
     offsets[row+1] = n_nonzeros_in;
   }
 
-
-
+  /**
+   * \returns The number of nonzeros in the requested row by
+   * subtracting the offsets vector entries.
+   */
   libMesh::dof_id_type n_nonzeros (const libMesh::dof_id_type row) const
   {
     libmesh_assert_less (row+1, offsets.size());
     return (offsets[row+1] - offsets[row]);
   }
 
-
+  /**
+   * Replaces the entries in the offsets vector with their partial
+   * sums and resizes the val vector accordingly.
+   */
   void prepare_for_use()
   {
     std::partial_sum (offsets.begin(), offsets.end(), offsets.begin());
@@ -69,27 +80,29 @@ public:
       vals.push_back(0);
   }
 
-
-
-  IndexType & operator()(const libMesh::dof_id_type row, const libMesh::dof_id_type nonzero)
+  /**
+   * \returns A writable reference to the nonzero'th entry of row.
+   */
+  IndexType & operator()(const libMesh::dof_id_type row,
+                         const libMesh::dof_id_type nonzero)
   {
     libmesh_assert_greater (vals.size(), offsets[row]+nonzero);
 
     return vals[offsets[row]+nonzero];
   }
 
-
-
-  const IndexType & operator()(const libMesh::dof_id_type row, const libMesh::dof_id_type nonzero) const
+  /**
+   * \returns A const reference to the nonzero'th entry of row.
+   */
+  const IndexType & operator()(const libMesh::dof_id_type row,
+                               const libMesh::dof_id_type nonzero) const
   {
     libmesh_assert_greater (vals.size(), offsets[row]+nonzero);
 
     return vals[offsets[row]+nonzero];
   }
-
 };
 
 } // namespace libMesh
-
 
 #endif // LIBMESH_METIS_CSR_GRAPH_H

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -30,23 +30,24 @@
 namespace libMesh
 {
 
-// Forward declaractions
+// Forward declarations
 class MeshBase;
 class DofMap;
 class CouplingMatrix;
-
-// ------------------------------------------------------------
-// Sparsity Pattern
 
 /**
  * This defines the sparsity pattern, or graph, of a sparse matrix.
  * The format is quite simple -- the global indices of the nonzero entries
  * in each row are packed into a vector.  The global indices (i,j) of the
  * nth nonzero entry of row i are given by j = sparsity_pattern[i][n];
+ *
+ * \author Roy Stogner
+ * \date 2010
+ * \brief Defines the sparsity pattern of a sparse matrix.
  */
 namespace SparsityPattern // use a namespace so member classes can be forward-declared.
 {
-typedef std::vector<dof_id_type, Threads::scalable_allocator<dof_id_type> > Row;
+typedef std::vector<dof_id_type, Threads::scalable_allocator<dof_id_type>> Row;
 class Graph : public std::vector<Row> {};
 
 class NonlocalGraph : public std::map<dof_id_type, Row> {};
@@ -82,8 +83,16 @@ private:
   const MeshBase & mesh;
   const DofMap & dof_map;
   const CouplingMatrix * dof_coupling;
+  const std::set<GhostingFunctor *> & coupling_functors;
   const bool implicit_neighbor_dofs;
   const bool need_full_sparsity_pattern;
+
+  void handle_vi_vj(const std::vector<dof_id_type> & element_dofs_i,
+                    const std::vector<dof_id_type> & element_dofs_j);
+
+  void sorted_connected_dofs(const Elem * elem,
+                             std::vector<dof_id_type> & dofs_vi,
+                             unsigned int vi);
 
 public:
 
@@ -96,6 +105,7 @@ public:
   Build (const MeshBase & mesh_in,
          const DofMap & dof_map_in,
          const CouplingMatrix * dof_coupling_in,
+         std::set<GhostingFunctor *> coupling_functors_in,
          const bool implicit_neighbor_dofs_in,
          const bool need_full_sparsity_pattern_in);
 

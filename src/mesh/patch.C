@@ -1,6 +1,5 @@
-
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -44,11 +43,9 @@ void Patch::find_face_neighbors(std::set<const Elem *> & new_neighbors)
   for (; it != end_it; ++it)
     {
       const Elem * elem = *it;
-      for (unsigned int s=0; s<elem->n_sides(); s++)
-        if (elem->neighbor(s) != libmesh_nullptr)        // we have a neighbor on this side
+      for (auto neighbor : elem->neighbor_ptr_range())
+        if (neighbor != nullptr)        // we have a neighbor on this side
           {
-            const Elem * neighbor = elem->neighbor(s);
-
 #ifdef LIBMESH_ENABLE_AMR
             if (!neighbor->active())          // the neighbor is *not* active,
               {                               // so add *all* neighboring

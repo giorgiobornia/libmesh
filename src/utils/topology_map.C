@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -17,23 +17,21 @@
 
 
 
-// C++ Includes -----------------------------------
-#include <limits>
-#include <utility>
-
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/elem.h"
 #include "libmesh/topology_map.h"
 #include "libmesh/mesh_base.h"
 #include "libmesh/node.h"
 #include "libmesh/parallel.h"
+#include "libmesh/remote_elem.h"
 
-
+// C++ Includes
+#include <limits>
+#include <utility>
 
 namespace libMesh
 {
 
-//--------------------------------------------------------------------------
 void TopologyMap::init(MeshBase & mesh)
 {
   // This function must be run on all processors at once
@@ -41,26 +39,24 @@ void TopologyMap::init(MeshBase & mesh)
   if (!mesh.is_serial())
     libmesh_parallel_only(mesh.comm());
 
-  START_LOG("init()", "TopologyMap");
+  LOG_SCOPE("init()", "TopologyMap");
 
   // Clear the old map
   _map.clear();
 
   this->fill(mesh);
-
-  STOP_LOG("init()", "TopologyMap");
 }
 
 
 
 void TopologyMap::add_node(const Node & mid_node,
-                           const std::vector<std::pair<dof_id_type, dof_id_type> > & bracketing_nodes)
+                           const std::vector<std::pair<dof_id_type, dof_id_type>> & bracketing_nodes)
 {
   const dof_id_type mid_node_id = mid_node.id();
 
   libmesh_assert_not_equal_to(mid_node_id, DofObject::invalid_id);
 
-  for (unsigned int i=0; i != bracketing_nodes.size(); ++i)
+  for (std::size_t i=0; i != bracketing_nodes.size(); ++i)
     {
       const dof_id_type id1 = bracketing_nodes[i].first;
       const dof_id_type id2 = bracketing_nodes[i].second;
@@ -83,11 +79,11 @@ void TopologyMap::add_node(const Node & mid_node,
 }
 
 
-dof_id_type TopologyMap::find(const std::vector<std::pair<dof_id_type, dof_id_type> > & bracketing_nodes) const
+dof_id_type TopologyMap::find(const std::vector<std::pair<dof_id_type, dof_id_type>> & bracketing_nodes) const
 {
   dof_id_type new_node_id = DofObject::invalid_id;
 
-  for (unsigned int i = 0; i != bracketing_nodes.size(); ++i)
+  for (std::size_t i = 0; i != bracketing_nodes.size(); ++i)
     {
       const dof_id_type lower_id = std::min(bracketing_nodes[i].first,
                                             bracketing_nodes[i].second);
@@ -143,30 +139,25 @@ dof_id_type TopologyMap::find(dof_id_type bracket_node1,
 void TopologyMap::fill(const MeshBase & mesh)
 {
   // Populate the nodes map
-  MeshBase::const_element_iterator
-    it = mesh.elements_begin(),
-    end = mesh.elements_end();
-  for (; it != end; ++it)
+  for (const auto & elem : mesh.element_ptr_range())
     {
-      const Elem * elem = *it;
-
       // We only need to add nodes which might be added during mesh
       // refinement; this means they need to be child nodes.
       if (!elem->has_children())
         continue;
 
-      for (unsigned int c = 0; c != elem->n_children(); ++c)
+      for (unsigned int c = 0, nc = elem->n_children(); c != nc; ++c)
         {
-          if (elem->child(c)->is_remote())
+          const Elem * child = elem->child_ptr(c);
+          if (child == remote_elem)
             continue;
 
           for (unsigned int n = 0; n != elem->n_nodes_in_child(c); ++n)
             {
-              const std::vector<std::pair<dof_id_type, dof_id_type> >
+              const std::vector<std::pair<dof_id_type, dof_id_type>>
                 bracketing_nodes = elem->bracketing_nodes(c,n);
 
-              this->add_node(*elem->child(c)->get_node(n),
-                             bracketing_nodes);
+              this->add_node(child->node_ref(n), bracketing_nodes);
             }
         }
     }

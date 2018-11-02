@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -42,17 +42,17 @@
 
 namespace
 {
-  bool split_first_diagonal(const libMesh::Elem * elem,
-                            unsigned int diag_1_node_1,
-                            unsigned int diag_1_node_2,
-                            unsigned int diag_2_node_1,
-                            unsigned int diag_2_node_2)
-    {
-      return ((elem->node(diag_1_node_1) > elem->node(diag_2_node_1) &&
-               elem->node(diag_1_node_1) > elem->node(diag_2_node_2)) ||
-              (elem->node(diag_1_node_2) > elem->node(diag_2_node_1) &&
-               elem->node(diag_1_node_2) > elem->node(diag_2_node_2)));
-    }
+bool split_first_diagonal(const libMesh::Elem * elem,
+                          unsigned int diag_1_node_1,
+                          unsigned int diag_1_node_2,
+                          unsigned int diag_2_node_1,
+                          unsigned int diag_2_node_2)
+{
+  return ((elem->node_id(diag_1_node_1) > elem->node_id(diag_2_node_1) &&
+           elem->node_id(diag_1_node_1) > elem->node_id(diag_2_node_2)) ||
+          (elem->node_id(diag_1_node_2) > elem->node_id(diag_2_node_1) &&
+           elem->node_id(diag_1_node_2) > elem->node_id(diag_2_node_2)));
+}
 
 }
 
@@ -70,31 +70,24 @@ void MeshTools::Modification::distort (MeshBase & mesh,
   libmesh_assert (mesh.n_elem());
   libmesh_assert ((factor >= 0.) && (factor <= 1.));
 
-  START_LOG("distort()", "MeshTools::Modification");
+  LOG_SCOPE("distort()", "MeshTools::Modification");
 
-
-
-  // First find nodes on the boundary and flag them
-  // so that we don't move them
-  // on_boundary holds false (not on boundary) and true (on boundary)
-  std::vector<bool> on_boundary (mesh.n_nodes(), false);
-
-  if (!perturb_boundary) MeshTools::find_boundary_nodes (mesh, on_boundary);
+  // If we are not perturbing boundary nodes, make a
+  // quickly-searchable list of node ids we can check against.
+  std::unordered_set<dof_id_type> boundary_node_ids;
+  if (!perturb_boundary)
+    boundary_node_ids = MeshTools::find_boundary_nodes (mesh);
 
   // Now calculate the minimum distance to
   // neighboring nodes for each node.
   // hmin holds these distances.
-  std::vector<float> hmin (mesh.n_nodes(),
+  std::vector<float> hmin (mesh.max_node_id(),
                            std::numeric_limits<float>::max());
 
-  MeshBase::element_iterator       el  = mesh.active_elements_begin();
-  const MeshBase::element_iterator end = mesh.active_elements_end();
-
-  for (; el!=end; ++el)
-    for (unsigned int n=0; n<(*el)->n_nodes(); n++)
-      hmin[(*el)->node(n)] = std::min(hmin[(*el)->node(n)],
-                                      static_cast<float>((*el)->hmin()));
-
+  for (const auto & elem : mesh.active_element_ptr_range())
+    for (auto & n : elem->node_ref_range())
+      hmin[n.id()] = std::min(hmin[n.id()],
+                              static_cast<float>(elem->hmin()));
 
   // Now actually move the nodes
   {
@@ -111,19 +104,13 @@ void MeshTools::Modification::distort (MeshBase & mesh,
     // then we should not move it.
     // [Note: Testing for (in)equality might be wrong
     // (different types, namely float and double)]
-    for (unsigned int n=0; n<mesh.n_nodes(); n++)
-      if (!on_boundary[n] && (hmin[n] < 1.e20) )
+    for (unsigned int n=0; n<mesh.max_node_id(); n++)
+      if ((perturb_boundary || !boundary_node_ids.count(n)) && hmin[n] < 1.e20)
         {
           // the direction, random but unit normalized
-
-          Point dir( static_cast<Real>(std::rand())/static_cast<Real>(RAND_MAX),
-                     (mesh.mesh_dimension() > 1) ?
-                     static_cast<Real>(std::rand())/static_cast<Real>(RAND_MAX)
-                     : 0.,
-                     ((mesh.mesh_dimension() == 3) ?
-                      static_cast<Real>(std::rand())/static_cast<Real>(RAND_MAX)
-                      : 0.)
-                     );
+          Point dir (static_cast<Real>(std::rand())/static_cast<Real>(RAND_MAX),
+                     (mesh.mesh_dimension() > 1) ? static_cast<Real>(std::rand())/static_cast<Real>(RAND_MAX) : 0.,
+                     ((mesh.mesh_dimension() == 3) ? static_cast<Real>(std::rand())/static_cast<Real>(RAND_MAX) : 0.));
 
           dir(0) = (dir(0)-.5)*2.;
           if (mesh.mesh_dimension() > 1)
@@ -133,7 +120,7 @@ void MeshTools::Modification::distort (MeshBase & mesh,
 
           dir = dir.unit();
 
-          Node * node = mesh.node_ptr(n);
+          Node * node = mesh.query_node_ptr(n);
           if (!node)
             continue;
 
@@ -144,10 +131,6 @@ void MeshTools::Modification::distort (MeshBase & mesh,
             (*node)(2) += dir(2)*factor*hmin[n];
         }
   }
-
-
-  // All done
-  STOP_LOG("distort()", "MeshTools::Modification");
 }
 
 
@@ -158,20 +141,15 @@ void MeshTools::Modification::redistribute (MeshBase & mesh,
   libmesh_assert (mesh.n_nodes());
   libmesh_assert (mesh.n_elem());
 
-  START_LOG("redistribute()", "MeshTools::Modification");
+  LOG_SCOPE("redistribute()", "MeshTools::Modification");
 
   DenseVector<Real> output_vec(LIBMESH_DIM);
 
   // FIXME - we should thread this later.
-  UniquePtr<FunctionBase<Real> > myfunc = mapfunc.clone();
+  std::unique_ptr<FunctionBase<Real>> myfunc = mapfunc.clone();
 
-  MeshBase::node_iterator       it  = mesh.nodes_begin();
-  const MeshBase::node_iterator end = mesh.nodes_end();
-
-  for (; it != end; ++it)
+  for (auto & node : mesh.node_ptr_range())
     {
-      Node * node = *it;
-
       (*myfunc)(*node, output_vec);
 
       (*node)(0) = output_vec(0);
@@ -182,9 +160,6 @@ void MeshTools::Modification::redistribute (MeshBase & mesh,
       (*node)(2) = output_vec(2);
 #endif
     }
-
-  // All done
-  STOP_LOG("redistribute()", "MeshTools::Modification");
 }
 
 
@@ -196,11 +171,8 @@ void MeshTools::Modification::translate (MeshBase & mesh,
 {
   const Point p(xt, yt, zt);
 
-  const MeshBase::node_iterator nd_end = mesh.nodes_end();
-
-  for (MeshBase::node_iterator nd = mesh.nodes_begin();
-       nd != nd_end; ++nd)
-    **nd += p;
+  for (auto & node : mesh.node_ptr_range())
+    *node += p;
 }
 
 
@@ -213,13 +185,13 @@ void MeshTools::Modification::translate (MeshBase & mesh,
 //   const Real  a = alpha/180.*pi;
 //   for (unsigned int n=0; n<mesh.n_nodes(); n++)
 //     {
-//       const Point p = mesh.node(n);
+//       const Point p = mesh.node_ref(n);
 //       const Real  x = p(0);
 //       const Real  y = p(1);
 //       const Real  z = p(2);
-//       mesh.node(n) = Point(std::cos(a)*x - std::sin(a)*y,
-//                            std::sin(a)*x + std::cos(a)*y,
-//                            z);
+//       mesh.node_ref(n) = Point(std::cos(a)*x - std::sin(a)*y,
+//                                std::sin(a)*x + std::cos(a)*y,
+//                                z);
 //     }
 
 // }
@@ -243,18 +215,15 @@ void MeshTools::Modification::rotate (MeshBase & mesh,
   // (equations 6-14 give the entries of the composite transformation matrix).
   // The rotations are performed sequentially about the z, x, and z axes, in that order.
   // A positive angle yields a counter-clockwise rotation about the axis in question.
-  const MeshBase::node_iterator nd_end = mesh.nodes_end();
-
-  for (MeshBase::node_iterator nd = mesh.nodes_begin();
-       nd != nd_end; ++nd)
+  for (auto & node : mesh.node_ptr_range())
     {
-      const Point pt = **nd;
+      const Point pt = *node;
       const Real  x  = pt(0);
       const Real  y  = pt(1);
       const Real  z  = pt(2);
-      **nd = Point(( cp*cs-sp*ct*ss)*x + ( sp*cs+cp*ct*ss)*y + (st*ss)*z,
-                   (-cp*ss-sp*ct*cs)*x + (-sp*ss+cp*ct*cs)*y + (st*cs)*z,
-                   ( sp*st)*x          + (-cp*st)*y          + (ct)*z   );
+      *node = Point(( cp*cs-sp*ct*ss)*x + ( sp*cs+cp*ct*ss)*y + (st*ss)*z,
+                    (-cp*ss-sp*ct*cs)*x + (-sp*ss+cp*ct*cs)*y + (st*cs)*z,
+                    ( sp*st)*x          + (-cp*st)*y          + (ct)*z   );
     }
 #else
   libmesh_error_msg("MeshTools::Modification::rotate() requires libMesh to be compiled with LIBMESH_DIM==3");
@@ -279,461 +248,23 @@ void MeshTools::Modification::scale (MeshBase & mesh,
     }
 
   // Scale the x coordinate in all dimensions
-  const MeshBase::node_iterator nd_end = mesh.nodes_end();
-
-  for (MeshBase::node_iterator nd = mesh.nodes_begin();
-       nd != nd_end; ++nd)
-    (**nd)(0) *= x_scale;
-
+  for (auto & node : mesh.node_ptr_range())
+    (*node)(0) *= x_scale;
 
   // Only scale the y coordinate in 2 and 3D
   if (LIBMESH_DIM < 2)
     return;
 
-  for (MeshBase::node_iterator nd = mesh.nodes_begin();
-       nd != nd_end; ++nd)
-    (**nd)(1) *= y_scale;
+  for (auto & node : mesh.node_ptr_range())
+    (*node)(1) *= y_scale;
 
   // Only scale the z coordinate in 3D
   if (LIBMESH_DIM < 3)
     return;
 
-  for (MeshBase::node_iterator nd = mesh.nodes_begin();
-       nd != nd_end; ++nd)
-    (**nd)(2) *= z_scale;
+  for (auto & node : mesh.node_ptr_range())
+    (*node)(2) *= z_scale;
 }
-
-
-
-
-// ------------------------------------------------------------
-// UnstructuredMesh class member functions for mesh modification
-void UnstructuredMesh::all_first_order ()
-{
-  /*
-   * when the mesh is not prepared,
-   * at least renumber the nodes and
-   * elements, so that the node ids
-   * are correct
-   */
-  if (!this->_is_prepared)
-    this->renumber_nodes_and_elements ();
-
-  START_LOG("all_first_order()", "Mesh");
-
-  /**
-   * Prepare to identify (and then delete) a bunch of no-longer-used nodes.
-   */
-  std::vector<bool> node_touched_by_me(this->max_node_id(), false);
-
-  /**
-   * Loop over the high-ordered elements.
-   * First make sure they _are_ indeed high-order, and then replace
-   * them with an equivalent first-order element.
-   */
-  element_iterator endit = elements_end();
-  for (element_iterator it = elements_begin();
-       it != endit; ++it)
-    {
-      Elem * so_elem = *it;
-
-      libmesh_assert(so_elem);
-
-      /*
-       * build the first-order equivalent, add to
-       * the new_elements list.
-       */
-      Elem * lo_elem = Elem::build
-        (Elem::first_order_equivalent_type
-         (so_elem->type()), so_elem->parent()).release();
-
-      for (unsigned int s=0; s != so_elem->n_sides(); ++s)
-        if (so_elem->neighbor(s) == remote_elem)
-          lo_elem->set_neighbor(s, const_cast<RemoteElem *>(remote_elem));
-
-#ifdef LIBMESH_ENABLE_AMR
-      /*
-       * Reset the parent links of any child elements
-       */
-      if (so_elem->has_children())
-        for (unsigned int c=0; c != so_elem->n_children(); ++c)
-          {
-            so_elem->child(c)->set_parent(lo_elem);
-            lo_elem->add_child(so_elem->child(c), c);
-          }
-
-      /*
-       * Reset the child link of any parent element
-       */
-      if (so_elem->parent())
-        {
-          unsigned int c =
-            so_elem->parent()->which_child_am_i(so_elem);
-          lo_elem->parent()->replace_child(lo_elem, c);
-        }
-
-      /*
-       * Copy as much data to the new element as makes sense
-       */
-      lo_elem->set_p_level(so_elem->p_level());
-      lo_elem->set_refinement_flag(so_elem->refinement_flag());
-      lo_elem->set_p_refinement_flag(so_elem->p_refinement_flag());
-#endif
-
-      libmesh_assert_equal_to (lo_elem->n_vertices(), so_elem->n_vertices());
-
-      /*
-       * By definition the vertices of the linear and
-       * second order element are identically numbered.
-       * transfer these.
-       */
-      for (unsigned int v=0; v < so_elem->n_vertices(); v++)
-        {
-          lo_elem->set_node(v) = so_elem->get_node(v);
-          node_touched_by_me[lo_elem->node(v)] = true;
-        }
-
-      /**
-       * If the second order element had any boundary conditions they
-       * should be transfered to the first-order element.  The old
-       * boundary conditions will be removed from the BoundaryInfo
-       * data structure by insert_elem.
-       */
-      libmesh_assert_equal_to (lo_elem->n_sides(), so_elem->n_sides());
-
-      std::vector<boundary_id_type> bndry_ids;
-      for (unsigned short s=0; s<so_elem->n_sides(); s++)
-        {
-          this->get_boundary_info().raw_boundary_ids (so_elem, s, bndry_ids);
-          this->get_boundary_info().add_side (lo_elem, s, bndry_ids);
-        }
-
-      /*
-       * The new first-order element is ready.
-       * Inserting it into the mesh will replace and delete
-       * the second-order element.
-       */
-      lo_elem->set_id(so_elem->id());
-#ifdef LIBMESH_ENABLE_UNIQUE_ID
-      lo_elem->set_unique_id() = so_elem->unique_id();
-#endif
-      lo_elem->processor_id() = so_elem->processor_id();
-      lo_elem->subdomain_id() = so_elem->subdomain_id();
-      this->insert_elem(lo_elem);
-    }
-
-  const MeshBase::node_iterator nd_end = this->nodes_end();
-  MeshBase::node_iterator nd = this->nodes_begin();
-  while (nd != nd_end)
-    {
-      Node * the_node = *nd;
-      ++nd;
-      if (!node_touched_by_me[the_node->id()])
-        this->delete_node(the_node);
-    }
-
-  STOP_LOG("all_first_order()", "Mesh");
-
-  // On hanging nodes that used to also be second order nodes, we
-  // might now have an invalid nodal processor_id()
-  Partitioner::set_node_processor_ids(*this);
-
-  // delete or renumber nodes, etc
-  this->prepare_for_use(/*skip_renumber =*/ false);
-}
-
-
-
-void UnstructuredMesh::all_second_order (const bool full_ordered)
-{
-  // This function must be run on all processors at once
-  parallel_object_only();
-
-  /*
-   * when the mesh is not prepared,
-   * at least renumber the nodes and
-   * elements, so that the node ids
-   * are correct
-   */
-  if (!this->_is_prepared)
-    this->renumber_nodes_and_elements ();
-
-  /*
-   * If the mesh is empty
-   * then we have nothing to do
-   */
-  if (!this->n_elem())
-    return;
-
-  /*
-   * If the mesh is already second order
-   * then we have nothing to do.
-   * We have to test for this in a round-about way to avoid
-   * a bug on distributed parallel meshes with more processors
-   * than elements.
-   */
-  bool already_second_order = false;
-  if (this->elements_begin() != this->elements_end() &&
-      (*(this->elements_begin()))->default_order() != FIRST)
-    already_second_order = true;
-  this->comm().max(already_second_order);
-  if (already_second_order)
-    return;
-
-  START_LOG("all_second_order()", "Mesh");
-
-  /*
-   * this map helps in identifying second order
-   * nodes.  Namely, a second-order node:
-   * - edge node
-   * - face node
-   * - bubble node
-   * is uniquely defined through a set of adjacent
-   * vertices.  This set of adjacent vertices is
-   * used to identify already added higher-order
-   * nodes.  We are safe to use node id's since we
-   * make sure that these are correctly numbered.
-   */
-  std::map<std::vector<dof_id_type>, Node *> adj_vertices_to_so_nodes;
-
-  /*
-   * for speed-up of the \p add_point() method, we
-   * can reserve memory.  Guess the number of additional
-   * nodes for different dimensions
-   */
-  switch (this->mesh_dimension())
-    {
-    case 1:
-      /*
-       * in 1D, there can only be order-increase from Edge2
-       * to Edge3.  Something like 1/2 of n_nodes() have
-       * to be added
-       */
-      this->reserve_nodes(static_cast<unsigned int>
-                          (1.5*static_cast<double>(this->n_nodes())));
-      break;
-
-    case 2:
-      /*
-       * in 2D, either refine from Tri3 to Tri6 (double the nodes)
-       * or from Quad4 to Quad8 (again, double) or Quad9 (2.25 that much)
-       */
-      this->reserve_nodes(static_cast<unsigned int>
-                          (2*static_cast<double>(this->n_nodes())));
-      break;
-
-
-    case 3:
-      /*
-       * in 3D, either refine from Tet4 to Tet10 (factor = 2.5) up to
-       * Hex8 to Hex27 (something  > 3).  Since in 3D there _are_ already
-       * quite some nodes, and since we do not want to overburden the memory by
-       * a too conservative guess, use the lower bound
-       */
-      this->reserve_nodes(static_cast<unsigned int>
-                          (2.5*static_cast<double>(this->n_nodes())));
-      break;
-
-    default:
-      // Hm?
-      libmesh_error_msg("Unknown mesh dimension " << this->mesh_dimension());
-    }
-
-
-
-  /*
-   * form a vector that will hold the node id's of
-   * the vertices that are adjacent to the son-th
-   * second-order node.  Pull this outside of the
-   * loop so that silly compilers don't repeatedly
-   * create and destroy the vector.
-   */
-  std::vector<dof_id_type> adjacent_vertices_ids;
-
-  /**
-   * Loop over the low-ordered elements in the _elements vector.
-   * First make sure they _are_ indeed low-order, and then replace
-   * them with an equivalent second-order element.  Don't
-   * forget to delete the low-order element, or else it will leak!
-   */
-  const_element_iterator endit = elements_end();
-  for (const_element_iterator it = elements_begin();
-       it != endit; ++it)
-    {
-      // the linear-order element
-      const Elem * lo_elem = *it;
-
-      libmesh_assert(lo_elem);
-
-      // make sure it is linear order
-      if (lo_elem->default_order() != FIRST)
-        libmesh_error_msg("ERROR: This is not a linear element: type=" << lo_elem->type());
-
-      // this does _not_ work for refined elements
-      libmesh_assert_equal_to (lo_elem->level (), 0);
-
-      /*
-       * build the second-order equivalent, add to
-       * the new_elements list.  Note that this here
-       * is the only point where \p full_ordered
-       * is necessary.  The remaining code works well
-       * for either type of seconrd-order equivalent, e.g.
-       * Hex20 or Hex27, as equivalents for Hex8
-       */
-      Elem * so_elem =
-        Elem::build (Elem::second_order_equivalent_type(lo_elem->type(),
-                                                        full_ordered) ).release();
-
-      libmesh_assert_equal_to (lo_elem->n_vertices(), so_elem->n_vertices());
-
-
-      /*
-       * By definition the vertices of the linear and
-       * second order element are identically numbered.
-       * transfer these.
-       */
-      for (unsigned int v=0; v < lo_elem->n_vertices(); v++)
-        so_elem->set_node(v) = lo_elem->get_node(v);
-
-      /*
-       * Now handle the additional mid-side nodes.  This
-       * is simply handled through a map that remembers
-       * the already-added nodes.  This map maps the global
-       * ids of the vertices (that uniquely define this
-       * higher-order node) to the new node.
-       * Notation: son = second-order node
-       */
-      const unsigned int son_begin = so_elem->n_vertices();
-      const unsigned int son_end   = so_elem->n_nodes();
-
-
-      for (unsigned int son=son_begin; son<son_end; son++)
-        {
-          const unsigned int n_adjacent_vertices =
-            so_elem->n_second_order_adjacent_vertices(son);
-
-          adjacent_vertices_ids.resize(n_adjacent_vertices);
-
-          for (unsigned int v=0; v<n_adjacent_vertices; v++)
-            adjacent_vertices_ids[v] =
-              so_elem->node( so_elem->second_order_adjacent_vertex(son,v) );
-
-          /*
-           * \p adjacent_vertices_ids is now in order of the current
-           * side.  sort it, so that comparisons  with the
-           * \p adjacent_vertices_ids created through other elements'
-           * sides can match
-           */
-          std::sort(adjacent_vertices_ids.begin(),
-                    adjacent_vertices_ids.end());
-
-
-          // does this set of vertices already has a mid-node added?
-          std::pair<std::map<std::vector<dof_id_type>, Node *>::iterator,
-                    std::map<std::vector<dof_id_type>, Node *>::iterator>
-            pos = adj_vertices_to_so_nodes.equal_range (adjacent_vertices_ids);
-
-          // no, not added yet
-          if (pos.first == pos.second)
-            {
-              /*
-               * for this set of vertices, there is no
-               * second_order node yet.  Add it.
-               *
-               * compute the location of the new node as
-               * the average over the adjacent vertices.
-               */
-              Point new_location = this->point(adjacent_vertices_ids[0]);
-              for (unsigned int v=1; v<n_adjacent_vertices; v++)
-                new_location += this->point(adjacent_vertices_ids[v]);
-
-              new_location /= static_cast<Real>(n_adjacent_vertices);
-
-              /* Add the new point to the mesh, giving it a globally
-               * well-defined processor id.
-               */
-              Node * so_node = this->add_point
-                (new_location, DofObject::invalid_id,
-                 this->node(adjacent_vertices_ids[0]).processor_id());
-
-              /*
-               * insert the new node with its defining vertex
-               * set into the map, and relocate pos to this
-               * new entry, so that the so_elem can use
-               * \p pos for inserting the node
-               */
-              adj_vertices_to_so_nodes.insert(pos.first,
-                                              std::make_pair(adjacent_vertices_ids,
-                                                             so_node));
-
-              so_elem->set_node(son) = so_node;
-            }
-          // yes, already added.
-          else
-            {
-              libmesh_assert(pos.first->second);
-
-              so_elem->set_node(son) = pos.first->second;
-            }
-        }
-
-
-      /**
-       * If the linear element had any boundary conditions they
-       * should be transfered to the second-order element.  The old
-       * boundary conditions will be removed from the BoundaryInfo
-       * data structure by insert_elem.
-       *
-       * Also, prepare_for_use() will reconstruct most of our neighbor
-       * links, but if we have any remote_elem links in a distributed
-       * mesh, they need to be preserved.  We do that in the same loop
-       * here.
-       */
-      libmesh_assert_equal_to (lo_elem->n_sides(), so_elem->n_sides());
-
-      std::vector<boundary_id_type> bndry_ids;
-      for (unsigned short s=0; s<lo_elem->n_sides(); s++)
-        {
-          this->get_boundary_info().raw_boundary_ids (lo_elem, s, bndry_ids);
-          this->get_boundary_info().add_side (so_elem, s, bndry_ids);
-
-          if (lo_elem->neighbor(s) == remote_elem)
-            so_elem->set_neighbor(s, const_cast<RemoteElem *>(remote_elem));
-        }
-
-      /*
-       * The new second-order element is ready.
-       * Inserting it into the mesh will replace and delete
-       * the first-order element.
-       */
-      so_elem->set_id(lo_elem->id());
-#ifdef LIBMESH_ENABLE_UNIQUE_ID
-      so_elem->set_unique_id() = lo_elem->unique_id();
-#endif
-      so_elem->processor_id() = lo_elem->processor_id();
-      so_elem->subdomain_id() = lo_elem->subdomain_id();
-      this->insert_elem(so_elem);
-    }
-
-  // we can clear the map
-  adj_vertices_to_so_nodes.clear();
-
-
-  STOP_LOG("all_second_order()", "Mesh");
-
-  // In a ParallelMesh our ghost node processor ids may be bad,
-  // the ids of nodes touching remote elements may be inconsistent,
-  // and unique_ids of newly added non-local nodes remain unset.
-  // make_nodes_parallel_consistent() will fix all this.
-  if (!this->is_serial())
-    MeshCommunication().make_nodes_parallel_consistent (*this);
-
-  // renumber nodes, elements etc
-  this->prepare_for_use(/*skip_renumber =*/ false);
-}
-
-
-
 
 
 
@@ -771,7 +302,7 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
   std::vector<boundary_id_type> new_bndry_ids;
 
   // We may need to add new points if we run into a 1.5th order
-  // element; if we do that on a ParallelMesh in a ghost element then
+  // element; if we do that on a DistributedMesh in a ghost element then
   // we will need to fix their ids / unique_ids
   bool added_new_ghost_point = false;
 
@@ -786,13 +317,12 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
 
   // FIXME: This algorithm does not work on refined grids!
   {
-    MeshBase::element_iterator       el  = mesh.elements_begin();
-    const MeshBase::element_iterator end = mesh.elements_end();
+#ifdef LIBMESH_ENABLE_UNIQUE_ID
+    unique_id_type max_unique_id = mesh.parallel_max_unique_id();
+#endif
 
-    for (; el!=end; ++el)
+    for (auto & elem : mesh.element_ptr_range())
       {
-        Elem * elem = *el;
-
         const ElemType etype = elem->type();
 
         // all_tri currently only works on coarse meshes
@@ -803,7 +333,7 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
         Elem * subelem[6];
 
         for (unsigned int i = 0; i != max_subelems; ++i)
-          subelem[i] = libmesh_nullptr;
+          subelem[i] = nullptr;
 
         switch (etype)
           {
@@ -816,24 +346,24 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
               if ((elem->point(0) - elem->point(2)).norm() <
                   (elem->point(1) - elem->point(3)).norm())
                 {
-                  subelem[0]->set_node(0) = elem->get_node(0);
-                  subelem[0]->set_node(1) = elem->get_node(1);
-                  subelem[0]->set_node(2) = elem->get_node(2);
+                  subelem[0]->set_node(0) = elem->node_ptr(0);
+                  subelem[0]->set_node(1) = elem->node_ptr(1);
+                  subelem[0]->set_node(2) = elem->node_ptr(2);
 
-                  subelem[1]->set_node(0) = elem->get_node(0);
-                  subelem[1]->set_node(1) = elem->get_node(2);
-                  subelem[1]->set_node(2) = elem->get_node(3);
+                  subelem[1]->set_node(0) = elem->node_ptr(0);
+                  subelem[1]->set_node(1) = elem->node_ptr(2);
+                  subelem[1]->set_node(2) = elem->node_ptr(3);
                 }
 
               else
                 {
-                  subelem[0]->set_node(0) = elem->get_node(0);
-                  subelem[0]->set_node(1) = elem->get_node(1);
-                  subelem[0]->set_node(2) = elem->get_node(3);
+                  subelem[0]->set_node(0) = elem->node_ptr(0);
+                  subelem[0]->set_node(1) = elem->node_ptr(1);
+                  subelem[0]->set_node(2) = elem->node_ptr(3);
 
-                  subelem[1]->set_node(0) = elem->get_node(1);
-                  subelem[1]->set_node(1) = elem->get_node(2);
-                  subelem[1]->set_node(2) = elem->get_node(3);
+                  subelem[1]->set_node(0) = elem->node_ptr(1);
+                  subelem[1]->set_node(1) = elem->node_ptr(2);
+                  subelem[1]->set_node(2) = elem->node_ptr(3);
                 }
 
 
@@ -849,10 +379,10 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
               subelem[1] = new Tri6;
 
               // Add a new node at the center (vertex average) of the element.
-              Node * new_node = mesh.add_point(.25 * (mesh.node(elem->node(0)) +
-                                                      mesh.node(elem->node(1)) +
-                                                      mesh.node(elem->node(2)) +
-                                                      mesh.node(elem->node(3))),
+              Node * new_node = mesh.add_point((mesh.point(elem->node_id(0)) +
+                                                mesh.point(elem->node_id(1)) +
+                                                mesh.point(elem->node_id(2)) +
+                                                mesh.point(elem->node_id(3)))/4,
                                                DofObject::invalid_id,
                                                elem->processor_id());
 
@@ -860,36 +390,36 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
               if ((elem->point(0) - elem->point(2)).norm() <
                   (elem->point(1) - elem->point(3)).norm())
                 {
-                  subelem[0]->set_node(0) = elem->get_node(0);
-                  subelem[0]->set_node(1) = elem->get_node(1);
-                  subelem[0]->set_node(2) = elem->get_node(2);
-                  subelem[0]->set_node(3) = elem->get_node(4);
-                  subelem[0]->set_node(4) = elem->get_node(5);
+                  subelem[0]->set_node(0) = elem->node_ptr(0);
+                  subelem[0]->set_node(1) = elem->node_ptr(1);
+                  subelem[0]->set_node(2) = elem->node_ptr(2);
+                  subelem[0]->set_node(3) = elem->node_ptr(4);
+                  subelem[0]->set_node(4) = elem->node_ptr(5);
                   subelem[0]->set_node(5) = new_node;
 
-                  subelem[1]->set_node(0) = elem->get_node(0);
-                  subelem[1]->set_node(1) = elem->get_node(2);
-                  subelem[1]->set_node(2) = elem->get_node(3);
+                  subelem[1]->set_node(0) = elem->node_ptr(0);
+                  subelem[1]->set_node(1) = elem->node_ptr(2);
+                  subelem[1]->set_node(2) = elem->node_ptr(3);
                   subelem[1]->set_node(3) = new_node;
-                  subelem[1]->set_node(4) = elem->get_node(6);
-                  subelem[1]->set_node(5) = elem->get_node(7);
+                  subelem[1]->set_node(4) = elem->node_ptr(6);
+                  subelem[1]->set_node(5) = elem->node_ptr(7);
 
                 }
 
               else
                 {
-                  subelem[0]->set_node(0) = elem->get_node(3);
-                  subelem[0]->set_node(1) = elem->get_node(0);
-                  subelem[0]->set_node(2) = elem->get_node(1);
-                  subelem[0]->set_node(3) = elem->get_node(7);
-                  subelem[0]->set_node(4) = elem->get_node(4);
+                  subelem[0]->set_node(0) = elem->node_ptr(3);
+                  subelem[0]->set_node(1) = elem->node_ptr(0);
+                  subelem[0]->set_node(2) = elem->node_ptr(1);
+                  subelem[0]->set_node(3) = elem->node_ptr(7);
+                  subelem[0]->set_node(4) = elem->node_ptr(4);
                   subelem[0]->set_node(5) = new_node;
 
-                  subelem[1]->set_node(0) = elem->get_node(1);
-                  subelem[1]->set_node(1) = elem->get_node(2);
-                  subelem[1]->set_node(2) = elem->get_node(3);
-                  subelem[1]->set_node(3) = elem->get_node(5);
-                  subelem[1]->set_node(4) = elem->get_node(6);
+                  subelem[1]->set_node(0) = elem->node_ptr(1);
+                  subelem[1]->set_node(1) = elem->node_ptr(2);
+                  subelem[1]->set_node(2) = elem->node_ptr(3);
+                  subelem[1]->set_node(3) = elem->node_ptr(5);
+                  subelem[1]->set_node(4) = elem->node_ptr(6);
                   subelem[1]->set_node(5) = new_node;
                 }
 
@@ -905,36 +435,36 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
               if ((elem->point(0) - elem->point(2)).norm() <
                   (elem->point(1) - elem->point(3)).norm())
                 {
-                  subelem[0]->set_node(0) = elem->get_node(0);
-                  subelem[0]->set_node(1) = elem->get_node(1);
-                  subelem[0]->set_node(2) = elem->get_node(2);
-                  subelem[0]->set_node(3) = elem->get_node(4);
-                  subelem[0]->set_node(4) = elem->get_node(5);
-                  subelem[0]->set_node(5) = elem->get_node(8);
+                  subelem[0]->set_node(0) = elem->node_ptr(0);
+                  subelem[0]->set_node(1) = elem->node_ptr(1);
+                  subelem[0]->set_node(2) = elem->node_ptr(2);
+                  subelem[0]->set_node(3) = elem->node_ptr(4);
+                  subelem[0]->set_node(4) = elem->node_ptr(5);
+                  subelem[0]->set_node(5) = elem->node_ptr(8);
 
-                  subelem[1]->set_node(0) = elem->get_node(0);
-                  subelem[1]->set_node(1) = elem->get_node(2);
-                  subelem[1]->set_node(2) = elem->get_node(3);
-                  subelem[1]->set_node(3) = elem->get_node(8);
-                  subelem[1]->set_node(4) = elem->get_node(6);
-                  subelem[1]->set_node(5) = elem->get_node(7);
+                  subelem[1]->set_node(0) = elem->node_ptr(0);
+                  subelem[1]->set_node(1) = elem->node_ptr(2);
+                  subelem[1]->set_node(2) = elem->node_ptr(3);
+                  subelem[1]->set_node(3) = elem->node_ptr(8);
+                  subelem[1]->set_node(4) = elem->node_ptr(6);
+                  subelem[1]->set_node(5) = elem->node_ptr(7);
                 }
 
               else
                 {
-                  subelem[0]->set_node(0) = elem->get_node(0);
-                  subelem[0]->set_node(1) = elem->get_node(1);
-                  subelem[0]->set_node(2) = elem->get_node(3);
-                  subelem[0]->set_node(3) = elem->get_node(4);
-                  subelem[0]->set_node(4) = elem->get_node(8);
-                  subelem[0]->set_node(5) = elem->get_node(7);
+                  subelem[0]->set_node(0) = elem->node_ptr(0);
+                  subelem[0]->set_node(1) = elem->node_ptr(1);
+                  subelem[0]->set_node(2) = elem->node_ptr(3);
+                  subelem[0]->set_node(3) = elem->node_ptr(4);
+                  subelem[0]->set_node(4) = elem->node_ptr(8);
+                  subelem[0]->set_node(5) = elem->node_ptr(7);
 
-                  subelem[1]->set_node(0) = elem->get_node(1);
-                  subelem[1]->set_node(1) = elem->get_node(2);
-                  subelem[1]->set_node(2) = elem->get_node(3);
-                  subelem[1]->set_node(3) = elem->get_node(5);
-                  subelem[1]->set_node(4) = elem->get_node(6);
-                  subelem[1]->set_node(5) = elem->get_node(8);
+                  subelem[1]->set_node(0) = elem->node_ptr(1);
+                  subelem[1]->set_node(1) = elem->node_ptr(2);
+                  subelem[1]->set_node(2) = elem->node_ptr(3);
+                  subelem[1]->set_node(3) = elem->node_ptr(5);
+                  subelem[1]->set_node(4) = elem->node_ptr(6);
+                  subelem[1]->set_node(5) = elem->node_ptr(8);
                 }
 
               break;
@@ -971,39 +501,39 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
                       // Split on 1-5 diagonal
                       if (split_first_diagonal(elem, 1,5, 2,4))
                         {
-                          subelem[0]->set_node(0) = elem->get_node(0);
-                          subelem[0]->set_node(1) = elem->get_node(4);
-                          subelem[0]->set_node(2) = elem->get_node(5);
-                          subelem[0]->set_node(3) = elem->get_node(3);
+                          subelem[0]->set_node(0) = elem->node_ptr(0);
+                          subelem[0]->set_node(1) = elem->node_ptr(4);
+                          subelem[0]->set_node(2) = elem->node_ptr(5);
+                          subelem[0]->set_node(3) = elem->node_ptr(3);
 
-                          subelem[1]->set_node(0) = elem->get_node(0);
-                          subelem[1]->set_node(1) = elem->get_node(4);
-                          subelem[1]->set_node(2) = elem->get_node(1);
-                          subelem[1]->set_node(3) = elem->get_node(5);
+                          subelem[1]->set_node(0) = elem->node_ptr(0);
+                          subelem[1]->set_node(1) = elem->node_ptr(4);
+                          subelem[1]->set_node(2) = elem->node_ptr(1);
+                          subelem[1]->set_node(3) = elem->node_ptr(5);
 
-                          subelem[2]->set_node(0) = elem->get_node(0);
-                          subelem[2]->set_node(1) = elem->get_node(1);
-                          subelem[2]->set_node(2) = elem->get_node(2);
-                          subelem[2]->set_node(3) = elem->get_node(5);
+                          subelem[2]->set_node(0) = elem->node_ptr(0);
+                          subelem[2]->set_node(1) = elem->node_ptr(1);
+                          subelem[2]->set_node(2) = elem->node_ptr(2);
+                          subelem[2]->set_node(3) = elem->node_ptr(5);
                         }
                       else // Split on 2-4 diagonal
                         {
                           libmesh_assert (split_first_diagonal(elem, 2,4, 1,5));
 
-                          subelem[0]->set_node(0) = elem->get_node(0);
-                          subelem[0]->set_node(1) = elem->get_node(4);
-                          subelem[0]->set_node(2) = elem->get_node(5);
-                          subelem[0]->set_node(3) = elem->get_node(3);
+                          subelem[0]->set_node(0) = elem->node_ptr(0);
+                          subelem[0]->set_node(1) = elem->node_ptr(4);
+                          subelem[0]->set_node(2) = elem->node_ptr(5);
+                          subelem[0]->set_node(3) = elem->node_ptr(3);
 
-                          subelem[1]->set_node(0) = elem->get_node(0);
-                          subelem[1]->set_node(1) = elem->get_node(4);
-                          subelem[1]->set_node(2) = elem->get_node(2);
-                          subelem[1]->set_node(3) = elem->get_node(5);
+                          subelem[1]->set_node(0) = elem->node_ptr(0);
+                          subelem[1]->set_node(1) = elem->node_ptr(4);
+                          subelem[1]->set_node(2) = elem->node_ptr(2);
+                          subelem[1]->set_node(3) = elem->node_ptr(5);
 
-                          subelem[2]->set_node(0) = elem->get_node(0);
-                          subelem[2]->set_node(1) = elem->get_node(1);
-                          subelem[2]->set_node(2) = elem->get_node(2);
-                          subelem[2]->set_node(3) = elem->get_node(4);
+                          subelem[2]->set_node(0) = elem->node_ptr(0);
+                          subelem[2]->set_node(1) = elem->node_ptr(1);
+                          subelem[2]->set_node(2) = elem->node_ptr(2);
+                          subelem[2]->set_node(3) = elem->node_ptr(4);
                         }
                     }
                   else // Split on 2-3 diagonal
@@ -1013,20 +543,20 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
                       // 0-4 and 2-3 split implies 2-4 split
                       libmesh_assert (split_first_diagonal(elem, 2,4, 1,5));
 
-                      subelem[0]->set_node(0) = elem->get_node(0);
-                      subelem[0]->set_node(1) = elem->get_node(4);
-                      subelem[0]->set_node(2) = elem->get_node(2);
-                      subelem[0]->set_node(3) = elem->get_node(3);
+                      subelem[0]->set_node(0) = elem->node_ptr(0);
+                      subelem[0]->set_node(1) = elem->node_ptr(4);
+                      subelem[0]->set_node(2) = elem->node_ptr(2);
+                      subelem[0]->set_node(3) = elem->node_ptr(3);
 
-                      subelem[1]->set_node(0) = elem->get_node(3);
-                      subelem[1]->set_node(1) = elem->get_node(4);
-                      subelem[1]->set_node(2) = elem->get_node(2);
-                      subelem[1]->set_node(3) = elem->get_node(5);
+                      subelem[1]->set_node(0) = elem->node_ptr(3);
+                      subelem[1]->set_node(1) = elem->node_ptr(4);
+                      subelem[1]->set_node(2) = elem->node_ptr(2);
+                      subelem[1]->set_node(3) = elem->node_ptr(5);
 
-                      subelem[2]->set_node(0) = elem->get_node(0);
-                      subelem[2]->set_node(1) = elem->get_node(1);
-                      subelem[2]->set_node(2) = elem->get_node(2);
-                      subelem[2]->set_node(3) = elem->get_node(4);
+                      subelem[2]->set_node(0) = elem->node_ptr(0);
+                      subelem[2]->set_node(1) = elem->node_ptr(1);
+                      subelem[2]->set_node(2) = elem->node_ptr(2);
+                      subelem[2]->set_node(3) = elem->node_ptr(4);
                     }
                 }
               else // Split on 1-3 diagonal
@@ -1039,20 +569,20 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
                       // 1-3 and 0-5 split implies 1-5 split
                       libmesh_assert (split_first_diagonal(elem, 1,5, 2,4));
 
-                      subelem[0]->set_node(0) = elem->get_node(1);
-                      subelem[0]->set_node(1) = elem->get_node(3);
-                      subelem[0]->set_node(2) = elem->get_node(4);
-                      subelem[0]->set_node(3) = elem->get_node(5);
+                      subelem[0]->set_node(0) = elem->node_ptr(1);
+                      subelem[0]->set_node(1) = elem->node_ptr(3);
+                      subelem[0]->set_node(2) = elem->node_ptr(4);
+                      subelem[0]->set_node(3) = elem->node_ptr(5);
 
-                      subelem[1]->set_node(0) = elem->get_node(1);
-                      subelem[1]->set_node(1) = elem->get_node(0);
-                      subelem[1]->set_node(2) = elem->get_node(3);
-                      subelem[1]->set_node(3) = elem->get_node(5);
+                      subelem[1]->set_node(0) = elem->node_ptr(1);
+                      subelem[1]->set_node(1) = elem->node_ptr(0);
+                      subelem[1]->set_node(2) = elem->node_ptr(3);
+                      subelem[1]->set_node(3) = elem->node_ptr(5);
 
-                      subelem[2]->set_node(0) = elem->get_node(0);
-                      subelem[2]->set_node(1) = elem->get_node(1);
-                      subelem[2]->set_node(2) = elem->get_node(2);
-                      subelem[2]->set_node(3) = elem->get_node(5);
+                      subelem[2]->set_node(0) = elem->node_ptr(0);
+                      subelem[2]->set_node(1) = elem->node_ptr(1);
+                      subelem[2]->set_node(2) = elem->node_ptr(2);
+                      subelem[2]->set_node(3) = elem->node_ptr(5);
                     }
                   else // Split on 2-3 diagonal
                     {
@@ -1061,39 +591,39 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
                       // Split on 1-5 diagonal
                       if (split_first_diagonal(elem, 1,5, 2,4))
                         {
-                          subelem[0]->set_node(0) = elem->get_node(0);
-                          subelem[0]->set_node(1) = elem->get_node(1);
-                          subelem[0]->set_node(2) = elem->get_node(2);
-                          subelem[0]->set_node(3) = elem->get_node(3);
+                          subelem[0]->set_node(0) = elem->node_ptr(0);
+                          subelem[0]->set_node(1) = elem->node_ptr(1);
+                          subelem[0]->set_node(2) = elem->node_ptr(2);
+                          subelem[0]->set_node(3) = elem->node_ptr(3);
 
-                          subelem[1]->set_node(0) = elem->get_node(3);
-                          subelem[1]->set_node(1) = elem->get_node(1);
-                          subelem[1]->set_node(2) = elem->get_node(2);
-                          subelem[1]->set_node(3) = elem->get_node(5);
+                          subelem[1]->set_node(0) = elem->node_ptr(3);
+                          subelem[1]->set_node(1) = elem->node_ptr(1);
+                          subelem[1]->set_node(2) = elem->node_ptr(2);
+                          subelem[1]->set_node(3) = elem->node_ptr(5);
 
-                          subelem[2]->set_node(0) = elem->get_node(1);
-                          subelem[2]->set_node(1) = elem->get_node(3);
-                          subelem[2]->set_node(2) = elem->get_node(4);
-                          subelem[2]->set_node(3) = elem->get_node(5);
+                          subelem[2]->set_node(0) = elem->node_ptr(1);
+                          subelem[2]->set_node(1) = elem->node_ptr(3);
+                          subelem[2]->set_node(2) = elem->node_ptr(4);
+                          subelem[2]->set_node(3) = elem->node_ptr(5);
                         }
                       else // Split on 2-4 diagonal
                         {
                           libmesh_assert (split_first_diagonal(elem, 2,4, 1,5));
 
-                          subelem[0]->set_node(0) = elem->get_node(0);
-                          subelem[0]->set_node(1) = elem->get_node(1);
-                          subelem[0]->set_node(2) = elem->get_node(2);
-                          subelem[0]->set_node(3) = elem->get_node(3);
+                          subelem[0]->set_node(0) = elem->node_ptr(0);
+                          subelem[0]->set_node(1) = elem->node_ptr(1);
+                          subelem[0]->set_node(2) = elem->node_ptr(2);
+                          subelem[0]->set_node(3) = elem->node_ptr(3);
 
-                          subelem[1]->set_node(0) = elem->get_node(2);
-                          subelem[1]->set_node(1) = elem->get_node(3);
-                          subelem[1]->set_node(2) = elem->get_node(4);
-                          subelem[1]->set_node(3) = elem->get_node(5);
+                          subelem[1]->set_node(0) = elem->node_ptr(2);
+                          subelem[1]->set_node(1) = elem->node_ptr(3);
+                          subelem[1]->set_node(2) = elem->node_ptr(4);
+                          subelem[1]->set_node(3) = elem->node_ptr(5);
 
-                          subelem[2]->set_node(0) = elem->get_node(3);
-                          subelem[2]->set_node(1) = elem->get_node(1);
-                          subelem[2]->set_node(2) = elem->get_node(2);
-                          subelem[2]->set_node(3) = elem->get_node(4);
+                          subelem[2]->set_node(0) = elem->node_ptr(3);
+                          subelem[2]->set_node(1) = elem->node_ptr(1);
+                          subelem[2]->set_node(2) = elem->node_ptr(2);
+                          subelem[2]->set_node(3) = elem->node_ptr(4);
                         }
                     }
                 }
@@ -1116,81 +646,81 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
                       // Split on 1-5 diagonal
                       if (split_first_diagonal(elem, 1,5, 2,4))
                         {
-                          subelem[0]->set_node(0) = elem->get_node(0);
-                          subelem[0]->set_node(1) = elem->get_node(4);
-                          subelem[0]->set_node(2) = elem->get_node(5);
-                          subelem[0]->set_node(3) = elem->get_node(3);
+                          subelem[0]->set_node(0) = elem->node_ptr(0);
+                          subelem[0]->set_node(1) = elem->node_ptr(4);
+                          subelem[0]->set_node(2) = elem->node_ptr(5);
+                          subelem[0]->set_node(3) = elem->node_ptr(3);
 
-                          subelem[0]->set_node(4) = elem->get_node(15);
-                          subelem[0]->set_node(5) = elem->get_node(13);
-                          subelem[0]->set_node(6) = elem->get_node(17);
-                          subelem[0]->set_node(7) = elem->get_node(9);
-                          subelem[0]->set_node(8) = elem->get_node(12);
-                          subelem[0]->set_node(9) = elem->get_node(14);
+                          subelem[0]->set_node(4) = elem->node_ptr(15);
+                          subelem[0]->set_node(5) = elem->node_ptr(13);
+                          subelem[0]->set_node(6) = elem->node_ptr(17);
+                          subelem[0]->set_node(7) = elem->node_ptr(9);
+                          subelem[0]->set_node(8) = elem->node_ptr(12);
+                          subelem[0]->set_node(9) = elem->node_ptr(14);
 
-                          subelem[1]->set_node(0) = elem->get_node(0);
-                          subelem[1]->set_node(1) = elem->get_node(4);
-                          subelem[1]->set_node(2) = elem->get_node(1);
-                          subelem[1]->set_node(3) = elem->get_node(5);
+                          subelem[1]->set_node(0) = elem->node_ptr(0);
+                          subelem[1]->set_node(1) = elem->node_ptr(4);
+                          subelem[1]->set_node(2) = elem->node_ptr(1);
+                          subelem[1]->set_node(3) = elem->node_ptr(5);
 
-                          subelem[1]->set_node(4) = elem->get_node(15);
-                          subelem[1]->set_node(5) = elem->get_node(10);
-                          subelem[1]->set_node(6) = elem->get_node(6);
-                          subelem[1]->set_node(7) = elem->get_node(17);
-                          subelem[1]->set_node(8) = elem->get_node(13);
-                          subelem[1]->set_node(9) = elem->get_node(16);
+                          subelem[1]->set_node(4) = elem->node_ptr(15);
+                          subelem[1]->set_node(5) = elem->node_ptr(10);
+                          subelem[1]->set_node(6) = elem->node_ptr(6);
+                          subelem[1]->set_node(7) = elem->node_ptr(17);
+                          subelem[1]->set_node(8) = elem->node_ptr(13);
+                          subelem[1]->set_node(9) = elem->node_ptr(16);
 
-                          subelem[2]->set_node(0) = elem->get_node(0);
-                          subelem[2]->set_node(1) = elem->get_node(1);
-                          subelem[2]->set_node(2) = elem->get_node(2);
-                          subelem[2]->set_node(3) = elem->get_node(5);
+                          subelem[2]->set_node(0) = elem->node_ptr(0);
+                          subelem[2]->set_node(1) = elem->node_ptr(1);
+                          subelem[2]->set_node(2) = elem->node_ptr(2);
+                          subelem[2]->set_node(3) = elem->node_ptr(5);
 
-                          subelem[2]->set_node(4) = elem->get_node(6);
-                          subelem[2]->set_node(5) = elem->get_node(7);
-                          subelem[2]->set_node(6) = elem->get_node(8);
-                          subelem[2]->set_node(7) = elem->get_node(17);
-                          subelem[2]->set_node(8) = elem->get_node(16);
-                          subelem[2]->set_node(9) = elem->get_node(11);
+                          subelem[2]->set_node(4) = elem->node_ptr(6);
+                          subelem[2]->set_node(5) = elem->node_ptr(7);
+                          subelem[2]->set_node(6) = elem->node_ptr(8);
+                          subelem[2]->set_node(7) = elem->node_ptr(17);
+                          subelem[2]->set_node(8) = elem->node_ptr(16);
+                          subelem[2]->set_node(9) = elem->node_ptr(11);
                         }
                       else // Split on 2-4 diagonal
                         {
                           libmesh_assert (split_first_diagonal(elem, 2,4, 1,5));
 
-                          subelem[0]->set_node(0) = elem->get_node(0);
-                          subelem[0]->set_node(1) = elem->get_node(4);
-                          subelem[0]->set_node(2) = elem->get_node(5);
-                          subelem[0]->set_node(3) = elem->get_node(3);
+                          subelem[0]->set_node(0) = elem->node_ptr(0);
+                          subelem[0]->set_node(1) = elem->node_ptr(4);
+                          subelem[0]->set_node(2) = elem->node_ptr(5);
+                          subelem[0]->set_node(3) = elem->node_ptr(3);
 
-                          subelem[0]->set_node(4) = elem->get_node(15);
-                          subelem[0]->set_node(5) = elem->get_node(13);
-                          subelem[0]->set_node(6) = elem->get_node(17);
-                          subelem[0]->set_node(7) = elem->get_node(9);
-                          subelem[0]->set_node(8) = elem->get_node(12);
-                          subelem[0]->set_node(9) = elem->get_node(14);
+                          subelem[0]->set_node(4) = elem->node_ptr(15);
+                          subelem[0]->set_node(5) = elem->node_ptr(13);
+                          subelem[0]->set_node(6) = elem->node_ptr(17);
+                          subelem[0]->set_node(7) = elem->node_ptr(9);
+                          subelem[0]->set_node(8) = elem->node_ptr(12);
+                          subelem[0]->set_node(9) = elem->node_ptr(14);
 
-                          subelem[1]->set_node(0) = elem->get_node(0);
-                          subelem[1]->set_node(1) = elem->get_node(4);
-                          subelem[1]->set_node(2) = elem->get_node(2);
-                          subelem[1]->set_node(3) = elem->get_node(5);
+                          subelem[1]->set_node(0) = elem->node_ptr(0);
+                          subelem[1]->set_node(1) = elem->node_ptr(4);
+                          subelem[1]->set_node(2) = elem->node_ptr(2);
+                          subelem[1]->set_node(3) = elem->node_ptr(5);
 
-                          subelem[1]->set_node(4) = elem->get_node(15);
-                          subelem[1]->set_node(5) = elem->get_node(16);
-                          subelem[1]->set_node(6) = elem->get_node(8);
-                          subelem[1]->set_node(7) = elem->get_node(17);
-                          subelem[1]->set_node(8) = elem->get_node(13);
-                          subelem[1]->set_node(9) = elem->get_node(11);
+                          subelem[1]->set_node(4) = elem->node_ptr(15);
+                          subelem[1]->set_node(5) = elem->node_ptr(16);
+                          subelem[1]->set_node(6) = elem->node_ptr(8);
+                          subelem[1]->set_node(7) = elem->node_ptr(17);
+                          subelem[1]->set_node(8) = elem->node_ptr(13);
+                          subelem[1]->set_node(9) = elem->node_ptr(11);
 
-                          subelem[2]->set_node(0) = elem->get_node(0);
-                          subelem[2]->set_node(1) = elem->get_node(1);
-                          subelem[2]->set_node(2) = elem->get_node(2);
-                          subelem[2]->set_node(3) = elem->get_node(4);
+                          subelem[2]->set_node(0) = elem->node_ptr(0);
+                          subelem[2]->set_node(1) = elem->node_ptr(1);
+                          subelem[2]->set_node(2) = elem->node_ptr(2);
+                          subelem[2]->set_node(3) = elem->node_ptr(4);
 
-                          subelem[2]->set_node(4) = elem->get_node(6);
-                          subelem[2]->set_node(5) = elem->get_node(7);
-                          subelem[2]->set_node(6) = elem->get_node(8);
-                          subelem[2]->set_node(7) = elem->get_node(15);
-                          subelem[2]->set_node(8) = elem->get_node(10);
-                          subelem[2]->set_node(9) = elem->get_node(16);
+                          subelem[2]->set_node(4) = elem->node_ptr(6);
+                          subelem[2]->set_node(5) = elem->node_ptr(7);
+                          subelem[2]->set_node(6) = elem->node_ptr(8);
+                          subelem[2]->set_node(7) = elem->node_ptr(15);
+                          subelem[2]->set_node(8) = elem->node_ptr(10);
+                          subelem[2]->set_node(9) = elem->node_ptr(16);
                         }
                     }
                   else // Split on 2-3 diagonal
@@ -1200,41 +730,41 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
                       // 0-4 and 2-3 split implies 2-4 split
                       libmesh_assert (split_first_diagonal(elem, 2,4, 1,5));
 
-                      subelem[0]->set_node(0) = elem->get_node(0);
-                      subelem[0]->set_node(1) = elem->get_node(4);
-                      subelem[0]->set_node(2) = elem->get_node(2);
-                      subelem[0]->set_node(3) = elem->get_node(3);
+                      subelem[0]->set_node(0) = elem->node_ptr(0);
+                      subelem[0]->set_node(1) = elem->node_ptr(4);
+                      subelem[0]->set_node(2) = elem->node_ptr(2);
+                      subelem[0]->set_node(3) = elem->node_ptr(3);
 
-                      subelem[0]->set_node(4) = elem->get_node(15);
-                      subelem[0]->set_node(5) = elem->get_node(16);
-                      subelem[0]->set_node(6) = elem->get_node(8);
-                      subelem[0]->set_node(7) = elem->get_node(9);
-                      subelem[0]->set_node(8) = elem->get_node(12);
-                      subelem[0]->set_node(9) = elem->get_node(17);
+                      subelem[0]->set_node(4) = elem->node_ptr(15);
+                      subelem[0]->set_node(5) = elem->node_ptr(16);
+                      subelem[0]->set_node(6) = elem->node_ptr(8);
+                      subelem[0]->set_node(7) = elem->node_ptr(9);
+                      subelem[0]->set_node(8) = elem->node_ptr(12);
+                      subelem[0]->set_node(9) = elem->node_ptr(17);
 
-                      subelem[1]->set_node(0) = elem->get_node(3);
-                      subelem[1]->set_node(1) = elem->get_node(4);
-                      subelem[1]->set_node(2) = elem->get_node(2);
-                      subelem[1]->set_node(3) = elem->get_node(5);
+                      subelem[1]->set_node(0) = elem->node_ptr(3);
+                      subelem[1]->set_node(1) = elem->node_ptr(4);
+                      subelem[1]->set_node(2) = elem->node_ptr(2);
+                      subelem[1]->set_node(3) = elem->node_ptr(5);
 
-                      subelem[1]->set_node(4) = elem->get_node(12);
-                      subelem[1]->set_node(5) = elem->get_node(16);
-                      subelem[1]->set_node(6) = elem->get_node(17);
-                      subelem[1]->set_node(7) = elem->get_node(14);
-                      subelem[1]->set_node(8) = elem->get_node(13);
-                      subelem[1]->set_node(9) = elem->get_node(11);
+                      subelem[1]->set_node(4) = elem->node_ptr(12);
+                      subelem[1]->set_node(5) = elem->node_ptr(16);
+                      subelem[1]->set_node(6) = elem->node_ptr(17);
+                      subelem[1]->set_node(7) = elem->node_ptr(14);
+                      subelem[1]->set_node(8) = elem->node_ptr(13);
+                      subelem[1]->set_node(9) = elem->node_ptr(11);
 
-                      subelem[2]->set_node(0) = elem->get_node(0);
-                      subelem[2]->set_node(1) = elem->get_node(1);
-                      subelem[2]->set_node(2) = elem->get_node(2);
-                      subelem[2]->set_node(3) = elem->get_node(4);
+                      subelem[2]->set_node(0) = elem->node_ptr(0);
+                      subelem[2]->set_node(1) = elem->node_ptr(1);
+                      subelem[2]->set_node(2) = elem->node_ptr(2);
+                      subelem[2]->set_node(3) = elem->node_ptr(4);
 
-                      subelem[2]->set_node(4) = elem->get_node(6);
-                      subelem[2]->set_node(5) = elem->get_node(7);
-                      subelem[2]->set_node(6) = elem->get_node(8);
-                      subelem[2]->set_node(7) = elem->get_node(15);
-                      subelem[2]->set_node(8) = elem->get_node(10);
-                      subelem[2]->set_node(9) = elem->get_node(16);
+                      subelem[2]->set_node(4) = elem->node_ptr(6);
+                      subelem[2]->set_node(5) = elem->node_ptr(7);
+                      subelem[2]->set_node(6) = elem->node_ptr(8);
+                      subelem[2]->set_node(7) = elem->node_ptr(15);
+                      subelem[2]->set_node(8) = elem->node_ptr(10);
+                      subelem[2]->set_node(9) = elem->node_ptr(16);
                     }
                 }
               else // Split on 1-3 diagonal
@@ -1247,41 +777,41 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
                       // 1-3 and 0-5 split implies 1-5 split
                       libmesh_assert (split_first_diagonal(elem, 1,5, 2,4));
 
-                      subelem[0]->set_node(0) = elem->get_node(1);
-                      subelem[0]->set_node(1) = elem->get_node(3);
-                      subelem[0]->set_node(2) = elem->get_node(4);
-                      subelem[0]->set_node(3) = elem->get_node(5);
+                      subelem[0]->set_node(0) = elem->node_ptr(1);
+                      subelem[0]->set_node(1) = elem->node_ptr(3);
+                      subelem[0]->set_node(2) = elem->node_ptr(4);
+                      subelem[0]->set_node(3) = elem->node_ptr(5);
 
-                      subelem[0]->set_node(4) = elem->get_node(15);
-                      subelem[0]->set_node(5) = elem->get_node(12);
-                      subelem[0]->set_node(6) = elem->get_node(10);
-                      subelem[0]->set_node(7) = elem->get_node(16);
-                      subelem[0]->set_node(8) = elem->get_node(14);
-                      subelem[0]->set_node(9) = elem->get_node(13);
+                      subelem[0]->set_node(4) = elem->node_ptr(15);
+                      subelem[0]->set_node(5) = elem->node_ptr(12);
+                      subelem[0]->set_node(6) = elem->node_ptr(10);
+                      subelem[0]->set_node(7) = elem->node_ptr(16);
+                      subelem[0]->set_node(8) = elem->node_ptr(14);
+                      subelem[0]->set_node(9) = elem->node_ptr(13);
 
-                      subelem[1]->set_node(0) = elem->get_node(1);
-                      subelem[1]->set_node(1) = elem->get_node(0);
-                      subelem[1]->set_node(2) = elem->get_node(3);
-                      subelem[1]->set_node(3) = elem->get_node(5);
+                      subelem[1]->set_node(0) = elem->node_ptr(1);
+                      subelem[1]->set_node(1) = elem->node_ptr(0);
+                      subelem[1]->set_node(2) = elem->node_ptr(3);
+                      subelem[1]->set_node(3) = elem->node_ptr(5);
 
-                      subelem[1]->set_node(4) = elem->get_node(6);
-                      subelem[1]->set_node(5) = elem->get_node(9);
-                      subelem[1]->set_node(6) = elem->get_node(15);
-                      subelem[1]->set_node(7) = elem->get_node(16);
-                      subelem[1]->set_node(8) = elem->get_node(17);
-                      subelem[1]->set_node(9) = elem->get_node(14);
+                      subelem[1]->set_node(4) = elem->node_ptr(6);
+                      subelem[1]->set_node(5) = elem->node_ptr(9);
+                      subelem[1]->set_node(6) = elem->node_ptr(15);
+                      subelem[1]->set_node(7) = elem->node_ptr(16);
+                      subelem[1]->set_node(8) = elem->node_ptr(17);
+                      subelem[1]->set_node(9) = elem->node_ptr(14);
 
-                      subelem[2]->set_node(0) = elem->get_node(0);
-                      subelem[2]->set_node(1) = elem->get_node(1);
-                      subelem[2]->set_node(2) = elem->get_node(2);
-                      subelem[2]->set_node(3) = elem->get_node(5);
+                      subelem[2]->set_node(0) = elem->node_ptr(0);
+                      subelem[2]->set_node(1) = elem->node_ptr(1);
+                      subelem[2]->set_node(2) = elem->node_ptr(2);
+                      subelem[2]->set_node(3) = elem->node_ptr(5);
 
-                      subelem[2]->set_node(4) = elem->get_node(6);
-                      subelem[2]->set_node(5) = elem->get_node(7);
-                      subelem[2]->set_node(6) = elem->get_node(8);
-                      subelem[2]->set_node(7) = elem->get_node(17);
-                      subelem[2]->set_node(8) = elem->get_node(16);
-                      subelem[2]->set_node(9) = elem->get_node(11);
+                      subelem[2]->set_node(4) = elem->node_ptr(6);
+                      subelem[2]->set_node(5) = elem->node_ptr(7);
+                      subelem[2]->set_node(6) = elem->node_ptr(8);
+                      subelem[2]->set_node(7) = elem->node_ptr(17);
+                      subelem[2]->set_node(8) = elem->node_ptr(16);
+                      subelem[2]->set_node(9) = elem->node_ptr(11);
                     }
                   else // Split on 2-3 diagonal
                     {
@@ -1290,81 +820,81 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
                       // Split on 1-5 diagonal
                       if (split_first_diagonal(elem, 1,5, 2,4))
                         {
-                          subelem[0]->set_node(0) = elem->get_node(0);
-                          subelem[0]->set_node(1) = elem->get_node(1);
-                          subelem[0]->set_node(2) = elem->get_node(2);
-                          subelem[0]->set_node(3) = elem->get_node(3);
+                          subelem[0]->set_node(0) = elem->node_ptr(0);
+                          subelem[0]->set_node(1) = elem->node_ptr(1);
+                          subelem[0]->set_node(2) = elem->node_ptr(2);
+                          subelem[0]->set_node(3) = elem->node_ptr(3);
 
-                          subelem[0]->set_node(4) = elem->get_node(6);
-                          subelem[0]->set_node(5) = elem->get_node(7);
-                          subelem[0]->set_node(6) = elem->get_node(8);
-                          subelem[0]->set_node(7) = elem->get_node(9);
-                          subelem[0]->set_node(8) = elem->get_node(15);
-                          subelem[0]->set_node(9) = elem->get_node(17);
+                          subelem[0]->set_node(4) = elem->node_ptr(6);
+                          subelem[0]->set_node(5) = elem->node_ptr(7);
+                          subelem[0]->set_node(6) = elem->node_ptr(8);
+                          subelem[0]->set_node(7) = elem->node_ptr(9);
+                          subelem[0]->set_node(8) = elem->node_ptr(15);
+                          subelem[0]->set_node(9) = elem->node_ptr(17);
 
-                          subelem[1]->set_node(0) = elem->get_node(3);
-                          subelem[1]->set_node(1) = elem->get_node(1);
-                          subelem[1]->set_node(2) = elem->get_node(2);
-                          subelem[1]->set_node(3) = elem->get_node(5);
+                          subelem[1]->set_node(0) = elem->node_ptr(3);
+                          subelem[1]->set_node(1) = elem->node_ptr(1);
+                          subelem[1]->set_node(2) = elem->node_ptr(2);
+                          subelem[1]->set_node(3) = elem->node_ptr(5);
 
-                          subelem[1]->set_node(4) = elem->get_node(15);
-                          subelem[1]->set_node(5) = elem->get_node(7);
-                          subelem[1]->set_node(6) = elem->get_node(17);
-                          subelem[1]->set_node(7) = elem->get_node(14);
-                          subelem[1]->set_node(8) = elem->get_node(16);
-                          subelem[1]->set_node(9) = elem->get_node(11);
+                          subelem[1]->set_node(4) = elem->node_ptr(15);
+                          subelem[1]->set_node(5) = elem->node_ptr(7);
+                          subelem[1]->set_node(6) = elem->node_ptr(17);
+                          subelem[1]->set_node(7) = elem->node_ptr(14);
+                          subelem[1]->set_node(8) = elem->node_ptr(16);
+                          subelem[1]->set_node(9) = elem->node_ptr(11);
 
-                          subelem[2]->set_node(0) = elem->get_node(1);
-                          subelem[2]->set_node(1) = elem->get_node(3);
-                          subelem[2]->set_node(2) = elem->get_node(4);
-                          subelem[2]->set_node(3) = elem->get_node(5);
+                          subelem[2]->set_node(0) = elem->node_ptr(1);
+                          subelem[2]->set_node(1) = elem->node_ptr(3);
+                          subelem[2]->set_node(2) = elem->node_ptr(4);
+                          subelem[2]->set_node(3) = elem->node_ptr(5);
 
-                          subelem[2]->set_node(4) = elem->get_node(15);
-                          subelem[2]->set_node(5) = elem->get_node(12);
-                          subelem[2]->set_node(6) = elem->get_node(10);
-                          subelem[2]->set_node(7) = elem->get_node(16);
-                          subelem[2]->set_node(8) = elem->get_node(14);
-                          subelem[2]->set_node(9) = elem->get_node(13);
+                          subelem[2]->set_node(4) = elem->node_ptr(15);
+                          subelem[2]->set_node(5) = elem->node_ptr(12);
+                          subelem[2]->set_node(6) = elem->node_ptr(10);
+                          subelem[2]->set_node(7) = elem->node_ptr(16);
+                          subelem[2]->set_node(8) = elem->node_ptr(14);
+                          subelem[2]->set_node(9) = elem->node_ptr(13);
                         }
                       else // Split on 2-4 diagonal
                         {
                           libmesh_assert (split_first_diagonal(elem, 2,4, 1,5));
 
-                          subelem[0]->set_node(0) = elem->get_node(0);
-                          subelem[0]->set_node(1) = elem->get_node(1);
-                          subelem[0]->set_node(2) = elem->get_node(2);
-                          subelem[0]->set_node(3) = elem->get_node(3);
+                          subelem[0]->set_node(0) = elem->node_ptr(0);
+                          subelem[0]->set_node(1) = elem->node_ptr(1);
+                          subelem[0]->set_node(2) = elem->node_ptr(2);
+                          subelem[0]->set_node(3) = elem->node_ptr(3);
 
-                          subelem[0]->set_node(4) = elem->get_node(6);
-                          subelem[0]->set_node(5) = elem->get_node(7);
-                          subelem[0]->set_node(6) = elem->get_node(8);
-                          subelem[0]->set_node(7) = elem->get_node(9);
-                          subelem[0]->set_node(8) = elem->get_node(15);
-                          subelem[0]->set_node(9) = elem->get_node(17);
+                          subelem[0]->set_node(4) = elem->node_ptr(6);
+                          subelem[0]->set_node(5) = elem->node_ptr(7);
+                          subelem[0]->set_node(6) = elem->node_ptr(8);
+                          subelem[0]->set_node(7) = elem->node_ptr(9);
+                          subelem[0]->set_node(8) = elem->node_ptr(15);
+                          subelem[0]->set_node(9) = elem->node_ptr(17);
 
-                          subelem[1]->set_node(0) = elem->get_node(2);
-                          subelem[1]->set_node(1) = elem->get_node(3);
-                          subelem[1]->set_node(2) = elem->get_node(4);
-                          subelem[1]->set_node(3) = elem->get_node(5);
+                          subelem[1]->set_node(0) = elem->node_ptr(2);
+                          subelem[1]->set_node(1) = elem->node_ptr(3);
+                          subelem[1]->set_node(2) = elem->node_ptr(4);
+                          subelem[1]->set_node(3) = elem->node_ptr(5);
 
-                          subelem[1]->set_node(4) = elem->get_node(17);
-                          subelem[1]->set_node(5) = elem->get_node(12);
-                          subelem[1]->set_node(6) = elem->get_node(16);
-                          subelem[1]->set_node(7) = elem->get_node(11);
-                          subelem[1]->set_node(8) = elem->get_node(14);
-                          subelem[1]->set_node(9) = elem->get_node(13);
+                          subelem[1]->set_node(4) = elem->node_ptr(17);
+                          subelem[1]->set_node(5) = elem->node_ptr(12);
+                          subelem[1]->set_node(6) = elem->node_ptr(16);
+                          subelem[1]->set_node(7) = elem->node_ptr(11);
+                          subelem[1]->set_node(8) = elem->node_ptr(14);
+                          subelem[1]->set_node(9) = elem->node_ptr(13);
 
-                          subelem[2]->set_node(0) = elem->get_node(3);
-                          subelem[2]->set_node(1) = elem->get_node(1);
-                          subelem[2]->set_node(2) = elem->get_node(2);
-                          subelem[2]->set_node(3) = elem->get_node(4);
+                          subelem[2]->set_node(0) = elem->node_ptr(3);
+                          subelem[2]->set_node(1) = elem->node_ptr(1);
+                          subelem[2]->set_node(2) = elem->node_ptr(2);
+                          subelem[2]->set_node(3) = elem->node_ptr(4);
 
-                          subelem[2]->set_node(4) = elem->get_node(15);
-                          subelem[2]->set_node(5) = elem->get_node(7);
-                          subelem[2]->set_node(6) = elem->get_node(17);
-                          subelem[2]->set_node(7) = elem->get_node(12);
-                          subelem[2]->set_node(8) = elem->get_node(10);
-                          subelem[2]->set_node(9) = elem->get_node(16);
+                          subelem[2]->set_node(4) = elem->node_ptr(15);
+                          subelem[2]->set_node(5) = elem->node_ptr(7);
+                          subelem[2]->set_node(6) = elem->node_ptr(17);
+                          subelem[2]->set_node(7) = elem->node_ptr(12);
+                          subelem[2]->set_node(8) = elem->node_ptr(10);
+                          subelem[2]->set_node(9) = elem->node_ptr(16);
                         }
                     }
                 }
@@ -1381,8 +911,8 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
           case TET4:
           case TET10:
           case INFEDGE2:
-          // No way to split infinite quad/prism elements, so
-          // hopefully no need to
+            // No way to split infinite quad/prism elements, so
+            // hopefully no need to
           case INFQUAD4:
           case INFQUAD6:
           case INFPRISM6:
@@ -1421,29 +951,29 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
             // Container to key boundary IDs handed back by the BoundaryInfo object.
             std::vector<boundary_id_type> bc_ids;
 
-            for (unsigned int sn=0; sn<elem->n_sides(); ++sn)
+            for (auto sn : elem->side_index_range())
               {
-                mesh.get_boundary_info().boundary_ids(*el, sn, bc_ids);
-                for (std::vector<boundary_id_type>::const_iterator id_it=bc_ids.begin(); id_it!=bc_ids.end(); ++id_it)
+                mesh.get_boundary_info().boundary_ids(elem, sn, bc_ids);
+                for (const auto & b_id : bc_ids)
                   {
-                    const boundary_id_type b_id = *id_it;
-
                     if (mesh_is_serial && b_id == BoundaryInfo::invalid_id)
                       continue;
 
                     // Make a sorted list of node ids for elem->side(sn)
-                    UniquePtr<Elem> elem_side = elem->build_side(sn);
+                    std::unique_ptr<Elem> elem_side = elem->build_side_ptr(sn);
                     std::vector<dof_id_type> elem_side_nodes(elem_side->n_nodes());
-                    for (unsigned int esn=0; esn<elem_side_nodes.size(); ++esn)
-                      elem_side_nodes[esn] = elem_side->node(esn);
+                    for (unsigned int esn=0,
+                         n_esn = cast_int<unsigned int>(elem_side_nodes.size());
+                         esn != n_esn; ++esn)
+                      elem_side_nodes[esn] = elem_side->node_id(esn);
                     std::sort(elem_side_nodes.begin(), elem_side_nodes.end());
 
                     for (unsigned int i=0; i != max_subelems; ++i)
                       if (subelem[i])
                         {
-                          for (unsigned int subside=0; subside < subelem[i]->n_sides(); ++subside)
+                          for (auto subside : subelem[i]->side_index_range())
                             {
-                              UniquePtr<Elem> subside_elem = subelem[i]->build_side(subside);
+                              std::unique_ptr<Elem> subside_elem = subelem[i]->build_side_ptr(subside);
 
                               // Make a list of *vertex* node ids for this subside, see if they are all present
                               // in elem->side(sn).  Note 1: we can't just compare elem->key(sn) to
@@ -1452,8 +982,10 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
                               // a Hex20 or Prism15's QUAD8 face may be split into two Tri6 faces, and the
                               // original face will not contain the mid-edge node.
                               std::vector<dof_id_type> subside_nodes(subside_elem->n_vertices());
-                              for (unsigned int ssn=0; ssn<subside_nodes.size(); ++ssn)
-                                subside_nodes[ssn] = subside_elem->node(ssn);
+                              for (unsigned int ssn=0,
+                                   n_ssn = cast_int<unsigned int>(subside_nodes.size());
+                                   ssn != n_ssn; ++ssn)
+                                subside_nodes[ssn] = subside_elem->node_id(ssn);
                               std::sort(subside_nodes.begin(), subside_nodes.end());
 
                               // std::includes returns true if every element of the second sorted range is
@@ -1470,7 +1002,7 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
 
                                   // If the original element had a RemoteElem neighbor on side 'sn',
                                   // then the subelem has one on side 'subside'.
-                                  if (elem->neighbor(sn) == remote_elem)
+                                  if (elem->neighbor_ptr(sn) == remote_elem)
                                     subelem[i]->set_neighbor(subside, const_cast<RemoteElem*>(remote_elem));
                                 }
                             }
@@ -1482,10 +1014,6 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
             mesh.get_boundary_info().remove(elem);
 
           } // end if (mesh_has_boundary_data)
-
-#ifdef LIBMESH_ENABLE_UNIQUE_ID
-        unique_id_type max_unique_id = mesh.parallel_max_unique_id();
-#endif
 
         // Determine new IDs for the split elements which will be
         // the same on all processors, therefore keeping the Mesh
@@ -1535,7 +1063,12 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
       // boundary QUAD into two boundary TRIs.  Therefore, we won't be
       // too picky about the actual number of BCs, and just assert that
       // there are some, somewhere.
-      libmesh_assert(new_bndry_elements.size()>0 || mesh.get_boundary_info().n_boundary_conds()>0);
+#ifndef NDEBUG
+      bool nbe_nonempty = new_bndry_elements.size();
+      mesh.comm().max(nbe_nonempty);
+      libmesh_assert(nbe_nonempty ||
+                     mesh.get_boundary_info().n_boundary_conds()>0);
+#endif
 
       // We should also be sure that the lengths of the new boundary data vectors
       // are all the same.
@@ -1543,13 +1076,13 @@ void MeshTools::Modification::all_tri (MeshBase & mesh)
       libmesh_assert_equal_to (new_bndry_sides.size(), new_bndry_ids.size());
 
       // Add the new boundary info to the mesh
-      for (unsigned int s=0; s<new_bndry_elements.size(); ++s)
+      for (std::size_t s=0; s<new_bndry_elements.size(); ++s)
         mesh.get_boundary_info().add_side(new_bndry_elements[s],
                                           new_bndry_sides[s],
                                           new_bndry_ids[s]);
     }
 
-  // In a ParallelMesh any newly added ghost node ids may be
+  // In a DistributedMesh any newly added ghost node ids may be
   // inconsistent, and unique_ids of newly added ghost nodes remain
   // unset.
   // make_nodes_parallel_consistent() will fix all this.
@@ -1580,13 +1113,12 @@ void MeshTools::Modification::smooth (MeshBase & mesh,
   libmesh_assert_equal_to (mesh.mesh_dimension(), 2);
 
   /*
-   * find the boundary nodes
+   * Create a quickly-searchable list of boundary nodes.
    */
-  std::vector<bool>  on_boundary;
-  MeshTools::find_boundary_nodes(mesh, on_boundary);
+  std::unordered_set<dof_id_type> boundary_node_ids =
+    MeshTools::find_boundary_nodes (mesh);
 
   for (unsigned int iter=0; iter<n_iterations; iter++)
-
     {
       /*
        * loop over the mesh refinement level
@@ -1602,19 +1134,10 @@ void MeshTools::Modification::smooth (MeshBase & mesh,
           weight.resize(mesh.n_nodes());
 
           {
-            /*
-             * Loop over the elements to calculate new node positions
-             */
-            MeshBase::element_iterator       el  = mesh.level_elements_begin(refinement_level);
-            const MeshBase::element_iterator end = mesh.level_elements_end(refinement_level);
-
-            for (; el != end; ++el)
+            // Loop over the elements to calculate new node positions
+            for (const auto & elem : as_range(mesh.level_elements_begin(refinement_level),
+                                              mesh.level_elements_end(refinement_level)))
               {
-                /*
-                 * Constant handle for the element
-                 */
-                const Elem * elem = *el;
-
                 /*
                  * We relax all nodes on level 0 first
                  * If the element is refined (level > 0), we interpolate the
@@ -1622,7 +1145,7 @@ void MeshTools::Modification::smooth (MeshBase & mesh,
                  */
                 if (refinement_level == 0)
                   {
-                    for (unsigned int s=0; s<elem->n_neighbors(); s++)
+                    for (auto s : elem->side_index_range())
                       {
                         /*
                          * Only operate on sides which are on the
@@ -1630,25 +1153,25 @@ void MeshTools::Modification::smooth (MeshBase & mesh,
                          * id is greater than its neighbor's.
                          * Sides get only built once.
                          */
-                        if ((elem->neighbor(s) != libmesh_nullptr) &&
-                            (elem->id() > elem->neighbor(s)->id()) )
+                        if ((elem->neighbor_ptr(s) != nullptr) &&
+                            (elem->id() > elem->neighbor_ptr(s)->id()))
                           {
-                            UniquePtr<Elem> side(elem->build_side(s));
+                            std::unique_ptr<const Elem> side(elem->build_side_ptr(s));
 
-                            Node * node0 = side->get_node(0);
-                            Node * node1 = side->get_node(1);
+                            const Node & node0 = side->node_ref(0);
+                            const Node & node1 = side->node_ref(1);
 
                             Real node_weight = 1.;
                             // calculate the weight of the nodes
                             if (power > 0)
                               {
-                                Point diff = (*node0)-(*node1);
+                                Point diff = node0-node1;
                                 node_weight = std::pow(diff.norm(), power);
                               }
 
-                            const dof_id_type id0 = node0->id(), id1 = node1->id();
-                            new_positions[id0].add_scaled( *node1, node_weight );
-                            new_positions[id1].add_scaled( *node0, node_weight );
+                            const dof_id_type id0 = node0.id(), id1 = node1.id();
+                            new_positions[id0].add_scaled( node1, node_weight );
+                            new_positions[id1].add_scaled( node0, node_weight );
                             weight[id0] += node_weight;
                             weight[id1] += node_weight;
                           }
@@ -1668,37 +1191,31 @@ void MeshTools::Modification::smooth (MeshBase & mesh,
                     /*
                      * find out which child I am
                      */
-                    for (unsigned int c=0; c < parent->n_children(); c++)
+                    unsigned int c = parent->which_child_am_i(elem);
+                    /*
+                     *loop over the childs (that is, the current elements) nodes
+                     */
+                    for (auto nc : elem->node_index_range())
                       {
-                        if (parent->child(c) == elem)
+                        /*
+                         * the new position of the node
+                         */
+                        Point point;
+                        for (auto n : parent->node_index_range())
                           {
                             /*
-                             *loop over the childs (that is, the current elements) nodes
+                             * The value from the embedding matrix
                              */
-                            for (unsigned int nc=0; nc < elem->n_nodes(); nc++)
-                              {
-                                /*
-                                 * the new position of the node
-                                 */
-                                Point point;
-                                for (unsigned int n=0; n<parent->n_nodes(); n++)
-                                  {
-                                    /*
-                                     * The value from the embedding matrix
-                                     */
-                                    const float em_val = parent->embedding_matrix(c,nc,n);
+                            const float em_val = parent->embedding_matrix(c,nc,n);
 
-                                    if (em_val != 0.)
-                                      point.add_scaled (parent->point(n), em_val);
-                                  }
+                            if (em_val != 0.)
+                              point.add_scaled (parent->point(n), em_val);
+                          }
 
-                                const dof_id_type id = elem->get_node(nc)->id();
-                                new_positions[id] = point;
-                                weight[id] = 1.;
-                              }
-
-                          } // if parent->child == elem
-                      } // for parent->n_children
+                        const dof_id_type id = elem->node_ptr(nc)->id();
+                        new_positions[id] = point;
+                        weight[id] = 1.;
+                      }
                   } // if element refinement_level
 #endif // #ifdef LIBMESH_ENABLE_AMR
 
@@ -1708,44 +1225,32 @@ void MeshTools::Modification::smooth (MeshBase & mesh,
              * finally reposition the vertex nodes
              */
             for (unsigned int nid=0; nid<mesh.n_nodes(); ++nid)
-              if (!on_boundary[nid] && weight[nid] > 0.)
-                mesh.node(nid) = new_positions[nid]/weight[nid];
+              if (!boundary_node_ids.count(nid) && weight[nid] > 0.)
+                mesh.node_ref(nid) = new_positions[nid]/weight[nid];
           }
 
-          {
-            /*
-             * Now handle the additional second_order nodes by calculating
-             * their position based on the vertex postitions
-             * we do a second loop over the level elements
-             */
-            MeshBase::element_iterator       el  = mesh.level_elements_begin(refinement_level);
-            const MeshBase::element_iterator end = mesh.level_elements_end(refinement_level);
+          // Now handle the additional second_order nodes by calculating
+          // their position based on the vertex positions
+          // we do a second loop over the level elements
+          for (auto & elem : as_range(mesh.level_elements_begin(refinement_level),
+                                      mesh.level_elements_end(refinement_level)))
+            {
+              const unsigned int son_begin = elem->n_vertices();
+              const unsigned int son_end   = elem->n_nodes();
+              for (unsigned int n=son_begin; n<son_end; n++)
+                {
+                  const unsigned int n_adjacent_vertices =
+                    elem->n_second_order_adjacent_vertices(n);
 
-            for (; el != end; ++el)
-              {
-                /*
-                 * Constant handle for the element
-                 */
-                const Elem * elem = *el;
-                const unsigned int son_begin = elem->n_vertices();
-                const unsigned int son_end   = elem->n_nodes();
-                for (unsigned int n=son_begin; n<son_end; n++)
-                  {
-                    const unsigned int n_adjacent_vertices =
-                      elem->n_second_order_adjacent_vertices(n);
+                  Point point;
+                  for (unsigned int v=0; v<n_adjacent_vertices; v++)
+                    point.add(elem->point( elem->second_order_adjacent_vertex(n,v) ));
 
-                    Point point;
-                    for (unsigned int v=0; v<n_adjacent_vertices; v++)
-                      point.add(elem->point( elem->second_order_adjacent_vertex(n,v) ));
-
-                    const dof_id_type id = elem->get_node(n)->id();
-                    mesh.node(id) = point/n_adjacent_vertices;
-                  }
-              }
-          }
-
+                  const dof_id_type id = elem->node_ptr(n)->id();
+                  mesh.node_ref(id) = point/n_adjacent_vertices;
+                }
+            }
         } // refinement_level loop
-
     } // end iteration
 }
 
@@ -1779,106 +1284,82 @@ void MeshTools::Modification::flatten(MeshBase & mesh)
   saved_boundary_elements.reserve(mesh.get_boundary_info().n_boundary_conds());
   saved_bc_ids.reserve(mesh.get_boundary_info().n_boundary_conds());
   saved_bc_sides.reserve(mesh.get_boundary_info().n_boundary_conds());
-  {
-    MeshBase::element_iterator       it  = mesh.active_elements_begin();
-    const MeshBase::element_iterator end = mesh.active_elements_end();
 
-    for (; it != end; ++it)
-      {
-        Elem * elem = *it;
+  for (auto & elem : mesh.active_element_ptr_range())
+    {
+      // Make a new element of the same type
+      Elem * copy = Elem::build(elem->type()).release();
 
-        // Make a new element of the same type
-        Elem * copy = Elem::build(elem->type()).release();
+      // Set node pointers (they still point to nodes in the original mesh)
+      for (auto n : elem->node_index_range())
+        copy->set_node(n) = elem->node_ptr(n);
 
-        // Set node pointers (they still point to nodes in the original mesh)
-        for(unsigned int n=0; n<elem->n_nodes(); n++)
-          copy->set_node(n) = elem->get_node(n);
+      // Copy over ids
+      copy->processor_id() = elem->processor_id();
+      copy->subdomain_id() = elem->subdomain_id();
 
-        // Copy over ids
-        copy->processor_id() = elem->processor_id();
-        copy->subdomain_id() = elem->subdomain_id();
-
-        // Retain the original element's ID(s) as well, otherwise
-        // the Mesh may try to create them for you...
-        copy->set_id( elem->id() );
+      // Retain the original element's ID(s) as well, otherwise
+      // the Mesh may try to create them for you...
+      copy->set_id( elem->id() );
 #ifdef LIBMESH_ENABLE_UNIQUE_ID
-        copy->set_unique_id() = elem->unique_id();
+      copy->set_unique_id() = elem->unique_id();
 #endif
 
-        // This element could have boundary info or ParallelMesh
-        // remote_elem links as well.  We need to save the (elem,
-        // side, bc_id) triples and those links
-        for (unsigned short s=0; s<elem->n_sides(); s++)
-          {
-            if (elem->neighbor(s) == remote_elem)
-              copy->set_neighbor(s, const_cast<RemoteElem *>(remote_elem));
+      // This element could have boundary info or DistributedMesh
+      // remote_elem links as well.  We need to save the (elem,
+      // side, bc_id) triples and those links
+      for (auto s : elem->side_index_range())
+        {
+          if (elem->neighbor_ptr(s) == remote_elem)
+            copy->set_neighbor(s, const_cast<RemoteElem *>(remote_elem));
 
-            mesh.get_boundary_info().boundary_ids(elem, s, bc_ids);
-            for (std::vector<boundary_id_type>::const_iterator id_it=bc_ids.begin(); id_it!=bc_ids.end(); ++id_it)
+          mesh.get_boundary_info().boundary_ids(elem, s, bc_ids);
+          for (const auto & bc_id : bc_ids)
+            if (bc_id != BoundaryInfo::invalid_id)
               {
-                const boundary_id_type bc_id = *id_it;
-
-                if (bc_id != BoundaryInfo::invalid_id)
-                  {
-                    saved_boundary_elements.push_back(copy);
-                    saved_bc_ids.push_back(bc_id);
-                    saved_bc_sides.push_back(s);
-                  }
+                saved_boundary_elements.push_back(copy);
+                saved_bc_ids.push_back(bc_id);
+                saved_bc_sides.push_back(s);
               }
-          }
+        }
 
 
-        // We're done with this element
-        mesh.delete_elem(elem);
+      // We're done with this element
+      mesh.delete_elem(elem);
 
-        // But save the copy
-        new_elements.push_back(copy);
-      }
+      // But save the copy
+      new_elements.push_back(copy);
+    }
 
-    // Make sure we saved the same number of boundary conditions
-    // in each vector.
-    libmesh_assert_equal_to (saved_boundary_elements.size(), saved_bc_ids.size());
-    libmesh_assert_equal_to (saved_bc_ids.size(), saved_bc_sides.size());
-  }
-
+  // Make sure we saved the same number of boundary conditions
+  // in each vector.
+  libmesh_assert_equal_to (saved_boundary_elements.size(), saved_bc_ids.size());
+  libmesh_assert_equal_to (saved_bc_ids.size(), saved_bc_sides.size());
 
   // Loop again, delete any remaining elements
-  {
-    MeshBase::element_iterator       it  = mesh.elements_begin();
-    const MeshBase::element_iterator end = mesh.elements_end();
-
-    for (; it != end; ++it)
-      mesh.delete_elem( *it );
-  }
-
+  for (auto & elem : mesh.element_ptr_range())
+    mesh.delete_elem(elem);
 
   // Add the copied (now level-0) elements back to the mesh
-  {
-    for (std::vector<Elem *>::iterator it = new_elements.begin();
-         it != new_elements.end();
-         ++it)
-      {
-#ifndef NDEBUG
-        dof_id_type orig_id = (*it)->id();
+  for (auto & new_elem : new_elements)
+    {
+      // Save the original ID, because the act of adding the Elem can
+      // change new_elem's id!
+      dof_id_type orig_id = new_elem->id();
 
-        // ugly mid-statement endif to avoid unused variable warnings
-        Elem * added_elem =
-#endif
-          mesh.add_elem(*it);
+      Elem * added_elem = mesh.add_elem(new_elem);
 
-#ifndef NDEBUG
-        dof_id_type added_id = added_elem->id();
-#endif
+      // If the Elem, as it was re-added to the mesh, now has a
+      // different ID (this is unlikely, so it's just an assert)
+      // the boundary information will no longer be correct.
+      libmesh_assert_equal_to (orig_id, added_elem->id());
 
-        // If the Elem, as it was re-added to the mesh, now has a
-        // different ID (this is unlikely, so it's just an assert)
-        // the boundary information will no longer be correct.
-        libmesh_assert_equal_to (orig_id, added_id);
-      }
-  }
+      // Avoid compiler warnings in opt mode.
+      libmesh_ignore(added_elem, orig_id);
+    }
 
   // Finally, also add back the saved boundary information
-  for (unsigned int e=0; e<saved_boundary_elements.size(); ++e)
+  for (std::size_t e=0; e<saved_boundary_elements.size(); ++e)
     mesh.get_boundary_info().add_side(saved_boundary_elements[e],
                                       saved_bc_sides[e],
                                       saved_bc_ids[e]);
@@ -1894,7 +1375,7 @@ void MeshTools::Modification::change_boundary_id (MeshBase & mesh,
                                                   const boundary_id_type old_id,
                                                   const boundary_id_type new_id)
 {
-  if(old_id == new_id)
+  if (old_id == new_id)
     {
       // If the IDs are the same, this is a no-op.
       return;
@@ -1904,20 +1385,15 @@ void MeshTools::Modification::change_boundary_id (MeshBase & mesh,
   BoundaryInfo & bi = mesh.get_boundary_info();
 
   {
-    // Build a list of all nodes that have boundary IDs
-    std::vector<dof_id_type> node_list;
-    std::vector<boundary_id_type> bc_id_list;
-    bi.build_node_list (node_list, bc_id_list);
-
     // Temporary vector to hold ids
     std::vector<boundary_id_type> bndry_ids;
 
-    // For each node with the old_id...
-    for (unsigned idx=0; idx<node_list.size(); ++idx)
-      if (bc_id_list[idx] == old_id)
+    // build_node_list returns a vector of (node, bc) tuples.
+    for (const auto & t : bi.build_node_list())
+      if (std::get<1>(t) == old_id)
         {
           // Get the node in question
-          const Node * node = mesh.node_ptr(node_list[idx]);
+          const Node * node = mesh.node_ptr(std::get<0>(t));
 
           // Get all the current IDs for this node.
           bi.boundary_ids(node, bndry_ids);
@@ -1934,24 +1410,18 @@ void MeshTools::Modification::change_boundary_id (MeshBase & mesh,
   }
 
   {
-    // Build a list of all edges that have boundary IDs
-    std::vector<dof_id_type> elem_list;
-    std::vector<unsigned short int> edge_list;
-    std::vector<boundary_id_type> bc_id_list;
-    bi.build_edge_list (elem_list, edge_list, bc_id_list);
-
     // Temporary vector to hold ids
     std::vector<boundary_id_type> bndry_ids;
 
-    // For each edge with the old_id...
-    for (unsigned idx=0; idx<elem_list.size(); ++idx)
-      if (bc_id_list[idx] == old_id)
+    // build_edge_list returns a vector of (elem, side, bc) tuples.
+    for (const auto & t : bi.build_edge_list())
+      if (std::get<2>(t) == old_id)
         {
           // Get the elem in question
-          const Elem * elem = mesh.elem(elem_list[idx]);
+          const Elem * elem = mesh.elem_ptr(std::get<0>(t));
 
           // The edge of the elem in question
-          unsigned short int edge = edge_list[idx];
+          unsigned short int edge = std::get<1>(t);
 
           // Get all the current IDs for the edge in question.
           bi.edge_boundary_ids(elem, edge, bndry_ids);
@@ -1968,24 +1438,46 @@ void MeshTools::Modification::change_boundary_id (MeshBase & mesh,
   }
 
   {
-    // Build a list of all sides that have boundary IDs
-    std::vector<dof_id_type> elem_list;
-    std::vector<unsigned short int> side_list;
-    std::vector<boundary_id_type> bc_id_list;
-    bi.build_side_list (elem_list, side_list, bc_id_list);
-
     // Temporary vector to hold ids
     std::vector<boundary_id_type> bndry_ids;
 
-    // For each side with the old_id...
-    for (unsigned idx=0; idx<elem_list.size(); ++idx)
-      if (bc_id_list[idx] == old_id)
+    // build_shellface_list returns a vector of (elem, side, bc) tuples.
+    for (const auto & t : bi.build_shellface_list())
+      if (std::get<2>(t) == old_id)
         {
           // Get the elem in question
-          const Elem * elem = mesh.elem(elem_list[idx]);
+          const Elem * elem = mesh.elem_ptr(std::get<0>(t));
+
+          // The shellface of the elem in question
+          unsigned short int shellface = std::get<1>(t);
+
+          // Get all the current IDs for the shellface in question.
+          bi.shellface_boundary_ids(elem, shellface, bndry_ids);
+
+          // Update the IDs accordingly
+          std::replace(bndry_ids.begin(), bndry_ids.end(), old_id, new_id);
+
+          // Remove all traces of that shellface from the BoundaryInfo object
+          bi.remove_shellface(elem, shellface);
+
+          // Add it back with the updated IDs
+          bi.add_shellface(elem, shellface, bndry_ids);
+        }
+  }
+
+  {
+    // Temporary vector to hold ids
+    std::vector<boundary_id_type> bndry_ids;
+
+    // build_side_list returns a vector of (elem, side, bc) tuples.
+    for (const auto & t : bi.build_side_list())
+      if (std::get<2>(t) == old_id)
+        {
+          // Get the elem in question
+          const Elem * elem = mesh.elem_ptr(std::get<0>(t));
 
           // The side of the elem in question
-          unsigned short int side = side_list[idx];
+          unsigned short int side = std::get<1>(t);
 
           // Get all the current IDs for the side in question.
           bi.boundary_ids(elem, side, bndry_ids);
@@ -2012,19 +1504,14 @@ void MeshTools::Modification::change_subdomain_id (MeshBase & mesh,
                                                    const subdomain_id_type old_id,
                                                    const subdomain_id_type new_id)
 {
-  if(old_id == new_id)
+  if (old_id == new_id)
     {
       // If the IDs are the same, this is a no-op.
       return;
     }
 
-  MeshBase::element_iterator           el = mesh.elements_begin();
-  const MeshBase::element_iterator end_el = mesh.elements_end();
-
-  for (; el != end_el; ++el)
+  for (auto & elem : mesh.element_ptr_range())
     {
-      Elem * elem = *el;
-
       if (elem->subdomain_id() == old_id)
         elem->subdomain_id() = new_id;
     }

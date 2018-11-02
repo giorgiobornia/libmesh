@@ -3,6 +3,7 @@
 #include "extrasrc/fptypes.hh"
 #include "extrasrc/fpaux.hh"
 #include <stdlib.h>
+#include "Faddeeva.hh"
 
 using namespace FUNCTIONPARSERTYPES;
 
@@ -11,14 +12,14 @@ using namespace FUNCTIONPARSERTYPES;
 using namespace FPoptimizer_CodeTree;
 
 #include <iostream>
+#include <fstream>
+#include <cstdio>
+#include <sys/stat.h>
+#include <errno.h>
+#include <unistd.h>
 
 #if LIBMESH_HAVE_FPARSER_JIT
-#  include <fstream>
-#  include <cstdio>
-#  include <unistd.h>
 #  include <dlfcn.h>
-#  include <errno.h>
-#  include <sys/stat.h>
 #endif
 
 #include "lib/sha1.h"
@@ -89,6 +90,8 @@ FunctionParserADBase<Value_t>::FunctionParserADBase() :
     ad(new ADImplementation<Value_t>(this))
 {
   this->AddFunction("plog", fp_plog, 2);
+  mFErf = this->mData->mFuncPtrs.size();
+  this->AddFunction("erf", fp_erf, 1);
 }
 
 template<typename Value_t>
@@ -96,10 +99,12 @@ FunctionParserADBase<Value_t>::FunctionParserADBase(const FunctionParserADBase& 
     FunctionParserBase<Value_t>(cpy),
     compiledFunction(cpy.compiledFunction),
     mFPlog(cpy.mFPlog),
+    mFErf(cpy.mFErf),
     mADFlags(cpy.mADFlags),
     mRegisteredDerivatives(cpy.mRegisteredDerivatives),
     ad(new ADImplementation<Value_t>(this))
 {
+  pImmed = this->mData->mImmed.empty() ? NULL : &(this->mData->mImmed[0]);
 }
 
 template<typename Value_t>
@@ -108,6 +113,32 @@ Value_t FunctionParserADBase<Value_t>::fp_plog(const Value_t * params)
   const Value_t x = params[0];
   const Value_t a = params[1];
   return x < a ? fp_log(a) + (x-a)/a - (x-a)*(x-a)/(Value_t(2)*a*a) + (x-a)*(x-a)*(x-a)/(Value_t(3)*a*a*a) : fp_log(x);
+}
+
+template <typename Value_t>
+Value_t FunctionParserADBase<Value_t>::fp_erf(const Value_t * params)
+{
+  return Faddeeva::erf(params[0]);
+}
+
+template<>
+std::complex<float>
+FunctionParserADBase<std::complex<float> >::fp_erf(const std::complex<float> * params)
+{
+  std::complex<double> result =
+    Faddeeva::erf(std::complex<double>(params[0].real(),
+                                       params[0].imag()));
+  return std::complex<float>(result.real(), result.imag());
+}
+
+template<>
+std::complex<long double>
+FunctionParserADBase<std::complex<long double> >::fp_erf(const std::complex<long double> * params)
+{
+  std::complex<double> result =
+    Faddeeva::erf(std::complex<double>(params[0].real(),
+                                       params[0].imag()));
+  return std::complex<long double>(result.real(), result.imag());
 }
 
 template<typename Value_t>
@@ -187,14 +218,14 @@ typename ADImplementation<Value_t>::CodeTreeAD ADImplementation<Value_t>::D(cons
 {
   // derivative of a constant number is 0
   if (func.IsImmed())
-    return CodeTreeAD(CodeTreeImmed(Value_t(0)));
+    return CodeTreeAD(0);
 
   // derivative of a variable is 1 for the variable we are diffing w.r.t. and 0 otherwise
   if (func.IsVar())
   {
     if (func.GetVar() == var) {
       // dx/dx = 1
-      return CodeTreeAD(CodeTreeImmed(Value_t(1)));
+      return CodeTreeAD(1);
     } else {
       // check if this derivative is registered
       typename std::vector<typename FunctionParserADBase<Value_t>::VariableDerivative>::const_iterator it;
@@ -204,7 +235,7 @@ typename ADImplementation<Value_t>::CodeTreeAD ADImplementation<Value_t>::D(cons
           return CodeTreeAD(CodeTreeVar<Value_t>(it->derivative));
 
       // otherwise return zero
-      return CodeTreeAD(CodeTreeImmed(Value_t(0)));
+      return CodeTreeAD(0);
     }
   }
 
@@ -248,6 +279,7 @@ typename ADImplementation<Value_t>::CodeTreeAD ADImplementation<Value_t>::D(cons
         sub.SetOpcode(cMul);
         for (j = 0; j < nparam; ++j)
           sub.AddParam(i==j ? D(param[j]) : param[j]);
+        sub.Rehash();
         diff.AddParam(sub);
       }
       diff.Rehash();
@@ -296,7 +328,7 @@ typename ADImplementation<Value_t>::CodeTreeAD ADImplementation<Value_t>::D(cons
         if (exponent == Value_t(1))
           return D(a);
         if (exponent == Value_t(0))
-          return CodeTreeAD(CodeTreeImmed(Value_t(0)));
+          return CodeTreeAD(0);
         return MakeTree(cPow, a, CodeTreeAD(exponent - Value_t(1))) * b * D(a);
       }
       return MakeTree(cPow, a, b) * (D(b) * MakeTree(cLog, a) + b * D(a)/a);
@@ -355,7 +387,7 @@ typename ADImplementation<Value_t>::CodeTreeAD ADImplementation<Value_t>::D(cons
     case cLessOrEq:
     case cGreater:
     case cGreaterOrEq:
-      return CodeTreeAD(CodeTreeImmed(Value_t(0)));
+      return CodeTreeAD(0);
 
     // these opcodes will never appear in the tree when building with keep_powi == false
     // they will be replaced by cPow, cMul, cDiv etc.:
@@ -372,6 +404,10 @@ typename ADImplementation<Value_t>::CodeTreeAD ADImplementation<Value_t>::D(cons
             + MakeTree(cPow, b, CodeTreeAD(-3)) * MakeTree(cSqr, a-b),
             MakeTree(cInv, a)
         );
+      }
+      else if (func.GetFuncNo() == this->parser->mFErf)
+      {
+        return D(a) * CodeTreeAD(Value_t(2) / fp_sqrt<Value_t>(M_PI)) * MakeTree(cExp, -(a*a));
       }
       // fall through to undefined
 
@@ -394,11 +430,11 @@ int FunctionParserADBase<Value_t>::AutoDiff(const std::string& var_name)
     unsigned int var_number = LookUpVarOpcode(var_name);
 
     // should and can we load a cached derivative?
-    std::string cache_file;
-    const std::string jitdir = ".jitdir";
+    std::string cachename;
+    const std::string jitdir = ".jitcache";
     if (cached)
     {
-      // generate a sha1 hash of the Value type size, byte code, and immediate list
+      // generate a sha1 hash of the Value type size, byte code, immediate list, and registered derivatives
       SHA1 *sha1 = new SHA1();
       char result[41]; // 40 sha1 chars plus null
       size_t value_t_size = sizeof(Value_t);
@@ -406,6 +442,8 @@ int FunctionParserADBase<Value_t>::AutoDiff(const std::string& var_name)
       sha1->addBytes(reinterpret_cast<const char *>(&this->mData->mByteCode[0]), this->mData->mByteCode.size() * sizeof(unsigned));
       if (!this->mData->mImmed.empty())
         sha1->addBytes(reinterpret_cast<const char *>(&this->mData->mImmed[0]), this->mData->mImmed.size() * sizeof(Value_t));
+      for (const auto & reg : this->mRegisteredDerivatives)
+        sha1->addBytes(reinterpret_cast<const char *>(&reg), sizeof(VariableDerivative));
 
       unsigned char* digest = sha1->getDigest();
       for (unsigned int i = 0; i<20; ++i)
@@ -418,14 +456,14 @@ int FunctionParserADBase<Value_t>::AutoDiff(const std::string& var_name)
       sprintf(var_number_string, "%x", var_number - VarBegin);
 
       // function name
-      cache_file = jitdir + "/d_";
-      cache_file += result;
-      cache_file += "_";
-      cache_file += var_number_string;
+      cachename = jitdir + "/d_";
+      cachename += result;
+      cachename += "_";
+      cachename += var_number_string;
 
       // try to open cache file
       std::ifstream istr;
-      istr.open(cache_file.c_str(), std::ios::in | std::ios::binary);
+      istr.open(cachename.c_str(), std::ios::in | std::ios::binary);
       if (istr)
       {
         Unserialize(istr);
@@ -447,14 +485,28 @@ int FunctionParserADBase<Value_t>::AutoDiff(const std::string& var_name)
       if (mkdir(jitdir.c_str(), 0700) == 0 || errno == EEXIST)
       {
         // save to a temporary name and rename only when the file is fully written
-        std::string cache_file_tmp = cache_file + ".tmp";
-        std::ofstream ostr;
-        ostr.open(cache_file_tmp.c_str(), std::ios::out | std::ios::binary);
-        if (ostr)
+        char cachetmpname[] = "./tmp_adc_XXXXXX";
+        int cachetmpfile = mkstemp(cachetmpname);
+        if (cachetmpfile == -1)
+          std::cerr << "Error creating AD cache tmp file " << cachetmpname << ".\n";
+        else
         {
-          Serialize(ostr);
-          ostr.close();
-          std::rename(cache_file_tmp.c_str(), cache_file.c_str());
+          close(cachetmpfile);
+          std::ofstream ostr;
+          ostr.open(cachetmpname, std::ios::out | std::ios::binary);
+          if (ostr)
+          {
+            Serialize(ostr);
+            ostr.close();
+
+            /**
+             * MPI runs on asynchronous networked filesystems require a two-step
+             * renaming. The link call will not do anything if the file cachename
+             * has already been created by a different rank.
+             */
+            link(cachetmpname, cachename.c_str());
+            std::remove(cachetmpname);
+          }
         }
       }
     }
@@ -507,13 +559,7 @@ template<typename Value_t>
 int ADImplementation<Value_t>::AutoDiff(unsigned int _var, typename FunctionParserADBase<Value_t>::Data * mData, bool autoOptimize)
 {
   CodeTreeAD orig;
-
-  std::vector<CodeTree<Value_t> > var_trees;
-  var_trees.reserve(mData->mVariablesAmount);
-  for(unsigned n=0; n<mData->mVariablesAmount; ++n)
-    var_trees.push_back(CodeTreeVar<Value_t>(n + VarBegin));
-
-  orig.GenerateFrom(*mData, var_trees, false);
+  orig.GenerateFrom(*mData, false);
 
   // store variable we are diffing for as a member
   var = _var;
@@ -635,18 +681,23 @@ bool FunctionParserADBase<Value_t>::JITCompileHelper(const std::string & Value_t
 
   // tmp filenames
   char ccname[] = "./tmp_jit_XXXXXX";
-  if (mkstemp(ccname) == -1)
+  int ccfile = mkstemp(ccname);
+  if (ccfile == -1)
   {
     std::cerr << "Error creating JIT tmp file " << ccname << ".\n";
     return false;
   }
-  char object[] = "./tmp_jit_XXXXXX";
-  if (mkstemp(object) == -1)
+  close(ccfile); // close file. We reopen this using an ofstream below.
+
+  char objectname[] = "./tmp_jit_XXXXXX";
+  int objectfile = mkstemp(objectname);
+  if (objectfile == -1)
   {
-    std::cerr << "Error creating JIT tmp file " << object << ".\n";
+    std::cerr << "Error creating JIT tmp file " << objectname << ".\n";
     std::remove(ccname);
     return false;
   }
+  close(objectfile); // close file. Will be reopened by the compiler.
 
   int status;
   std::vector<bool> jumpTarget(ByteCode.size());
@@ -655,7 +706,7 @@ bool FunctionParserADBase<Value_t>::JITCompileHelper(const std::string & Value_t
   // determine all jump targets in the current program
   unsigned long ip;
   for (unsigned int i = 0; i < ByteCode.size(); ++i)
-    switch(ByteCode[i])
+    switch (ByteCode[i])
     {
       case cJump: case cIf: case cAbsIf:
         ip = ByteCode[i+1] + 1;
@@ -677,20 +728,20 @@ bool FunctionParserADBase<Value_t>::JITCompileHelper(const std::string & Value_t
   for (unsigned int i = 0; i < ByteCode.size(); ++i) stackAtTarget[i] = -2;
 
   // save source
-  std::ofstream ccfile;
-  ccfile.open(ccname);
-  ccfile << "#define _USE_MATH_DEFINES\n";
-  ccfile << "#include <cmath>\n";
-  ccfile << "extern \"C\" " << Value_t_name << ' '
+  std::ofstream ccout;
+  ccout.open(ccname);
+  ccout << "#define _USE_MATH_DEFINES\n";
+  ccout << "#include <cmath>\n";
+  ccout << "extern \"C\" " << Value_t_name << ' '
          << fnname << "(const " << Value_t_name << " *params, const " << Value_t_name << " *immed, const " << Value_t_name << " eps) {\n";
-  ccfile << Value_t_name << " r, s[" << this->mData->mStackSize << "];\n";
+  ccout << Value_t_name << " r, s[" << this->mData->mStackSize << "];\n";
   int nImmed = 0, sp = -1, op;
   for (unsigned int i = 0; i < ByteCode.size(); ++i)
   {
     // place a label?
     if (jumpTarget[i])
     {
-      ccfile << "l" << i << ":\n";
+      ccout << "l" << i << ":\n";
       if (stackAtTarget[i] > -2)
         sp = stackAtTarget[i];
     }
@@ -699,153 +750,164 @@ bool FunctionParserADBase<Value_t>::JITCompileHelper(const std::string & Value_t
     switch (op = ByteCode[i])
     {
       case cImmed:
-        ++sp; ccfile << "s[" << sp << "] = immed[" << nImmed++ << "];\n"; break;
+        ++sp; ccout << "s[" << sp << "] = immed[" << nImmed++ << "];\n"; break;
       case cAdd:
-        --sp; ccfile << "s[" << sp << "] += s[" << (sp+1) << "];\n"; break;
+        --sp; ccout << "s[" << sp << "] += s[" << (sp+1) << "];\n"; break;
       case cSub:
-        --sp; ccfile << "s[" << sp << "] -= s[" << (sp+1) << "];\n"; break;
+        --sp; ccout << "s[" << sp << "] -= s[" << (sp+1) << "];\n"; break;
       case cRSub:
-        --sp; ccfile << "s[" << sp << "] = s[" << (sp+1) << "] - s[" << sp << "];\n"; break;
+        --sp; ccout << "s[" << sp << "] = s[" << (sp+1) << "] - s[" << sp << "];\n"; break;
       case cMul:
-        --sp; ccfile << "s[" << sp << "] *= s[" << (sp+1) << "];\n"; break;
+        --sp; ccout << "s[" << sp << "] *= s[" << (sp+1) << "];\n"; break;
       case cDiv:
-        --sp; ccfile << "s[" << sp << "] /= s[" << (sp+1) << "];\n"; break;
+        --sp; ccout << "s[" << sp << "] /= s[" << (sp+1) << "];\n"; break;
       case cMod:
-        --sp; ccfile << "s[" << sp << "] = std::fmod(s[" << sp << "], s[" << (sp+1) << "]);\n"; break;
+        --sp; ccout << "s[" << sp << "] = std::fmod(s[" << sp << "], s[" << (sp+1) << "]);\n"; break;
       case cRDiv:
-        --sp; ccfile << "s[" << sp << "] = s[" << (sp+1) << "] / s[" << sp << "];\n"; break;
+        --sp; ccout << "s[" << sp << "] = s[" << (sp+1) << "] / s[" << sp << "];\n"; break;
 
       case cSin:
-        ccfile << "s[" << sp << "] = std::sin(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::sin(s[" << sp << "]);\n"; break;
       case cCos:
-        ccfile << "s[" << sp << "] = std::cos(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::cos(s[" << sp << "]);\n"; break;
       case cTan:
-        ccfile << "s[" << sp << "] = std::tan(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::tan(s[" << sp << "]);\n"; break;
       case cSinh:
-        ccfile << "s[" << sp << "] = std::sinh(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::sinh(s[" << sp << "]);\n"; break;
       case cCosh:
-        ccfile << "s[" << sp << "] = std::cosh(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::cosh(s[" << sp << "]);\n"; break;
       case cTanh:
-        ccfile << "s[" << sp << "] = std::tanh(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::tanh(s[" << sp << "]);\n"; break;
       // TODO: div by zero -> this->mData->mEvalErrorType=1; return Value_t(0);
       case cCsc:
-        ccfile << "s[" << sp << "] = 1.0/std::sin(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = 1.0/std::sin(s[" << sp << "]);\n"; break;
       case cSec:
-        ccfile << "s[" << sp << "] = 1.0/std::cos(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = 1.0/std::cos(s[" << sp << "]);\n"; break;
       case cCot:
-        ccfile << "s[" << sp << "] = 1.0/std::tan(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = 1.0/std::tan(s[" << sp << "]);\n"; break;
       case cSinCos:
-        ccfile << "s[" << (sp+1) << "] = std::cos(s[" << sp << "]);\n";
-        ccfile << "s[" << sp << "] = std::sin(s[" << sp << "]);\n";
+        ccout << "s[" << (sp+1) << "] = std::cos(s[" << sp << "]);\n";
+        ccout << "s[" << sp << "] = std::sin(s[" << sp << "]);\n";
         ++sp;
         break;
       case cSinhCosh:
-        ccfile << "s[" << (sp+1) << "] = std::cosh(s[" << sp << "]);\n";
-        ccfile << "s[" << sp << "] = std::sinh(s[" << sp << "]);\n";
+        ccout << "s[" << (sp+1) << "] = std::cosh(s[" << sp << "]);\n";
+        ccout << "s[" << sp << "] = std::sinh(s[" << sp << "]);\n";
         ++sp;
         break;
       case cAsin:
-        ccfile << "s[" << sp << "] = std::asin(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::asin(s[" << sp << "]);\n"; break;
       case cAcos:
-        ccfile << "s[" << sp << "] = std::acos(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::acos(s[" << sp << "]);\n"; break;
       case cAsinh:
-        ccfile << "s[" << sp << "] = std::asinh(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::asinh(s[" << sp << "]);\n"; break;
       case cAcosh:
-        ccfile << "s[" << sp << "] = std::acosh(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::acosh(s[" << sp << "]);\n"; break;
       case cAtan:
-        ccfile << "s[" << sp << "] = std::atan(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::atan(s[" << sp << "]);\n"; break;
       case cAtanh:
-        ccfile << "s[" << sp << "] = std::atanh(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::atanh(s[" << sp << "]);\n"; break;
       case cAtan2:
-        --sp; ccfile << "s[" << sp << "] = std::atan2(s[" << sp << "], s[" << (sp+1) << "]);\n"; break;
+        --sp; ccout << "s[" << sp << "] = std::atan2(s[" << sp << "], s[" << (sp+1) << "]);\n"; break;
       case cHypot:
-        --sp; ccfile << "s[" << sp << "] = std::sqrt(s[" << sp << "]*s[" << sp << "] + s[" << (sp+1) << "]*s[" << (sp+1) << "]);\n"; break;
+        --sp; ccout << "s[" << sp << "] = std::sqrt(s[" << sp << "]*s[" << sp << "] + s[" << (sp+1) << "]*s[" << (sp+1) << "]);\n"; break;
 
       case cAbs:
-        ccfile << "s[" << sp << "] = std::abs(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::abs(s[" << sp << "]);\n"; break;
       case cMax:
-        --sp; ccfile << "s[" << sp << "] = s[" << sp << "] > s[" << (sp+1) << "] ? s[" << sp << "] : s[" << (sp+1) << "];\n"; break;
+        --sp; ccout << "s[" << sp << "] = s[" << sp << "] > s[" << (sp+1) << "] ? s[" << sp << "] : s[" << (sp+1) << "];\n"; break;
       case cMin:
-        --sp; ccfile << "s[" << sp << "] = s[" << sp << "] < s[" << (sp+1) << "] ? s[" << sp << "] : s[" << (sp+1) << "];\n"; break;
+        --sp; ccout << "s[" << sp << "] = s[" << sp << "] < s[" << (sp+1) << "] ? s[" << sp << "] : s[" << (sp+1) << "];\n"; break;
       case cTrunc:
-        ccfile << "s[" << sp << "] = s[" << sp << "] < 0 ? std::ceil(s[" << sp << "]) : std::floor(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = s[" << sp << "] < 0 ? std::ceil(s[" << sp << "]) : std::floor(s[" << sp << "]);\n"; break;
       case cCeil:
-        ccfile << "s[" << sp << "] = std::ceil(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::ceil(s[" << sp << "]);\n"; break;
       case cFloor:
-        ccfile << "s[" << sp << "] = std::floor(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::floor(s[" << sp << "]);\n"; break;
       case cInt:
-        ccfile << "s[" << sp << "] = s[" << sp << "] < 0 ? std::ceil(s[" << sp << "] - 0.5) : std::floor(s[" << sp << "] + 0.5);\n"; break;
+        ccout << "s[" << sp << "] = s[" << sp << "] < 0 ? std::ceil(s[" << sp << "] - 0.5) : std::floor(s[" << sp << "] + 0.5);\n"; break;
 
       case cEqual:
-        //--sp; ccfile << "s[" << sp << "] = s[" << sp << "] == s[" << (sp+1) << "];\n"; break;
-        --sp; ccfile << "s[" << sp << "] = std::abs(s[" << sp << "] - s[" << (sp+1) << "]) <= eps;\n"; break;
+        //--sp; ccout << "s[" << sp << "] = s[" << sp << "] == s[" << (sp+1) << "];\n"; break;
+        --sp; ccout << "s[" << sp << "] = std::abs(s[" << sp << "] - s[" << (sp+1) << "]) <= eps;\n"; break;
       case cNEqual:
-        //--sp; ccfile << "s[" << sp << "] = s[" << sp << "] != s[" << (sp+1) << "];\n"; break;
-        --sp; ccfile << "s[" << sp << "] = std::abs(s[" << sp << "] - s[" << (sp+1) << "]) > eps;\n"; break;
+        //--sp; ccout << "s[" << sp << "] = s[" << sp << "] != s[" << (sp+1) << "];\n"; break;
+        --sp; ccout << "s[" << sp << "] = std::abs(s[" << sp << "] - s[" << (sp+1) << "]) > eps;\n"; break;
       case cLess:
-        --sp; ccfile << "s[" << sp << "] = s[" << sp << "] < (s[" << (sp+1) << "] - eps);\n"; break;
+        --sp; ccout << "s[" << sp << "] = s[" << sp << "] < (s[" << (sp+1) << "] - eps);\n"; break;
       case cLessOrEq:
-        --sp; ccfile << "s[" << sp << "] = s[" << sp << "] <= (s[" << (sp+1) << "] + eps);\n"; break;
+        --sp; ccout << "s[" << sp << "] = s[" << sp << "] <= (s[" << (sp+1) << "] + eps);\n"; break;
       case cGreater:
-        --sp; ccfile << "s[" << sp << "] = (s[" << sp << "] - eps) > s[" << (sp+1) << "];\n"; break;
+        --sp; ccout << "s[" << sp << "] = (s[" << sp << "] - eps) > s[" << (sp+1) << "];\n"; break;
       case cGreaterOrEq:
-        --sp; ccfile << "s[" << sp << "] = (s[" << sp << "] + eps) >= s[" << (sp+1) << "];\n"; break;
+        --sp; ccout << "s[" << sp << "] = (s[" << sp << "] + eps) >= s[" << (sp+1) << "];\n"; break;
       case cNot:
-        ccfile << "s[" << sp << "] = std::abs(s[" << sp << "]) < 0.5;\n"; break;
+        ccout << "s[" << sp << "] = std::abs(s[" << sp << "]) < 0.5;\n"; break;
       case cNotNot:
-        ccfile << "s[" << sp << "] = std::abs(s[" << sp << "]) >= 0.5;\n"; break;
+        ccout << "s[" << sp << "] = std::abs(s[" << sp << "]) >= 0.5;\n"; break;
       case cAbsNot:
-        ccfile << "s[" << sp << "] = s[" << sp << "] < 0.5;\n"; break;
+        ccout << "s[" << sp << "] = s[" << sp << "] < 0.5;\n"; break;
       case cAbsNotNot:
-        ccfile << "s[" << sp << "] = s[" << sp << "] >= 0.5;\n"; break;
+        ccout << "s[" << sp << "] = s[" << sp << "] >= 0.5;\n"; break;
       case cOr:
-        --sp; ccfile << "s[" << sp << "] = (std::abs(s[" << sp << "]) >= 0.5) || (std::abs(s[" << (sp+1) << "]) >= 0.5);\n"; break;
+        --sp; ccout << "s[" << sp << "] = (std::abs(s[" << sp << "]) >= 0.5) || (std::abs(s[" << (sp+1) << "]) >= 0.5);\n"; break;
       case cAbsOr:
-        --sp; ccfile << "s[" << sp << "] = (s[" << sp << "] >= 0.5) || (s[" << (sp+1) << "] >= 0.5);\n"; break;
+        --sp; ccout << "s[" << sp << "] = (s[" << sp << "] >= 0.5) || (s[" << (sp+1) << "] >= 0.5);\n"; break;
       case cAnd:
-        --sp; ccfile << "s[" << sp << "] = (std::abs(s[" << sp << "]) >= 0.5) && (std::abs(s[" << (sp+1) << "]) >= 0.5);\n"; break;
+        --sp; ccout << "s[" << sp << "] = (std::abs(s[" << sp << "]) >= 0.5) && (std::abs(s[" << (sp+1) << "]) >= 0.5);\n"; break;
       case cAbsAnd:
-        --sp; ccfile << "s[" << sp << "] = (s[" << sp << "] >= 0.5) && (s[" << (sp+1) << "] >= 0.5);\n"; break;
+        --sp; ccout << "s[" << sp << "] = (s[" << sp << "] >= 0.5) && (s[" << (sp+1) << "] >= 0.5);\n"; break;
 
       case cLog:
-        ccfile << "s[" << sp << "] = std::log(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::log(s[" << sp << "]);\n"; break;
       case cLog2:
 #ifdef FP_SUPPORT_CPLUSPLUS11_MATH_FUNCS
-        ccfile << "s[" << (sp-1) << "] = std::log2(s[" << (sp-1) << "]);\n";
+        ccout << "s[" << (sp-1) << "] = std::log2(s[" << (sp-1) << "]);\n";
 #else
-        ccfile << "s[" << sp << "] = std::log(s[" << sp << "])/log(2.0);\n";
+        ccout << "s[" << sp << "] = std::log(s[" << sp << "])/log(2.0);\n";
 #endif
         break;
       case cLog10:
-        ccfile << "s[" << sp << "] = std::log10(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::log10(s[" << sp << "]);\n"; break;
 
       case cNeg:
-        ccfile << "s[" << sp << "] = -s[" << sp << "];\n"; break;
+        ccout << "s[" << sp << "] = -s[" << sp << "];\n"; break;
       case cInv:
-        ccfile << "s[" << sp << "] = 1.0/s[" << sp << "];\n"; break;
+        ccout << "s[" << sp << "] = 1.0/s[" << sp << "];\n"; break;
       case cDeg:
-        ccfile << "s[" << sp << "] *= 180.0/M_PI;\n"; break;
+        ccout << "s[" << sp << "] *= 180.0/M_PI;\n"; break;
       case cRad:
-        ccfile << "s[" << sp << "] /= 180.0/M_PI;\n"; break;
+        ccout << "s[" << sp << "] /= 180.0/M_PI;\n"; break;
 
       case cFetch:
-        ++sp; ccfile << "s[" << sp << "] = s[" << ByteCode[++i] << "];\n"; break;
+        ++sp; ccout << "s[" << sp << "] = s[" << ByteCode[++i] << "];\n"; break;
       case cDup:
-        ++sp; ccfile << "s[" << sp << "] = s[" << (sp-1) << "];\n"; break;
+        ++sp; ccout << "s[" << sp << "] = s[" << (sp-1) << "];\n"; break;
 
       case cFCall:
       {
         unsigned function = ByteCode[++i];
         if (function == mFPlog)
         {
-          // --sp; ccfile << "s[" << sp << "] = s[" << sp << "] < s[" << (sp+1) << "] ? std::log(s[" << (sp+1) << "]) + (s[" << sp << "] - s[" << (sp+1) << "]) / s[" << (sp+1) << "] : std::log(s[" << sp << "]);\n";
-          // --sp; ccfile << "s[" << sp << "] = s[" << sp << "] < s[" << (sp+1) << "] ? std::log(s[" << (sp+1) << "]) - 1.5 + 2.0/s[" << (sp+1) << "] * s[" << sp << "] - 0.5/(s[" << (sp+1) << "]*s[" << (sp+1) << "]) * s[" << sp << "]*s[" << sp << "] : std::log(s[" << sp << "]);\n";
-          --sp; ccfile << "s[" << sp << "] = s[" << sp << "] < s[" << (sp+1) << "] ? std::log(s[" << (sp+1) << "])  +  (s[" << sp << "]-s[" << (sp+1) << "])/s[" << (sp+1) << "]  -  std::pow((s[" << sp << "]-s[" << (sp+1) << "])/s[" << (sp+1) << "],2.0)/2.0  +  std::pow((s[" << sp << "]-s[" << (sp+1) << "])/s[" << (sp+1) << "],3.0)/3.0 : std::log(s[" << sp << "]);\n";
+          // --sp; ccout << "s[" << sp << "] = s[" << sp << "] < s[" << (sp+1) << "] ? std::log(s[" << (sp+1) << "]) + (s[" << sp << "] - s[" << (sp+1) << "]) / s[" << (sp+1) << "] : std::log(s[" << sp << "]);\n";
+          // --sp; ccout << "s[" << sp << "] = s[" << sp << "] < s[" << (sp+1) << "] ? std::log(s[" << (sp+1) << "]) - 1.5 + 2.0/s[" << (sp+1) << "] * s[" << sp << "] - 0.5/(s[" << (sp+1) << "]*s[" << (sp+1) << "]) * s[" << sp << "]*s[" << sp << "] : std::log(s[" << sp << "]);\n";
+          --sp; ccout << "s[" << sp << "] = s[" << sp << "] < s[" << (sp+1) << "] ? std::log(s[" << (sp+1) << "])  +  (s[" << sp << "]-s[" << (sp+1) << "])/s[" << (sp+1) << "]  -  std::pow((s[" << sp << "]-s[" << (sp+1) << "])/s[" << (sp+1) << "],2.0)/2.0  +  std::pow((s[" << sp << "]-s[" << (sp+1) << "])/s[" << (sp+1) << "],3.0)/3.0 : std::log(s[" << sp << "]);\n";
+        }
+        else if (function == mFErf)
+        {
+#if LIBMESH_HAVE_CXX11_ERF
+          ccout << "s[" << sp << "] = std::erf(s[" << sp << "]);\n";
+#else
+          std::cerr << "Libmesh is not compiled with c++11 so std::erf is not supported by JIT.\n";
+          ccout.close();
+          std::remove(ccname);
+          return false;
+#endif
         }
         else
         {
           std::cerr << "Function call not supported by JIT.\n";
-          ccfile.close();
+          ccout.close();
           std::remove(ccname);
           return false;
         }
@@ -857,33 +919,33 @@ bool FunctionParserADBase<Value_t>::JITCompileHelper(const std::string & Value_t
       {
         int dst = ByteCode[++i],
             src = ByteCode[++i];
-        ccfile << "s[" << dst << "] = s[" << src << "];\n";
+        ccout << "s[" << dst << "] = s[" << src << "];\n";
         sp = dst;
         break;
       }
       case cLog2by:
-        --sp; ccfile << "s[" << sp << "] = std::log(s[" << sp << "])/log(2.0) * s[" << (sp+1) << "];\n"; break;
+        --sp; ccout << "s[" << sp << "] = std::log(s[" << sp << "])/log(2.0) * s[" << (sp+1) << "];\n"; break;
       case cNop:
         break;
 #endif
 
       case cSqr:
-        ccfile << "s[" << sp << "] *= s[" << sp << "];\n"; break;
+        ccout << "s[" << sp << "] *= s[" << sp << "];\n"; break;
       case cSqrt:
-        ccfile << "s[" << sp << "] = std::sqrt(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::sqrt(s[" << sp << "]);\n"; break;
       case cRSqrt:
-        ccfile << "s[" << sp << "] = std::pow(s[" << sp << "], " << Value_t_name << "(-0.5));\n"; break;
+        ccout << "s[" << sp << "] = std::pow(s[" << sp << "], " << Value_t_name << "(-0.5));\n"; break;
       case cPow:
-        --sp; ccfile << "s[" << sp << "] = std::pow(s[" << sp << "], s[" << (sp+1) << "]);\n"; break;
+        --sp; ccout << "s[" << sp << "] = std::pow(s[" << sp << "], s[" << (sp+1) << "]);\n"; break;
       case cExp:
-        ccfile << "s[" << sp << "] = std::exp(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::exp(s[" << sp << "]);\n"; break;
       case cExp2:
-        ccfile << "s[" << sp << "] = std::pow(" << Value_t_name << "(2.0), s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::pow(" << Value_t_name << "(2.0), s[" << sp << "]);\n"; break;
       case cCbrt:
 #ifdef FP_SUPPORT_CPLUSPLUS11_MATH_FUNCS
-        ccfile << "s[" << sp << "] = std::cbrt(s[" << sp << "]);\n"; break;
+        ccout << "s[" << sp << "] = std::cbrt(s[" << sp << "]);\n"; break;
 #else
-        ccfile << "s[" << sp << "] = s[" << sp << "] == 0 ? 0 : (s[" << sp << "] > 0 ? std::exp(std::log(s[" << sp << "])/3.0) : -std::exp(std::log(-s[" << sp << "])/3.0));\n"; break;
+        ccout << "s[" << sp << "] = s[" << sp << "] == 0 ? 0 : (s[" << sp << "] > 0 ? std::exp(std::log(s[" << sp << "])/3.0) : -std::exp(std::log(-s[" << sp << "])/3.0));\n"; break;
 #endif
 
       case cJump:
@@ -893,15 +955,15 @@ bool FunctionParserADBase<Value_t>::JITCompileHelper(const std::string & Value_t
         unsigned long ip = ByteCode[++i] + 1;
 
         if (op == cIf)
-          ccfile << "if (std::abs(s[" << sp-- << "]) < 0.5) ";
+          ccout << "if (std::abs(s[" << sp-- << "]) < 0.5) ";
         if (op == cAbsIf)
-          ccfile << "if (s[" << sp-- << "] < 0.5) ";
+          ccout << "if (s[" << sp-- << "] < 0.5) ";
 
         if (ip >= ByteCode.size())
-          ccfile << "return s[" << sp << "];\n";
+          ccout << "return s[" << sp << "];\n";
         else
         {
-          ccfile << "goto l" << ip << ";\n";
+          ccout << "goto l" << ip << ";\n";
           stackAtTarget[ip] = sp;
         }
 
@@ -913,19 +975,19 @@ bool FunctionParserADBase<Value_t>::JITCompileHelper(const std::string & Value_t
         if ( op>= VarBegin)
         {
           // load variable
-          ++sp; ccfile << "s[" << sp << "] = params[" << (op-VarBegin) << "];\n";
+          ++sp; ccout << "s[" << sp << "] = params[" << (op-VarBegin) << "];\n";
         }
         else
         {
           std::cerr << "Opcode not supported by JIT.\n";
-          ccfile.close();
+          ccout.close();
           std::remove(ccname);
           return false;
         }
     }
   }
-  ccfile << "return s[" << sp << "]; }\n";
-  ccfile.close();
+  ccout << "return s[" << sp << "]; }\n";
+  ccout.close();
 
   // add a .cc extension to the source (needed by the compiler)
   std::string ccname_cc = ccname;
@@ -945,7 +1007,7 @@ bool FunctionParserADBase<Value_t>::JITCompileHelper(const std::string & Value_t
 #else
   std::string command = FPARSER_JIT_COMPILER" -O2 -shared -rdynamic -fPIC ";
 #endif
-  command += ccname_cc + " -o " + object;
+  command += ccname_cc + " -o " + objectname;
   status = system(command.c_str());
   std::remove(ccname_cc.c_str());
   if (status != 0) {
@@ -954,13 +1016,13 @@ bool FunctionParserADBase<Value_t>::JITCompileHelper(const std::string & Value_t
   }
 
   // add a .so extension to the object (needed by dlopen on mac)
-  std::string object_so = object;
+  std::string object_so = objectname;
   object_so += ".so";
-  status = std::rename(object, object_so.c_str());
+  status = std::rename(objectname, object_so.c_str());
   if (status != 0)
   {
     std::cerr << "Unable to rename JIT compiled function object\n";
-    std::remove(object);
+    std::remove(objectname);
     return false;
   }
 
@@ -985,13 +1047,13 @@ bool FunctionParserADBase<Value_t>::JITCompileHelper(const std::string & Value_t
   // clear evalerror (this will not get set again by the JIT code)
   this->mData->mEvalErrorType = 0;
 
-  // rename successfully compiled obj to cache file
+  // hard link successfully compiled obj to final cache file
   if (cacheFunction && (mkdir(jitdir.c_str(), 0700) == 0 || errno == EEXIST)) {
-    // the directory was either successfuly created, or it already exists
-    status = std::rename(object_so.c_str(), libname.c_str());
-    if (status == 0) return true;
+    // the directory was either successfully created, or it already exists
+    link(object_so.c_str(), libname.c_str());
   }
 
+  // remove temporary object
   std::remove(object_so.c_str());
   return true;
 }
@@ -1032,15 +1094,21 @@ void FunctionParserADBase<Value_t>::Unserialize(std::istream & istr)
   std::vector<unsigned> byteCode;
   size_t byte_code_size;
   istr.read(reinterpret_cast<char *>(&byte_code_size), sizeof(byte_code_size));
-  byteCode.resize(byte_code_size);
-  istr.read(reinterpret_cast<char *>(&byteCode[0]), byte_code_size * sizeof(unsigned));
+  if (byte_code_size > 0)
+  {
+    byteCode.resize(byte_code_size);
+    istr.read(reinterpret_cast<char *>(&byteCode[0]), byte_code_size * sizeof(unsigned));
+  }
 
   // read immediates
   std::vector<Value_t> immed;
   size_t immed_size;
   istr.read(reinterpret_cast<char *>(&immed_size), sizeof(immed_size));
-  immed.resize(immed_size);
-  istr.read(reinterpret_cast<char *>(&immed[0]), immed_size * sizeof(Value_t));
+  if (immed_size > 0)
+  {
+    immed.resize(immed_size);
+    istr.read(reinterpret_cast<char *>(&immed[0]), immed_size * sizeof(Value_t));
+  }
 
   // read stacktop
   unsigned stacktop_max;

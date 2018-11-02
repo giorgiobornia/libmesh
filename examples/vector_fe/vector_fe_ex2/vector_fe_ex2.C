@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -34,6 +34,8 @@
 #include "libmesh/mesh_generation.h"
 #include "libmesh/exact_solution.h"
 #include "libmesh/ucd_io.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
+#include "libmesh/enum_solver_package.h"
 
 // The systems and solvers we may use
 #include "laplace_system.h"
@@ -48,6 +50,10 @@ int main (int argc, char** argv)
 {
   // Initialize libMesh.
   LibMeshInit init (argc, argv);
+
+  // This example requires a linear solver package.
+  libmesh_example_requires(libMesh::default_solver_package() != INVALID_SOLVER_PACKAGE,
+                           "--enable-petsc, --enable-trilinos, or --enable-eigen");
 
   // Parse the input file
   GetPot infile("vector_fe_ex2.in");
@@ -64,7 +70,7 @@ int main (int argc, char** argv)
 
   // Use the MeshTools::Generation mesh generator to create a uniform
   // grid on the square [-1,1]^D.  We instruct the mesh generator
-  // to build a mesh of 8x8 \p Quad9 elements in 2D, or \p Hex27
+  // to build a mesh of 8x8 Quad9 elements in 2D, or Hex27
   // elements in 3D.  Building these higher-order elements allows
   // us to use higher-order approximation, as in example 3.
   MeshTools::Generation::build_cube (mesh,
@@ -87,8 +93,7 @@ int main (int argc, char** argv)
     equation_systems.add_system<LaplaceSystem> ("Laplace");
 
   // This example only implements the steady-state problem
-  system.time_solver =
-    UniquePtr<TimeSolver>(new SteadySolver(system));
+  system.time_solver = libmesh_make_unique<SteadySolver>(system);
 
   // Initialize the system
   equation_systems.init();

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -20,51 +20,62 @@
 #ifndef LIBMESH_LINEAR_PARTITIONER_H
 #define LIBMESH_LINEAR_PARTITIONER_H
 
-// Local Includes -----------------------------------
+// Local Includes
 #include "libmesh/partitioner.h"
-
-// C++ Includes   -----------------------------------
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
 
 namespace libMesh
 {
 
-
-
 /**
- * The \p LinearPartitioner is the simplest of all possible partitioners.
- * It takes the element list and splits it into equal-sized chunks assigned
- * to each processor.  Health Warning: THIS PARTITIONER COULD BE ARBITRARILY
- * BAD!!
+ * The \p LinearPartitioner simply takes the element list and splits
+ * it into equal-sized chunks assigned to each processor.  Warning:
+ * the resulting domain decomposition can be arbitrarily bad in terms
+ * of edge-cut and other communication-based metrics!
+ *
+ * \author Benjamin S. Kirk
+ * \date 2003
+ * \brief Partitions the elements based solely on their ids.
  */
 class LinearPartitioner : public Partitioner
 {
 public:
 
   /**
-   * Constructor.
+   * Ctors, assignment operators, and destructor are
+   * all explicitly defaulted for this class.
    */
-  LinearPartitioner () {}
+  LinearPartitioner () = default;
+  LinearPartitioner (const LinearPartitioner &) = default;
+  LinearPartitioner (LinearPartitioner &&) = default;
+  LinearPartitioner & operator= (const LinearPartitioner &) = default;
+  LinearPartitioner & operator= (LinearPartitioner &&) = default;
+  virtual ~LinearPartitioner() = default;
 
   /**
-   * Creates a new partitioner of this type and returns it in
-   * an \p UniquePtr.
+   * \returns A copy of this partitioner wrapped in a smart pointer.
    */
-  virtual UniquePtr<Partitioner> clone () const libmesh_override
+  virtual std::unique_ptr<Partitioner> clone () const override
   {
-    return UniquePtr<Partitioner>(new LinearPartitioner());
+    return libmesh_make_unique<LinearPartitioner>(*this);
   }
 
+  /**
+   * Called by the SubdomainPartitioner to partition elements in the range (it, end).
+   */
+  virtual void partition_range(MeshBase & mesh,
+                               MeshBase::element_iterator it,
+                               MeshBase::element_iterator end,
+                               const unsigned int n) override;
 protected:
+
   /**
    * Partition the \p MeshBase into \p n subdomains.
    */
   virtual void _do_partition (MeshBase & mesh,
-                              const unsigned int n) libmesh_override;
+                              const unsigned int n) override;
 };
 
-
 } // namespace libMesh
-
-
 
 #endif  // LIBMESH_LINEAR_PARTITIONER_H

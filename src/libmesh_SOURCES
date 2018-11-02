@@ -1,18 +1,25 @@
 # Do not edit - automatically generated from ./rebuild_libmesh_SOURCES.sh
 libmesh_SOURCES =  \
+        src/base/default_coupling.C \
+        src/base/dirichlet_boundary.C \
         src/base/dof_map.C \
         src/base/dof_map_constraints.C \
         src/base/dof_object.C \
+        src/base/ghost_point_neighbors.C \
         src/base/libmesh.C \
         src/base/libmesh_common.C \
         src/base/libmesh_isnan.c \
         src/base/libmesh_singleton.C \
+        src/base/libmesh_version.C \
         src/base/periodic_boundaries.C \
         src/base/periodic_boundary.C \
         src/base/periodic_boundary_base.C \
+        src/base/point_neighbor_coupling.C \
         src/base/print_trace.C \
         src/base/reference_counted_object.C \
         src/base/reference_counter.C \
+        src/base/sibling_coupling.C \
+        src/base/single_predicates.C \
         src/base/sparsity_pattern.C \
         src/error_estimation/adjoint_refinement_estimator.C \
         src/error_estimation/adjoint_residual_error_estimator.C \
@@ -28,7 +35,7 @@ libmesh_SOURCES =  \
         src/error_estimation/kelly_error_estimator.C \
         src/error_estimation/patch_recovery_error_estimator.C \
         src/error_estimation/uniform_refinement_estimator.C \
-        src/error_estimation/weighted_patch_recovery_estimator.C \
+        src/error_estimation/weighted_patch_recovery_error_estimator.C \
         src/fe/fe.C \
         src/fe/fe_abstract.C \
         src/fe/fe_base.C \
@@ -113,6 +120,7 @@ libmesh_SOURCES =  \
         src/fe/inf_fe_map.C \
         src/fe/inf_fe_map_eval.C \
         src/fe/inf_fe_static.C \
+        src/geom/bounding_box.C \
         src/geom/cell.C \
         src/geom/cell_hex.C \
         src/geom/cell_hex20.C \
@@ -152,10 +160,13 @@ libmesh_SOURCES =  \
         src/geom/face_inf_quad6.C \
         src/geom/face_quad.C \
         src/geom/face_quad4.C \
+        src/geom/face_quad4_shell.C \
         src/geom/face_quad8.C \
+        src/geom/face_quad8_shell.C \
         src/geom/face_quad9.C \
         src/geom/face_tri.C \
         src/geom/face_tri3.C \
+        src/geom/face_tri3_shell.C \
         src/geom/face_tri3_subdivision.C \
         src/geom/face_tri6.C \
         src/geom/node.C \
@@ -171,7 +182,7 @@ libmesh_SOURCES =  \
         src/mesh/boundary_info.C \
         src/mesh/boundary_mesh.C \
         src/mesh/checkpoint_io.C \
-        src/mesh/diva_io.C \
+        src/mesh/distributed_mesh.C \
         src/mesh/ensight_io.C \
         src/mesh/exodusII_io.C \
         src/mesh/exodusII_io_helper.C \
@@ -180,16 +191,11 @@ libmesh_SOURCES =  \
         src/mesh/gmv_io.C \
         src/mesh/gnuplot_io.C \
         src/mesh/inf_elem_builder.C \
-        src/mesh/legacy_xdr_io.C \
         src/mesh/matlab_io.C \
         src/mesh/medit_io.C \
         src/mesh/mesh_base.C \
         src/mesh/mesh_communication.C \
         src/mesh/mesh_communication_global_indices.C \
-        src/mesh/mesh_data.C \
-        src/mesh/mesh_data_tetgen_support.C \
-        src/mesh/mesh_data_unv_support.C \
-        src/mesh/mesh_data_xdr_support.C \
         src/mesh/mesh_function.C \
         src/mesh/mesh_generation.C \
         src/mesh/mesh_iterators.C \
@@ -213,22 +219,16 @@ libmesh_SOURCES =  \
         src/mesh/nemesis_io.C \
         src/mesh/nemesis_io_helper.C \
         src/mesh/off_io.C \
-        src/mesh/parallel_mesh.C \
         src/mesh/patch.C \
         src/mesh/postscript_io.C \
-        src/mesh/serial_mesh.C \
+        src/mesh/replicated_mesh.C \
         src/mesh/tecplot_io.C \
         src/mesh/tetgen_io.C \
         src/mesh/ucd_io.C \
         src/mesh/unstructured_mesh.C \
         src/mesh/unv_io.C \
         src/mesh/vtk_io.C \
-        src/mesh/xdr_head.C \
         src/mesh/xdr_io.C \
-        src/mesh/xdr_mesh.C \
-        src/mesh/xdr_mgf.C \
-        src/mesh/xdr_soln.C \
-        src/numerics/analytic_function.C \
         src/numerics/coupling_matrix.C \
         src/numerics/dense_matrix.C \
         src/numerics/dense_matrix_base.C \
@@ -241,7 +241,6 @@ libmesh_SOURCES =  \
         src/numerics/eigen_preconditioner.C \
         src/numerics/eigen_sparse_matrix.C \
         src/numerics/eigen_sparse_vector.C \
-        src/numerics/function_base.C \
         src/numerics/laspack_matrix.C \
         src/numerics/laspack_vector.C \
         src/numerics/numeric_vector.C \
@@ -259,20 +258,25 @@ libmesh_SOURCES =  \
         src/numerics/trilinos_preconditioner.C \
         src/numerics/type_tensor.C \
         src/numerics/type_vector.C \
+        src/parallel/communicator.C \
+        src/parallel/message_tag.C \
         src/parallel/parallel_bin_sorter.C \
         src/parallel/parallel_elem.C \
         src/parallel/parallel_ghost_sync.C \
         src/parallel/parallel_histogram.C \
         src/parallel/parallel_node.C \
         src/parallel/parallel_sort.C \
+        src/parallel/request.C \
         src/parallel/threads.C \
         src/partitioning/centroid_partitioner.C \
         src/partitioning/linear_partitioner.C \
+        src/partitioning/mapped_subdomain_partitioner.C \
         src/partitioning/metis_partitioner.C \
         src/partitioning/parmetis_partitioner.C \
         src/partitioning/partitioner.C \
         src/partitioning/partitioner_factory.C \
         src/partitioning/sfc_partitioner.C \
+        src/partitioning/subdomain_partitioner.C \
         src/physics/diff_physics.C \
         src/physics/diff_qoi.C \
         src/physics/fem_physics.C \
@@ -335,6 +339,7 @@ libmesh_SOURCES =  \
         src/reduced_basis/transient_rb_construction.C \
         src/reduced_basis/transient_rb_evaluation.C \
         src/reduced_basis/transient_rb_theta_expansion.C \
+        src/solution_transfer/boundary_volume_solution_transfer.C \
         src/solution_transfer/direct_solution_transfer.C \
         src/solution_transfer/dtk_adapter.C \
         src/solution_transfer/dtk_evaluator.C \
@@ -351,6 +356,7 @@ libmesh_SOURCES =  \
         src/solvers/eigen_time_solver.C \
         src/solvers/euler2_solver.C \
         src/solvers/euler_solver.C \
+        src/solvers/first_order_unsteady_solver.C \
         src/solvers/laspack_linear_solver.C \
         src/solvers/linear_solver.C \
         src/solvers/memory_solution_history.C \
@@ -362,6 +368,7 @@ libmesh_SOURCES =  \
         src/solvers/optimization_solver.C \
         src/solvers/petsc_auto_fieldsplit.C \
         src/solvers/petsc_diff_solver.C \
+        src/solvers/petsc_dm_wrapper.C \
         src/solvers/petsc_linear_solver.C \
         src/solvers/petsc_nonlinear_solver.C \
         src/solvers/petscdmlibmesh.C \
@@ -397,13 +404,13 @@ libmesh_SOURCES =  \
         src/systems/steady_system.C \
         src/systems/system.C \
         src/systems/system_io.C \
+        src/systems/system_norm.C \
         src/systems/system_projection.C \
         src/systems/system_subset.C \
         src/systems/system_subset_by_subdomain.C \
         src/systems/transient_system.C \
         src/utils/error_vector.C \
         src/utils/hashword.C \
-        src/utils/libmesh_version.C \
         src/utils/location_maps.C \
         src/utils/number_lookups.C \
         src/utils/perf_log.C \
@@ -411,7 +418,6 @@ libmesh_SOURCES =  \
         src/utils/plt_loader_read.C \
         src/utils/plt_loader_write.C \
         src/utils/point_locator_base.C \
-        src/utils/point_locator_list.C \
         src/utils/point_locator_tree.C \
         src/utils/statistics.C \
         src/utils/string_to_enum.C \

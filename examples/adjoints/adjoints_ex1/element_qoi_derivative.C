@@ -21,20 +21,20 @@ void LaplaceSystem::element_qoi_derivative (DiffContext & context,
 
   // First we get some references to cell-specific data that
   // will be used to assemble the linear system.
-  FEBase * elem_fe = libmesh_nullptr;
+  FEBase * elem_fe = nullptr;
   c.get_element_fe(0, elem_fe);
 
   // Element Jacobian * quadrature weights for interior integration
   const std::vector<Real> & JxW = elem_fe->get_JxW();
 
   // The basis functions for the element
-  const std::vector<std::vector<Real> > & phi = elem_fe->get_phi();
+  const std::vector<std::vector<Real>> & phi = elem_fe->get_phi();
 
   // The element quadrature points
   const std::vector<Point > & q_point = elem_fe->get_xyz();
 
   // The number of local degrees of freedom in each variable
-  const unsigned int n_T_dofs = c.get_dof_indices(0).size();
+  const unsigned int n_T_dofs = c.n_dof_indices(0);
   unsigned int n_qpoints = c.get_element_qrule().n_points();
 
   // Fill the QoI RHS corresponding to this QoI. Since this is the 0th QoI

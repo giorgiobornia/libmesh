@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -31,6 +31,7 @@
 #include <cstddef>
 #include <map>
 #include <vector>
+#include <memory>
 
 namespace libMesh
 {
@@ -327,20 +328,20 @@ public:
   /**
    * Const accessor for QoI derivatives.
    */
-  const std::vector<DenseVector<Number> > & get_qoi_derivatives() const
+  const std::vector<DenseVector<Number>> & get_qoi_derivatives() const
   { return _elem_qoi_derivative; }
 
   /**
    * Non-const accessor for QoI derivatives.
    */
-  std::vector<DenseVector<Number> > & get_qoi_derivatives()
+  std::vector<DenseVector<Number>> & get_qoi_derivatives()
   { return _elem_qoi_derivative; }
 
   /**
    * Const accessor for QoI derivative of a particular qoi and variable corresponding
    * to the index arguments.
    */
-  const DenseSubVector<Number> & get_qoi_derivatives( unsigned int qoi, unsigned int var ) const
+  const DenseSubVector<Number> & get_qoi_derivatives( std::size_t qoi, unsigned int var ) const
   {
     libmesh_assert_greater(_elem_qoi_subderivatives.size(), qoi);
     libmesh_assert_greater(_elem_qoi_subderivatives[qoi].size(), var);
@@ -352,7 +353,7 @@ public:
    * Non-const accessor for QoI derivative of a particular qoi and variable corresponding
    * to the index arguments.
    */
-  DenseSubVector<Number> & get_qoi_derivatives( unsigned int qoi, unsigned int var )
+  DenseSubVector<Number> & get_qoi_derivatives( std::size_t qoi, unsigned int var )
   {
     libmesh_assert_greater(_elem_qoi_subderivatives.size(), qoi);
     libmesh_assert_greater(_elem_qoi_subderivatives[qoi].size(), var);
@@ -390,6 +391,22 @@ public:
   {
     libmesh_assert_greater(_dof_indices_var.size(), var);
     return _dof_indices_var[var];
+  }
+
+  /**
+   * Total number of dof indices on the element
+   */
+  unsigned int n_dof_indices() const
+  { return cast_int<unsigned int>(_dof_indices.size()); }
+
+  /**
+   * Total number of dof indices of the particular variable
+   * corresponding to the index argument
+   */
+  unsigned int n_dof_indices( unsigned int var ) const
+  {
+    libmesh_assert_greater(_dof_indices_var.size(), var);
+    return cast_int<unsigned int>(_dof_indices_var[var].size());
   }
 
   /**
@@ -510,7 +527,7 @@ public:
   void set_deltat_pointer(Real * dt);
 
   /**
-   * Returns the value currently pointed to by this class's _deltat
+   * \returns The value currently pointed to by this class's \p _deltat
    * member
    */
   Real get_deltat_value();
@@ -524,7 +541,7 @@ public:
   /**
    * Typedef for the localized_vectors iterator
    */
-  typedef std::map<const NumericVector<Number> *, std::pair<DenseVector<Number>, std::vector<DenseSubVector<Number> *> > >::iterator localized_vectors_iterator;
+  typedef std::map<const NumericVector<Number> *, std::pair<DenseVector<Number>, std::vector<std::unique_ptr<DenseSubVector<Number>>>>>::iterator localized_vectors_iterator;
 
   /**
    * Return a reference to DenseVector localization of localized_vector
@@ -555,28 +572,28 @@ protected:
    * pairs of element localized versions of that vector and per variable views
    */
 
-  std::map<const NumericVector<Number> *, std::pair<DenseVector<Number>, std::vector<DenseSubVector<Number> *> > > _localized_vectors;
+  std::map<const NumericVector<Number> *, std::pair<DenseVector<Number>, std::vector<std::unique_ptr<DenseSubVector<Number>>>>> _localized_vectors;
 
   /**
    * Element by element components of nonlinear_solution
    * as adjusted by a time_solver
    */
   DenseVector<Number> _elem_solution;
-  std::vector<DenseSubVector<Number> *> _elem_subsolutions;
+  std::vector<std::unique_ptr<DenseSubVector<Number>>> _elem_subsolutions;
 
   /**
    * Element by element components of du/dt
    * as adjusted by a time_solver
    */
   DenseVector<Number> _elem_solution_rate;
-  std::vector<DenseSubVector<Number> *> _elem_subsolution_rates;
+  std::vector<std::unique_ptr<DenseSubVector<Number>>> _elem_subsolution_rates;
 
   /**
    * Element by element components of du/dt
    * as adjusted by a time_solver
    */
   DenseVector<Number> _elem_solution_accel;
-  std::vector<DenseSubVector<Number> *> _elem_subsolution_accels;
+  std::vector<std::unique_ptr<DenseSubVector<Number>>> _elem_subsolution_accels;
 
   /**
    * Element by element components of nonlinear_solution
@@ -584,7 +601,7 @@ protected:
    * stabilized methods
    */
   DenseVector<Number> _elem_fixed_solution;
-  std::vector<DenseSubVector<Number> *> _elem_fixed_subsolutions;
+  std::vector<std::unique_ptr<DenseSubVector<Number>>> _elem_fixed_subsolutions;
 
   /**
    * Element residual vector
@@ -605,25 +622,25 @@ protected:
   /**
    * Element quantity of interest derivative contributions
    */
-  std::vector<DenseVector<Number> > _elem_qoi_derivative;
-  std::vector<std::vector<DenseSubVector<Number> *> > _elem_qoi_subderivatives;
+  std::vector<DenseVector<Number>> _elem_qoi_derivative;
+  std::vector<std::vector<std::unique_ptr<DenseSubVector<Number>>>> _elem_qoi_subderivatives;
 
   /**
    * Element residual subvectors and Jacobian submatrices
    */
-  std::vector<DenseSubVector<Number> *> _elem_subresiduals;
-  std::vector<std::vector<DenseSubMatrix<Number> *> > _elem_subjacobians;
+  std::vector<std::unique_ptr<DenseSubVector<Number>>> _elem_subresiduals;
+  std::vector<std::vector<std::unique_ptr<DenseSubMatrix<Number>>>> _elem_subjacobians;
 
   /**
    * Global Degree of freedom index lists
    */
   std::vector<dof_id_type> _dof_indices;
-  std::vector<std::vector<dof_id_type> > _dof_indices_var;
+  std::vector<std::vector<dof_id_type>> _dof_indices_var;
 
 private:
 
   /**
-   * Default NULL, can optionally be used to point to a timestep value
+   * Defaults to nullptr, can optionally be used to point to a timestep value
    * in the System-derived class responsible for creating this DiffContext.
    *
    * In DiffSystem's build_context() function, is assigned to point to
@@ -631,7 +648,7 @@ private:
    *
    * Accessible via public get_deltat()/set_deltat() methods of this class.
    *
-   * Always test for NULL before using!
+   * Always test for nullptr before using!
    */
   Real * _deltat;
 

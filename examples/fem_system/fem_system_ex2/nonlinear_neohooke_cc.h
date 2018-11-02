@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -40,7 +40,7 @@ using namespace libMesh;
 class NonlinearNeoHookeCurrentConfig
 {
 public:
-  NonlinearNeoHookeCurrentConfig(const std::vector<std::vector<RealGradient> > & dphi_in,
+  NonlinearNeoHookeCurrentConfig(const std::vector<std::vector<RealGradient>> & dphi_in,
                                  GetPot & args,
                                  bool calculate_linearized_stiffness_in) :
     calculate_linearized_stiffness(calculate_linearized_stiffness_in),
@@ -83,7 +83,7 @@ private:
                               DenseVector<Real> & vec);
 
   unsigned int current_qp;
-  const std::vector<std::vector<RealGradient> > & dphi;
+  const std::vector<std::vector<RealGradient>> & dphi;
 
   DenseMatrix<Real> C_mat;
   Real E;

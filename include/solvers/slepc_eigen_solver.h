@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -28,25 +28,24 @@
 #include "libmesh/eigen_solver.h"
 #include "libmesh/slepc_macro.h"
 
-/**
- * SLEPc include files.
- */
+// SLEPc include files.
 EXTERN_C_FOR_SLEPC_BEGIN
+# include "libmesh/ignore_warnings.h"
 # include <slepceps.h>
+# include "libmesh/restore_warnings.h"
 EXTERN_C_FOR_SLEPC_END
-
-// C++ includes
-
 
 namespace libMesh
 {
 
-
 /**
  * This class provides an interface to the SLEPc
- * eigenvalue solver library \p www.grycap.upv.es/slepc/.
+ * eigenvalue solver library from http://slepc.upv.es/.
+ *
+ * \author Steffen Peterson
+ * \date 2005
+ * \brief EigenSolver implementation based on SLEPc.
  */
-
 template <typename T>
 class SlepcEigenSolver : public EigenSolver<T>
 {
@@ -56,8 +55,7 @@ public:
   /**
    *  Constructor. Initializes Petsc data structures
    */
-  SlepcEigenSolver(const Parallel::Communicator & comm_in
-                   LIBMESH_CAN_DEFAULT_TO_COMMWORLD);
+  SlepcEigenSolver(const Parallel::Communicator & comm_in);
 
 
   /**
@@ -69,13 +67,13 @@ public:
   /**
    * Release all memory and clear data structures.
    */
-  virtual void clear() libmesh_override;
+  virtual void clear() override;
 
 
   /**
    * Initialize data structures if not done so already.
    */
-  virtual void init() libmesh_override;
+  virtual void init() override;
 
 
   /**
@@ -93,7 +91,7 @@ public:
                   int nev,
                   int ncv,
                   const double tol,
-                  const unsigned int m_its) libmesh_override;
+                  const unsigned int m_its) override;
 
   /**
    * Same as above except that matrix_A is a ShellMatrix
@@ -104,7 +102,7 @@ public:
                   int nev,
                   int ncv,
                   const double tol,
-                  const unsigned int m_its) libmesh_override;
+                  const unsigned int m_its) override;
 
 
   /**
@@ -125,7 +123,7 @@ public:
                     int nev,
                     int ncv,
                     const double tol,
-                    const unsigned int m_its) libmesh_override;
+                    const unsigned int m_its) override;
 
   /**
    * Solve generalized eigenproblem when matrix_A is of
@@ -137,7 +135,7 @@ public:
                     int nev,
                     int ncv,
                     const double tol,
-                    const unsigned int m_its) libmesh_override;
+                    const unsigned int m_its) override;
 
   /**
    * Solve generalized eigenproblem when matrix_A is of
@@ -155,7 +153,7 @@ public:
                     int nev,
                     int ncv,
                     const double tol,
-                    const unsigned int m_its) libmesh_override;
+                    const unsigned int m_its) override;
 
   /**
    * Solve generalized eigenproblem when both matrix_A and
@@ -173,39 +171,45 @@ public:
                     int nev,
                     int ncv,
                     const double tol,
-                    const unsigned int m_its) libmesh_override;
+                    const unsigned int m_its) override;
 
 
 
   /**
-   * This function returns the real and imaginary part of the
-   * ith eigenvalue and copies the respective eigenvector to the
-   * solution vector. Note that also in case of purely real matrix
-   * entries the eigenpair may be complex values.
+   * \returns The real and imaginary part of the ith eigenvalue and
+   * copies the respective eigenvector to the solution vector.
+   *
+   * \note The eigenpair may be complex even for real-valued matrices.
    */
   virtual std::pair<Real, Real>
-  get_eigenpair (unsigned int i,
-                 NumericVector<T> & solution_in) libmesh_override;
+  get_eigenpair (dof_id_type i,
+                 NumericVector<T> & solution_in) override;
 
   /**
    * Same as above, but does not copy the eigenvector.
    */
   virtual std::pair<Real, Real>
-  get_eigenvalue (unsigned int i) libmesh_override;
+  get_eigenvalue (dof_id_type i) override;
 
   /**
-   * @returns the relative error ||A*x-lambda*x||/|lambda*x|
-   * of the ith eigenpair. (or the equivalent for a general eigenvalue problem)
+   * \returns The relative error \f$ ||A x - \lambda x|| / |\lambda x| \f$
+   * of the ith eigenpair (or the equivalent for a general eigenvalue problem).
    */
   Real get_relative_error (unsigned int i);
 
   /**
    * Attach a deflation space defined by a single vector.
    */
-  virtual void attach_deflation_space(NumericVector<T> & deflation_vector) libmesh_override;
+  virtual void attach_deflation_space(NumericVector<T> & deflation_vector) override;
 
   /**
-   * Returns the raw SLEPc eps context pointer.
+   * Use \p initial_space_in as the initial guess.
+   */
+  virtual void
+  set_initial_space(NumericVector<T> & initial_space_in) override;
+
+  /**
+   * \returns The raw SLEPc \p EPS pointer.
    */
   EPS eps() { this->init(); return _eps; }
 
@@ -268,26 +272,6 @@ private:
   EPS _eps;
 
 };
-
-
-/*----------------------- inline functions ----------------------------------*/
-template <typename T>
-inline
-SlepcEigenSolver<T>::SlepcEigenSolver (const Parallel::Communicator & comm_in) :
-  EigenSolver<T>(comm_in)
-{
-  this->_eigen_solver_type  = ARNOLDI;
-  this->_eigen_problem_type = NHEP;
-}
-
-
-
-template <typename T>
-inline
-SlepcEigenSolver<T>::~SlepcEigenSolver ()
-{
-  this->clear ();
-}
 
 } // namespace libMesh
 

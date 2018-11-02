@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -38,6 +38,7 @@ namespace libMesh
 
 // Forward declares
 class EquationSystems;
+template <typename T> class NumericVector;
 
 
 /**
@@ -54,18 +55,18 @@ class MeshOutput
 protected:
 
   /**
-   * Default constructor. Will set the _obj to NULL, effectively
+   * Default constructor. Will set the _obj to nullptr, effectively
    * rendering this object useless.
    */
   explicit
-  MeshOutput (const bool is_parallel_format = false);
+  MeshOutput (const bool is_parallel_format = false, const bool serial_only_needed_on_proc_0 = false);
 
   /**
    * Constructor.  Takes a reference to a constant object.
    * This constructor will only allow us to write the object.
    */
   explicit
-  MeshOutput (const MT &, const bool is_parallel_format = false);
+  MeshOutput (const MT &, const bool is_parallel_format = false, const bool serial_only_needed_on_proc_0 = false);
 
 
 public:
@@ -86,7 +87,16 @@ public:
    */
   virtual void write_equation_systems (const std::string &,
                                        const EquationSystems &,
-                                       const std::set<std::string> * system_names=libmesh_nullptr);
+                                       const std::set<std::string> * system_names=nullptr);
+
+  /**
+   * This method implements writing a mesh with discontinuous data to a
+   * specified file where the data is taken from the \p EquationSystems
+   * object.
+   */
+  virtual void write_discontinuous_equation_systems (const std::string &,
+                                                     const EquationSystems &,
+                                                     const std::set<std::string> * system_names=nullptr);
 
   /**
    * This method implements writing a mesh with nodal data to a
@@ -96,6 +106,32 @@ public:
                                  const std::vector<Number> &,
                                  const std::vector<std::string> &)
   { libmesh_not_implemented(); }
+
+  /**
+   * This method implements writing a mesh with discontinuous data to a
+   * specified file where the nodal data and variables names are provided.
+   */
+  virtual void write_nodal_data_discontinuous (const std::string &,
+                                               const std::vector<Number> &,
+                                               const std::vector<std::string> &)
+  { libmesh_not_implemented(); }
+
+  /**
+   * This method should be overridden by "parallel" output formats for
+   * writing nodal data.  Instead of getting a localized copy of the
+   * nodal solution vector, it is passed a NumericVector of
+   * type=PARALLEL which is in node-major order i.e.
+   * (u0,v0,w0, u1,v1,w1, u2,v2,w2, u3,v3,w3, ...)
+   * and contains n_nodes*n_vars total entries.  Then, it is up to the
+   * individual I/O class to extract the required solution values from
+   * this vector and write them in parallel.
+   *
+   * If not implemented, localizes the parallel vector into a std::vector
+   * and calls the other version of this function.
+   */
+  virtual void write_nodal_data (const std::string &,
+                                 const NumericVector<Number> &,
+                                 const std::vector<std::string> &);
 
   /**
    * Return/set the precision to use when writing ASCII files.
@@ -110,7 +146,7 @@ protected:
 
 
   /**
-   * Returns the object as a read-only reference.
+   * \returns The object as a read-only reference.
    */
   const MT & mesh() const;
 
@@ -122,6 +158,14 @@ protected:
    */
   const bool _is_parallel_format;
 
+  /**
+   * Flag specifying whether this format can be written by only
+   * serializing the mesh to processor zero
+   *
+   * If this is false (default) the mesh will be serialized to
+   * all processors
+   */
+  const bool _serial_only_needed_on_proc_0;
 
 private:
 
@@ -136,17 +180,6 @@ private:
    * Precision to use when writing ASCII files.
    */
   unsigned int _ascii_precision;
-
-  /**
-   * A helper function which allows us to fill temporary
-   * name and solution vectors with an EquationSystems object.
-   * Only generate names and solution data corresponding to
-   * systems specified in system_names.
-   */
-  void _build_variable_names_and_solution_vector(const EquationSystems & es,
-                                                 std::vector<Number> & soln,
-                                                 std::vector<std::string> & names,
-                                                 const std::set<std::string> * system_names=libmesh_nullptr);
 };
 
 
@@ -158,9 +191,10 @@ private:
 // MeshOutput inline members
 template <class MT>
 inline
-MeshOutput<MT>::MeshOutput (const bool is_parallel_format) :
+MeshOutput<MT>::MeshOutput (const bool is_parallel_format, const bool serial_only_needed_on_proc_0) :
   _is_parallel_format(is_parallel_format),
-  _obj(libmesh_nullptr),
+  _serial_only_needed_on_proc_0(serial_only_needed_on_proc_0),
+  _obj(nullptr),
   _ascii_precision (std::numeric_limits<Real>::digits10 + 2)
 {}
 
@@ -168,8 +202,9 @@ MeshOutput<MT>::MeshOutput (const bool is_parallel_format) :
 
 template <class MT>
 inline
-MeshOutput<MT>::MeshOutput (const MT & obj, const bool is_parallel_format) :
+MeshOutput<MT>::MeshOutput (const MT & obj, const bool is_parallel_format, const bool serial_only_needed_on_proc_0) :
   _is_parallel_format(is_parallel_format),
+  _serial_only_needed_on_proc_0(serial_only_needed_on_proc_0),
   _obj (&obj),
   _ascii_precision (std::numeric_limits<Real>::digits10 + 2)
 {

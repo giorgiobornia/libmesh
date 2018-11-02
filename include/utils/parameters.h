@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -40,13 +40,16 @@
 namespace libMesh
 {
 /**
- * Helper functions for printing scalar and vector types.  Called from Parameters::Parameter<T>::print(...).
+ * Helper functions for printing scalar, vector and vector<vector> types.  Called from Parameters::Parameter<T>::print(...).
  */
 template<typename P>
 void print_helper(std::ostream & os, const P * param);
 
 template<typename P>
 void print_helper(std::ostream & os, const std::vector<P> * param);
+
+template<typename P>
+void print_helper(std::ostream & os, const std::vector<std::vector<P>> * param);
 
 /**
  * This class provides the ability to map between
@@ -90,7 +93,7 @@ public:
   virtual Parameters & operator+= (const Parameters & source);
 
   /**
-   * @returns \p true if a parameter of type \p T
+   * \returns \p true if a parameter of type \p T
    * with a specified name exists, \p false otherwise.
    *
    * If RTTI has been disabled then we return \p true
@@ -100,7 +103,7 @@ public:
   bool have_parameter (const std::string &) const;
 
   /**
-   * @returns a constant reference to the specified parameter
+   * \returns A constant reference to the specified parameter
    * value.  Requires, of course, that the parameter exists.
    */
   template <typename T>
@@ -115,7 +118,7 @@ public:
   void insert (const std::string &);
 
   /**
-   * @returns a writeable reference to the specified parameter.
+   * \returns A writable reference to the specified parameter.
    * This method will create the parameter if it does not exist,
    * so it can be used to define parameters which will later be
    * accessed with the \p get() member.
@@ -135,13 +138,13 @@ public:
   void remove (const std::string &);
 
   /**
-   * @returns the total number of parameters.
+   * \returns The total number of parameters.
    */
   std::size_t n_parameters () const { return _values.size(); }
 
 #ifdef LIBMESH_HAVE_RTTI
   /**
-   * @returns the number of parameters of the requested type.
+   * \returns The number of parameters of the requested type.
    */
   template <typename T>
   unsigned int n_parameters () const;
@@ -156,8 +159,6 @@ public:
    * Prints the contents, by default to libMesh::out.
    */
   void print (std::ostream & os=libMesh::out) const;
-
-private:
 
   /**
    * Abstract definition of a parameter value.
@@ -192,8 +193,6 @@ private:
     virtual Value * clone () const = 0;
   };
 
-public:
-
   /**
    * Concrete definition of a parameter value
    * for a specified type.
@@ -204,12 +203,12 @@ public:
   public:
 
     /**
-     * @returns a read-only reference to the parameter value.
+     * \returns A read-only reference to the parameter value.
      */
     const T & get () const { return _value; }
 
     /**
-     * @returns a writeable reference to the parameter value.
+     * \returns A writable reference to the parameter value.
      */
     T & set () { return _value; }
 
@@ -322,7 +321,7 @@ void Parameters::clear () // since this is inline we must define it
       Parameters::iterator it = _values.begin();
 
       delete it->second;
-      it->second = libmesh_nullptr;
+      it->second = nullptr;
 
       _values.erase(it);
     }
@@ -342,12 +341,11 @@ Parameters & Parameters::operator= (const Parameters & source)
 inline
 Parameters & Parameters::operator+= (const Parameters & source)
 {
-  for (Parameters::const_iterator it = source._values.begin();
-       it != source._values.end(); ++it)
+  for (const auto & pr : source._values)
     {
-      if (_values.find(it->first) != _values.end())
-        delete _values[it->first];
-      _values[it->first] = it->second->clone();
+      if (_values.find(pr.first) != _values.end())
+        delete _values[pr.first];
+      _values[pr.first] = pr.second->clone();
     }
 
   return *this;
@@ -391,7 +389,7 @@ void Parameters::print (std::ostream & os) const
 
 
 
-// Declare this now that Paramers::print() is defined.
+// Declare this now that Parameters::print() is defined.
 // By declaring this early we can use it in subsequent
 // methods.  Required for gcc-4.0.2 -- 11/30/2005, BSK
 inline
@@ -411,9 +409,9 @@ bool Parameters::have_parameter (const std::string & name) const
 
   if (it != _values.end())
 #ifdef LIBMESH_HAVE_RTTI
-    if (dynamic_cast<const Parameter<T> *>(it->second) != libmesh_nullptr)
+    if (dynamic_cast<const Parameter<T> *>(it->second) != nullptr)
 #else // LIBMESH_HAVE_RTTI
-      if (cast_ptr<const Parameter<T> *>(it->second) != libmesh_nullptr)
+      if (cast_ptr<const Parameter<T> *>(it->second) != nullptr)
 #endif // LIBMESH_HAVE_RTTI
         return true;
 
@@ -481,7 +479,7 @@ void Parameters::remove (const std::string & name)
   if (it != _values.end())
     {
       delete it->second;
-      it->second = libmesh_nullptr;
+      it->second = nullptr;
 
       _values.erase(it);
     }
@@ -500,7 +498,7 @@ unsigned int Parameters::n_parameters () const
   const Parameters::const_iterator vals_end = _values.end();
 
   for (; it != vals_end; ++it)
-    if (dynamic_cast<Parameter<T> *>(it->second) != libmesh_nullptr)
+    if (dynamic_cast<Parameter<T> *>(it->second) != nullptr)
       cnt++;
 
   return cnt;
@@ -538,12 +536,37 @@ void print_helper(std::ostream & os, const P * param)
   os << *param;
 }
 
+template<>
+inline
+void print_helper(std::ostream & os, const char * param)
+{
+  // Specialization so that we don't print out unprintable characters
+  os << static_cast<int>(*param);
+}
+
+template<>
+inline
+void print_helper(std::ostream & os, const unsigned char * param)
+{
+  // Specialization so that we don't print out unprintable characters
+  os << static_cast<int>(*param);
+}
+
 //non-member vector print function
 template<typename P>
 void print_helper(std::ostream & os, const std::vector<P> * param)
 {
-  for (unsigned int i=0; i<param->size(); ++i)
+  for (std::size_t i=0; i<param->size(); ++i)
     os << (*param)[i] << " ";
+}
+
+//non-member vector<vector> print function
+template<typename P>
+void print_helper(std::ostream & os, const std::vector<std::vector<P>> * param)
+{
+  for (std::size_t i=0; i<param->size(); ++i)
+    for (std::size_t j=0; j<(*param)[i].size(); ++j)
+      os << (*param)[i][j] << " ";
 }
 
 } // namespace libMesh

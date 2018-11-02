@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -25,7 +25,6 @@
 
 // Local Includes
 #include "libmesh/elem_range.h"
-#include "libmesh/enum_order.h"
 #include "libmesh/error_estimator.h"
 #include "libmesh/fem_function_base.h"
 #include "libmesh/patch_recovery_error_estimator.h"
@@ -55,14 +54,17 @@ public:
    * seminorms should be supported now.  W1,p and W2,p norms would
    * be natural to support if any contributors make the effort.
    */
-  WeightedPatchRecoveryErrorEstimator() :
-    PatchRecoveryErrorEstimator()
-  {}
+  WeightedPatchRecoveryErrorEstimator() = default;
 
   /**
-   * Destructor.
+   * Copy/move ctor, copy/move assignment operator, and destructor are
+   * all explicitly defaulted for this class.
    */
-  ~WeightedPatchRecoveryErrorEstimator() {}
+  WeightedPatchRecoveryErrorEstimator (const WeightedPatchRecoveryErrorEstimator &) = default;
+  WeightedPatchRecoveryErrorEstimator (WeightedPatchRecoveryErrorEstimator &&) = default;
+  WeightedPatchRecoveryErrorEstimator & operator= (const WeightedPatchRecoveryErrorEstimator &) = default;
+  WeightedPatchRecoveryErrorEstimator & operator= (WeightedPatchRecoveryErrorEstimator &&) = default;
+  virtual ~WeightedPatchRecoveryErrorEstimator() = default;
 
   /**
    * This function uses the Patch Recovery error
@@ -72,17 +74,16 @@ public:
    */
   virtual void estimate_error (const System & system,
                                ErrorVector & error_per_cell,
-                               const NumericVector<Number> * solution_vector = libmesh_nullptr,
-                               bool estimate_parent_error = false) libmesh_override;
+                               const NumericVector<Number> * solution_vector = nullptr,
+                               bool estimate_parent_error = false) override;
 
   /**
-     Vector of fem function base pointers, the user will fill this in
-     with pointers to the appropriate weight functions
-  */
+   * Vector of fem function base pointers, the user will fill this in
+   * with pointers to the appropriate weight functions.
+   */
   std::vector<FEMFunctionBase<Number> *> weight_functions;
 
-  virtual ErrorEstimatorType type() const libmesh_override
-  { return WEIGHTED_PATCH_RECOVERY;}
+  virtual ErrorEstimatorType type() const override;
 
 private:
 

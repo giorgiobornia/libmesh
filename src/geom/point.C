@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -27,7 +27,7 @@
 
 
 // ------------------------------------------------------------
-// Point class member funcions
+// Point class member functions
 // unsigned int Point::key() const
 // {
 //   unsigned int tempx,tempy,tempz;
@@ -44,7 +44,7 @@
 //   index[1]=0;
 //   index[2]=0;
 
-//   for(i=sizeof(unsigned int)*8-1;i>=0;i--)
+//   for (i=sizeof(unsigned int)*8-1;i>=0;i--)
 //     {
 //       index[j] += (tempx >> i) & 01;
 //       index[j]  = index[j] << 01;

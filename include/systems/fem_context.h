@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -69,6 +69,13 @@ public:
   FEMContext (const System & sys);
 
   /**
+   * Constructor.  Specify the extra quadrature order instead
+   * of getting it from \p sys.
+   */
+  explicit
+  FEMContext (const System & sys, int extra_quadrature_order);
+
+  /**
    * Destructor.
    */
   virtual ~FEMContext ();
@@ -81,10 +88,12 @@ public:
   /**
    * Lists the boundary ids found on the current side
    *
-   * This function is now deprecated. Instead, use the version that
-   * takes a reference to a std::set.
+   * \deprecated Instead, use the version that takes a reference to a
+   * std::set.
    */
+#ifdef LIBMESH_ENABLE_DEPRECATED
   std::vector<boundary_id_type> side_boundary_ids() const;
+#endif
 
   /**
    * As above, but fills in the std::set provided by the user.
@@ -92,132 +101,150 @@ public:
   void side_boundary_ids(std::vector<boundary_id_type> & vec_to_fill) const;
 
   /**
-   * Returns the value of the solution variable \p var at the quadrature
-   * point \p qp on the current element interior.
-   * This API currently present for backward compatibility.
+   * \returns The value of the solution variable \p var at the
+   * quadrature point \p qp on the current element interior.
+   *
+   * \note This API is currently present for backward compatibility.
    */
   Number interior_value(unsigned int var, unsigned int qp) const;
 
   /**
-   * Returns the value of the solution variable \p var at the quadrature
+   * \returns The value of the solution variable \p var at the quadrature
    * point \p qp on the current element side.
-   * This API currently present for backward compatibility.
+   *
+   * \note This API currently is present for backward compatibility.
    */
   Number side_value(unsigned int var, unsigned int qp) const;
 
   /**
-   * Returns the value of the solution variable \p var at the physical
+   * \returns The value of the solution variable \p var at the physical
    * point \p p on the current element.
-   * This API currently present for backward compatibility.
+   *
+   * \note This API is currently present for backward compatibility.
    */
   Number point_value(unsigned int var, const Point & p) const;
 
   /**
-   * Returns the gradient of the solution variable \p var at the quadrature
+   * \returns The gradient of the solution variable \p var at the quadrature
    * point \p qp on the current element interior.
-   * This API currently present for backward compatibility.
+   *
+   * \note This API is currently present for backward compatibility.
    */
   Gradient interior_gradient(unsigned int var, unsigned int qp) const;
 
   /**
-   * Returns the gradient of the solution variable \p var at the quadrature
+   * \returns The gradient of the solution variable \p var at the quadrature
    * point \p qp on the current element side.
-   * This API currently present for backward compatibility.
+   *
+   * \note This API is currently present for backward compatibility.
    */
   Gradient side_gradient(unsigned int var, unsigned int qp) const;
 
   /**
-   * Returns the gradient of the solution variable \p var at the physical
+   * \returns The gradient of the solution variable \p var at the physical
    * point \p p on the current element.
-   * This API currently present for backward compatibility.
+   *
+   * \note This API is currently present for backward compatibility.
    */
   Gradient point_gradient(unsigned int var, const Point & p) const;
 
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
   /**
-   * Returns the hessian of the solution variable \p var at the quadrature
+   * \returns The hessian of the solution variable \p var at the quadrature
    * point \p qp on the current element interior.
-   * This API currently present for backward compatibility.
+   *
+   * \note This API is currently present for backward compatibility.
    */
   Tensor interior_hessian(unsigned int var, unsigned int qp) const;
 
   /**
-   * Returns the hessian of the solution variable \p var at the quadrature
+   * \returns The hessian of the solution variable \p var at the quadrature
    * point \p qp on the current element side.
-   * This API currently present for backward compatibility.
+   *
+   * \note This API is currently present for backward compatibility.
    */
   Tensor side_hessian(unsigned int var, unsigned int qp) const;
 
   /**
-   * Returns the hessian of the solution variable \p var at the physical
+   * \returns The hessian of the solution variable \p var at the physical
    * point \p p on the current element.
-   * This API currently present for backward compatibility.
+   *
+   * \note This API currently present for backward compatibility.
    */
   Tensor point_hessian(unsigned int var, const Point & p) const;
 
 #endif // LIBMESH_ENABLE_SECOND_DERIVATIVES
 
   /**
-   * Returns the value of the fixed_solution variable \p var at the quadrature
+   * \returns The value of the fixed_solution variable \p var at the quadrature
    * point \p qp on the current element interior.
-   * This API currently present for backward compatibility.
+   *
+   * \note This API is currently present for backward compatibility.
    */
   Number fixed_interior_value(unsigned int var, unsigned int qp) const;
 
   /**
-   * Returns the value of the fixed_solution variable \p var at the quadrature
+   * \returns The value of the fixed_solution variable \p var at the quadrature
    * point \p qp on the current element side.
-   * This API currently present for backward compatibility.
+   *
+   * \note This API is currently present for backward compatibility.
    */
   Number fixed_side_value(unsigned int var, unsigned int qp) const;
 
   /**
-   * Returns the value of the fixed_solution variable \p var at the physical
+   * \returns The value of the fixed_solution variable \p var at the physical
    * point \p p on the current element.
-   * This API currently present for backward compatibility.
+   *
+   * \note This API is currently present for backward compatibility.
    */
   Number fixed_point_value(unsigned int var, const Point & p) const;
 
   /**
-   * Returns the gradient of the fixed_solution variable \p var at the quadrature
+   * \returns The gradient of the fixed_solution variable \p var at the quadrature
    * point \p qp on the current element interior.
-   * This API currently present for backward compatibility.
+   *
+   * \note This API is currently present for backward compatibility.
    */
   Gradient fixed_interior_gradient(unsigned int var, unsigned int qp) const;
 
   /**
-   * Returns the gradient of the fixed_solution variable \p var at the quadrature
+   * \returns The gradient of the fixed_solution variable \p var at the quadrature
    * point \p qp on the current element side.
-   * This API currently present for backward compatibility.
+   *
+   * \note This API is currently present for backward compatibility.
    */
   Gradient fixed_side_gradient(unsigned int var, unsigned int qp) const;
 
   /**
-   * Returns the gradient of the fixed_solution variable \p var at the physical
+   * \returns The gradient of the fixed_solution variable \p var at the physical
    * point \p p on the current element.
-   * This API currently present for backward compatibility.
+   *
+   * \note This API is currently present for backward compatibility.
    */
   Gradient fixed_point_gradient(unsigned int var, const Point & p) const;
 
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
   /**
-   * Returns the hessian of the fixed_solution variable \p var at the quadrature
+   * \returns The hessian of the fixed_solution variable \p var at the quadrature
    * point \p qp on the current element interior.
-   * This API currently present for backward compatibility.
+   *
+   * \note This API is currently present for backward compatibility.
    */
   Tensor fixed_interior_hessian(unsigned int var, unsigned int qp) const;
 
   /**
-   * Returns the hessian of the fixed_solution variable \p var at the quadrature
+   * \returns The hessian of the fixed_solution variable \p var at the quadrature
    * point \p qp on the current element side.
-   * This API currently present for backward compatibility.
+   *
+   * \note This API is currently present for backward compatibility.
    */
   Tensor fixed_side_hessian(unsigned int var, unsigned int qp) const;
 
   /**
-   * Returns the hessian of the fixed_solution variable \p var at the physical
+   * \returns The hessian of the fixed_solution variable \p var at the physical
    * point \p p on the current element.
-   * This API currently present for backward compatibility.
+   *
+   * \note This API is currently present for backward compatibility.
    */
   Tensor fixed_point_hessian (unsigned int var, const Point & p) const;
 
@@ -252,13 +279,13 @@ public:
    */
   template<typename OutputShape>
   void get_element_fe( unsigned int var, FEGenericBase<OutputShape> *& fe,
-                       unsigned char dim ) const;
+                       unsigned short dim ) const;
 
   /**
    * Accessor for interior finite element object for scalar-valued variable var for
    * dimension dim.
    */
-  FEBase * get_element_fe( unsigned int var, unsigned char dim ) const;
+  FEBase * get_element_fe( unsigned int var, unsigned short dim ) const;
 
   /**
    * Accessor for edge/face (2D/3D) finite element object for variable var
@@ -289,13 +316,13 @@ public:
    */
   template<typename OutputShape>
   void get_side_fe( unsigned int var, FEGenericBase<OutputShape> *& fe,
-                    unsigned char dim ) const;
+                    unsigned short dim ) const;
 
   /**
    * Accessor for side finite element object for scalar-valued variable var
    * for dimension dim.
    */
-  FEBase * get_side_fe( unsigned int var, unsigned char dim ) const;
+  FEBase * get_side_fe( unsigned int var, unsigned short dim ) const;
 
   /**
    * Accessor for edge (3D only!) finite element object for variable var.
@@ -309,8 +336,10 @@ public:
   FEBase * get_edge_fe( unsigned int var ) const;
 
   /**
-   * Returns the value of the solution variable \p var at the quadrature
-   * point \p qp on the current element interior. This is the preferred API.
+   * \returns The value of the solution variable \p var at the quadrature
+   * point \p qp on the current element interior.
+   *
+   * \note This is the preferred API.
    */
   template<typename OutputType>
   void interior_value(unsigned int var,
@@ -327,8 +356,10 @@ public:
                        std::vector<OutputType> & interior_values_vector) const;
 
   /**
-   * Returns the value of the solution variable \p var at the quadrature
-   * point \p qp on the current element side. This is the preferred API.
+   * \returns The value of the solution variable \p var at the quadrature
+   * point \p qp on the current element side.
+   *
+   * \note This is the preferred API.
    */
   template<typename OutputType>
   void side_value(unsigned int var,
@@ -345,8 +376,10 @@ public:
                    std::vector<OutputType> & side_values_vector) const;
 
   /**
-   * Returns the value of the solution variable \p var at the physical
-   * point \p p on the current element. This is the preferred API.
+   * \returns The value of the solution variable \p var at the physical
+   * point \p p on the current element.
+   *
+   * \note This is the preferred API.
    *
    * Allows evaluation of points within a relative tolerance outside
    * the element.
@@ -358,8 +391,10 @@ public:
                    const Real tolerance = TOLERANCE) const;
 
   /**
-   * Returns the gradient of the solution variable \p var at the quadrature
-   * point \p qp on the current element interior. This is the preferred API.
+   * \returns The gradient of the solution variable \p var at the quadrature
+   * point \p qp on the current element interior.
+   *
+   * \note This is the preferred API.
    */
   template<typename OutputType>
   void interior_gradient(unsigned int var, unsigned int qp,
@@ -367,7 +402,9 @@ public:
 
   /**
    * Fills a vector with the gradient of the solution variable \p var at all the quadrature
-   * points in the current element interior. This is the preferred API.
+   * points in the current element interior.
+   *
+   * \note This is the preferred API.
    */
   template<typename OutputType>
   void interior_gradients(unsigned int var,
@@ -375,8 +412,10 @@ public:
                           std::vector<OutputType> & interior_gradients_vector) const;
 
   /**
-   * Returns the gradient of the solution variable \p var at the quadrature
-   * point \p qp on the current element side. This is the preferred API.
+   * \returns The gradient of the solution variable \p var at the quadrature
+   * point \p qp on the current element side.
+   *
+   * \note This is the preferred API.
    */
   template<typename OutputType>
   void side_gradient(unsigned int var,
@@ -385,7 +424,9 @@ public:
 
   /**
    * Fills a vector with the gradient of the solution variable \p var at all the quadrature
-   * points on the current element side. This is the preferred API.
+   * points on the current element side.
+   *
+   * \note This is the preferred API.
    */
   template<typename OutputType>
   void side_gradients(unsigned int var,
@@ -393,8 +434,10 @@ public:
                       std::vector<OutputType> & side_gradients_vector) const;
 
   /**
-   * Returns the gradient of the solution variable \p var at the physical
-   * point \p p on the current element. This is the preferred API.
+   * \returns The gradient of the solution variable \p var at the physical
+   * point \p p on the current element.
+   *
+   * \note This is the preferred API.
    *
    * Allows evaluation of points within a relative tolerance outside
    * the element.
@@ -407,8 +450,10 @@ public:
 
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
   /**
-   * Returns the hessian of the solution variable \p var at the quadrature
-   * point \p qp on the current element interior. This is the preferred API.
+   * \returns The hessian of the solution variable \p var at the quadrature
+   * point \p qp on the current element interior.
+   *
+   * \note This is the preferred API.
    */
   template<typename OutputType>
   void interior_hessian(unsigned int var,
@@ -426,8 +471,10 @@ public:
                          std::vector<OutputType> & d2u_vals) const;
 
   /**
-   * Returns the hessian of the solution variable \p var at the quadrature
-   * point \p qp on the current element side. This is the preferred API.
+   * \returns The hessian of the solution variable \p var at the quadrature
+   * point \p qp on the current element side.
+   *
+   * \note This is the preferred API.
    */
   template<typename OutputType>
   void side_hessian(unsigned int var,
@@ -445,8 +492,10 @@ public:
                      std::vector<OutputType> & d2u_vals) const;
 
   /**
-   * Returns the hessian of the solution variable \p var at the physical
-   * point \p p on the current element. This is the preferred API.
+   * \returns The hessian of the solution variable \p var at the physical
+   * point \p p on the current element.
+   *
+   * \note This is the preferred API.
    *
    * Allows evaluation of points within a relative tolerance outside
    * the element.
@@ -460,7 +509,7 @@ public:
 #endif // LIBMESH_ENABLE_SECOND_DERIVATIVES
 
   /**
-   * Returns the time derivative (rate) of the solution variable
+   * \returns The time derivative (rate) of the solution variable
    * \p var at the quadrature point \p qp on the current element
    * interior.
    */
@@ -470,7 +519,7 @@ public:
                      OutputType & u) const;
 
   /**
-   * Returns the time derivative (rate) of the solution variable
+   * \returns The time derivative (rate) of the solution variable
    * \p var at the quadrature point \p qp on the current element side.
    */
   template<typename OutputType>
@@ -479,7 +528,7 @@ public:
                  OutputType & u) const;
 
   /**
-   * Returns the time derivative (rate) of the solution variable
+   * \returns The time derivative (rate) of the solution variable
    * \p var at the physical point \p p on the current element.
    */
   template<typename OutputType>
@@ -488,7 +537,7 @@ public:
                   OutputType & u) const;
 
   /**
-   * Returns the second time derivative (acceleration) of the solution variable
+   * \returns The second time derivative (acceleration) of the solution variable
    * \p var at the quadrature point \p qp on the current element
    * interior.
    */
@@ -498,7 +547,7 @@ public:
                       OutputType & u) const;
 
   /**
-   * Returns the second time derivative (acceleration) of the solution variable
+   * \returns The second time derivative (acceleration) of the solution variable
    * \p var at the quadrature point \p qp on the current element side.
    */
   template<typename OutputType>
@@ -507,7 +556,7 @@ public:
                   OutputType & u) const;
 
   /**
-   * Returns the second time derivative (acceleration) of the solution variable
+   * \returns The second time derivative (acceleration) of the solution variable
    * \p var at the physical point \p p on the current element.
    */
   template<typename OutputType>
@@ -516,8 +565,10 @@ public:
                    OutputType & u) const;
 
   /**
-   * Returns the value of the fixed_solution variable \p var at the quadrature
-   * point \p qp on the current element interior. This is the preferred API.
+   * \returns The value of the fixed_solution variable \p var at the quadrature
+   * point \p qp on the current element interior.
+   *
+   * \note This is the preferred API.
    */
   template<typename OutputType>
   void fixed_interior_value(unsigned int var,
@@ -525,8 +576,10 @@ public:
                             OutputType & u) const;
 
   /**
-   * Returns the value of the fixed_solution variable \p var at the quadrature
-   * point \p qp on the current element side. This is the preferred API.
+   * \returns The value of the fixed_solution variable \p var at the quadrature
+   * point \p qp on the current element side.
+   *
+   * \note This is the preferred API.
    */
   template<typename OutputType>
   void fixed_side_value(unsigned int var,
@@ -534,8 +587,10 @@ public:
                         OutputType & u) const;
 
   /**
-   * Returns the value of the fixed_solution variable \p var at the physical
-   * point \p p on the current element. This is the preferred API.
+   * \returns The value of the fixed_solution variable \p var at the physical
+   * point \p p on the current element.
+   *
+   * \note This is the preferred API.
    *
    * Allows evaluation of points within a relative tolerance outside
    * the element.
@@ -547,8 +602,10 @@ public:
                          const Real tolerance = TOLERANCE) const;
 
   /**
-   * Returns the gradient of the fixed_solution variable \p var at the quadrature
-   * point \p qp on the current element interior. This is the preferred API.
+   * \returns The gradient of the fixed_solution variable \p var at the quadrature
+   * point \p qp on the current element interior.
+   *
+   * \note This is the preferred API.
    */
   template<typename OutputType>
   void fixed_interior_gradient(unsigned int var,
@@ -556,8 +613,10 @@ public:
                                OutputType & grad_u) const;
 
   /**
-   * Returns the gradient of the fixed_solution variable \p var at the quadrature
-   * point \p qp on the current element side. This is the preferred API.
+   * \returns The gradient of the fixed_solution variable \p var at the quadrature
+   * point \p qp on the current element side.
+   *
+   * \note This is the preferred API.
    */
   template<typename OutputType>
   void fixed_side_gradient(unsigned int var,
@@ -565,8 +624,10 @@ public:
                            OutputType & grad_u) const;
 
   /**
-   * Returns the gradient of the fixed_solution variable \p var at the physical
-   * point \p p on the current element. This is the preferred API.
+   * \returns The gradient of the fixed_solution variable \p var at the physical
+   * point \p p on the current element.
+   *
+   * \note This is the preferred API.
    *
    * Allows evaluation of points within a relative tolerance outside
    * the element.
@@ -579,8 +640,10 @@ public:
 
 #ifdef LIBMESH_ENABLE_SECOND_DERIVATIVES
   /**
-   * Returns the hessian of the fixed_solution variable \p var at the quadrature
-   * point \p qp on the current element interior. This is the preferred API.
+   * \returns The hessian of the fixed_solution variable \p var at the quadrature
+   * point \p qp on the current element interior.
+   *
+   * \note This is the preferred API.
    */
   template<typename OutputType>
   void fixed_interior_hessian(unsigned int var,
@@ -588,8 +651,10 @@ public:
                               OutputType & hess_u) const;
 
   /**
-   * Returns the hessian of the fixed_solution variable \p var at the quadrature
-   * point \p qp on the current element side. This is the preferred API.
+   * \returns The hessian of the fixed_solution variable \p var at the quadrature
+   * point \p qp on the current element side.
+   *
+   * \note This is the preferred API.
    */
   template<typename OutputType>
   void fixed_side_hessian(unsigned int var,
@@ -597,8 +662,10 @@ public:
                           OutputType & hess_u) const;
 
   /**
-   * Returns the hessian of the fixed_solution variable \p var at the physical
-   * point \p p on the current element. This is the preferred API.
+   * \returns The hessian of the fixed_solution variable \p var at the physical
+   * point \p p on the current element.
+   *
+   * \note This is the preferred API.
    *
    * Allows evaluation of points within a relative tolerance outside
    * the element.
@@ -612,7 +679,7 @@ public:
 #endif // LIBMESH_ENABLE_SECOND_DERIVATIVES
 
   /**
-   * Returns the curl of the solution variable \p var at the physical
+   * \returns The curl of the solution variable \p var at the physical
    * point \p p on the current element.
    */
   template<typename OutputType>
@@ -621,7 +688,7 @@ public:
                      OutputType & curl_u) const;
 
   /**
-   * Returns the curl of the solution variable \p var at the physical
+   * \returns The curl of the solution variable \p var at the physical
    * point \p p on the current element.
    *
    * Allows evaluation of points within a relative tolerance outside
@@ -634,7 +701,7 @@ public:
                   const Real tolerance = TOLERANCE) const;
 
   /**
-   * Returns the divergence of the solution variable \p var at the physical
+   * \returns The divergence of the solution variable \p var at the physical
    * point \p p on the current element.
    */
   template<typename OutputType>
@@ -644,31 +711,31 @@ public:
 
   // should be protected:
   /**
-   * Reinitialize Elem and FE objects if necessary for integration at a new
-   * point in time: specifically, handle moving elements in moving mesh
-   * schemes.
+   * Resets the current time in the context. Additionally, reinitialize Elem
+   * and FE objects if there's a moving mesh present in the system such that
+   * the mesh is deformed to its position at \f$ t_{\theta} \f$.
    */
-  virtual void elem_reinit(Real theta) libmesh_override;
+  virtual void elem_reinit(Real theta) override;
 
   /**
-   * Reinitialize Elem and side FE objects if necessary for integration at a
-   * new point in time: specifically, handle moving elements in moving mesh
-   * schemes.
+   * Resets the current time in the context. Additionally, reinitialize Elem
+   * and FE objects if there's a moving mesh present in the system such that
+   * the mesh is deformed to its position at \f$ t_{\theta} \f$.
    */
-  virtual void elem_side_reinit(Real theta) libmesh_override;
+  virtual void elem_side_reinit(Real theta) override;
 
   /**
-   * Reinitialize Elem and edge FE objects if necessary for
-   * integration at a new point in time: specifically, handle moving
-   * elements in moving mesh schemes.
+   * Resets the current time in the context. Additionally, reinitialize Elem
+   * and FE objects if there's a moving mesh present in the system such that
+   * the mesh is deformed to its position at \f$ t_{\theta} \f$.
    */
-  virtual void elem_edge_reinit(Real theta) libmesh_override;
+  virtual void elem_edge_reinit(Real theta) override;
 
   /**
    * Gives derived classes the opportunity to reinitialize data needed
    * for nonlocal calculations at a new point within a timestep
    */
-  virtual void nonlocal_reinit(Real theta) libmesh_override;
+  virtual void nonlocal_reinit(Real theta) override;
 
   /**
    * Reinitializes local data vectors/matrices on the current geometric element
@@ -679,7 +746,7 @@ public:
   /**
    * Reinitializes interior FE objects on the current geometric element
    */
-  void elem_fe_reinit(const std::vector<Point> * const pts = libmesh_nullptr);
+  virtual void elem_fe_reinit(const std::vector<Point> * const pts = nullptr);
 
   /**
    * Reinitializes side FE objects on the current geometric element
@@ -689,7 +756,7 @@ public:
   /**
    * Reinitializes edge FE objects on the current geometric element
    */
-  void edge_fe_reinit();
+  virtual void edge_fe_reinit();
 
   /**
    * Accessor for element interior quadrature rule for the dimension of the
@@ -708,14 +775,14 @@ public:
   /**
    * Accessor for element interior quadrature rule.
    */
-  const QBase & get_element_qrule( unsigned char dim ) const
+  const QBase & get_element_qrule( unsigned short dim ) const
   { libmesh_assert(_element_qrule[dim]);
     return *(this->_element_qrule[dim]); }
 
   /**
    * Accessor for element side quadrature rule.
    */
-  const QBase & get_side_qrule( unsigned char dim ) const
+  const QBase & get_side_qrule( unsigned short dim ) const
   {
     libmesh_assert(_side_qrule[dim]);
     return *(this->_side_qrule[dim]);
@@ -796,7 +863,7 @@ public:
    * Test for current Elem object
    */
   bool has_elem() const
-  { return (this->_elem != libmesh_nullptr); }
+  { return (this->_elem != nullptr); }
 
   /**
    * Accessor for current Elem object
@@ -833,14 +900,14 @@ public:
   { return this->_dim; }
 
   /**
-   * Returns the dimension of this->_elem. For mixed dimension meshes, this
+   * \returns The dimension of this->_elem. For mixed dimension meshes, this
    * may be different from get_dim().
    */
   unsigned char get_elem_dim() const
   { return _elem_dim; }
 
   /**
-   * @returns set of dimensions of elements present in the mesh at
+   * \returns Set of dimensions of elements present in the mesh at
    * context initialization.
    */
   const std::set<unsigned char> & elem_dimensions() const
@@ -867,7 +934,9 @@ public:
                        DOFS_ONLY, // Reinitialize dof_indices, not
                                   // algebraic structures
                        CURRENT,   // Use dof_indices, current solution
-                       OLD };     // Use old_dof_indices, custom solution
+                       OLD,       // Use old_dof_indices, custom solution
+                       OLD_DOFS_ONLY}; // Reinitialize old_dof_indices, not
+                                       // algebraic structures
 
   /**
    * Setting which determines whether to initialize algebraic
@@ -882,11 +951,11 @@ public:
   /*
    * Get the current AlgebraicType setting
    */
-  AlgebraicType algebraic_type() { return _atype; }
+  AlgebraicType algebraic_type() const { return _atype; }
 
   /**
    * Set a NumericVector to be used in place of current_local_solution
-   * for calculating elem_solution.  Set to NULL to restore the
+   * for calculating elem_solution.  Set to nullptr to restore the
    * current_local_solution behavior.  Advanced DifferentiableSystem
    * specific capabilities will only be enabled in the
    * current_local_solution case.
@@ -914,6 +983,14 @@ public:
    */
   unsigned char edge;
 
+  /**
+   * Helper function to reduce some code duplication in the *_point_* methods.
+   */
+  template<typename OutputShape>
+  FEGenericBase<OutputShape> * build_new_fe(const FEGenericBase<OutputShape> * fe,
+                                            const Point & p,
+                                            const Real tolerance = TOLERANCE) const;
+
 protected:
 
   /**
@@ -926,13 +1003,17 @@ protected:
    */
   const NumericVector<Number> * _custom_solution;
 
-  /**
-   * Helper function to reduce some code duplication in the *_point_* methods.
-   */
+  mutable std::unique_ptr<FEGenericBase<Real>>         _real_fe;
+  mutable std::unique_ptr<FEGenericBase<RealGradient>> _real_grad_fe;
+
+#ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
+  mutable bool _real_fe_is_inf;
+  mutable bool _real_grad_fe_is_inf;
+#endif
+
   template<typename OutputShape>
-  UniquePtr<FEGenericBase<OutputShape> > build_new_fe( const FEGenericBase<OutputShape> * fe,
-                                                       const Point & p,
-                                                       const Real tolerance = TOLERANCE) const;
+  FEGenericBase<OutputShape> * cached_fe( const unsigned int elem_dim,
+                                          const FEType fe_type ) const;
 
   /**
    * Helper function to promote accessor usage
@@ -962,17 +1043,17 @@ protected:
     // Typedefs for "Value getter" function pointer
     typedef typename TensorTools::MakeReal<OutputType>::type value_shape;
     typedef FEGenericBase<value_shape> value_base;
-    typedef void (FEMContext::*value_getter) (unsigned int, value_base *&, unsigned char) const;
+    typedef void (FEMContext::*value_getter) (unsigned int, value_base *&, unsigned short) const;
 
     // Typedefs for "Grad getter" function pointer
     typedef typename TensorTools::MakeReal<Rank1Decrement>::type grad_shape;
     typedef FEGenericBase<grad_shape> grad_base;
-    typedef void (FEMContext::*grad_getter) (unsigned int, grad_base *&, unsigned char) const;
+    typedef void (FEMContext::*grad_getter) (unsigned int, grad_base *&, unsigned short) const;
 
     // Typedefs for "Hessian getter" function pointer
     typedef typename TensorTools::MakeReal<Rank2Decrement>::type hess_shape;
     typedef FEGenericBase<hess_shape> hess_base;
-    typedef void (FEMContext::*hess_getter) (unsigned int, hess_base *&, unsigned char) const;
+    typedef void (FEMContext::*hess_getter) (unsigned int, hess_base *&, unsigned short) const;
   };
 
 
@@ -1011,9 +1092,9 @@ protected:
    * We store FE objects for each element dimension present in the mesh,
    * except for edge_fe which only applies to 3D elements.
    */
-  std::vector<std::map<FEType, FEAbstract *> > _element_fe;
-  std::vector<std::map<FEType, FEAbstract *> > _side_fe;
-  std::map<FEType, FEAbstract *> _edge_fe;
+  std::vector<std::map<FEType, std::unique_ptr<FEAbstract>>> _element_fe;
+  std::vector<std::map<FEType, std::unique_ptr<FEAbstract>>> _side_fe;
+  std::map<FEType, std::unique_ptr<FEAbstract>> _edge_fe;
 
 
   /**
@@ -1022,8 +1103,8 @@ protected:
    * present in the mesh, except for edge_fe_var which only applies
    * for 3D elements.
    */
-  std::vector<std::vector<FEAbstract *> > _element_fe_var;
-  std::vector<std::vector<FEAbstract *> > _side_fe_var;
+  std::vector<std::vector<FEAbstract *>> _element_fe_var;
+  std::vector<std::vector<FEAbstract *>> _side_fe_var;
   std::vector<FEAbstract *> _edge_fe_var;
 
   /**
@@ -1059,7 +1140,7 @@ protected:
    * correctly integrates all variables. We prepare quadrature
    * rules for each element dimension in the mesh.
    */
-  std::vector<QBase *> _element_qrule;
+  std::vector<std::unique_ptr<QBase>> _element_qrule;
 
   /**
    * Quadrature rules for element sides
@@ -1067,7 +1148,7 @@ protected:
    * correctly integrates all variables. We prepare quadrature
    * rules for each element dimension in the mesh.
    */
-  std::vector<QBase *> _side_qrule;
+  std::vector<std::unique_ptr<QBase>> _side_qrule;
 
   /**
    * Quadrature rules for element edges.  If the FEM context is told
@@ -1076,9 +1157,19 @@ protected:
    * Because edge rules only apply to 3D elements, we don't need to
    * worry about multiple dimensions
    */
-  QBase * _edge_qrule;
+  std::unique_ptr<QBase> _edge_qrule;
+
+  /**
+   * The extra quadrature order for this context.
+   */
+  int _extra_quadrature_order;
 
 private:
+  /**
+   * Helper function used in constructors to set up internal data.
+   */
+  void init_internal_data(const System & sys);
+
   /**
    * Uses the coordinate data specified by mesh_*_position configuration
    * to set the geometry of \p elem to the value it would take after a fraction
@@ -1112,7 +1203,7 @@ void FEMContext::elem_position_set(Real theta)
 template<typename OutputShape>
 inline
 void FEMContext::get_element_fe( unsigned int var, FEGenericBase<OutputShape> *& fe,
-                                 unsigned char dim ) const
+                                 unsigned short dim ) const
 {
   libmesh_assert( !_element_fe_var[dim].empty() );
   libmesh_assert_less ( var, (_element_fe_var[dim].size() ) );
@@ -1120,7 +1211,7 @@ void FEMContext::get_element_fe( unsigned int var, FEGenericBase<OutputShape> *&
 }
 
 inline
-FEBase * FEMContext::get_element_fe( unsigned int var, unsigned char dim ) const
+FEBase * FEMContext::get_element_fe( unsigned int var, unsigned short dim ) const
 {
   libmesh_assert( !_element_fe_var[dim].empty() );
   libmesh_assert_less ( var, (_element_fe_var[dim].size() ) );
@@ -1130,7 +1221,7 @@ FEBase * FEMContext::get_element_fe( unsigned int var, unsigned char dim ) const
 template<typename OutputShape>
 inline
 void FEMContext::get_side_fe( unsigned int var, FEGenericBase<OutputShape> *& fe,
-                              unsigned char dim ) const
+                              unsigned short dim ) const
 {
   libmesh_assert( !_side_fe_var[dim].empty() );
   libmesh_assert_less ( var, (_side_fe_var[dim].size() ) );
@@ -1138,7 +1229,7 @@ void FEMContext::get_side_fe( unsigned int var, FEGenericBase<OutputShape> *& fe
 }
 
 inline
-FEBase * FEMContext::get_side_fe( unsigned int var, unsigned char dim ) const
+FEBase * FEMContext::get_side_fe( unsigned int var, unsigned short dim ) const
 {
   libmesh_assert( !_side_fe_var[dim].empty() );
   libmesh_assert_less ( var, (_side_fe_var[dim].size() ) );

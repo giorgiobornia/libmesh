@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -16,13 +16,13 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-// C++ includes
-
 // Local includes
 #include "libmesh/side.h"
 #include "libmesh/cell_hex8.h"
 #include "libmesh/edge_edge2.h"
 #include "libmesh/face_quad4.h"
+#include "libmesh/enum_io_package.h"
+#include "libmesh/enum_order.h"
 
 namespace libMesh
 {
@@ -32,7 +32,14 @@ namespace libMesh
 
 // ------------------------------------------------------------
 // Hex8 class static member initializations
-const unsigned int Hex8::side_nodes_map[6][4] =
+const int Hex8::num_nodes;
+const int Hex8::num_sides;
+const int Hex8::num_edges;
+const int Hex8::num_children;
+const int Hex8::nodes_per_side;
+const int Hex8::nodes_per_edge;
+
+const unsigned int Hex8::side_nodes_map[Hex8::num_sides][Hex8::nodes_per_side] =
   {
     {0, 3, 2, 1}, // Side 0
     {0, 1, 5, 4}, // Side 1
@@ -42,20 +49,20 @@ const unsigned int Hex8::side_nodes_map[6][4] =
     {4, 5, 6, 7}  // Side 5
   };
 
-const unsigned int Hex8::edge_nodes_map[12][2] =
+const unsigned int Hex8::edge_nodes_map[Hex8::num_edges][Hex8::nodes_per_edge] =
   {
-    {0, 1}, // Side 0
-    {1, 2}, // Side 1
-    {2, 3}, // Side 2
-    {0, 3}, // Side 3
-    {0, 4}, // Side 4
-    {1, 5}, // Side 5
-    {2, 6}, // Side 6
-    {3, 7}, // Side 7
-    {4, 5}, // Side 8
-    {5, 6}, // Side 9
-    {6, 7}, // Side 10
-    {4, 7}  // Side 11
+    {0, 1}, // Edge 0
+    {1, 2}, // Edge 1
+    {2, 3}, // Edge 2
+    {0, 3}, // Edge 3
+    {0, 4}, // Edge 4
+    {1, 5}, // Edge 5
+    {2, 6}, // Edge 6
+    {3, 7}, // Edge 7
+    {4, 5}, // Edge 8
+    {5, 6}, // Edge 9
+    {6, 7}, // Edge 10
+    {4, 7}  // Edge 11
   };
 
 
@@ -81,20 +88,25 @@ bool Hex8::is_node_on_side(const unsigned int n,
                            const unsigned int s) const
 {
   libmesh_assert_less (s, n_sides());
-  for (unsigned int i = 0; i != 4; ++i)
-    if (side_nodes_map[s][i] == n)
-      return true;
-  return false;
+  return std::find(std::begin(side_nodes_map[s]),
+                   std::end(side_nodes_map[s]),
+                   n) != std::end(side_nodes_map[s]);
+}
+
+std::vector<unsigned>
+Hex8::nodes_on_side(const unsigned int s) const
+{
+  libmesh_assert_less(s, n_sides());
+  return {std::begin(side_nodes_map[s]), std::end(side_nodes_map[s])};
 }
 
 bool Hex8::is_node_on_edge(const unsigned int n,
                            const unsigned int e) const
 {
   libmesh_assert_less (e, n_edges());
-  for (unsigned int i = 0; i != 2; ++i)
-    if (edge_nodes_map[e][i] == n)
-      return true;
-  return false;
+  return std::find(std::begin(edge_nodes_map[e]),
+                   std::end(edge_nodes_map[e]),
+                   n) != std::end(edge_nodes_map[e]);
 }
 
 
@@ -117,36 +129,40 @@ bool Hex8::has_affine_map() const
 
 
 
-UniquePtr<Elem> Hex8::build_side (const unsigned int i,
-                                  bool proxy) const
+Order Hex8::default_order() const
 {
-  libmesh_assert_less (i, this->n_sides());
-
-  if (proxy)
-    return UniquePtr<Elem>(new Side<Quad4,Hex8>(this,i));
-
-  else
-    {
-      Elem * face = new Quad4;
-      face->subdomain_id() = this->subdomain_id();
-
-      for (unsigned n=0; n<face->n_nodes(); ++n)
-        face->set_node(n) = this->get_node(Hex8::side_nodes_map[i][n]);
-
-      return UniquePtr<Elem>(face);
-    }
-
-  libmesh_error_msg("We'll never get here!");
-  return UniquePtr<Elem>();
+  return FIRST;
 }
 
 
 
-UniquePtr<Elem> Hex8::build_edge (const unsigned int i) const
+std::unique_ptr<Elem> Hex8::build_side_ptr (const unsigned int i,
+                                            bool proxy)
+{
+  libmesh_assert_less (i, this->n_sides());
+
+  if (proxy)
+    return libmesh_make_unique<Side<Quad4,Hex8>>(this,i);
+
+  else
+    {
+      std::unique_ptr<Elem> face = libmesh_make_unique<Quad4>();
+      face->subdomain_id() = this->subdomain_id();
+
+      for (unsigned n=0; n<face->n_nodes(); ++n)
+        face->set_node(n) = this->node_ptr(Hex8::side_nodes_map[i][n]);
+
+      return face;
+    }
+}
+
+
+
+std::unique_ptr<Elem> Hex8::build_edge_ptr (const unsigned int i)
 {
   libmesh_assert_less (i, this->n_edges());
 
-  return UniquePtr<Elem>(new SideEdge<Edge2,Hex8>(this,i));
+  return libmesh_make_unique<SideEdge<Edge2,Hex8>>(this,i);
 }
 
 
@@ -165,27 +181,27 @@ void Hex8::connectivity(const unsigned int libmesh_dbg_var(sc),
     {
     case TECPLOT:
       {
-        conn[0] = this->node(0)+1;
-        conn[1] = this->node(1)+1;
-        conn[2] = this->node(2)+1;
-        conn[3] = this->node(3)+1;
-        conn[4] = this->node(4)+1;
-        conn[5] = this->node(5)+1;
-        conn[6] = this->node(6)+1;
-        conn[7] = this->node(7)+1;
+        conn[0] = this->node_id(0)+1;
+        conn[1] = this->node_id(1)+1;
+        conn[2] = this->node_id(2)+1;
+        conn[3] = this->node_id(3)+1;
+        conn[4] = this->node_id(4)+1;
+        conn[5] = this->node_id(5)+1;
+        conn[6] = this->node_id(6)+1;
+        conn[7] = this->node_id(7)+1;
         return;
       }
 
     case VTK:
       {
-        conn[0] = this->node(0);
-        conn[1] = this->node(1);
-        conn[2] = this->node(2);
-        conn[3] = this->node(3);
-        conn[4] = this->node(4);
-        conn[5] = this->node(5);
-        conn[6] = this->node(6);
-        conn[7] = this->node(7);
+        conn[0] = this->node_id(0);
+        conn[1] = this->node_id(1);
+        conn[2] = this->node_id(2);
+        conn[3] = this->node_id(3);
+        conn[4] = this->node_id(4);
+        conn[5] = this->node_id(5);
+        conn[6] = this->node_id(6);
+        conn[7] = this->node_id(7);
         return;
       }
 
@@ -198,7 +214,7 @@ void Hex8::connectivity(const unsigned int libmesh_dbg_var(sc),
 
 #ifdef LIBMESH_ENABLE_AMR
 
-const float Hex8::_embedding_matrix[8][8][8] =
+const float Hex8::_embedding_matrix[Hex8::num_children][Hex8::num_nodes][Hex8::num_nodes] =
   {
     // The 8 children of the Hex-type elements can be thought of as being
     // associated with the 8 vertices of the Hex.  Some of the children are
@@ -331,28 +347,31 @@ Real Hex8::volume () const
   // \vec{x}_{\eta}  = \vec{a2}*xi*zeta  + \vec{b2}*xi  + \vec{c2}*zeta + \vec{d2}
   // \vec{x}_{\zeta} = \vec{a3}*xi*eta   + \vec{b3}*xi  + \vec{c3}*eta  + \vec{d3}
   // but it turns out that a1, a2, and a3 are not needed for the volume calculation.
-  // This is copy-pasted directly from the output of a Python script, other
-  // than division by 8, which is done at the end when the volume is returned.
-  Point
-    b1 = x0 - x1 + x2 - x3 + x4 - x5 + x6 - x7,
-    c1 = x0 - x1 - x2 + x3 - x4 + x5 + x6 - x7,
-    d1 = -x0 + x1 + x2 - x3 - x4 + x5 + x6 - x7,
 
-    b2 = b1,
-    c2 = x0 + x1 - x2 - x3 - x4 - x5 + x6 + x7,
-    d2 = -x0 - x1 + x2 + x3 - x4 - x5 + x6 + x7,
+  // Build up the 6 unique vectors which make up dx/dxi, dx/deta, and dx/dzeta.
+  Point q[6] =
+    {
+      /*b1*/  x0 - x1 + x2 - x3 + x4 - x5 + x6 - x7, /*=b2*/
+      /*c1*/  x0 - x1 - x2 + x3 - x4 + x5 + x6 - x7, /*=b3*/
+      /*d1*/ -x0 + x1 + x2 - x3 - x4 + x5 + x6 - x7,
+      /*c2*/  x0 + x1 - x2 - x3 - x4 - x5 + x6 + x7, /*=c3*/
+      /*d2*/ -x0 - x1 + x2 + x3 - x4 - x5 + x6 + x7,
+      /*d3*/ -x0 - x1 - x2 - x3 + x4 + x5 + x6 + x7
+    };
 
-    b3 = c1,
-    c3 = c2,
-    d3 = -x0 - x1 - x2 - x3 + x4 + x5 + x6 + x7;
-
-  // We could check for a quick return, but it's almost faster to just
-  // compute the result...
+  // We could check for a linear element, but it's probably faster to
+  // just compute the result...
   return
-    (triple_product(b1,d2,c3) +
-     triple_product(d1,b2,b3) +
-     triple_product(c1,c2,d3)) / 192. +
-    triple_product(d1,d2,d3) / 64.;
+    (triple_product(q[0], q[4], q[3]) +
+     triple_product(q[2], q[0], q[1]) +
+     triple_product(q[1], q[3], q[5])) / 192. +
+    triple_product(q[2], q[4], q[5]) / 64.;
+}
+
+BoundingBox
+Hex8::loose_bounding_box () const
+{
+  return Elem::loose_bounding_box();
 }
 
 } // namespace libMesh

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -23,55 +23,50 @@
 // Local includes
 #include "libmesh/cell_prism.h"
 
-// C++ includes
-#include <cstddef>
-
 namespace libMesh
 {
 
-
-
-
 /**
  * The \p Prism15 is an element in 3D composed of 15 nodes.
+ * It is numbered like this:
+ * \verbatim
+ *   PRISM15:
+ *                5
+ *                o
+ *               /:\
+ *              / : \
+ *             /  :  \
+ *            /   :   \
+ *        14 o    :    o 13
+ *          /     :     \
+ *         /      :      \
+ *        /       o 11    \
+ *     3 /        :        \4
+ *      o---------o---------o
+ *      |         :12       |
+ *      |         :         |
+ *      |         :         |            zeta
+ *      |         o         |             ^   eta (into page)
+ *      |        .2.        |             | /
+ *      |       .   .       |             |/
+ *    9 o      .     .      o 10          o---> xi
+ *      |     .       .     |
+ *      |  8 o         o 7  |
+ *      |   .           .   |
+ *      |  .             .  |
+ *      | .               . |
+ *      |.                 .|
+ *      o---------o---------o
+ *      0         6         1
+ * \endverbatim
+ * (xi, eta, zeta) are the reference element coordinates associated with
+ * the given numbering.
  *
  * \author Benjamin S. Kirk
  * \date 2003
- *
- * It is numbered like this:
- * \verbatim
- * PRISM15:
- *              5
- *              o
- *             /:\
- *            / : \
- *           /  :  \
- *          /   :   \
- *      14 o    :    o 13
- *        /     :     \
- *       /      :      \
- *      /       o 11    \
- *   3 /        :        \4
- *    o---------o---------o
- *    |         :12       |
- *    |         :         |
- *    |         :         |
- *    |         o         |
- *    |        .2.        |
- *    |       .   .       |
- *  9 o      .     .      o 10
- *    |     .       .     |
- *    |  8 o         o 7  |
- *    |   .           .   |
- *    |  .             .  |
- *    | .               . |
- *    |.                 .|
- *    o---------o---------o
- *    0         6         1
- *
- * \endverbatim
+ * \brief A 3D prismatic element with 15 nodes.
  */
-class Prism15 libmesh_final : public Prism
+class Prism15 final : public Prism
 {
 public:
 
@@ -79,130 +74,151 @@ public:
    * Constructor.  By default this element has no parent.
    */
   explicit
-  Prism15 (Elem * p=libmesh_nullptr) :
+  Prism15 (Elem * p=nullptr) :
     Prism(Prism15::n_nodes(), p, _nodelinks_data)
   {}
 
-  /**
-   * @returns \p PRISM15
-   */
-  virtual ElemType type () const libmesh_override { return PRISM15; }
+  Prism15 (Prism15 &&) = delete;
+  Prism15 (const Prism15 &) = delete;
+  Prism15 & operator= (const Prism15 &) = delete;
+  Prism15 & operator= (Prism15 &&) = delete;
+  virtual ~Prism15() = default;
 
   /**
-   * @returns 15
+   * \returns \p PRISM15.
    */
-  virtual unsigned int n_nodes() const libmesh_override { return 15; }
+  virtual ElemType type () const override { return PRISM15; }
 
   /**
-   * @returns 1
+   * \returns 15.
    */
-  virtual unsigned int n_sub_elem() const libmesh_override { return 1; }
+  virtual unsigned int n_nodes() const override { return num_nodes; }
 
   /**
-   * @returns true iff the specified (local) node number is a vertex.
+   * \returns 1.
    */
-  virtual bool is_vertex(const unsigned int i) const libmesh_override;
+  virtual unsigned int n_sub_elem() const override { return 1; }
 
   /**
-   * @returns true iff the specified (local) node number is an edge.
+   * \returns \p true if the specified (local) node number is a vertex.
    */
-  virtual bool is_edge(const unsigned int i) const libmesh_override;
+  virtual bool is_vertex(const unsigned int i) const override;
 
   /**
-   * @returns true iff the specified (local) node number is a face.
+   * \returns \p true if the specified (local) node number is an edge.
    */
-  virtual bool is_face(const unsigned int i) const libmesh_override;
+  virtual bool is_edge(const unsigned int i) const override;
 
-  /*
-   * @returns true iff the specified (local) node number is on the
-   * specified side
+  /**
+   * \returns \p true if the specified (local) node number is a face.
+   */
+  virtual bool is_face(const unsigned int i) const override;
+
+  /**
+   * \returns \p true if the specified (local) node number is on the
+   * specified side.
    */
   virtual bool is_node_on_side(const unsigned int n,
-                               const unsigned int s) const libmesh_override;
+                               const unsigned int s) const override;
 
-  /*
-   * @returns true iff the specified (local) node number is on the
-   * specified edge
-   */
-  virtual bool is_node_on_edge(const unsigned int n,
-                               const unsigned int e) const libmesh_override;
-
-  /*
-   * @returns true iff the element map is definitely affine within
-   * numerical tolerances
-   */
-  virtual bool has_affine_map () const libmesh_override;
+  virtual std::vector<unsigned int> nodes_on_side(const unsigned int s) const override;
 
   /**
-   * @returns SECOND
+   * \returns \p true if the specified (local) node number is on the
+   * specified edge.
    */
-  virtual Order default_order() const libmesh_override { return SECOND; }
+  virtual bool is_node_on_edge(const unsigned int n,
+                               const unsigned int e) const override;
+
+  /**
+   * \returns \p true if the element map is definitely affine within
+   * numerical tolerances.
+   */
+  virtual bool has_affine_map () const override;
+
+  /**
+   * \returns SECOND.
+   */
+  virtual Order default_order() const override;
+
+  /**
+   * \returns \p Prism15::side_nodes_map[side][side_node] after doing some range checking.
+   */
+  virtual unsigned int which_node_am_i(unsigned int side,
+                                       unsigned int side_node) const override;
 
   /**
    * Builds a \p QUAD8 or \p TRI6 built coincident with face i.
-   * The \p UniquePtr<Elem> handles the memory aspect.
+   * The \p std::unique_ptr<Elem> handles the memory aspect.
    */
-  virtual UniquePtr<Elem> build_side (const unsigned int i,
-                                      bool proxy) const libmesh_override;
+  virtual std::unique_ptr<Elem> build_side_ptr (const unsigned int i,
+                                                bool proxy) override;
 
   /**
    * Builds a \p EDGE3 or \p INFEDGE2 coincident with edge i.
-   * The \p UniquePtr<Elem> handles the memory aspect.
+   * The \p std::unique_ptr<Elem> handles the memory aspect.
    */
-  virtual UniquePtr<Elem> build_edge (const unsigned int i) const libmesh_override;
+  virtual std::unique_ptr<Elem> build_edge_ptr (const unsigned int i) override;
 
   virtual void connectivity(const unsigned int sc,
                             const IOPackage iop,
-                            std::vector<dof_id_type> & conn) const libmesh_override;
+                            std::vector<dof_id_type> & conn) const override;
   /**
-   * @returns 2 for all \p n
+   * \returns 2 for all \p n.
    */
-  virtual unsigned int n_second_order_adjacent_vertices (const unsigned int) const libmesh_override
+  virtual unsigned int n_second_order_adjacent_vertices (const unsigned int) const override
   { return 2; }
 
   /**
-   * @returns the element-local number of the  \f$ v^{th} \f$ vertex
+   * \returns The element-local number of the \f$ v^{th} \f$ vertex
    * that defines the \f$ n^{th} \f$ second-order node.
-   * Note that \p n is counted as depicted above, \f$ 6 \le n < 15 \f$.
+   *
+   * \note \p n is counted as depicted above, \f$ 6 \le n < 15 \f$.
    */
   virtual unsigned short int second_order_adjacent_vertex (const unsigned int n,
-                                                           const unsigned int v) const libmesh_override;
+                                                           const unsigned int v) const override;
 
   /**
-   * @returns the child number \p c and element-local index \p v of the
-   * \f$ n^{th} \f$ second-order node on the parent element.  Note that
-   * the return values are always less \p this->n_children() and
-   * \p this->child(c)->n_vertices(), while \p n has to be greater or equal
-   * to \p * this->n_vertices().  For linear elements this returns 0,0.
-   * On refined second order elements, the return value will satisfy
-   * \p this->get_node(n)==this->child(c)->get_node(v)
+   * \returns The child number \p c and element-local index \p v of the
+   * \f$ n^{th} \f$ second-order node on the parent element.  See
+   * elem.h for further details.
    */
   virtual std::pair<unsigned short int, unsigned short int>
-  second_order_child_vertex (const unsigned int n) const libmesh_override;
+  second_order_child_vertex (const unsigned int n) const override;
+
+  /**
+   * Geometric constants for Prism15.
+   */
+  static const int num_nodes = 15;
+  static const int num_sides = 5;
+  static const int num_edges = 9;
+  static const int num_children = 8;
+  static const int nodes_per_side = 8;
+  static const int nodes_per_edge = 3;
 
   /**
    * This maps the \f$ j^{th} \f$ node of the \f$ i^{th} \f$ side to
    * element node numbers.
    */
-  static const unsigned int side_nodes_map[5][8];
+  static const unsigned int side_nodes_map[num_sides][nodes_per_side];
 
   /**
    * This maps the \f$ j^{th} \f$ node of the \f$ i^{th} \f$ edge to
    * element node numbers.
    */
-  static const unsigned int edge_nodes_map[9][3];
+  static const unsigned int edge_nodes_map[num_edges][nodes_per_edge];
 
   /**
    * A specialization for computing the volume of a Prism15.
    */
-  virtual Real volume () const libmesh_override;
+  virtual Real volume () const override;
 
 protected:
 
   /**
-   * Data for links to nodes
+   * Data for links to nodes.
    */
-  Node * _nodelinks_data[15];
+  Node * _nodelinks_data[num_nodes];
 
 
 
@@ -213,14 +229,14 @@ protected:
    */
   virtual float embedding_matrix (const unsigned int i,
                                   const unsigned int j,
-                                  const unsigned int k) const libmesh_override
+                                  const unsigned int k) const override
   { return _embedding_matrix[i][j][k]; }
 
   /**
    * Matrix that computes new nodal locations/solution values
    * from current nodes/solution.
    */
-  static const float _embedding_matrix[8][15][15];
+  static const float _embedding_matrix[num_children][num_nodes][num_nodes];
 
   LIBMESH_ENABLE_TOPOLOGY_CACHES;
 

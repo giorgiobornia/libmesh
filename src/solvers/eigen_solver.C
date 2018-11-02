@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -19,12 +19,12 @@
 #include "libmesh/libmesh_config.h"
 #ifdef LIBMESH_HAVE_SLEPC
 
-// C++ includes
-
 // Local Includes
 #include "libmesh/eigen_solver.h"
 #include "libmesh/slepc_eigen_solver.h"
 #include "libmesh/solver_configuration.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
+#include "libmesh/enum_eigen_solver_type.h"
 
 namespace libMesh
 {
@@ -33,7 +33,29 @@ namespace libMesh
 //------------------------------------------------------------------
 // EigenSolver members
 template <typename T>
-UniquePtr<EigenSolver<T> >
+EigenSolver<T>::EigenSolver (const Parallel::Communicator & comm_in) :
+  ParallelObject(comm_in),
+  _eigen_solver_type    (ARNOLDI),
+  _eigen_problem_type   (NHEP),
+  _position_of_spectrum (LARGEST_MAGNITUDE),
+  _is_initialized       (false),
+  _solver_configuration(nullptr),
+  _close_matrix_before_solve(true)
+{
+}
+
+
+
+template <typename T>
+EigenSolver<T>::~EigenSolver ()
+{
+  this->clear ();
+}
+
+
+
+template <typename T>
+std::unique_ptr<EigenSolver<T>>
 EigenSolver<T>::build(const Parallel::Communicator & comm,
                       const SolverPackage solver_package)
 {
@@ -43,14 +65,14 @@ EigenSolver<T>::build(const Parallel::Communicator & comm,
 
 #ifdef LIBMESH_HAVE_SLEPC
     case SLEPC_SOLVERS:
-      return UniquePtr<EigenSolver<T> >(new SlepcEigenSolver<T>(comm));
+      return libmesh_make_unique<SlepcEigenSolver<T>>(comm);
 #endif
 
     default:
       libmesh_error_msg("ERROR:  Unrecognized eigen solver package: " << solver_package);
     }
 
-  return UniquePtr<EigenSolver<T> >();
+  return std::unique_ptr<EigenSolver<T>>();
 }
 
 
@@ -59,6 +81,25 @@ void EigenSolver<T>::set_solver_configuration(SolverConfiguration & solver_confi
 {
   _solver_configuration = &solver_configuration;
 }
+
+template <typename T>
+void EigenSolver<T>::set_position_of_spectrum (Real pos)
+{
+  if (pos >= 0)
+    _position_of_spectrum = TARGET_MAGNITUDE;
+  else
+    _position_of_spectrum = TARGET_REAL;
+
+  _target_val = pos;
+}
+
+template <typename T>
+void EigenSolver<T>::set_position_of_spectrum (Real pos, PositionOfSpectrum target)
+{
+  _position_of_spectrum = target;
+  _target_val = pos;
+}
+
 
 
 //------------------------------------------------------------------

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -21,9 +21,17 @@
 
 // libMesh includes
 #include "libmesh/libmesh.h"
-#include "libmesh/enum_elem_type.h"
 #include "libmesh/mesh_base.h"
 #include "libmesh/mesh_output.h"
+
+#ifdef LIBMESH_FORWARD_DECLARE_ENUMS
+namespace libMesh
+{
+enum ElemType : int;
+}
+#else
+#include "libmesh/enum_elem_type.h"
+#endif
 
 // C++ includes
 #include <map>
@@ -61,9 +69,10 @@ public:
 
   /**
    * Tell the EnsightIO interface to output the finite element (not
-   * SCALAR) variable named "s".  Note: you must call add_scalar() or
-   * add_vector() (see below) at least once, otherwise only the Mesh
-   * will be written out.
+   * SCALAR) variable named "s".
+   *
+   * \note You must call add_scalar() or add_vector() (see below) at
+   * least once, otherwise only the Mesh will be written out.
    */
   void add_scalar (const std::string & system,
                    const std::string & scalar_description,
@@ -71,8 +80,10 @@ public:
 
   /**
    * Tell the EnsightIO interface that the variables (u,v) constitute
-   * a vector.  Note: u and v must have the same FEType, and be
-   * defined in the same system.
+   * a vector.
+   *
+   * \note \p u and \p v must have the same FEType, and be defined in
+   * the same system.
    */
   void add_vector (const std::string & system,
                    const std::string & vec_description,
@@ -81,8 +92,10 @@ public:
 
   /**
    * Tell the EnsightIO interface that the variables (u, v, w)
-   * constitute a vector.  Note: Requires a 3D mesh, u, v, and must
-   * have the same FEType, and must be defined in the same system.
+   * constitute a vector.
+   *
+   * \note Requires a 3D mesh, \p u, \p v, and \p w must have the same
+   * FEType, and must be defined in the same system.
    */
   void add_vector (const std::string & system,
                    const std::string & vec_description,
@@ -102,7 +115,7 @@ public:
   /**
    * Calls this->write(0);
    */
-  virtual void write (const std::string & name) libmesh_override;
+  virtual void write (const std::string & name) override;
 
 private:
   // Represents the vectors that are used by the EnsightIO
@@ -140,8 +153,7 @@ private:
   std::vector<Real> _time_steps;
 
   // mapping from system names to variable names+descriptions
-  typedef std::map <std::string, SystemVars> system_vars_map_t;
-  system_vars_map_t _system_vars_map;
+  std::map <std::string, SystemVars> _system_vars_map;
 
   // Reference to the EquationSystems we were constructed with
   const EquationSystems & _equation_systems;

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -15,12 +15,12 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-// C++ includes
-
 // Local includes
 #include "libmesh/side.h"
 #include "libmesh/edge_edge3.h"
 #include "libmesh/face_quad8.h"
+#include "libmesh/enum_io_package.h"
+#include "libmesh/enum_order.h"
 
 namespace libMesh
 {
@@ -30,7 +30,12 @@ namespace libMesh
 
 // ------------------------------------------------------------
 // Quad8 class static member initializations
-const unsigned int Quad8::side_nodes_map[4][3] =
+const int Quad8::num_nodes;
+const int Quad8::num_sides;
+const int Quad8::num_children;
+const int Quad8::nodes_per_side;
+
+const unsigned int Quad8::side_nodes_map[Quad8::num_sides][Quad8::nodes_per_side] =
   {
     {0, 1, 4}, // Side 0
     {1, 2, 5}, // Side 1
@@ -41,7 +46,7 @@ const unsigned int Quad8::side_nodes_map[4][3] =
 
 #ifdef LIBMESH_ENABLE_AMR
 
-const float Quad8::_embedding_matrix[4][8][8] =
+const float Quad8::_embedding_matrix[Quad8::num_children][Quad8::num_nodes][Quad8::num_nodes] =
   {
     // embedding matrix for child 0
     {
@@ -126,13 +131,17 @@ bool Quad8::is_node_on_side(const unsigned int n,
                             const unsigned int s) const
 {
   libmesh_assert_less (s, n_sides());
-  for (unsigned int i = 0; i != 3; ++i)
-    if (side_nodes_map[s][i] == n)
-      return true;
-  return false;
+  return std::find(std::begin(side_nodes_map[s]),
+                   std::end(side_nodes_map[s]),
+                   n) != std::end(side_nodes_map[s]);
 }
 
-
+std::vector<unsigned>
+Quad8::nodes_on_side(const unsigned int s) const
+{
+  libmesh_assert_less(s, n_sides());
+  return {std::begin(side_nodes_map[s]), std::end(side_nodes_map[s])};
+}
 
 bool Quad8::has_affine_map() const
 {
@@ -154,6 +163,13 @@ bool Quad8::has_affine_map() const
 
 
 
+Order Quad8::default_order() const
+{
+  return SECOND;
+}
+
+
+
 dof_id_type Quad8::key (const unsigned int s) const
 {
   libmesh_assert_less (s, this->n_sides());
@@ -163,55 +179,60 @@ dof_id_type Quad8::key (const unsigned int s) const
     case 0:
 
       return
-        this->compute_key (this->node(4));
+        this->compute_key (this->node_id(4));
 
     case 1:
 
       return
-        this->compute_key (this->node(5));
+        this->compute_key (this->node_id(5));
 
     case 2:
 
       return
-        this->compute_key (this->node(6));
+        this->compute_key (this->node_id(6));
 
     case 3:
 
       return
-        this->compute_key (this->node(7));
+        this->compute_key (this->node_id(7));
 
     default:
       libmesh_error_msg("Invalid side s = " << s);
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return 0;
 }
 
 
 
-UniquePtr<Elem> Quad8::build_side (const unsigned int i,
-                                   bool proxy) const
+unsigned int Quad8::which_node_am_i(unsigned int side,
+                                    unsigned int side_node) const
+{
+  libmesh_assert_less (side, this->n_sides());
+  libmesh_assert_less (side_node, Quad8::nodes_per_side);
+
+  return Quad8::side_nodes_map[side][side_node];
+}
+
+
+
+std::unique_ptr<Elem> Quad8::build_side_ptr (const unsigned int i,
+                                             bool proxy)
 {
   libmesh_assert_less (i, this->n_sides());
 
   if (proxy)
-    return UniquePtr<Elem>(new Side<Edge3,Quad8>(this,i));
+    return libmesh_make_unique<Side<Edge3,Quad8>>(this,i);
 
   else
     {
-      Elem * edge = new Edge3;
+      std::unique_ptr<Elem> edge = libmesh_make_unique<Edge3>();
       edge->subdomain_id() = this->subdomain_id();
 
       // Set the nodes
       for (unsigned n=0; n<edge->n_nodes(); ++n)
-        edge->set_node(n) = this->get_node(Quad8::side_nodes_map[i][n]);
+        edge->set_node(n) = this->node_ptr(Quad8::side_nodes_map[i][n]);
 
-      return UniquePtr<Elem>(edge);
+      return edge;
     }
-
-  libmesh_error_msg("We'll never get here!");
-  return UniquePtr<Elem>();
 }
 
 
@@ -240,46 +261,46 @@ void Quad8::connectivity(const unsigned int sf,
           {
           case 0:
             // linear sub-tri 0
-            conn[0] = this->node(0)+1;
-            conn[1] = this->node(4)+1;
-            conn[2] = this->node(7)+1;
-            conn[3] = this->node(7)+1;
+            conn[0] = this->node_id(0)+1;
+            conn[1] = this->node_id(4)+1;
+            conn[2] = this->node_id(7)+1;
+            conn[3] = this->node_id(7)+1;
 
             return;
 
           case 1:
             // linear sub-tri 1
-            conn[0] = this->node(4)+1;
-            conn[1] = this->node(1)+1;
-            conn[2] = this->node(5)+1;
-            conn[3] = this->node(5)+1;
+            conn[0] = this->node_id(4)+1;
+            conn[1] = this->node_id(1)+1;
+            conn[2] = this->node_id(5)+1;
+            conn[3] = this->node_id(5)+1;
 
             return;
 
           case 2:
             // linear sub-tri 2
-            conn[0] = this->node(5)+1;
-            conn[1] = this->node(2)+1;
-            conn[2] = this->node(6)+1;
-            conn[3] = this->node(6)+1;
+            conn[0] = this->node_id(5)+1;
+            conn[1] = this->node_id(2)+1;
+            conn[2] = this->node_id(6)+1;
+            conn[3] = this->node_id(6)+1;
 
             return;
 
           case 3:
             // linear sub-tri 3
-            conn[0] = this->node(7)+1;
-            conn[1] = this->node(6)+1;
-            conn[2] = this->node(3)+1;
-            conn[3] = this->node(3)+1;
+            conn[0] = this->node_id(7)+1;
+            conn[1] = this->node_id(6)+1;
+            conn[2] = this->node_id(3)+1;
+            conn[3] = this->node_id(3)+1;
 
             return;
 
           case 4:
             // linear sub-quad
-            conn[0] = this->node(4)+1;
-            conn[1] = this->node(5)+1;
-            conn[2] = this->node(6)+1;
-            conn[3] = this->node(7)+1;
+            conn[0] = this->node_id(4)+1;
+            conn[1] = this->node_id(5)+1;
+            conn[2] = this->node_id(6)+1;
+            conn[3] = this->node_id(7)+1;
 
             return;
 
@@ -296,14 +317,14 @@ void Quad8::connectivity(const unsigned int sf,
       {
         // Create storage
         conn.resize(8);
-        conn[0] = this->node(0);
-        conn[1] = this->node(1);
-        conn[2] = this->node(2);
-        conn[3] = this->node(3);
-        conn[4] = this->node(4);
-        conn[5] = this->node(5);
-        conn[6] = this->node(6);
-        conn[7] = this->node(7);
+        conn[0] = this->node_id(0);
+        conn[1] = this->node_id(1);
+        conn[2] = this->node_id(2);
+        conn[3] = this->node_id(3);
+        conn[4] = this->node_id(4);
+        conn[5] = this->node_id(5);
+        conn[6] = this->node_id(6);
+        conn[7] = this->node_id(7);
         return;
         /*
           conn.resize(3);
@@ -312,33 +333,33 @@ void Quad8::connectivity(const unsigned int sf,
           {
           case 0:
           // linear sub-tri 0
-          conn[0] = this->node(0);
-          conn[1] = this->node(4);
-          conn[2] = this->node(7);
+          conn[0] = this->node_id(0);
+          conn[1] = this->node_id(4);
+          conn[2] = this->node_id(7);
 
           return;
 
           case 1:
           // linear sub-tri 1
-          conn[0] = this->node(4);
-          conn[1] = this->node(1);
-          conn[2] = this->node(5);
+          conn[0] = this->node_id(4);
+          conn[1] = this->node_id(1);
+          conn[2] = this->node_id(5);
 
           return;
 
           case 2:
           // linear sub-tri 2
-          conn[0] = this->node(5);
-          conn[1] = this->node(2);
-          conn[2] = this->node(6);
+          conn[0] = this->node_id(5);
+          conn[1] = this->node_id(2);
+          conn[2] = this->node_id(6);
 
           return;
 
           case 3:
           // linear sub-tri 3
-          conn[0] = this->node(7);
-          conn[1] = this->node(6);
-          conn[2] = this->node(3);
+          conn[0] = this->node_id(7);
+          conn[1] = this->node_id(6);
+          conn[2] = this->node_id(3);
 
           return;
 
@@ -346,10 +367,10 @@ void Quad8::connectivity(const unsigned int sf,
           conn.resize(4);
 
           // linear sub-quad
-          conn[0] = this->node(4);
-          conn[1] = this->node(5);
-          conn[2] = this->node(6);
-          conn[3] = this->node(7);
+          conn[0] = this->node_id(4);
+          conn[1] = this->node_id(5);
+          conn[2] = this->node_id(6);
+          conn[3] = this->node_id(7);
         */
         //        return;
 
@@ -363,6 +384,36 @@ void Quad8::connectivity(const unsigned int sf,
     }
 }
 
+
+
+BoundingBox Quad8::loose_bounding_box () const
+{
+  // This might have curved edges, or might be a curved surface in
+  // 3-space, in which case the full bounding box can be larger than
+  // the bounding box of just the nodes.
+  //
+  //
+  // FIXME - I haven't yet proven the formula below to be correct for
+  // biquadratics - RHS
+  Point pmin, pmax;
+
+  for (unsigned d=0; d<LIBMESH_DIM; ++d)
+    {
+      Real center = this->point(0)(d);
+      for (unsigned int p=1; p != 8; ++p)
+        center += this->point(p)(d);
+      center /= 8;
+
+      Real hd = std::abs(center - this->point(0)(d));
+      for (unsigned int p=0; p != 8; ++p)
+        hd = std::max(hd, std::abs(center - this->point(p)(d)));
+
+      pmin(d) = center - hd;
+      pmax(d) = center + hd;
+    }
+
+  return BoundingBox(pmin, pmax);
+}
 
 
 Real Quad8::volume () const
@@ -403,8 +454,8 @@ Real Quad8::volume () const
   Real vol=0.;
   for (unsigned int i=0; i<N; ++i)
     for (unsigned int j=0; j<N; ++j)
-      vol += (q[j]*q[j]*a1 + q[i]*q[j]*b1 + q[i]*c1 + q[j]*d1 + e1).
-        cross(q[i]*q[i]*a2 + q[i]*q[j]*b2 + q[i]*c2 + q[j]*d2 + e2).norm() * w[i] * w[j];
+      vol += w[i] * w[j] * cross_norm(q[j]*q[j]*a1 + q[i]*q[j]*b1 + q[i]*c1 + q[j]*d1 + e1,
+                                      q[i]*q[i]*a2 + q[i]*q[j]*b2 + q[i]*c2 + q[j]*d2 + e2);
 
   return vol;
 }

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -23,8 +23,6 @@
 // Local includes
 #include "libmesh/quadrature.h"
 
-// C++ includes
-
 namespace libMesh
 {
 
@@ -46,19 +44,20 @@ namespace libMesh
  *
  * \author John W. Peterson
  * \date 2003
+ * \brief Implements 1D Gauss-Jacobi quadrature rules of various orders.
  */
-class QJacobi libmesh_final : public QBase
+class QJacobi final : public QBase
 {
 public:
 
   /**
    * Constructor.  Currently, only one-dimensional rules provided.
    */
-  QJacobi (const unsigned int _dim,
-           const Order _order=INVALID_ORDER,
-           const unsigned int a=1,
-           const unsigned int b=0) :
-    QBase(_dim, _order),
+  QJacobi (unsigned int dim,
+           Order order=INVALID_ORDER,
+           unsigned int a=1,
+           unsigned int b=0) :
+    QBase(dim, order),
     _alpha(a),
     _beta(b)
   {
@@ -67,22 +66,27 @@ public:
   }
 
   /**
-   * Destructor. Empty.
+   * Copy/move ctor, copy/move assignment operator, and destructor are
+   * all explicitly defaulted for this simple class.
    */
-  ~QJacobi() {}
+  QJacobi (const QJacobi &) = default;
+  QJacobi (QJacobi &&) = default;
+  QJacobi & operator= (const QJacobi &) = default;
+  QJacobi & operator= (QJacobi &&) = default;
+  virtual ~QJacobi() = default;
 
   /**
-   * @returns the \p QuadratureType, either
-   * \p QJACOBI_1_0 or \p QJACOBI_2_0.
+   * \returns The \p QuadratureType, either \p QJACOBI_1_0 or \p
+   * QJACOBI_2_0.
    */
-  virtual QuadratureType type() const libmesh_override;
+  virtual QuadratureType type() const override;
 
 private:
   const unsigned int _alpha;
   const unsigned int _beta;
 
   virtual void init_1D (const ElemType _type=INVALID_ELEM,
-                        unsigned int p_level=0) libmesh_override;
+                        unsigned int p_level=0) override;
 };
 
 } // namespace libMesh

@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -29,6 +29,7 @@
 #include "libmesh/dense_vector.h"
 #include "libmesh/dense_subvector.h"
 #include "libmesh/parallel.h"
+#include "libmesh/parallel_sync.h"
 #include "libmesh/tensor_tools.h"
 
 namespace libMesh
@@ -161,15 +162,15 @@ NumericVector<T> & DistributedVector<T>::operator -= (const NumericVector<T> & v
 
 
 template <typename T>
-NumericVector<T> & DistributedVector<T>::operator /= (NumericVector<T> & v)
+NumericVector<T> & DistributedVector<T>::operator /= (const NumericVector<T> & v)
 {
   libmesh_assert_equal_to(size(), v.size());
 
-  DistributedVector<T> & v_vec = cast_ref<DistributedVector<T> &>(v);
+  const DistributedVector<T> & v_vec = cast_ref<const DistributedVector<T> &>(v);
 
   std::size_t val_size = _values.size();
 
-  for(std::size_t i=0; i<val_size; i++)
+  for (std::size_t i=0; i<val_size; i++)
     _values[i] = _values[i] / v_vec._values[i];
 
   return *this;
@@ -414,6 +415,97 @@ void DistributedVector<T>::localize (NumericVector<T> & v_local_in,
 
   // TODO: We don't yet support the send list; this is inefficient:
   localize (v_local_in);
+}
+
+
+
+template <typename T>
+void DistributedVector<T>::localize (std::vector<T> & v_local,
+                                     const std::vector<numeric_index_type> & indices) const
+{
+  // Resize v_local so there is enough room to hold all the local values.
+  v_local.resize(indices.size());
+
+  // We need to know who has the values we want, so get everyone's _local_size
+  std::vector<numeric_index_type> local_sizes;
+  this->comm().allgather (_local_size, local_sizes);
+
+  // Make a vector of partial sums of local sizes
+  std::vector<numeric_index_type> local_size_sums(this->n_processors());
+  local_size_sums[0] = local_sizes[0];
+  for (numeric_index_type i=1; i<local_sizes.size(); i++)
+    local_size_sums[i] = local_size_sums[i-1] + local_sizes[i];
+
+  // We now fill in 'requested_ids' based on the indices.  Also keep
+  // track of the local index (in the indices vector) for each of
+  // these, since we need that when unpacking.
+  std::map<processor_id_type, std::vector<numeric_index_type>>
+    requested_ids, local_requested_ids;
+
+  // We'll use this typedef a couple of times below.
+  typedef typename std::vector<numeric_index_type>::iterator iter_t;
+
+  // For each index in indices, determine which processor it is on.
+  // This is an O(N*log(p)) algorithm that uses std::upper_bound().
+  // Note: upper_bound() returns an iterator to the first entry which is
+  // greater than the given value.
+  for (numeric_index_type i=0; i<indices.size(); i++)
+    {
+      iter_t ub = std::upper_bound(local_size_sums.begin(),
+                                   local_size_sums.end(),
+                                   indices[i]);
+
+      processor_id_type on_proc = cast_int<processor_id_type>
+        (std::distance(local_size_sums.begin(), ub));
+
+      requested_ids[on_proc].push_back(indices[i]);
+      local_requested_ids[on_proc].push_back(i);
+    }
+
+  auto gather_functor =
+    [this]
+    (processor_id_type, const std::vector<dof_id_type> & ids,
+     std::vector<T> & values)
+    {
+      // The first send/receive we did was for indices, the second one will be
+      // for corresponding floating point values, so create storage for that now...
+      const std::size_t ids_size = ids.size();
+      values.resize(ids_size);
+
+      for (std::size_t i=0; i != ids_size; i++)
+        {
+          // The index of the requested value
+          const numeric_index_type requested_index = ids[i];
+
+          // Transform into local numbering, and get requested value.
+          values[i] = _values[requested_index - _first_local_index];
+        }
+    };
+
+  auto action_functor =
+    [& v_local, & local_requested_ids]
+    (processor_id_type pid,
+     const std::vector<dof_id_type> &,
+     const std::vector<T> & values)
+    {
+      // Now write the received values to the appropriate place(s) in v_local
+      for (std::size_t i=0, vsize = values.size(); i != vsize; i++)
+        {
+          libmesh_assert(local_requested_ids.count(pid));
+          libmesh_assert_less(i, local_requested_ids[pid].size());
+
+          // Get the index in v_local where this value needs to be inserted.
+          const numeric_index_type local_requested_index =
+            local_requested_ids[pid][i];
+
+          // Actually set the value in v_local
+          v_local[local_requested_index] = values[i];
+        }
+    };
+
+  const T * ex = nullptr;
+  Parallel::pull_parallel_vector_data
+    (this->comm(), requested_ids, gather_functor, action_functor, ex);
 }
 
 

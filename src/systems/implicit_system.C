@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -23,6 +23,7 @@
 #include "libmesh/dof_map.h"
 #include "libmesh/equation_systems.h"
 #include "libmesh/implicit_system.h"
+#include "libmesh/int_range.h"
 #include "libmesh/libmesh_logging.h"
 #include "libmesh/linear_solver.h"
 #include "libmesh/mesh_base.h"
@@ -43,9 +44,12 @@ ImplicitSystem::ImplicitSystem (EquationSystems & es,
                                 const unsigned int number_in) :
 
   Parent            (es, name_in, number_in),
-  matrix            (libmesh_nullptr),
+  matrix            (nullptr),
+  zero_out_matrix_and_rhs(true),
   _can_add_matrices (true)
 {
+  // Add the system matrix.
+  this->add_system_matrix ();
 }
 
 
@@ -54,6 +58,8 @@ ImplicitSystem::~ImplicitSystem ()
 {
   // Clear data
   this->clear();
+
+  remove_matrix("System Matrix");
 }
 
 
@@ -65,20 +71,19 @@ void ImplicitSystem::clear ()
 
   // clear any user-added matrices
   {
-    for (matrices_iterator pos = _matrices.begin();
-         pos != _matrices.end(); ++pos)
+    for (auto & pr : _matrices)
       {
-        pos->second->clear ();
-        delete pos->second;
-        pos->second = libmesh_nullptr;
+        pr.second->clear ();
+        delete pr.second;
+        pr.second = nullptr;
       }
 
     _matrices.clear();
     _can_add_matrices = true;
   }
 
-  // NULL the matrix.
-  matrix = libmesh_nullptr;
+  // Restore us to a "basic" state
+  this->add_system_matrix ();
 }
 
 
@@ -89,12 +94,8 @@ void ImplicitSystem::init_data ()
   Parent::init_data();
 
   // Clear any existing matrices
-  for (matrices_iterator pos = _matrices.begin();
-       pos != _matrices.end(); ++pos)
-    pos->second->clear();
-
-  // Add the system matrix.
-  this->add_system_matrix ();
+  for (auto & pr : _matrices)
+    pr.second->clear();
 
   // Initialize the matrices for the system
   this->init_matrices ();
@@ -119,10 +120,9 @@ void ImplicitSystem::init_matrices ()
   _can_add_matrices = false;
 
   // Tell the matrices about the dof map, and vice versa
-  for (matrices_iterator pos = _matrices.begin();
-       pos != _matrices.end(); ++pos)
+  for (auto & pr : _matrices)
     {
-      SparseMatrix<Number> & m = *(pos->second);
+      SparseMatrix<Number> & m = *(pr.second);
       libmesh_assert (!m.initialized());
 
       // We want to allow repeated init() on systems, but we don't
@@ -137,14 +137,12 @@ void ImplicitSystem::init_matrices ()
   dof_map.compute_sparsity (this->get_mesh());
 
   // Initialize matrices
-  for (matrices_iterator pos = _matrices.begin();
-       pos != _matrices.end(); ++pos)
-    pos->second->init ();
+  for (auto & pr : _matrices)
+    pr.second->init ();
 
   // Set the additional matrices to 0.
-  for (matrices_iterator pos = _matrices.begin();
-       pos != _matrices.end(); ++pos)
-    pos->second->zero ();
+  for (auto & pr : _matrices)
+    pr.second->zero ();
 }
 
 
@@ -158,11 +156,10 @@ void ImplicitSystem::reinit ()
   DofMap & dof_map = this->get_dof_map();
 
   // Clear the matrices
-  for (matrices_iterator pos = _matrices.begin();
-       pos != _matrices.end(); ++pos)
+  for (auto & pr : _matrices)
     {
-      pos->second->clear();
-      pos->second->attach_dof_map (dof_map);
+      pr.second->clear();
+      pr.second->attach_dof_map (dof_map);
     }
 
   // Clear the sparsity pattern
@@ -174,14 +171,12 @@ void ImplicitSystem::reinit ()
   dof_map.compute_sparsity (this->get_mesh());
 
   // Initialize matrices
-  for (matrices_iterator pos = _matrices.begin();
-       pos != _matrices.end(); ++pos)
-    pos->second->init ();
+  for (auto & pr : _matrices)
+    pr.second->init ();
 
   // Set the additional matrices to 0.
-  for (matrices_iterator pos = _matrices.begin();
-       pos != _matrices.end(); ++pos)
-    pos->second->zero ();
+  for (auto & pr : _matrices)
+    pr.second->zero ();
 }
 
 
@@ -193,10 +188,11 @@ void ImplicitSystem::assemble ()
   libmesh_assert(rhs);
   libmesh_assert (rhs->initialized());
 
-  // The user assembly gets to expect to accumulate on an initially
-  // empty system
-  matrix->zero ();
-  rhs->zero ();
+  if (zero_out_matrix_and_rhs)
+    {
+      matrix->zero ();
+      rhs->zero ();
+    }
 
   // Call the base class assemble function
   Parent::assemble ();
@@ -223,6 +219,20 @@ SparseMatrix<Number> & ImplicitSystem::add_matrix (const std::string & mat_name)
 }
 
 
+void ImplicitSystem::remove_matrix (const std::string & mat_name)
+{
+  matrices_iterator pos = _matrices.find (mat_name);
+
+  //Return if the matrix does not exist
+  if (pos == _matrices.end())
+    return;
+
+  delete pos->second;
+
+  _matrices.erase(pos);
+}
+
+
 
 const SparseMatrix<Number> * ImplicitSystem::request_matrix (const std::string & mat_name) const
 {
@@ -230,7 +240,7 @@ const SparseMatrix<Number> * ImplicitSystem::request_matrix (const std::string &
   const_matrices_iterator pos = _matrices.find (mat_name);
 
   if (pos == _matrices.end())
-    return libmesh_nullptr;
+    return nullptr;
 
   return pos->second;
 }
@@ -243,7 +253,7 @@ SparseMatrix<Number> * ImplicitSystem::request_matrix (const std::string & mat_n
   matrices_iterator pos = _matrices.find (mat_name);
 
   if (pos == _matrices.end())
-    return libmesh_nullptr;
+    return nullptr;
 
   return pos->second;
 }
@@ -279,13 +289,13 @@ SparseMatrix<Number> & ImplicitSystem::get_matrix (const std::string & mat_name)
 void ImplicitSystem::add_system_matrix ()
 {
   // Possible that we cleared the _matrices but
-  // forgot to NULL-out the matrix?
-  if (_matrices.empty()) matrix = libmesh_nullptr;
-
+  // forgot to update the matrix pointer?
+  if (_matrices.empty())
+    matrix = nullptr;
 
   // Only need to add the matrix if it isn't there
   // already!
-  if (matrix == libmesh_nullptr)
+  if (matrix == nullptr)
     matrix = &(this->add_matrix ("System Matrix"));
 
   libmesh_assert(matrix);
@@ -304,7 +314,7 @@ std::pair<unsigned int, Real>
 ImplicitSystem::sensitivity_solve (const ParameterVector & parameters)
 {
   // Log how long the linear solve takes.
-  START_LOG("sensitivity_solve()", "ImplicitSystem");
+  LOG_SCOPE("sensitivity_solve()", "ImplicitSystem");
 
   // The forward system should now already be solved.
   // Now assemble the corresponding sensitivity system.
@@ -330,7 +340,7 @@ ImplicitSystem::sensitivity_solve (const ParameterVector & parameters)
 
   // Solve the linear system.
   SparseMatrix<Number> * pc = this->request_matrix("Preconditioner");
-  for (unsigned int p=0; p != parameters.size(); ++p)
+  for (auto p : IntRange<unsigned int>(0, parameters.size()))
     {
       std::pair<unsigned int, Real> rval =
         linear_solver->solve (*matrix, pc,
@@ -345,16 +355,13 @@ ImplicitSystem::sensitivity_solve (const ParameterVector & parameters)
 
   // The linear solver may not have fit our constraints exactly
 #ifdef LIBMESH_ENABLE_CONSTRAINTS
-  for (unsigned int p=0; p != parameters.size(); ++p)
+  for (auto p : IntRange<unsigned int>(0, parameters.size()))
     this->get_dof_map().enforce_constraints_exactly
       (*this, &this->get_sensitivity_solution(p),
        /* homogeneous = */ true);
 #endif
 
   this->release_linear_solver(linear_solver);
-
-  // Stop logging the nonlinear solve
-  STOP_LOG("sensitivity_solve()", "ImplicitSystem");
 
   return totalrval;
 }
@@ -365,7 +372,7 @@ std::pair<unsigned int, Real>
 ImplicitSystem::adjoint_solve (const QoISet & qoi_indices)
 {
   // Log how long the linear solve takes.
-  START_LOG("adjoint_solve()", "ImplicitSystem");
+  LOG_SCOPE("adjoint_solve()", "ImplicitSystem");
 
   if (this->assemble_before_solve)
     // Assemble the linear system
@@ -386,7 +393,7 @@ ImplicitSystem::adjoint_solve (const QoISet & qoi_indices)
     this->get_linear_solve_parameters();
   std::pair<unsigned int, Real> totalrval = std::make_pair(0,0.0);
 
-  for (unsigned int i=0; i != this->qoi.size(); ++i)
+  for (unsigned int i=0; i != this->n_qois(); ++i)
     if (qoi_indices.has_index(i))
       {
         const std::pair<unsigned int, Real> rval =
@@ -403,14 +410,11 @@ ImplicitSystem::adjoint_solve (const QoISet & qoi_indices)
 
   // The linear solver may not have fit our constraints exactly
 #ifdef LIBMESH_ENABLE_CONSTRAINTS
-  for (unsigned int i=0; i != this->qoi.size(); ++i)
+  for (unsigned int i=0; i != this->n_qois(); ++i)
     if (qoi_indices.has_index(i))
       this->get_dof_map().enforce_adjoint_constraints_exactly
         (this->get_adjoint_solution(i), i);
 #endif
-
-  // Stop logging the nonlinear solve
-  STOP_LOG("adjoint_solve()", "ImplicitSystem");
 
   return totalrval;
 }
@@ -423,7 +427,7 @@ ImplicitSystem::weighted_sensitivity_adjoint_solve (const ParameterVector & para
                                                     const QoISet & qoi_indices)
 {
   // Log how long the linear solve takes.
-  START_LOG("weighted_sensitivity_adjoint_solve()", "ImplicitSystem");
+  LOG_SCOPE("weighted_sensitivity_adjoint_solve()", "ImplicitSystem");
 
   // We currently get partial derivatives via central differencing
   const Real delta_p = TOLERANCE;
@@ -439,7 +443,7 @@ ImplicitSystem::weighted_sensitivity_adjoint_solve (const ParameterVector & para
 
   // FIXME: The derivation here does not yet take adjoint boundary
   // conditions into account.
-  for (unsigned int i=0; i != this->qoi.size(); ++i)
+  for (unsigned int i=0; i != this->n_qois(); ++i)
     if (qoi_indices.has_index(i))
       libmesh_assert(!this->get_dof_map().has_adjoint_dirichlet_boundaries(i));
 
@@ -449,10 +453,10 @@ ImplicitSystem::weighted_sensitivity_adjoint_solve (const ParameterVector & para
   // We'll use temporary rhs vectors, because we haven't (yet) found
   // any good reasons why users might want to save these:
 
-  std::vector<NumericVector<Number> *> temprhs(this->qoi.size());
-  for (unsigned int i=0; i != this->qoi.size(); ++i)
+  std::vector<std::unique_ptr<NumericVector<Number>>> temprhs(this->n_qois());
+  for (unsigned int i=0; i != this->n_qois(); ++i)
     if (qoi_indices.has_index(i))
-      temprhs[i] = this->rhs->zero_clone().release();
+      temprhs[i] = this->rhs->zero_clone();
 
   // We approximate the _l partial derivatives via a central
   // differencing perturbation in the w_l direction:
@@ -481,7 +485,7 @@ ImplicitSystem::weighted_sensitivity_adjoint_solve (const ParameterVector & para
   this->assemble_qoi_derivative(qoi_indices,
                                 /* include_liftfunc = */ false,
                                 /* apply_constraints = */ true);
-  for (unsigned int i=0; i != this->qoi.size(); ++i)
+  for (unsigned int i=0; i != this->n_qois(); ++i)
     if (qoi_indices.has_index(i))
       {
         this->get_adjoint_rhs(i).close();
@@ -501,7 +505,7 @@ ImplicitSystem::weighted_sensitivity_adjoint_solve (const ParameterVector & para
   this->assemble_qoi_derivative(qoi_indices,
                                 /* include_liftfunc = */ false,
                                 /* apply_constraints = */ true);
-  for (unsigned int i=0; i != this->qoi.size(); ++i)
+  for (unsigned int i=0; i != this->n_qois(); ++i)
     if (qoi_indices.has_index(i))
       {
         this->get_adjoint_rhs(i).close();
@@ -534,7 +538,7 @@ ImplicitSystem::weighted_sensitivity_adjoint_solve (const ParameterVector & para
     this->get_linear_solve_parameters();
   std::pair<unsigned int, Real> totalrval = std::make_pair(0,0.0);
 
-  for (unsigned int i=0; i != this->qoi.size(); ++i)
+  for (unsigned int i=0; i != this->n_qois(); ++i)
     if (qoi_indices.has_index(i))
       {
         const std::pair<unsigned int, Real> rval =
@@ -549,21 +553,14 @@ ImplicitSystem::weighted_sensitivity_adjoint_solve (const ParameterVector & para
 
   this->release_linear_solver(linear_solver);
 
-  for (unsigned int i=0; i != this->qoi.size(); ++i)
-    if (qoi_indices.has_index(i))
-      delete temprhs[i];
-
   // The linear solver may not have fit our constraints exactly
 #ifdef LIBMESH_ENABLE_CONSTRAINTS
-  for (unsigned int i=0; i != this->qoi.size(); ++i)
+  for (unsigned int i=0; i != this->n_qois(); ++i)
     if (qoi_indices.has_index(i))
       this->get_dof_map().enforce_constraints_exactly
         (*this, &this->get_weighted_sensitivity_adjoint_solution(i),
          /* homogeneous = */ true);
 #endif
-
-  // Stop logging the nonlinear solve
-  STOP_LOG("weighted_sensitivity_adjoint_solve()", "ImplicitSystem");
 
   return totalrval;
 }
@@ -575,7 +572,7 @@ ImplicitSystem::weighted_sensitivity_solve (const ParameterVector & parameters_i
                                             const ParameterVector & weights)
 {
   // Log how long the linear solve takes.
-  START_LOG("weighted_sensitivity_solve()", "ImplicitSystem");
+  LOG_SCOPE("weighted_sensitivity_solve()", "ImplicitSystem");
 
   // We currently get partial derivatives via central differencing
   const Real delta_p = TOLERANCE;
@@ -608,7 +605,7 @@ ImplicitSystem::weighted_sensitivity_solve (const ParameterVector & parameters_i
   this->assembly(true, false, true);
   this->rhs->close();
 
-  UniquePtr<NumericVector<Number> > temprhs = this->rhs->clone();
+  std::unique_ptr<NumericVector<Number>> temprhs = this->rhs->clone();
 
   oldparameters.value_copy(parameters);
   parameterperturbation *= -1.0;
@@ -648,9 +645,6 @@ ImplicitSystem::weighted_sensitivity_solve (const ParameterVector & parameters_i
     (*this, &this->get_weighted_sensitivity_solution(),
      /* homogeneous = */ true);
 #endif
-
-  // Stop logging the nonlinear solve
-  STOP_LOG("weighted_sensitivity_solve()", "ImplicitSystem");
 
   return rval;
 }
@@ -709,8 +703,7 @@ void ImplicitSystem::adjoint_qoi_parameter_sensitivity (const QoISet & qoi_indic
 
   const unsigned int Np = cast_int<unsigned int>
     (parameters.size());
-  const unsigned int Nq = cast_int<unsigned int>
-    (qoi.size());
+  const unsigned int Nq = this->n_qois();
 
   // An introduction to the problem:
   //
@@ -732,7 +725,7 @@ void ImplicitSystem::adjoint_qoi_parameter_sensitivity (const QoISet & qoi_indic
 
   this->assemble_residual_derivatives(parameters_in);
 
-  // Get ready to fill in senstivities:
+  // Get ready to fill in sensitivities:
   sensitivities.allocate_data(qoi_indices, *this, parameters);
 
   // We use the identities:
@@ -820,8 +813,7 @@ void ImplicitSystem::forward_qoi_parameter_sensitivity (const QoISet & qoi_indic
 
   const unsigned int Np = cast_int<unsigned int>
     (parameters.size());
-  const unsigned int Nq = cast_int<unsigned int>
-    (qoi.size());
+  const unsigned int Nq = this->n_qois();
 
   // An introduction to the problem:
   //
@@ -838,7 +830,7 @@ void ImplicitSystem::forward_qoi_parameter_sensitivity (const QoISet & qoi_indic
 
   this->sensitivity_solve(parameters);
 
-  // Get ready to fill in senstivities:
+  // Get ready to fill in sensitivities:
   sensitivities.allocate_data(qoi_indices, *this, parameters);
 
   // We use the identity:
@@ -853,7 +845,7 @@ void ImplicitSystem::forward_qoi_parameter_sensitivity (const QoISet & qoi_indic
   // We don't need these to be closed() in this function, but libMesh
   // standard practice is to have them closed() by the time the
   // function exits
-  for (unsigned int i=0; i != this->qoi.size(); ++i)
+  for (unsigned int i=0; i != this->n_qois(); ++i)
     if (qoi_indices.has_index(i))
       this->get_adjoint_rhs(i).close();
 
@@ -914,12 +906,11 @@ void ImplicitSystem::qoi_parameter_hessian_vector_product (const QoISet & qoi_in
     const_cast<ParameterVector &>(parameters_in);
 
   // We'll use a single temporary vector for matrix-vector-vector products
-  UniquePtr<NumericVector<Number> > tempvec = this->solution->zero_clone();
+  std::unique_ptr<NumericVector<Number>> tempvec = this->solution->zero_clone();
 
   const unsigned int Np = cast_int<unsigned int>
     (parameters.size());
-  const unsigned int Nq = cast_int<unsigned int>
-    (qoi.size());
+  const unsigned int Nq = this->n_qois();
 
   // For each quantity of interest q, the parameter sensitivity
   // Hessian is defined as q''_{kl} = {d^2 q}/{d p_k d p_l}.
@@ -945,7 +936,7 @@ void ImplicitSystem::qoi_parameter_hessian_vector_product (const QoISet & qoi_in
       this->adjoint_solve(qoi_indices);
     }
 
-  // Get ready to fill in senstivities:
+  // Get ready to fill in sensitivities:
   sensitivities.allocate_data(qoi_indices, *this, parameters);
 
   // We can't solve for all the solution sensitivities u'_l or for all
@@ -962,12 +953,12 @@ void ImplicitSystem::qoi_parameter_hessian_vector_product (const QoISet & qoi_in
   for (unsigned int k=0; k != Np; ++k)
     {
       // We approximate sum_l(w_l * Q''_{kl}) with a central
-      // differencing pertubation:
+      // differencing perturbation:
       // sum_l(w_l * Q''_{kl}) ~=
       // (Q(p + dp*w_l*e_l + dp*e_k) - Q(p - dp*w_l*e_l + dp*e_k) -
       // Q(p + dp*w_l*e_l - dp*e_k) + Q(p - dp*w_l*e_l - dp*e_k))/(4*dp^2)
 
-      // The sum(w_l*R''_kl) term requires the same sort of pertubation,
+      // The sum(w_l*R''_kl) term requires the same sort of perturbation,
       // and so we subtract it in at the same time:
       // sum_l(w_l * R''_{kl}) ~=
       // (R(p + dp*w_l*e_l + dp*e_k) - R(p - dp*w_l*e_l + dp*e_k) -
@@ -986,7 +977,7 @@ void ImplicitSystem::qoi_parameter_hessian_vector_product (const QoISet & qoi_in
       this->assembly(true, false, true);
       this->rhs->close();
       std::vector<Number> partial2q_term = this->qoi;
-      std::vector<Number> partial2R_term(this->qoi.size());
+      std::vector<Number> partial2R_term(this->n_qois());
       for (unsigned int i=0; i != Nq; ++i)
         if (qoi_indices.has_index(i))
           partial2R_term[i] = this->rhs->dot(this->get_adjoint_solution(i));
@@ -1119,16 +1110,15 @@ void ImplicitSystem::qoi_parameter_hessian (const QoISet & qoi_indices,
     const_cast<ParameterVector &>(parameters_in);
 
   // We'll use one temporary vector for matrix-vector-vector products
-  UniquePtr<NumericVector<Number> > tempvec = this->solution->zero_clone();
+  std::unique_ptr<NumericVector<Number>> tempvec = this->solution->zero_clone();
 
   // And another temporary vector to hold a copy of the true solution
   // so we can safely perturb this->solution.
-  UniquePtr<NumericVector<Number> > oldsolution = this->solution->clone();
+  std::unique_ptr<NumericVector<Number>> oldsolution = this->solution->clone();
 
   const unsigned int Np = cast_int<unsigned int>
     (parameters.size());
-  const unsigned int Nq = cast_int<unsigned int>
-    (qoi.size());
+  const unsigned int Nq = this->n_qois();
 
   // For each quantity of interest q, the parameter sensitivity
   // Hessian is defined as q''_{kl} = {d^2 q}/{d p_k d p_l}.
@@ -1189,7 +1179,7 @@ void ImplicitSystem::qoi_parameter_hessian (const QoISet & qoi_indices,
           this->assembly(true, false, true);
           this->rhs->close();
           std::vector<Number> partial2q_term = this->qoi;
-          std::vector<Number> partial2R_term(this->qoi.size());
+          std::vector<Number> partial2R_term(this->n_qois());
           for (unsigned int i=0; i != Nq; ++i)
             if (qoi_indices.has_index(i))
               partial2R_term[i] = this->rhs->dot(this->get_adjoint_solution(i));
@@ -1322,6 +1312,10 @@ void ImplicitSystem::qoi_parameter_hessian (const QoISet & qoi_indices,
       *this->solution = this->get_sensitivity_solution(k);
       *this->solution *= delta_p;
       *this->solution += *oldsolution;
+
+      // We've modified solution, so we need to update before calling
+      // assembly since assembly may only use current_local_solution
+      this->update();
       this->assembly(false, true);
       this->matrix->close();
       this->assemble_qoi_derivative(qoi_indices,
@@ -1354,6 +1348,10 @@ void ImplicitSystem::qoi_parameter_hessian (const QoISet & qoi_indices,
       *this->solution = this->get_sensitivity_solution(k);
       *this->solution *= -delta_p;
       *this->solution += *oldsolution;
+
+      // We've modified solution, so we need to update before calling
+      // assembly since assembly may only use current_local_solution
+      this->update();
       this->assembly(false, true);
       this->matrix->close();
       this->assemble_qoi_derivative(qoi_indices,
@@ -1383,6 +1381,9 @@ void ImplicitSystem::qoi_parameter_hessian (const QoISet & qoi_indices,
   // All parameters have been reset.
   // Don't leave the qoi or system changed - principle of least
   // surprise.
+  // We've modified solution, so we need to update before calling
+  // assembly since assembly may only use current_local_solution
+  this->update();
   this->assembly(true, true);
   this->rhs->close();
   this->matrix->close();
@@ -1393,10 +1394,21 @@ void ImplicitSystem::qoi_parameter_hessian (const QoISet & qoi_indices,
 
 LinearSolver<Number> * ImplicitSystem::get_linear_solver() const
 {
+  // This function allocates memory and hands it back to the user as a
+  // naked pointer.  This makes it too easy to leak memory, and
+  // therefore this function is deprecated.  After a period of
+  // deprecation, this function will eventually be marked with a
+  // libmesh_error_msg().
+  libmesh_deprecated();
+  // libmesh_error_msg("This function should be overridden by derived classes. "
+  //                   "It does not contain a valid LinearSolver to hand back to "
+  //                   "the user, so it creates one, opening up the possibility "
+  //                   "of a memory leak.");
+
   LinearSolver<Number> * new_solver =
     LinearSolver<Number>::build(this->comm()).release();
 
-  if (libMesh::on_command_line("--solver_system_names"))
+  if (libMesh::on_command_line("--solver-system-names"))
     new_solver->init((this->name()+"_").c_str());
   else
     new_solver->init();
@@ -1416,6 +1428,9 @@ std::pair<unsigned int, Real> ImplicitSystem::get_linear_solve_parameters() cons
 
 void ImplicitSystem::release_linear_solver(LinearSolver<Number> * s) const
 {
+  // This is the counterpart of the get_linear_solver() function, which is now deprecated.
+  libmesh_deprecated();
+
   delete s;
 }
 

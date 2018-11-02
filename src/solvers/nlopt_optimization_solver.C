@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -38,7 +38,7 @@ double __libmesh_nlopt_objective(unsigned n,
                                  double * gradient,
                                  void * data)
 {
-  START_LOG("objective()", "NloptOptimizationSolver");
+  LOG_SCOPE("objective()", "NloptOptimizationSolver");
 
   // ctx should be a pointer to the solver (it was passed in as void *)
   NloptOptimizationSolver<Number> * solver =
@@ -62,7 +62,7 @@ double __libmesh_nlopt_objective(unsigned n,
   sys.update();
 
   Real objective;
-  if (solver->objective_object != libmesh_nullptr)
+  if (solver->objective_object != nullptr)
     {
       objective =
         solver->objective_object->objective(
@@ -76,7 +76,7 @@ double __libmesh_nlopt_objective(unsigned n,
   // If the gradient has been requested, fill it in
   if (gradient)
     {
-      if (solver->gradient_object != libmesh_nullptr)
+      if (solver->gradient_object != nullptr)
         {
           solver->gradient_object->gradient(
                                             *(sys.current_local_solution), *(sys.rhs), sys);
@@ -93,8 +93,6 @@ double __libmesh_nlopt_objective(unsigned n,
       else
         libmesh_error_msg("Gradient function not defined in __libmesh_nlopt_objective");
     }
-
-  STOP_LOG("objective()", "NloptOptimizationSolver");
 
   // Increment the iteration count.
   solver->get_iteration_count()++;
@@ -115,7 +113,7 @@ void __libmesh_nlopt_equality_constraints(unsigned m,
                                           double * gradient,
                                           void * data)
 {
-  START_LOG("equality_constraints()", "NloptOptimizationSolver");
+  LOG_SCOPE("equality_constraints()", "NloptOptimizationSolver");
 
   libmesh_assert(data);
 
@@ -130,7 +128,7 @@ void __libmesh_nlopt_equality_constraints(unsigned m,
   if (sys.solution->size() != n)
     libmesh_error_msg("Error: Input vector x has different length than sys.solution!");
 
-  for(unsigned int i=sys.solution->first_local_index(); i<sys.solution->last_local_index(); i++)
+  for (unsigned int i=sys.solution->first_local_index(); i<sys.solution->last_local_index(); i++)
     sys.solution->set(i, x[i]);
   sys.solution->close();
 
@@ -157,7 +155,7 @@ void __libmesh_nlopt_equality_constraints(unsigned m,
       for (unsigned i=0; i<m; ++i)
         result[i] = (*sys.C_eq)(i);
 
-      // If gradient != NULL, then the Jacobian matrix of the equality
+      // If gradient != nullptr, then the Jacobian matrix of the equality
       // constraints has been requested.  The incoming 'gradient'
       // array is of length m*n and d(c_i)/d(x_j) = gradient[n*i+j].
       if (gradient)
@@ -174,16 +172,9 @@ void __libmesh_nlopt_equality_constraints(unsigned m,
               sys.C_eq_jac->close();
 
               // copy the Jacobian data to the gradient array
-              for(numeric_index_type i=0; i<m; i++)
-                {
-                  std::set<numeric_index_type>::iterator it = sys.eq_constraint_jac_sparsity[i].begin();
-                  std::set<numeric_index_type>::iterator it_end = sys.eq_constraint_jac_sparsity[i].end();
-                  for( ; it != it_end; ++it)
-                    {
-                      numeric_index_type dof_index = *it;
-                      gradient[n*i+dof_index] = (*sys.C_eq_jac)(i,dof_index);
-                    }
-                }
+              for (numeric_index_type i=0; i<m; i++)
+                for (const auto & dof_index : sys.eq_constraint_jac_sparsity[i])
+                  gradient[n*i+dof_index] = (*sys.C_eq_jac)(i,dof_index);
             }
           else
             libmesh_error_msg("Jacobian function not defined in __libmesh_nlopt_equality_constraints");
@@ -192,10 +183,6 @@ void __libmesh_nlopt_equality_constraints(unsigned m,
     }
   else
     libmesh_error_msg("Constraints function not defined in __libmesh_nlopt_equality_constraints");
-
-
-
-  STOP_LOG("equality_constraints()", "NloptOptimizationSolver");
 }
 
 
@@ -206,7 +193,7 @@ void __libmesh_nlopt_inequality_constraints(unsigned m,
                                             double * gradient,
                                             void * data)
 {
-  START_LOG("inequality_constraints()", "NloptOptimizationSolver");
+  LOG_SCOPE("inequality_constraints()", "NloptOptimizationSolver");
 
   libmesh_assert(data);
 
@@ -221,7 +208,7 @@ void __libmesh_nlopt_inequality_constraints(unsigned m,
   if (sys.solution->size() != n)
     libmesh_error_msg("Error: Input vector x has different length than sys.solution!");
 
-  for(unsigned int i=sys.solution->first_local_index(); i<sys.solution->last_local_index(); i++)
+  for (unsigned int i=sys.solution->first_local_index(); i<sys.solution->last_local_index(); i++)
     sys.solution->set(i, x[i]);
   sys.solution->close();
 
@@ -248,7 +235,7 @@ void __libmesh_nlopt_inequality_constraints(unsigned m,
       for (unsigned i=0; i<m; ++i)
         result[i] = (*sys.C_ineq)(i);
 
-      // If gradient != NULL, then the Jacobian matrix of the equality
+      // If gradient != nullptr, then the Jacobian matrix of the equality
       // constraints has been requested.  The incoming 'gradient'
       // array is of length m*n and d(c_i)/d(x_j) = gradient[n*i+j].
       if (gradient)
@@ -265,16 +252,9 @@ void __libmesh_nlopt_inequality_constraints(unsigned m,
               sys.C_ineq_jac->close();
 
               // copy the Jacobian data to the gradient array
-              for(numeric_index_type i=0; i<m; i++)
-                {
-                  std::set<numeric_index_type>::iterator it = sys.ineq_constraint_jac_sparsity[i].begin();
-                  std::set<numeric_index_type>::iterator it_end = sys.ineq_constraint_jac_sparsity[i].end();
-                  for( ; it != it_end; ++it)
-                    {
-                      numeric_index_type dof_index = *it;
-                      gradient[n*i+dof_index] = (*sys.C_ineq_jac)(i,dof_index);
-                    }
-                }
+              for (numeric_index_type i=0; i<m; i++)
+                for (const auto & dof_index : sys.ineq_constraint_jac_sparsity[i])
+                  gradient[n*i+dof_index] = (*sys.C_ineq_jac)(i,dof_index);
             }
           else
             libmesh_error_msg("Jacobian function not defined in __libmesh_nlopt_inequality_constraints");
@@ -283,8 +263,6 @@ void __libmesh_nlopt_inequality_constraints(unsigned m,
     }
   else
     libmesh_error_msg("Constraints function not defined in __libmesh_nlopt_inequality_constraints");
-
-  STOP_LOG("inequality_constraints()", "NloptOptimizationSolver");
 }
 
 //---------------------------------------------------------------------
@@ -297,7 +275,7 @@ template <typename T>
 NloptOptimizationSolver<T>::NloptOptimizationSolver (OptimizationSystem & system_in)
   :
   OptimizationSolver<T>(system_in),
-  _opt(libmesh_nullptr),
+  _opt(nullptr),
   _result(NLOPT_SUCCESS),
   _iteration_count(0),
   _constraints_tolerance(1.e-8)
@@ -343,8 +321,7 @@ void NloptOptimizationSolver<T>::init ()
                                                            nlopt_algorithm_name);
 
       // Convert string to an nlopt algorithm type
-      std::map<std::string, nlopt_algorithm>::iterator it =
-        _nlopt_algorithms.find(nlopt_algorithm_name);
+      auto it = _nlopt_algorithms.find(nlopt_algorithm_name);
 
       if (it == _nlopt_algorithms.end())
         libmesh_error_msg("Invalid nlopt algorithm requested on command line: " \
@@ -359,7 +336,7 @@ void NloptOptimizationSolver<T>::init ()
 template <typename T>
 void NloptOptimizationSolver<T>::solve ()
 {
-  START_LOG("solve()", "NloptOptimizationSolver");
+  LOG_SCOPE("solve()", "NloptOptimizationSolver");
 
   this->init ();
 
@@ -385,7 +362,7 @@ void NloptOptimizationSolver<T>::solve ()
 
       std::vector<Real> nlopt_lb(nlopt_size);
       std::vector<Real> nlopt_ub(nlopt_size);
-      for(unsigned int i=0; i<nlopt_size; i++)
+      for (unsigned int i=0; i<nlopt_size; i++)
         {
           nlopt_lb[i] = this->system().get_vector("lower_bounds")(i);
           nlopt_ub[i] = this->system().get_vector("upper_bounds")(i);
@@ -455,8 +432,6 @@ void NloptOptimizationSolver<T>::solve ()
                  << this->get_iteration_count()
                  << " iterations."
                  << std::endl;
-
-  STOP_LOG("solve()", "NloptOptimizationSolver");
 }
 
 

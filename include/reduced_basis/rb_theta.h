@@ -54,13 +54,20 @@ public:
   RBTheta () {}
 
   /**
+   * Move constructor, must be declared noexcept.
+   */
+  RBTheta (RBTheta && other) noexcept
+    : ReferenceCountedObject<RBTheta>(std::move(other))
+  {}
+
+  /**
    * Destructor.
    */
   virtual ~RBTheta () {}
 
   /**
    * Evaluate the functor object for the given parameter.
-   * Default implementation is to return 1, overload
+   * Default implementation is to return 1, override
    * to provide problem dependent behavior.
    */
   virtual Number evaluate(const RBParameters &) { return 1.; }

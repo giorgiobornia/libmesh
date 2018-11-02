@@ -1,5 +1,5 @@
 // The libMesh Finite Element Library.
-// Copyright (C) 2002-2016 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+// Copyright (C) 2002-2018 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
 
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -25,7 +25,6 @@
 #include "libmesh/libmesh_singleton.h"
 
 // C++ includes
-#include <cstddef>
 #include <limits>
 
 namespace libMesh
@@ -36,10 +35,11 @@ namespace libMesh
  * not exist on the local processor, the ghost element's neighbors
  * are set to point to the singleton RemoteElement instead.
  * Library code can then distinguish between such elements and
- * boundary elements (with NULL neighbors).
+ * boundary elements (with nullptr neighbors).
  *
  * \author Roy H. Stogner
  * \date 2007
+ * \brief Used by ParallelMesh to represent an Elem owned by another processor.
  */
 class RemoteElem : public Elem,
                    public Singleton
@@ -57,27 +57,33 @@ public:
 private:
   RemoteElem () : Elem(0,
                        0,
-                       libmesh_nullptr,
+                       nullptr,
                        _elemlinks_data,
-                       libmesh_nullptr)
+                       nullptr)
   { this->set_id(remote_elem_id); }
 
 public:
+
+  RemoteElem (RemoteElem &&) = delete;
+  RemoteElem (const RemoteElem &) = delete;
+  RemoteElem & operator= (const RemoteElem &) = delete;
+  RemoteElem & operator= (RemoteElem &&) = delete;
+
   /**
-   * Destructor.
+   * Sets remote_elem to nullptr.
    */
   virtual ~RemoteElem();
 
   /**
    * Return a reference to the global \p RemoteElem
-   * sigleton object.
+   * singleton object.
    */
   static const Elem & create ();
 
-  virtual Point master_point (const unsigned int /*i*/) const libmesh_override
+  virtual Point master_point (const unsigned int /*i*/) const override
   { libmesh_not_implemented(); return Point(); }
 
-  virtual Node * & set_node (const unsigned int i) libmesh_override
+  virtual Node * & set_node (const unsigned int i) override
   { libmesh_not_implemented(); return Elem::set_node(i); }
 
   /**
@@ -85,85 +91,95 @@ public:
    */
   using Elem::key;
 
-  virtual dof_id_type key (const unsigned int) const libmesh_override
+  virtual dof_id_type key (const unsigned int) const override
   { libmesh_not_implemented(); return 0; }
 
-  virtual bool is_remote () const libmesh_override
+  virtual unsigned int which_node_am_i(unsigned int /*side*/,
+                                       unsigned int /*side_node*/) const override
+  { libmesh_not_implemented(); return 0; }
+
+  virtual bool is_remote () const override
   { return true; }
 
   virtual void connectivity(const unsigned int,
                             const IOPackage,
-                            std::vector<dof_id_type> &) const libmesh_override
+                            std::vector<dof_id_type> &) const override
   { libmesh_not_implemented(); }
 
-  virtual ElemType type () const libmesh_override
+  virtual ElemType type () const override
   { return REMOTEELEM; }
 
-  virtual unsigned int dim () const libmesh_override
+  virtual unsigned short dim () const override
   { libmesh_not_implemented(); return 0; }
 
-  virtual unsigned int n_nodes () const libmesh_override
+  virtual unsigned int n_nodes () const override
   { libmesh_not_implemented(); return 0; }
 
-  virtual unsigned int n_sides () const libmesh_override
+  virtual unsigned int n_sides () const override
   { libmesh_not_implemented(); return 0; }
 
-  virtual unsigned int n_vertices () const libmesh_override
+  virtual unsigned int n_vertices () const override
   { libmesh_not_implemented(); return 0; }
 
-  virtual unsigned int n_edges () const libmesh_override
+  virtual unsigned int n_edges () const override
   { libmesh_not_implemented(); return 0; }
 
-  virtual unsigned int n_faces () const libmesh_override
+  virtual unsigned int n_faces () const override
   { libmesh_not_implemented(); return 0; }
 
-  virtual unsigned int n_children () const libmesh_override
+  virtual unsigned int n_children () const override
   { libmesh_not_implemented(); return 0; }
 
-  virtual bool is_vertex(const unsigned int) const libmesh_override
+  virtual bool is_vertex(const unsigned int) const override
   { libmesh_not_implemented(); return false; }
 
-  virtual bool is_edge(const unsigned int) const libmesh_override
+  virtual bool is_edge(const unsigned int) const override
   { libmesh_not_implemented(); return false; }
 
-  virtual bool is_face(const unsigned int) const libmesh_override
+  virtual bool is_face(const unsigned int) const override
   { libmesh_not_implemented(); return false; }
 
   virtual bool is_node_on_side(const unsigned int,
-                               const unsigned int) const libmesh_override
+                               const unsigned int) const override
   { libmesh_not_implemented(); return false; }
 
+  virtual std::vector<unsigned int> nodes_on_side(const unsigned int) const override
+  {
+    libmesh_not_implemented();
+    return {0};
+  }
+
   virtual bool is_child_on_side(const unsigned int,
-                                const unsigned int) const libmesh_override
+                                const unsigned int) const override
   { libmesh_not_implemented(); return false; }
 
   virtual bool is_edge_on_side(const unsigned int,
-                               const unsigned int) const libmesh_override
+                               const unsigned int) const override
   { libmesh_not_implemented(); return false; }
 
   virtual bool is_node_on_edge(const unsigned int,
-                               const unsigned int) const libmesh_override
+                               const unsigned int) const override
   { libmesh_not_implemented(); return false; }
 
-  virtual unsigned int n_sub_elem () const libmesh_override
+  virtual unsigned int n_sub_elem () const override
   { libmesh_not_implemented(); return 0; }
 
-  virtual UniquePtr<Elem> side (const unsigned int) const libmesh_override
-  { libmesh_not_implemented(); return UniquePtr<Elem>(); }
+  virtual std::unique_ptr<Elem> side_ptr (const unsigned int) override
+  { libmesh_not_implemented(); return std::unique_ptr<Elem>(); }
 
-  virtual UniquePtr<Elem> build_side (const unsigned int,
-                                      bool) const libmesh_override
-  { libmesh_not_implemented(); return UniquePtr<Elem>(); }
+  virtual std::unique_ptr<Elem> build_side_ptr (const unsigned int,
+                                                bool) override
+  { libmesh_not_implemented(); return std::unique_ptr<Elem>(); }
 
-  virtual UniquePtr<Elem> build_edge (const unsigned int) const libmesh_override
-  { libmesh_not_implemented(); return UniquePtr<Elem>(); }
+  virtual std::unique_ptr<Elem> build_edge_ptr (const unsigned int) override
+  { libmesh_not_implemented(); return std::unique_ptr<Elem>(); }
 
-  virtual Order default_order () const libmesh_override
-  { libmesh_not_implemented(); return FIRST; }
+  virtual Order default_order () const override
+  { libmesh_not_implemented(); return static_cast<Order>(1); }
 
 #ifdef LIBMESH_ENABLE_INFINITE_ELEMENTS
 
-  virtual bool infinite () const libmesh_override
+  virtual bool infinite () const override
   { libmesh_not_implemented(); return false; }
 
 #endif
@@ -172,11 +188,11 @@ public:
 
   /**
    * Matrix that transforms the parents nodes into the children's
-   * nodes
+   * nodes.
    */
   virtual float embedding_matrix (const unsigned int,
                                   const unsigned int,
-                                  const unsigned int) const libmesh_override
+                                  const unsigned int) const override
   { libmesh_not_implemented(); return 0.; }
 
   LIBMESH_ENABLE_TOPOLOGY_CACHES;
@@ -187,7 +203,7 @@ public:
 protected:
 
   /**
-   * Data for link to (NULL!) parent
+   * Data for link to (nullptr!) parent.
    */
   Elem * _elemlinks_data[1];
 };
